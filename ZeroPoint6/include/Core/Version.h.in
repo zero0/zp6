@@ -1,0 +1,21 @@
+//
+// Created by phosg on 11/5/2021.
+//
+
+#ifndef ZP_VERSION_H
+#define ZP_VERSION_H
+
+#cmakedefine ZP_VERSION_MAJOR   @ZP_VERSION_MAJOR@
+#cmakedefine ZP_VERSION_MINOR   @ZP_VERSION_MINOR@
+#cmakedefine ZP_VERSION_PATCH   @ZP_VERSION_PATCH@
+#cmakedefine ZP_VERSION         "@ZP_VERSION@"
+
+#ifndef ZP_VERSION_MINOR
+#define ZP_VERSION_MINOR 0
+#endif
+
+#ifndef ZP_VERSION_PATCH
+#define ZP_VERSION_PATCH 0
+#endif
+
+#endif //ZP_VERSION_H

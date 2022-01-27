@@ -1,0 +1,554 @@
+//
+// Created by phosg on 1/25/2022.
+//
+
+#ifndef ZP_VECTOR_H
+#define ZP_VECTOR_H
+
+#include "Core/Types.h"
+#include "Core/Common.h"
+#include "Core/Allocator.h"
+
+namespace zp
+{
+    template<MemoryLabel MemLabel, zp_size_t Alignment = kDefaultMemoryAlignment>
+    struct TypedMemoryLabelAllocator
+    {
+        void* allocate( zp_size_t size ) const
+        {
+            void* ptr = GetAllocator( MemLabel )->allocate( size, Alignment );
+            return ptr;
+        }
+
+        void free( void* ptr ) const
+        {
+            GetAllocator( MemLabel )->free( ptr );
+        }
+    };
+
+    struct MemoryLabelAllocator
+    {
+        MemoryLabelAllocator( MemoryLabel memoryLabel )
+            : memoryLabel( memoryLabel )
+            , alignment( kDefaultMemoryAlignment )
+        {
+        }
+
+        MemoryLabelAllocator( MemoryLabel memoryLabel, zp_size_t alignment )
+            : memoryLabel( memoryLabel )
+            , alignment( alignment )
+        {
+        }
+
+        void* allocate( zp_size_t size ) const
+        {
+            void* ptr = GetAllocator( memoryLabel )->allocate( size, alignment );
+            return ptr;
+        }
+
+        void free( void* ptr ) const
+        {
+            GetAllocator( memoryLabel )->free( ptr );
+        }
+
+    private:
+        const MemoryLabel memoryLabel;
+        const zp_size_t alignment;
+    };
+
+    template<typename T, typename Allocator = MemoryLabelAllocator>
+    class Vector
+    {
+    public:
+        static const zp_size_t npos = -1;
+
+        typedef T value_type;
+        typedef T& reference;
+        typedef const T& const_reference;
+        typedef T* pointer;
+        typedef const T* const_pointer;
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+        typedef Allocator allocator_value;
+        typedef const allocator_value& allocator_const_reference;
+
+        Vector();
+
+        explicit Vector( allocator_const_reference allocator );
+
+        explicit Vector( zp_size_t capacity );
+
+        Vector( zp_size_t capacity, allocator_const_reference allocator );
+
+        ~Vector();
+
+        reference operator[]( zp_size_t index );
+
+        const_reference operator[]( zp_size_t index ) const;
+
+        const_reference at( zp_size_t index ) const;
+
+        zp_size_t size() const;
+
+        zp_bool_t isEmpty() const;
+
+        zp_bool_t isFixed() const;
+
+        void pushBack( const_reference val );
+
+        reference pushBackEmpty();
+
+        void pushFront( const_reference val );
+
+        reference pushFrontEmpty();
+
+        void popBack();
+
+        void popFront();
+
+        void eraseAt( zp_size_t index );
+
+        void eraseAtSwapBack( zp_size_t index );
+
+        zp_bool_t erase( const_reference val );
+
+        zp_bool_t eraseSwapBack( const_reference val );
+
+        zp_size_t eraseAll( const_reference val );
+
+        void clear();
+
+        void reset();
+
+        void reserve( zp_size_t size );
+
+        void destroy();
+
+        zp_size_t indexOf( const_reference val ) const;
+
+        zp_size_t lastIndexOf( const_reference val ) const;
+
+        T& front();
+
+        T& back();
+
+        const_reference front() const;
+
+        const_reference back() const;
+
+        iterator begin();
+
+        iterator end();
+
+        const_iterator begin() const;
+
+        const_iterator end() const;
+
+    private:
+        void ensureCapacity( zp_size_t capacity );
+
+        pointer m_data;
+        zp_size_t m_size;
+        zp_size_t m_capacity;
+
+        allocator_value m_allocator;
+    };
+};
+
+//
+// Impl
+//
+
+namespace zp
+{
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::Vector()
+        : m_data( nullptr )
+        , m_size( 0 )
+        , m_capacity( 0 )
+        , m_allocator( allocator_value())
+    {
+    }
+
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::Vector( allocator_const_reference allocator )
+        : m_data( nullptr )
+        , m_size( 0 )
+        , m_capacity( 0 )
+        , m_allocator( allocator )
+    {
+    }
+
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::Vector( zp_size_t capacity )
+        : m_data( nullptr )
+        , m_size( 0 )
+        , m_capacity( 0 )
+        , m_allocator( allocator_value())
+    {
+        ensureCapacity( capacity );
+    }
+
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::Vector( zp_size_t capacity, allocator_const_reference allocator )
+        : m_data( nullptr )
+        , m_size( 0 )
+        , m_capacity( 0 )
+        , m_allocator( allocator )
+    {
+        ensureCapacity( capacity );
+    }
+
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::~Vector()
+    {
+        destroy();
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::operator[]( zp_size_t index )
+    {
+        return m_data[ index ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_reference Vector<T, Allocator>::operator[]( zp_size_t index ) const
+    {
+        return m_data[ index ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_reference Vector<T, Allocator>::at( zp_size_t index ) const
+    {
+        return m_data[ index ];
+    }
+
+    template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::size() const
+    {
+        return m_size;
+    }
+
+    template<typename T, typename Allocator>
+    zp_bool_t Vector<T, Allocator>::isEmpty() const
+    {
+        return m_size == 0;
+    }
+
+    template<typename T, typename Allocator>
+    zp_bool_t Vector<T, Allocator>::isFixed() const
+    {
+        return m_allocator.isFixed();
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushBack( const_reference val )
+    {
+        if( m_size == m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+        m_data[ m_size++ ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmpty()
+    {
+        if( m_size == m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+        new( m_data + m_size ) T();
+        return m_data[ m_size++ ];
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushFront( const_reference val )
+    {
+        if( m_size == m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+
+        for( zp_size_t i = m_size + 1; i >= 1; --i )
+        {
+            m_data[ i ] = zp_move( m_data[ i - 1 ] );
+        }
+
+        ++m_size;
+
+        m_data[ 0 ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushFrontEmpty()
+    {
+        if( m_size == m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+
+        for( zp_size_t i = m_size + 1; i >= 1; --i )
+        {
+            m_data[ i ] = zp_move( m_data[ i - 1 ] );
+        }
+
+        ++m_size;
+
+        new( m_data ) T();
+        return m_data[ 0 ];
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::popBack()
+    {
+        if( m_size )
+        {
+            (m_data + --m_size)->~T();
+        }
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::popFront()
+    {
+        if( m_size )
+        {
+            m_data->~T();
+
+            for( zp_size_t i = 1; i < m_size; ++i )
+            {
+                m_data[ i - 1 ] = zp_move( m_data[ i ] );
+            }
+
+            --m_size;
+        }
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::eraseAt( zp_size_t index )
+    {
+        (m_data + index)->~T();
+
+        for( zp_size_t i = index + 1; i < m_size; ++i )
+        {
+            m_data[ i - 1 ] = zp_move( m_data[ i ] );
+        }
+
+        --m_size;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::eraseAtSwapBack( zp_size_t index )
+    {
+        (m_data + index)->~T();
+        m_data[ index ] = zp_move( m_data[ m_size - 1 ] );
+        --m_size;
+    }
+
+    template<typename T, typename Allocator>
+    zp_bool_t Vector<T, Allocator>::erase( const_reference val )
+    {
+        zp_size_t index = indexOf( val );
+        zp_bool_t found = index != npos;
+
+        if( found )
+        {
+            eraseAt( index );
+        }
+
+        return found;
+    }
+
+    template<typename T, typename Allocator>
+    zp_bool_t Vector<T, Allocator>::eraseSwapBack( const_reference val )
+    {
+        zp_size_t index = indexOf( val );
+        zp_bool_t found = index != npos;
+
+        if( found )
+        {
+            eraseAtSwapBack( index );
+        }
+
+        return found;
+    }
+
+    template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::eraseAll( const_reference val )
+    {
+        zp_size_t numErased = 0;
+        for( zp_size_t i = 0; i < m_size; ++i )
+        {
+            T* t = m_data + i;
+            if( *t == val )
+            {
+                ++numErased;
+
+                t->~T();
+
+                m_data[ i ] = zp_move( m_data[ m_size - 1 ] );
+                --m_size;
+                --i;
+            }
+
+        }
+        return numErased;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::clear()
+    {
+        iterator b = m_data;
+        iterator e = m_data + m_size;
+        for( ; b != e; ++b )
+        {
+            b->~T();
+        }
+
+        m_size = 0;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::reset()
+    {
+        m_size = 0;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::reserve( zp_size_t size )
+    {
+        if( size > m_capacity )
+        {
+            ensureCapacity( size );
+        }
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::destroy()
+    {
+        clear();
+
+        if( m_data )
+        {
+            m_allocator.free( m_data );
+            m_data = nullptr;
+        }
+
+        m_capacity = 0;
+    }
+
+    template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::indexOf( const_reference val ) const
+    {
+        zp_size_t index = npos;
+
+        const_iterator b = m_data;
+        const_iterator e = m_data + m_size;
+        for( ; b != e; ++b )
+        {
+            if( *b == val )
+            {
+                index = b - m_data;
+                break;
+            }
+
+        }
+
+        return index;
+    }
+
+    template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::lastIndexOf( const_reference val ) const
+    {
+        zp_size_t index = npos;
+
+        const_iterator b = m_data;
+        const_iterator e = m_data + m_size;
+        for( ; b != e; )
+        {
+            --e;
+            if( *e == val )
+            {
+                index = e - m_data;
+                break;
+            }
+        }
+
+        return index;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::front()
+    {
+        return m_data[ 0 ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::back()
+    {
+        return m_data[ m_size - 1 ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_reference Vector<T, Allocator>::front() const
+    {
+        return m_data[ 0 ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_reference Vector<T, Allocator>::back() const
+    {
+        return m_data[ m_size - 1 ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::iterator Vector<T, Allocator>::begin()
+    {
+        return m_data;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::iterator Vector<T, Allocator>::end()
+    {
+        return m_data + m_size;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_iterator Vector<T, Allocator>::begin() const
+    {
+        return m_data;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_iterator Vector<T, Allocator>::end() const
+    {
+        return m_data + m_size;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::ensureCapacity( zp_size_t capacity )
+    {
+        capacity = capacity < 4 ? 4 : capacity;
+
+        pointer newArray = static_cast<pointer>( m_allocator.allocate( sizeof( T ) * capacity ));
+        zp_zero_memory_array( newArray, capacity );
+
+        if( m_data != nullptr )
+        {
+            for( zp_size_t i = 0; i != m_size; ++i )
+            {
+                newArray[ i ] = zp_move( m_data[ i ] );
+            }
+
+            m_allocator.free( m_data );
+            m_data = nullptr;
+        }
+
+        m_data = newArray;
+        m_capacity = capacity;
+    }
+
+};
+
+#endif //ZP_VECTOR_H
