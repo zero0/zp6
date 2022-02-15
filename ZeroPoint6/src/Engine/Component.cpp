@@ -7,6 +7,7 @@
 #include "Core/Allocator.h"
 
 #include "Engine/Component.h"
+#include "Engine/MemoryLabels.h"
 
 namespace zp
 {
@@ -208,9 +209,9 @@ namespace zp
         return index;
     }
 
-    zp_uint8_t ComponentArchetypeManager::getComponentTypeIndex( const ComponentType componentType ) const
+    zp_size_t ComponentArchetypeManager::getComponentTypeIndex( const ComponentType componentType ) const
     {
-        zp_uint8_t index = ~0;
+        zp_size_t index = ~0;
 
         for( zp_size_t i = 0; i < kMaxComponentsPerArchetype; ++i )
         {
@@ -229,8 +230,12 @@ namespace zp
     //
 
     ComponentManager::ComponentManager( MemoryLabel memoryLabel )
-        : memoryLabel( memoryLabel )
+        : m_registeredComponents( 0 )
+        , m_registeredTags( 0 )
+        , m_components {}
+        , m_tags {}
         , m_componentArchetypes( 16, memoryLabel )
+        , memoryLabel( memoryLabel )
     {
     }
 
@@ -238,7 +243,11 @@ namespace zp
     {
         ComponentType componentType = m_registeredComponents;
 
-        m_componentDescriptors[ m_registeredComponents ] = *componentDescriptor;
+        m_components[ m_registeredComponents ] = {
+            componentDescriptor->typeHash,
+            componentDescriptor->size,
+            componentType,
+        };
         ++m_registeredComponents;
 
         return componentType;
@@ -248,7 +257,10 @@ namespace zp
     {
         TagType tagType = m_registeredTags;
 
-        m_tagDescriptors[ m_registeredTags ] = *tagDescriptor;
+        m_tags[ m_registeredTags ] = {
+            tagDescriptor->typeHash,
+            tagType
+        };
         ++m_registeredTags;
 
         return tagType;
@@ -274,16 +286,14 @@ namespace zp
     }
 #endif
 
-    void ComponentManager::registerComponentSignature( const ComponentSignature componentSignature )
+    void ComponentManager::registerComponentSignature( const ComponentSignature& componentSignature )
     {
         if( componentSignature.structuralSignature != 0 )
         {
             zp_bool_t found = false;
-            auto b = m_componentArchetypes.begin();
-            auto e = m_componentArchetypes.end();
-            for( ; b != e; ++b )
+            for( const ComponentArchetypeManager* componentArchetype: m_componentArchetypes )
             {
-                if((*b)->getComponentSignature().structuralSignature == componentSignature.structuralSignature )
+                if( componentArchetype->getComponentSignature().structuralSignature == componentSignature.structuralSignature )
                 {
                     found = true;
                     break;
@@ -304,7 +314,7 @@ namespace zp
                         archetype.componentOffset[ archetype.componentCount ] = archetype.totalStride;
                         archetype.componentType[ archetype.componentCount ] = index;
 
-                        archetype.totalStride += m_componentDescriptors[ index ].size;
+                        archetype.totalStride += m_components[ index ].size;
                         ++archetype.componentCount;
                     }
                 }
@@ -317,21 +327,18 @@ namespace zp
         }
     }
 
-    ComponentArchetypeManager* ComponentManager::getComponentArchetype( const ComponentSignature componentSignature ) const
+    ComponentArchetypeManager* ComponentManager::getComponentArchetype( const ComponentSignature& componentSignature ) const
     {
         ComponentArchetypeManager* archetypeManager = nullptr;
 
-        auto b = m_componentArchetypes.begin();
-        auto e = m_componentArchetypes.end();
-        for( ; b != e; ++b )
+        for( ComponentArchetypeManager* componentArchetype: m_componentArchetypes )
         {
-            if((*b)->getComponentSignature().structuralSignature == componentSignature.structuralSignature )
+            if( componentArchetype->getComponentSignature().structuralSignature == componentSignature.structuralSignature )
             {
-                archetypeManager = *b;
+                archetypeManager = componentArchetype;
                 break;
             }
         }
-
 
         return archetypeManager;
     }
@@ -340,11 +347,11 @@ namespace zp
     {
         ComponentType componentType {};
 
-        for( zp_size_t i = 0; i < m_registeredComponents; ++i )
+        for( const RegisteredComponent& component: m_components )
         {
-            if( m_componentDescriptors[ i ].typeHash == typeHash )
+            if( component.typeHash == typeHash )
             {
-                componentType = i;
+                componentType = component.type;
                 break;
             }
         }
@@ -352,9 +359,36 @@ namespace zp
         return componentType;
     }
 
+    TagType ComponentManager::getTagTypeForTypeHash( zp_hash64_t typeHash ) const
+    {
+        TagType tagType {};
+
+        for( const RegisteredTag& tag: m_tags )
+        {
+            if( tag.typeHash == typeHash )
+            {
+                tagType = tag.type;
+                break;
+            }
+        }
+
+        return tagType;
+    }
+
     //
     //
     //
+
+    EntityComponentManager::EntityComponentManager( MemoryLabel memoryLabel )
+        : m_entityManager( memoryLabel )
+        , m_componentManager( memoryLabel )
+        , memoryLabel( memoryLabel )
+    {
+    }
+
+    EntityComponentManager::~EntityComponentManager()
+    {
+    }
 
     Entity EntityComponentManager::createEntity()
     {
@@ -408,4 +442,90 @@ namespace zp
     {
         m_componentManager.registerComponentSignature( componentSignature );
     }
+
+    ComponentType EntityComponentManager::getComponentType( zp_hash64_t typeHash ) const
+    {
+        return m_componentManager.getComponentTypeFromTypeHash( typeHash );
+    }
+
+    TagType EntityComponentManager::getTagType( zp_hash64_t typeHash ) const
+    {
+        return m_componentManager.getTagTypeForTypeHash( typeHash );
+    }
+
+    void EntityComponentManager::findEntities( const EntityQuery* entityQuery, EntityQueryCallback entityQueryCallback ) const
+    {
+        if( entityQuery )
+        {
+            if( entityQuery->tagsOnly )
+            {
+                if( entityQuery->allTagsMatches )
+                {
+                    m_entityManager.findEntitiesWithTagsAll( entityQuery->componentSignature, entityQueryCallback );
+                }
+                else
+                {
+                    m_entityManager.findEntitiesWithTagsAny( entityQuery->componentSignature, entityQueryCallback );
+                }
+            }
+            else
+            {
+                if( entityQuery->allStructureMatches )
+                {
+                    m_entityManager.findEntitiesAll( entityQuery->componentSignature, entityQueryCallback );
+                }
+                else
+                {
+                    m_entityManager.findEntitiesAny( entityQuery->componentSignature, entityQueryCallback );
+                }
+            }
+        }
+    }
+
+    void EntityComponentManager::findEntities( const EntityQuery* entityQuery, Vector<Entity>& foundEntities ) const
+    {
+        if( entityQuery )
+        {
+            if( entityQuery->tagsOnly )
+            {
+                if( entityQuery->allTagsMatches )
+                {
+                    m_entityManager.findEntitiesWithTagsAll( entityQuery->componentSignature, foundEntities );
+                }
+                else
+                {
+                    m_entityManager.findEntitiesWithTagsAny( entityQuery->componentSignature, foundEntities );
+                }
+            }
+            else
+            {
+                if( entityQuery->allStructureMatches )
+                {
+                    m_entityManager.findEntitiesAll( entityQuery->componentSignature, foundEntities );
+                }
+                else
+                {
+                    m_entityManager.findEntitiesAny( entityQuery->componentSignature, foundEntities );
+                }
+            }
+        }
+    }
+
+    const void* EntityComponentManager::getComponentDataReadOnly( Entity entity, ComponentType componentType ) const
+    {
+        const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
+        ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
+        const void* data = archetypeManager->getComponentData( entity, componentType );
+        return data;
+    }
+
+    void* EntityComponentManager::getComponentData( Entity entity, ComponentType componentType )
+    {
+        const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
+        ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
+        void* data = archetypeManager->getComponentData( entity, componentType );
+        return data;
+    }
 }
+
+

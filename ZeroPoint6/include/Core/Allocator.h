@@ -11,7 +11,7 @@
 #include <new>
 
 #define ZP_NEW( l, t )                  new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l)
-#define ZP_NEW_ARGS( l, t, ... )        new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l,__VA_ARGS__)
+#define ZP_NEW_ARGS( l, t, ... )        new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l),__VA_ARGS__)
 
 #define ZP_NEW_( l, t )                 new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l)
 #define ZP_NEW_ARGS_( l, t, ... )       new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l,__VA_ARGS__)
@@ -36,6 +36,7 @@
 
 #define ZP_MALLOC_( l, s )              zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), zp::kDefaultMemoryAlignment)
 #define ZP_MALLOC_T( l, t )             static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment))
+#define ZP_MALLOC_T_ARRAY( l, t, c )    static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), zp::kDefaultMemoryAlignment))
 #define ZP_ALIGNED_MALLOC_( l, s, a )   zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), (a))
 #define ZP_FREE_( l, p )                zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free((p))
 
@@ -90,6 +91,40 @@ namespace zp
     void RegisterAllocator( MemoryLabel memoryLabel, IMemoryAllocator* memoryAllocator );
 
     IMemoryAllocator* GetAllocator( MemoryLabel memoryLabel );
+
+    //
+    //
+    //
+
+    struct MemoryLabelAllocator
+    {
+        MemoryLabelAllocator( MemoryLabel memoryLabel )
+            : memoryLabel( memoryLabel )
+            , alignment( kDefaultMemoryAlignment )
+        {
+        }
+
+        MemoryLabelAllocator( MemoryLabel memoryLabel, zp_size_t alignment )
+            : memoryLabel( memoryLabel )
+            , alignment( alignment )
+        {
+        }
+
+        void* allocate( zp_size_t size ) const
+        {
+            void* ptr = GetAllocator( memoryLabel )->allocate( size, alignment );
+            return ptr;
+        }
+
+        void free( void* ptr ) const
+        {
+            GetAllocator( memoryLabel )->free( ptr );
+        }
+
+    private:
+        const MemoryLabel memoryLabel;
+        const zp_size_t alignment;
+    };
 }
 
 //

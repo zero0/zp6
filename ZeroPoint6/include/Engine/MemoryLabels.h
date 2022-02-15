@@ -21,7 +21,7 @@ namespace zp
         Temp,
         ThreadSafe,
 
-        Profiler,
+        Profiling,
         Debug,
 
         MemoryLabels_Count

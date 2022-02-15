@@ -5,21 +5,51 @@
 #ifndef ZP_SHADER_H
 #define ZP_SHADER_H
 
+#include "Core/Defines.h"
+#include "Core/Types.h"
+
+#include "Rendering/GraphicsResource.h"
+
 namespace zp
 {
-    class Shader
+    enum
     {
-    public:
-
-    protected:
-
-    private:
+        ShaderStage_Count = 6,
     };
 
-    struct ShaderData
+    enum ShaderStage
     {
-        void* handle;
+        ZP_SHADER_STAGE_VERTEX,
+        ZP_SHADER_STAGE_TESSELLATION_CONTROL,
+        ZP_SHADER_STAGE_TESSELLATION_EVALUATION,
+        ZP_SHADER_STAGE_GEOMETRY,
+        ZP_SHADER_STAGE_FRAGMENT,
+        ZP_SHADER_STAGE_COMPUTE,
     };
+
+    struct ShaderDesc
+    {
+        const char* name;
+
+        const char* entryPointName;
+        zp_size_t codeSize;
+        const void* codeData;
+
+        ShaderStage shaderStage;
+    };
+
+    struct Shader
+    {
+        zp_hash128_t shaderHash;
+
+        zp_handle_t shader;
+
+        ShaderStage shaderStage;
+        char entryPointName[32];
+    };
+
+    typedef GraphicsResource <Shader> ShaderResource;
+    typedef GraphicsResourceHandle <Shader> ShaderResourceHandle;
 }
 
 #endif //ZP_SHADER_H

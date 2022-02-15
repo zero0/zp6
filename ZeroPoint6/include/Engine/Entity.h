@@ -22,12 +22,15 @@ namespace zp
         ZP_NULL_ENTITY = ~0ULL
     };
 
+    typedef void (*EntityQueryCallback)( Entity entity, const ComponentSignature& signature );
+
+
     class EntityManager
     {
     ZP_NONCOPYABLE( EntityManager );
 
     public:
-        EntityManager( MemoryLabel memoryLabel );
+        explicit EntityManager( MemoryLabel memoryLabel );
 
         ~EntityManager();
 
@@ -41,8 +44,21 @@ namespace zp
 
         void setSignature( Entity entity, const ComponentSignature& signature );
 
-    public:
-        const MemoryLabel memoryLabel;
+        void findEntitiesAll( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
+
+        void findEntitiesAny( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
+
+        void findEntitiesWithTagsAll( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
+
+        void findEntitiesWithTagsAny( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
+
+        void findEntitiesAll( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
+
+        void findEntitiesAny( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
+
+        void findEntitiesWithTagsAll( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
+
+        void findEntitiesWithTagsAny( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
 
     private:
         MemoryLabel m_entityMemoryLabel;
@@ -50,6 +66,9 @@ namespace zp
 
         Vector<Entity> m_freeList;
         Vector<ComponentSignature> m_componentSignatures;
+
+    public:
+        const MemoryLabel memoryLabel;
     };
 }
 #endif //ZP_ENTITY_H

@@ -10,6 +10,8 @@
 #cmakedefine ZP_VERSION_PATCH   @ZP_VERSION_PATCH@
 #cmakedefine ZP_VERSION         "@ZP_VERSION@"
 
+#cmakedefine ZP_RENDERING_API   @ZP_RENDERING_API@
+
 #ifndef ZP_VERSION_MINOR
 #define ZP_VERSION_MINOR 0
 #endif

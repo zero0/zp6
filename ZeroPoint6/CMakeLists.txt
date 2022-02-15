@@ -13,7 +13,10 @@ set(ZP_RENDERING_API Vulkan)
 
 # Source Files
 set(ZP_CORE_SRC
+        "src/Core/Allocator.cpp"
         "src/Core/Common.cpp"
+        "src/Core/Math.cpp"
+        "src/Core/Profiler.cpp"
         )
 
 set(ZP_PLATFORM_SRC
@@ -22,12 +25,15 @@ set(ZP_PLATFORM_SRC
         )
 
 set(ZP_RENDERING_SRC
+        "src/Rendering/GraphicsDevice.cpp"
+        "src/Rendering/GraphicsResource.cpp"
+        "src/Rendering/RenderSystem.cpp"
+        "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.cpp"
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}RenderingEngine.cpp"
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}Shader.cpp"
         )
 
 set(ZP_ENGINE_SRC
-        "src/Core/Allocator.cpp"
         "src/Engine/Component.cpp"
         "src/Engine/Engine.cpp"
         "src/Engine/Entity.cpp"
@@ -49,12 +55,16 @@ configure_file(
 )
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 set(ZP_CORE_HEADERS
+        "include/Core/Allocator.h"
+        "include/Core/Atomic.h"
         "include/Core/Common.h"
         "include/Core/Defines.h"
         "include/Core/Macros.h"
+        "include/Core/Math.h"
+        "include/Core/Profiler.h"
+        "include/Core/Set.h"
         "include/Core/Types.h"
         "include/Core/Vector.h"
-        "include/Core/Allocator.h"
         )
 
 set(ZP_ENGINE_HEADERS
@@ -63,10 +73,12 @@ set(ZP_ENGINE_HEADERS
         "include/Engine/Component.h"
         "include/Engine/ComponentSignature.h"
         "include/Engine/Engine.h"
-        "include/Engine/EngineEntryPointAPI.h"
+        "include/Engine/EnginePipeline.h"
         "include/Engine/Entity.h"
         "include/Engine/JobSystem.h"
         "include/Engine/MemoryLabels.h"
+        "include/Engine/ModuleEntryPointAPI.h"
+        "include/Engine/TransformComponent.h"
         )
 
 set(ZP_PLATFORM_HEADERS
@@ -74,8 +86,12 @@ set(ZP_PLATFORM_HEADERS
         )
 
 set(ZP_RENDERING_HEADERS
-        "include/Rendering/RenderingEngine.h"
+        "include/Rendering/GraphicsCommandBuffer.h"
+        "include/Rendering/GraphicsDevice.h"
+        "include/Rendering/RenderPipeline.h"
+        "include/Rendering/RenderSystem.h"
         "include/Rendering/Shader.h"
+        "include/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.h"
         )
 
 set(ZP_HEADERS
@@ -119,6 +135,9 @@ cmake_path(SET VulkanSDK $ENV{VULKAN_SDK})
 
 target_include_directories(${ZP_TARGET}
         PRIVATE "${VulkanSDK}/Include"
+        )
+target_link_options(${ZP_TARGET}
+        PRIVATE -static-libgcc -static-libstdc++ -static
         )
 target_link_libraries(${ZP_TARGET}
         PRIVATE "${VulkanSDK}/Lib/vulkan-1.lib"

@@ -11,14 +11,38 @@
 
 namespace zp
 {
-    typedef zp_uint8_t TagType;
-    typedef zp_uint8_t ComponentType;
+    typedef zp_uint32_t TagType;
+    typedef zp_uint32_t ComponentType;
 
-    //typedef GenericComponentSignature<64> ComponentSignature;
-    typedef struct {
+    struct ComponentSignature
+    {
         zp_uint64_t tagSignature;
         zp_uint64_t structuralSignature;
-    } ComponentSignature;
+
+        ComponentSignature& addComponent( ComponentType type )
+        {
+            structuralSignature |= 1 << type;
+            return *this;
+        }
+
+        ComponentSignature& removeComponent( ComponentType type )
+        {
+            structuralSignature &= ~(1 << type);
+            return *this;
+        }
+
+        ComponentSignature& addTag( TagType type )
+        {
+            tagSignature |= 1 << type;
+            return *this;
+        }
+
+        ComponentSignature& removeTag( TagType type )
+        {
+            tagSignature &= ~(1 << type);
+            return *this;
+        }
+    };
 }
 
 #endif //ZP_COMPONENTSIGNATURE_H

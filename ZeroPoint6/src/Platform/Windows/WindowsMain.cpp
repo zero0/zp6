@@ -13,7 +13,7 @@
 
 #include "Platform/Platform.h"
 
-#include "Rendering/RenderingEngine.h"
+#include "Rendering/RenderSystem.h"
 
 #include "Engine/MemoryLabels.h"
 #include "Engine/Engine.h"
@@ -41,7 +41,7 @@ static LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM
 
         case WM_SIZE:
         {
-            zp::ResizeRenderingEngine( 0, 0 );
+            //zp::ResizeRenderingEngine( 0, 0 );
         }
             break;
 
@@ -175,7 +175,7 @@ int APIENTRY OldWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lp
     ::ShowWindow( hWnd, SW_SHOW );
     ::UpdateWindow( hWnd );
 
-    zp::InitializeRenderingEngine( hInstance, hWnd, width, height );
+    //zp::InitializeRenderingEngine( hInstance, hWnd, width, height );
     zp_printf( "hello world" );
     int exitCode = 0;
 
@@ -197,11 +197,11 @@ int APIENTRY OldWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lp
 
         if( isRunning )
         {
-            zp::RenderFrame();
+            //zp::RenderFrame();
         }
     }
 
-    zp::DestroyRenderingEngine();
+    //zp::DestroyRenderingEngine();
 
     ::DestroyWindow( hWnd );
     ::UnregisterClass( kZeroPointClassName, hInstance );
@@ -232,23 +232,35 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
     RegisterAllocator( MemoryLabels::Default, &s_simpleAllocator );
     RegisterAllocator( MemoryLabels::String, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Graphics, &s_defaultAllocator );
+    RegisterAllocator( MemoryLabels::Graphics, &s_simpleAllocator );
     RegisterAllocator( MemoryLabels::FileIO, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Buffer, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::User, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Data, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Temp, &s_defaultAllocator );
+    RegisterAllocator( MemoryLabels::Temp, &s_simpleAllocator );
     RegisterAllocator( MemoryLabels::ThreadSafe, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Profiler, &s_defaultAllocator );
+    RegisterAllocator( MemoryLabels::Profiling, &s_simpleAllocator );
     RegisterAllocator( MemoryLabels::Debug, &s_defaultAllocator );
 
-    Engine* engine = ZP_NEW( Default, Engine );
-    engine->initialize();
+    auto engine = ZP_NEW( Default, Engine );
+    {
+        engine->initialize();
 
-    engine->startEngine();
+        engine->startEngine();
 
-    engine->destroy();
-    int exitCode = engine->getExitCode();
+        do
+        {
+            engine->process();
+
+            //zp_yield_current_thread();
+        } while( engine->isRunning());
+
+        engine->stopEngine();
+
+        engine->destroy();
+    }
+
+    const zp_int32_t exitCode = engine->getExitCode();
 
     ZP_FREE( Default, engine );
 

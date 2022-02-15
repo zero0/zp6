@@ -5,12 +5,20 @@
 #ifndef ZP_DEFINES_H
 #define ZP_DEFINES_H
 
-#if defined(DEBUG) || defined(_DEBUG)
-#define ZP_DEBUG 1
+#if defined(DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
+#define ZP_DEBUG                    1
+#endif
+
+#if defined(RELEASE_BUILD)
+#define ZP_RELEASE_BUILD            1
 #endif
 
 #if defined(WIN64) || defined(_WIN64)
-#define ZP_ARCH64 1
+#define ZP_ARCH64                   1
+#endif
+
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+#define ZP_OS_WINDOWS                      1
 #endif
 
 #if defined(__cplusplus)
@@ -41,5 +49,7 @@
 #define ZP_USE_ASSERTIONS       1
 #define ZP_USE_PRINTF           1
 #define ZP_USE_SAFE_DELETE      1
+
+#define ZP_USE_PROFILER         1
 
 #endif //ZP_DEFINES_H

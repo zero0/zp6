@@ -26,35 +26,6 @@ namespace zp
         }
     };
 
-    struct MemoryLabelAllocator
-    {
-        MemoryLabelAllocator( MemoryLabel memoryLabel )
-            : memoryLabel( memoryLabel )
-            , alignment( kDefaultMemoryAlignment )
-        {
-        }
-
-        MemoryLabelAllocator( MemoryLabel memoryLabel, zp_size_t alignment )
-            : memoryLabel( memoryLabel )
-            , alignment( alignment )
-        {
-        }
-
-        void* allocate( zp_size_t size ) const
-        {
-            void* ptr = GetAllocator( memoryLabel )->allocate( size, alignment );
-            return ptr;
-        }
-
-        void free( void* ptr ) const
-        {
-            GetAllocator( memoryLabel )->free( ptr );
-        }
-
-    private:
-        const MemoryLabel memoryLabel;
-        const zp_size_t alignment;
-    };
 
     template<typename T, typename Allocator = MemoryLabelAllocator>
     class Vector
@@ -121,6 +92,8 @@ namespace zp
 
         void reset();
 
+        void resize_unsafe( zp_size_t size );
+
         void reserve( zp_size_t size );
 
         void destroy();
@@ -128,6 +101,10 @@ namespace zp
         zp_size_t indexOf( const_reference val ) const;
 
         zp_size_t lastIndexOf( const_reference val ) const;
+
+        pointer data();
+
+        const_pointer data() const;
 
         T& front();
 
@@ -416,6 +393,13 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
+    void Vector<T, Allocator>::resize_unsafe( zp_size_t size )
+    {
+        ZP_ASSERT( size <= m_capacity );
+        m_size = size;
+    }
+
+    template<typename T, typename Allocator>
     void Vector<T, Allocator>::reserve( zp_size_t size )
     {
         if( size > m_capacity )
@@ -476,6 +460,18 @@ namespace zp
         }
 
         return index;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::pointer Vector<T, Allocator>::data()
+    {
+        return m_data;
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::const_pointer Vector<T, Allocator>::data() const
+    {
+        return m_data;
     }
 
     template<typename T, typename Allocator>

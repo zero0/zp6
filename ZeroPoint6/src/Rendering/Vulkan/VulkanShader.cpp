@@ -4,6 +4,14 @@
 
 #include <vulkan/vulkan.h>
 
+#include "Rendering/Shader.h"
+
+namespace zp
+{
+
+
+}
+
 static VkResult CreateShader(
     VkDevice localDevice,
     const VkAllocationCallbacks* allocationCallbacks,
