@@ -13,12 +13,12 @@ namespace zp
 {
 
     ComponentArchetypeManager::ComponentArchetypeManager( MemoryLabel memoryLabel, const ComponentBlockArchetype& archetype )
-        : memoryLabel( memoryLabel )
-        , m_componentBlockArchetype( archetype )
+        : m_componentBlockArchetype( archetype )
         , m_root()
         , m_head( &m_root )
         , m_entityMap( 4, memoryLabel )
         , m_entities( 4, memoryLabel )
+        , memoryLabel( memoryLabel )
     {
         m_head->next = m_head;
         m_head->prev = m_head;
@@ -114,6 +114,18 @@ namespace zp
 
             ArchetypeBlock* block = entityMap.block;
 
+            // destroy component data
+            zp_uint8_t* componentData = entityMap.block->blockPtr;
+            componentData += m_componentBlockArchetype.totalStride * entityMap.index;
+
+            for( zp_uint32_t i = 0; i < m_componentBlockArchetype.componentCount; ++i )
+            {
+                if( m_componentBlockArchetype.destroyCallbacks[ i ] )
+                {
+                    m_componentBlockArchetype.destroyCallbacks[ i ]( componentData + m_componentBlockArchetype.componentOffset[ i ], m_componentBlockArchetype.componentSize[ i ] );
+                }
+            }
+
             // copy end data block to index that it will be at after swap back
             zp_uint8_t* srcArchData = block->blockPtr + m_componentBlockArchetype.totalStride * endEntityMap.index;
             zp_uint8_t* dstArchData = block->blockPtr + m_componentBlockArchetype.totalStride * entityMap.index;
@@ -180,7 +192,7 @@ namespace zp
         return componentData;
     }
 
-    void ComponentArchetypeManager::setComponentData( Entity entity, ComponentType componentType, void* data, zp_size_t length )
+    void ComponentArchetypeManager::setComponentData( Entity entity, ComponentType componentType, const void* data, zp_size_t length )
     {
         const zp_size_t index = getEntityIndex( entity );
         const zp_uint8_t componentIndex = getComponentTypeIndex( componentType );
@@ -247,6 +259,7 @@ namespace zp
             componentDescriptor->typeHash,
             componentDescriptor->size,
             componentType,
+            componentDescriptor->destroyCallback
         };
         ++m_registeredComponents;
 
@@ -291,7 +304,7 @@ namespace zp
         if( componentSignature.structuralSignature != 0 )
         {
             zp_bool_t found = false;
-            for( const ComponentArchetypeManager* componentArchetype: m_componentArchetypes )
+            for( const ComponentArchetypeManager* componentArchetype : m_componentArchetypes )
             {
                 if( componentArchetype->getComponentSignature().structuralSignature == componentSignature.structuralSignature )
                 {
@@ -306,15 +319,19 @@ namespace zp
                 archetype.componentSignature = componentSignature;
                 archetype.componentSignature.tagSignature = 0;
 
-                for( zp_size_t index = 0; index < kMaxComponentTypes; ++index )
+                for( zp_size_t index = 0; index < kMaxComponentTypes && archetype.componentCount < kMaxComponentsPerArchetype; ++index )
                 {
-                    const zp_uint64_t componentMask = ~(1 << index);
+                    const zp_uint64_t componentMask = ~( 1 << index );
                     if( componentSignature.structuralSignature & componentMask )
                     {
+                        const RegisteredComponent& registeredComponent = m_components[ index ];
+
+                        archetype.componentSize[ archetype.componentCount ] = registeredComponent.size;
                         archetype.componentOffset[ archetype.componentCount ] = archetype.totalStride;
                         archetype.componentType[ archetype.componentCount ] = index;
+                        archetype.destroyCallbacks[ archetype.componentCount ] = registeredComponent.destroyCallback;
 
-                        archetype.totalStride += m_components[ index ].size;
+                        archetype.totalStride += registeredComponent.size;
                         ++archetype.componentCount;
                     }
                 }
@@ -331,7 +348,7 @@ namespace zp
     {
         ComponentArchetypeManager* archetypeManager = nullptr;
 
-        for( ComponentArchetypeManager* componentArchetype: m_componentArchetypes )
+        for( ComponentArchetypeManager* componentArchetype : m_componentArchetypes )
         {
             if( componentArchetype->getComponentSignature().structuralSignature == componentSignature.structuralSignature )
             {
@@ -347,7 +364,7 @@ namespace zp
     {
         ComponentType componentType {};
 
-        for( const RegisteredComponent& component: m_components )
+        for( const RegisteredComponent& component : m_components )
         {
             if( component.typeHash == typeHash )
             {
@@ -359,11 +376,11 @@ namespace zp
         return componentType;
     }
 
-    TagType ComponentManager::getTagTypeForTypeHash( zp_hash64_t typeHash ) const
+    TagType ComponentManager::getTagTypeFromTypeHash( zp_hash64_t typeHash ) const
     {
         TagType tagType {};
 
-        for( const RegisteredTag& tag: m_tags )
+        for( const RegisteredTag& tag : m_tags )
         {
             if( tag.typeHash == typeHash )
             {
@@ -375,157 +392,11 @@ namespace zp
         return tagType;
     }
 
-    //
-    //
-    //
-
-    EntityComponentManager::EntityComponentManager( MemoryLabel memoryLabel )
-        : m_entityManager( memoryLabel )
-        , m_componentManager( memoryLabel )
-        , memoryLabel( memoryLabel )
+    zp_size_t ComponentManager::getComponentDataSize( ComponentType componentType ) const
     {
+        return m_components[ componentType ].size;
     }
 
-    EntityComponentManager::~EntityComponentManager()
-    {
-    }
-
-    Entity EntityComponentManager::createEntity()
-    {
-        return m_entityManager.createEntity();
-    }
-
-    Entity EntityComponentManager::createEntity( ComponentSignature componentSignature )
-    {
-        Entity entity = m_entityManager.createEntity( componentSignature );
-
-        m_componentManager.registerComponentSignature( componentSignature );
-        ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-
-        archetypeManager->addEntity( entity );
-
-        return entity;
-    }
-
-    void EntityComponentManager::destroyEntity( Entity entity )
-    {
-        ComponentSignature componentSignature = m_entityManager.getSignature( entity );
-        ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-
-        archetypeManager->removeEntity( entity );
-
-        m_entityManager.destroyEntity( entity );
-    }
-
-    void EntityComponentManager::setEntityComponentSignature( Entity entity, ComponentSignature newComponentSignature )
-    {
-        ComponentSignature componentSignature = m_entityManager.getSignature( entity );
-        if( componentSignature.structuralSignature != newComponentSignature.structuralSignature )
-        {
-            ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-            archetypeManager->removeEntity( entity );
-
-            m_componentManager.registerComponentSignature( newComponentSignature );
-
-            ComponentArchetypeManager* newArchetypeManager = m_componentManager.getComponentArchetype( newComponentSignature );
-            newArchetypeManager->addEntity( entity );
-
-            m_entityManager.setSignature( entity, newComponentSignature );
-        }
-        else if( componentSignature.tagSignature != newComponentSignature.tagSignature )
-        {
-            m_entityManager.setSignature( entity, newComponentSignature );
-        }
-    }
-
-    void EntityComponentManager::registerComponentSignature( ComponentSignature componentSignature )
-    {
-        m_componentManager.registerComponentSignature( componentSignature );
-    }
-
-    ComponentType EntityComponentManager::getComponentType( zp_hash64_t typeHash ) const
-    {
-        return m_componentManager.getComponentTypeFromTypeHash( typeHash );
-    }
-
-    TagType EntityComponentManager::getTagType( zp_hash64_t typeHash ) const
-    {
-        return m_componentManager.getTagTypeForTypeHash( typeHash );
-    }
-
-    void EntityComponentManager::findEntities( const EntityQuery* entityQuery, EntityQueryCallback entityQueryCallback ) const
-    {
-        if( entityQuery )
-        {
-            if( entityQuery->tagsOnly )
-            {
-                if( entityQuery->allTagsMatches )
-                {
-                    m_entityManager.findEntitiesWithTagsAll( entityQuery->componentSignature, entityQueryCallback );
-                }
-                else
-                {
-                    m_entityManager.findEntitiesWithTagsAny( entityQuery->componentSignature, entityQueryCallback );
-                }
-            }
-            else
-            {
-                if( entityQuery->allStructureMatches )
-                {
-                    m_entityManager.findEntitiesAll( entityQuery->componentSignature, entityQueryCallback );
-                }
-                else
-                {
-                    m_entityManager.findEntitiesAny( entityQuery->componentSignature, entityQueryCallback );
-                }
-            }
-        }
-    }
-
-    void EntityComponentManager::findEntities( const EntityQuery* entityQuery, Vector<Entity>& foundEntities ) const
-    {
-        if( entityQuery )
-        {
-            if( entityQuery->tagsOnly )
-            {
-                if( entityQuery->allTagsMatches )
-                {
-                    m_entityManager.findEntitiesWithTagsAll( entityQuery->componentSignature, foundEntities );
-                }
-                else
-                {
-                    m_entityManager.findEntitiesWithTagsAny( entityQuery->componentSignature, foundEntities );
-                }
-            }
-            else
-            {
-                if( entityQuery->allStructureMatches )
-                {
-                    m_entityManager.findEntitiesAll( entityQuery->componentSignature, foundEntities );
-                }
-                else
-                {
-                    m_entityManager.findEntitiesAny( entityQuery->componentSignature, foundEntities );
-                }
-            }
-        }
-    }
-
-    const void* EntityComponentManager::getComponentDataReadOnly( Entity entity, ComponentType componentType ) const
-    {
-        const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
-        ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-        const void* data = archetypeManager->getComponentData( entity, componentType );
-        return data;
-    }
-
-    void* EntityComponentManager::getComponentData( Entity entity, ComponentType componentType )
-    {
-        const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
-        ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-        void* data = archetypeManager->getComponentData( entity, componentType );
-        return data;
-    }
 }
 
 

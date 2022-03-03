@@ -14,10 +14,13 @@ namespace zp
     typedef zp_uint32_t TagType;
     typedef zp_uint32_t ComponentType;
 
+    typedef zp_uint64_t TagSignature;
+    typedef zp_uint64_t StructuralSignature;
+
     struct ComponentSignature
     {
-        zp_uint64_t tagSignature;
-        zp_uint64_t structuralSignature;
+        TagSignature tagSignature;
+        StructuralSignature structuralSignature;
 
         ComponentSignature& addComponent( ComponentType type )
         {
@@ -27,7 +30,7 @@ namespace zp
 
         ComponentSignature& removeComponent( ComponentType type )
         {
-            structuralSignature &= ~(1 << type);
+            structuralSignature &= ~( 1 << type );
             return *this;
         }
 
@@ -39,7 +42,7 @@ namespace zp
 
         ComponentSignature& removeTag( TagType type )
         {
-            tagSignature &= ~(1 << type);
+            tagSignature &= ~( 1 << type );
             return *this;
         }
     };

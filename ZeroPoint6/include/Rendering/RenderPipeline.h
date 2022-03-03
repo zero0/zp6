@@ -13,28 +13,38 @@
 
 namespace zp
 {
-
+    class RenderSystem;
 
     class RenderPipelineContext
     {
     public:
-        void beginRenderPass() {}
+        void beginRenderPass()
+        {
+        }
 
-        void endRenderPass() {}
+        void endRenderPass()
+        {
+        }
+
+        void cull();
+
+        void drawRenderers();
 
     public:
+        zp_uint64_t m_frameIndex;
         GraphicsDevice* m_graphicsDevice;
+        RenderSystem* m_renderSystem;
         JobSystem* m_jobSystem;
     };
 
     ZP_DECLSPEC_NOVTABLE class RenderPipeline
     {
     public:
-        virtual void onActivate( GraphicsDevice* graphicsDevice ) = 0;
+        virtual void onActivate( RenderSystem* renderSystem ) = 0;
 
-        virtual void onDeactivate( GraphicsDevice* graphicsDevice ) = 0;
+        virtual void onDeactivate( RenderSystem* renderSystem ) = 0;
 
-        virtual PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& inputHandle ) = 0;
+        virtual PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& parentJobHandle ) = 0;
     };
 };
 

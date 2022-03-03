@@ -11,32 +11,70 @@
 #include "Core/Allocator.h"
 
 #if ZP_USE_PROFILER
+#if ZP_OS_WINDOWS
+#define __FILENAME__                        (zp_strrchr("\\" __FILE__, '\\') + 1)
+#else
+#define __FILENAME__                        (zp_strrchr("/" __FILE__, '/') + 1)
+#endif
 
+#define ZP_PROFILE_CPU_BLOCK()              ProfileBlock ZP_CONCAT(__profilerBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, nullptr, 0 )
+#define ZP_PROFILE_CPU_BLOCK_E( e )         ProfileBlock ZP_CONCAT(__profilerBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, #e, 0 )
 
-#else // !ZP_USE_PROFILER
+#define ZP_PROFILE_CPU_BLOCK_V( v )         ProfileBlock( __FILENAME__, __FUNCTION__, __LINE__, nullptr, v )
+#define ZP_PROFILE_CPU_BLOCK_EV( e, v )     ProfileBlock( __FILENAME__, __FUNCTION__, __LINE__, #e, v )
 
-#endif // ZP_USE_PROFILER
+#define ZP_PROFILE_CPU_MARK( e )            zp::Profiler::MarkCPU( __FILENAME__, __FUNCTION__, __LINE__, #e, 0 )
+#define ZP_PROFILE_CPU_MARK_V( e, v )       zp::Profiler::MarkCPU( __FILENAME__, __FUNCTION__, __LINE__, #e, v )
 
-#define ZP_PROFILE_CPU_BLOCK()              ProfileBlock ZP_CONCAT(__profilerBlock_,__LINE__)( __FILE__, __FUNCTION__, __LINE__, nullptr, 0 )
-#define ZP_PROFILE_CPU_BLOCK_E( e )         ProfileBlock ZP_CONCAT(__profilerBlock_,__LINE__)( __FILE__, __FUNCTION__, __LINE__, #e, 0 )
-
-#define ZP_PROFILE_CPU_BLOCK_V( v )         ProfileBlock( __FILE__, __FUNCTION__, __LINE__, nullptr, v )
-#define ZP_PROFILE_CPU_BLOCK_EV( e, v )     ProfileBlock( __FILE__, __FUNCTION__, __LINE__, #e, v )
-
-#define ZP_PROFILE_CPU_MARK( e )            zp::Profiler::MarkCPU( __FILE__, __FUNCTION__, __LINE__, #e, 0 )
-#define ZP_PROFILE_CPU_MARK_V( e, v )       zp::Profiler::MarkCPU( __FILE__, __FUNCTION__, __LINE__, #e, v )
-
-#define ZP_PROFILE_CPU_START( e )           const zp_size_t __profilerIndex_##e = zp::Profiler::StartCPU( __FILE__, __FUNCTION__, __LINE__, #e, 0 )
-#define ZP_PROFILE_CPU_START_V( e, v )      const zp_size_t __profilerIndex_##e = zp::Profiler::StartCPU( __FILE__, __FUNCTION__, __LINE__, #e, v )
+#define ZP_PROFILE_CPU_START( e )           const zp_size_t __profilerIndex_##e = zp::Profiler::StartCPU( __FILENAME__, __FUNCTION__, __LINE__, #e, 0 )
+#define ZP_PROFILE_CPU_START_V( e, v )      const zp_size_t __profilerIndex_##e = zp::Profiler::StartCPU( __FILENAME__, __FUNCTION__, __LINE__, #e, v )
 #define ZP_PROFILE_CPU_END( e )             zp::Profiler::EndCPU( __profilerIndex_##e )
 
 #define ZP_PROFILE_MEM( l, a, f, t, c )     do { zp::Profiler::MemoryDesc ZP_CONCAT(__desc_,__LINE__) { a, f, t, c, l }; zp::Profiler::MarkMemory( &ZP_CONCAT(__desc_,__LINE__) ); } while( false )
 
-#define ZP_PROFILE_GPU_START()              const zp_size_t __gpuProfilerIndex = zp::Profiler::StartGPU()
-#define ZP_PROFILE_GPU_END( d, dc, t, c )   do { zp::Profiler::GPUDesc ZP_CONCAT(__desc_,__LINE__) { d, dc, t, c }; zp::Profiler::EndGPU( __gpuProfilerIndex, &ZP_CONCAT(__desc_,__LINE__) ); } while( false )
+//#define ZP_PROFILE_GPU_START()              const zp_size_t __gpuProfilerIndex = zp::Profiler::StartGPU()
+//#define ZP_PROFILE_GPU_END( d, dc, t, c )   do { zp::Profiler::GPUDesc ZP_CONCAT(__desc_,__LINE__) { d, dc, t, c }; zp::Profiler::EndGPU( __gpuProfilerIndex, &ZP_CONCAT(__desc_,__LINE__) ); } while( false )
+#define ZP_PROFILE_GPU_MARK( d )            do { zp::Profiler::GPUDesc ZP_CONCAT(_gpuDesc_,__LINE__) { .duration = d }; zp::Profiler::MarkGPU( &ZP_CONCAT(_gpuDesc_,__LINE__) ); } while( false )
 
+#define ZP_PROFILE_ADVANCE_FRAME( f )       zp::Profiler::AdvanceFrame( (f) )
+
+#else // !ZP_USE_PROFILER
+
+#define ZP_PROFILE_CPU_BLOCK()              (void)0
+#define ZP_PROFILE_CPU_BLOCK_E( ... )       (void)0
+
+#define ZP_PROFILE_CPU_BLOCK_V( ... )       (void)0
+#define ZP_PROFILE_CPU_BLOCK_EV( ... )      (void)0
+
+#define ZP_PROFILE_CPU_MARK( ... )          (void)0
+#define ZP_PROFILE_CPU_MARK_V( ... )        (void)0
+
+#define ZP_PROFILE_CPU_START( ... )         (void)0
+#define ZP_PROFILE_CPU_START_V( ... )       (void)0
+#define ZP_PROFILE_CPU_END( ... )           (void)0
+
+#define ZP_PROFILE_MEM( ... )               (void)0
+
+#define ZP_PROFILE_GPU_MARK( ... )          (void)0
+
+#define ZP_PROFILE_ADVANCE_FRAME( ... )     (void)0
+
+#endif // ZP_USE_PROFILER
+
+#if ZP_USE_PROFILER
 namespace zp
 {
+    struct ProfilerThreadData;
+
+    struct ProfilerCreateDesc
+    {
+        zp_size_t maxThreadCount;
+        zp_size_t maxCPUEventsPerThread;
+        zp_size_t maxMemoryEventsPerThread;
+        zp_size_t maxGPUEventsPerThread;
+        zp_size_t maxFramesToCapture;
+    };
+
     class Profiler
     {
     ZP_NONCOPYABLE( Profiler );
@@ -69,7 +107,7 @@ namespace zp
         };
 
     public:
-        explicit Profiler( MemoryLabel memoryLabel );
+        Profiler( MemoryLabel memoryLabel, const ProfilerCreateDesc* profilerCreateDesc );
 
         ~Profiler();
 
@@ -84,30 +122,22 @@ namespace zp
 
         static void EndCPU( zp_size_t eventIndex );
 
-        static void MarkMemory( MemoryDesc* memoryDesc );
+        static void MarkMemory( const MemoryDesc* memoryDesc );
 
-        static zp_size_t StartGPU();
+        static void MarkGPU( const GPUDesc* gpuDesc );
 
-        static void EndGPU( zp_size_t eventIndex, const GPUDesc* gpuDesc );
+        static void AdvanceFrame( zp_uint64_t frameIndex );
 
     public:
-        void advanceFrame( zp_size_t currentFrame );
+        void advanceFrame( zp_uint64_t frameIndex );
 
     private:
-        void markCPUProfilerEvent( const char* filename, const char* functionName, zp_int32_t lineNumber, const char* eventName, zp_ptr_t userData );
-
-        zp_size_t startCPUProfilerEvent( const char* filename, const char* functionName, zp_int32_t lineNumber, const char* eventName, zp_ptr_t userData );
-
-        void endCPUProfilerEvent( zp_size_t eventIndex );
-
-        void markMemoryProfilerEvent( MemoryDesc* memoryDesc );
-
-        zp_size_t startGPUProfilerEvent();
-
-        void endGPUProfilerEvent( zp_size_t eventIndex, const GPUDesc* gpuDesc );
+        void registerProfilerThread( ProfilerThreadData* profilerThreadData );
 
     private:
-        zp_size_t m_currentFrame;
+        zp_uint64_t m_currentFrame;
+
+        zp_size_t m_maxProfilerThreads;
 
         zp_size_t m_currentCPUProfilerEvent;
         zp_size_t m_currentMemoryProfilerEvent;
@@ -117,9 +147,19 @@ namespace zp
         zp_size_t m_maxMemoryProfilerEvents;
         zp_size_t m_maxGPUProfilerEvents;
 
+        zp_size_t m_framesToCapture;
+        zp_size_t m_profilerFrameStride;
+        zp_size_t m_writeFrameIndex;
+
         void* m_cpuProfilerData;
         void* m_memoryProfilerData;
         void* m_gpuProfilerData;
+
+        void* m_profilerFrameBuffers;
+
+        ProfilerThreadData** m_profilerThreadData;
+        zp_size_t m_profilerDataCount;
+        zp_size_t m_profilerDataCapacity;
 
     public:
         const MemoryLabel memoryLabel;
@@ -133,7 +173,7 @@ namespace zp
     {
     public:
         ZP_FORCEINLINE ProfileBlock( const char* filename, const char* functionName, zp_int32_t lineNumber, const char* eventName, zp_ptr_t userData )
-            : m_index( Profiler::StartCPU( filename, functionName, lineNumber, eventName, userData ))
+            : m_index( Profiler::StartCPU( filename, functionName, lineNumber, eventName, userData ) )
         {
         }
 
@@ -146,5 +186,6 @@ namespace zp
         const zp_size_t m_index;
     };
 }
+#endif // ZP_USE_PROFILER
 
 #endif //ZP_PROFILER_H

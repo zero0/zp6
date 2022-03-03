@@ -5,6 +5,7 @@
 #include "Core/Allocator.h"
 
 #include "Engine/Entity.h"
+#include "Engine/EntityQuery.h"
 #include "Engine/MemoryLabels.h"
 
 namespace zp
@@ -26,7 +27,7 @@ namespace zp
     {
         Entity entity = ZP_NULL_ENTITY;
 
-        if( !m_freeList.isEmpty())
+        if( !m_freeList.isEmpty() )
         {
             entity = m_freeList.back();
             m_freeList.popBack();
@@ -63,106 +64,38 @@ namespace zp
 
     void EntityManager::setSignature( Entity entity, const ComponentSignature& signature )
     {
-        m_componentSignatures[ entity ] = signature;
+        m_componentSignatures[ entity ] = zp_move( signature );
     }
 
-    void EntityManager::findEntitiesAll( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const
+    zp_bool_t EntityManager::nextEntity( EntityQueryIterator* entityQueryIterator ) const
     {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.structuralSignature & signature.structuralSignature) == signature.structuralSignature &&
-               (componentSignature.tagSignature & signature.tagSignature) == signature.tagSignature )
-            {
-                entityQueryCallback( entity, componentSignature );
-            }
-        }
-    }
+        Entity entity = entityQueryIterator->m_current == ZP_NULL_ENTITY ? 0 : entityQueryIterator->m_current + 1;
+        zp_bool_t found = false;
+        zp_bool_t pass;
 
-    void EntityManager::findEntitiesAny( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
+        for( ; entity < m_componentSignatures.size(); ++entity )
         {
             const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.structuralSignature & signature.structuralSignature) != 0 &&
-               (componentSignature.tagSignature & signature.tagSignature) != 0 )
+            if( componentSignature.tagSignature != 0 && componentSignature.structuralSignature != 0 )
             {
-                entityQueryCallback( entity, componentSignature );
-            }
-        }
-    }
+                EntityQuery& entityQuery = entityQueryIterator->m_query;
+                pass = ( componentSignature.tagSignature & entityQuery.requiredTags ) == entityQuery.requiredTags;
+                pass &= pass && ( componentSignature.tagSignature | ~entityQuery.notIncludedStructures ) == ~entityQuery.requiredTags;
+                pass &= pass && ( entityQuery.anyTags == 0 || ( componentSignature.tagSignature & entityQuery.anyTags ) != 0 );
 
-    void EntityManager::findEntitiesWithTagsAll( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.tagSignature & signature.tagSignature) == signature.tagSignature )
-            {
-                entityQueryCallback( entity, componentSignature );
-            }
-        }
-    }
+                pass &= pass && ( componentSignature.structuralSignature & entityQuery.requiredStructures ) == entityQuery.requiredStructures;
+                pass &= pass && ( componentSignature.structuralSignature | ~entityQuery.notIncludedStructures ) == ~entityQuery.requiredStructures;
+                pass &= pass && ( entityQuery.anyStructures == 0 || ( componentSignature.structuralSignature & entityQuery.anyStructures ) != 0 );
 
-    void EntityManager::findEntitiesWithTagsAny( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.tagSignature & signature.tagSignature) != 0 )
-            {
-                entityQueryCallback( entity, componentSignature );
+                if( pass )
+                {
+                    entityQueryIterator->m_current = entity;
+                    found = true;
+                    break;
+                }
             }
         }
-    }
 
-    void EntityManager::findEntitiesAll( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.structuralSignature & signature.structuralSignature) == signature.structuralSignature &&
-               (componentSignature.tagSignature & signature.tagSignature) == signature.tagSignature )
-            {
-                foundEntities.pushBack( entity );
-            }
-        }
-    }
-
-    void EntityManager::findEntitiesAny( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.structuralSignature & signature.structuralSignature) != 0 &&
-               (componentSignature.tagSignature & signature.tagSignature) != 0 )
-            {
-                foundEntities.pushBack( entity );
-            }
-        }
-    }
-
-    void EntityManager::findEntitiesWithTagsAll( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.tagSignature & signature.tagSignature) == signature.tagSignature )
-            {
-                foundEntities.pushBack( entity );
-            }
-        }
-    }
-
-    void EntityManager::findEntitiesWithTagsAny( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const
-    {
-        for( Entity entity = 0; entity < m_componentSignatures.size(); ++entity )
-        {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
-            if((componentSignature.tagSignature & signature.tagSignature) != 0 )
-            {
-                foundEntities.pushBack( entity );
-            }
-        }
+        return found;
     }
 }

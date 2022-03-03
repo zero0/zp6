@@ -9,6 +9,11 @@
 #include "Rendering/Shader.h"
 #include "Rendering/GraphicsResource.h"
 
+#include "Rendering/ImmediateModeRenderer.h"
+#include "Rendering/BatchModeRenderer.h"
+
+#include <cstddef>
+
 namespace zp
 {
     namespace
@@ -145,6 +150,14 @@ namespace zp
                                                    0x00000011, 0x0000000e, 0x0003003e, 0x00000009,
                                                    0x00000012, 0x000100fd, 0x00010038 };
 
+        const zp_uint32_t colorVertexShader[] = {
+#include "Rendering/../../bin/Shaders/debug_color.vert.spv"
+        };
+
+        const zp_uint32_t colorFragmentShader[] = {
+#include "Rendering/../../bin/Shaders/debug_color.frag.spv"
+        };
+
         struct WaitOnGPUJob
         {
             zp_uint64_t frameIndex;
@@ -208,12 +221,14 @@ namespace zp
     {
     public:
 
-        void onActivate( GraphicsDevice* graphicsDevice ) final
+        void onActivate( RenderSystem* renderSystem ) final
         {
+            GraphicsDevice* graphicsDevice = renderSystem->getGraphicsDevice();
+
             // create render pass
             {
                 RenderPassDesc renderPassDesc {};
-                graphicsDevice->createRenderPass( &renderPassDesc, m_renderPass.data());
+                graphicsDevice->createRenderPass( &renderPassDesc, m_renderPass.data() );
             }
 
             // create shaders
@@ -225,23 +240,36 @@ namespace zp
                 shaderDesc.codeData = vertexShaderCode;
                 shaderDesc.codeSize = ZP_ARRAY_SIZE( vertexShaderCode );
                 shaderDesc.name = "vertex shader";
-                graphicsDevice->createShader( &shaderDesc, m_vertexShader.data());
+                graphicsDevice->createShader( &shaderDesc, m_vertexShader.data() );
 
                 shaderDesc.shaderStage = ZP_SHADER_STAGE_FRAGMENT;
                 shaderDesc.codeData = fragmentShaderCode;
                 shaderDesc.codeSize = ZP_ARRAY_SIZE( fragmentShaderCode );
                 shaderDesc.name = "fragment shader";
-                graphicsDevice->createShader( &shaderDesc, m_fragmentShader.data());
+                graphicsDevice->createShader( &shaderDesc, m_fragmentShader.data() );
+
+                // color shaders
+                shaderDesc.shaderStage = ZP_SHADER_STAGE_VERTEX;
+                shaderDesc.codeData = colorVertexShader;
+                shaderDesc.codeSize = ZP_ARRAY_SIZE( colorVertexShader );
+                shaderDesc.name = "color vertex shader";
+                graphicsDevice->createShader( &shaderDesc, m_colorVertexShader.data() );
+
+                shaderDesc.shaderStage = ZP_SHADER_STAGE_FRAGMENT;
+                shaderDesc.codeData = colorFragmentShader;
+                shaderDesc.codeSize = ZP_ARRAY_SIZE( colorFragmentShader );
+                shaderDesc.name = "color fragment shader";
+                graphicsDevice->createShader( &shaderDesc, m_colorFragmentShader.data() );
             }
 
             {
                 PipelineLayoutDesc pipelineLayoutDesc {};
-                graphicsDevice->createPipelineLayout( &pipelineLayoutDesc, m_pipelineLayout.data());
+                graphicsDevice->createPipelineLayout( &pipelineLayoutDesc, m_pipelineLayout.data() );
             }
 
             // create pipeline
             {
-                GraphicsPipelineStateDesc graphicsPipelineStateDesc {};
+                GraphicsPipelineStateCreateDesc graphicsPipelineStateDesc {};
                 graphicsPipelineStateDesc.name = "default pipeline";
                 graphicsPipelineStateDesc.layout = PipelineLayoutResourceHandle( &m_pipelineLayout );
                 graphicsPipelineStateDesc.renderPass = RenderPassResourceHandle( &m_renderPass );
@@ -278,16 +306,43 @@ namespace zp
                 graphicsPipelineStateDesc.blendStates[ 0 ].writeMask = ZP_COLOR_COMPONENT_RGBA;
 
                 graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_graphicsPipelineState );
+
+                // color
+                m_colorMaterial = {};
+                m_colorMaterial.get().vertShader = ShaderResourceHandle( &m_colorVertexShader );
+                m_colorMaterial.get().fragShader = ShaderResourceHandle( &m_colorFragmentShader );
+
+                graphicsPipelineStateDesc.name = "color pipeline";
+                graphicsPipelineStateDesc.shaderStages[ 0 ] = m_colorMaterial.get().vertShader;
+                graphicsPipelineStateDesc.shaderStages[ 1 ] = m_colorMaterial.get().fragShader;
+
+                graphicsPipelineStateDesc.vertexBindingCount = 1;
+                graphicsPipelineStateDesc.vertexAttributeCount = 3;
+                graphicsPipelineStateDesc.vertexBindings[ 0 ] = { 0, sizeof( VertexVUC ), ZP_VERTEX_INPUT_RATE_VERTEX };
+                graphicsPipelineStateDesc.vertexAttributes[ 0 ] = { 0, 0, offsetof( struct VertexVUC, vertexOS ), ZP_GRAPHICS_FORMAT_R32G32B32_SFLOAT };
+                graphicsPipelineStateDesc.vertexAttributes[ 1 ] = { 1, 0, offsetof( struct VertexVUC, uv0 ), ZP_GRAPHICS_FORMAT_R32G32_SFLOAT };
+                graphicsPipelineStateDesc.vertexAttributes[ 2 ] = { 2, 0, offsetof( struct VertexVUC, color ), ZP_GRAPHICS_FORMAT_R32G32B32A32_SFLOAT };
+
+                graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_colorMaterial.get().materialRenderPipeline );
+            }
+
+            {
+                renderSystem->getImmediateModeRenderer()->registerMaterial( MaterialResourceHandle( &m_colorMaterial ) );
             }
         }
 
-        void onDeactivate( GraphicsDevice* graphicsDevice ) final
+        void onDeactivate( RenderSystem* renderSystem ) final
         {
-            graphicsDevice->destroyShader( m_fragmentShader.data());
-            graphicsDevice->destroyShader( m_vertexShader.data());
-            graphicsDevice->destroyPipelineLayout( m_pipelineLayout.data());
+            GraphicsDevice* graphicsDevice = renderSystem->getGraphicsDevice();
+
+            graphicsDevice->destroyShader( m_fragmentShader.data() );
+            graphicsDevice->destroyShader( m_vertexShader.data() );
+            graphicsDevice->destroyShader( m_colorVertexShader.data() );
+            graphicsDevice->destroyShader( m_colorFragmentShader.data() );
+            graphicsDevice->destroyPipelineLayout( m_pipelineLayout.data() );
             graphicsDevice->destroyGraphicsPipeline( &m_graphicsPipelineState );
-            graphicsDevice->destroyRenderPass( m_renderPass.data());
+            graphicsDevice->destroyGraphicsPipeline( &m_colorMaterial.get().materialRenderPipeline );
+            graphicsDevice->destroyRenderPass( m_renderPass.data() );
         }
 
         struct PipelineJob
@@ -295,30 +350,42 @@ namespace zp
             RenderPassResourceHandle renderPass;
             GraphicsPipelineState* graphicsPipelineState;
             RenderPipelineContext renderPipelineContext;
-            zp_uint64_t frameIndex;
 
             static void Execute( const JobHandle& parentJobHandle, const PipelineJob* data )
             {
-                CommandQueue* cmd = data->renderPipelineContext.m_graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, data->frameIndex );
+                RenderPipelineContext context = data->renderPipelineContext;
+                GraphicsDevice* graphicsDevice = context.m_graphicsDevice;
+#if 0
+                context.cull();
 
-                data->renderPipelineContext.m_graphicsDevice->beginRenderPass( data->renderPass.data(), cmd );
+                context.beginRenderPass();
 
-                data->renderPipelineContext.m_graphicsDevice->bindPipeline( data->graphicsPipelineState, ZP_PIPELINE_BIND_POINT_GRAPHICS, cmd );
+                context.drawRenderers(); // opaque
 
-                data->renderPipelineContext.m_graphicsDevice->draw( 3, 1, 0, 0, cmd );
+                context.drawRenderers(); // transparent
 
-                data->renderPipelineContext.m_graphicsDevice->endRenderPass( cmd );
+                context.endRenderPass();
+#endif
+                CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, context.m_frameIndex );
+
+                graphicsDevice->beginRenderPass( data->renderPass.data(), cmd );
+
+                graphicsDevice->bindPipeline( data->graphicsPipelineState, ZP_PIPELINE_BIND_POINT_GRAPHICS, cmd );
+
+                graphicsDevice->draw( 3, 1, 0, 0, cmd );
+
+                graphicsDevice->endRenderPass( cmd );
             }
         };
 
-        PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& inputHandle ) final
+        PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& parentJobHandle ) final
         {
             PipelineJob pipelineJob {
                 .renderPass = RenderPassResourceHandle( &m_renderPass ),
                 .graphicsPipelineState = &m_graphicsPipelineState,
                 .renderPipelineContext = *renderPipelineContext,
             };
-            return renderPipelineContext->m_jobSystem->PrepareJobData( pipelineJob, inputHandle );
+            return renderPipelineContext->m_jobSystem->PrepareChildJobData( parentJobHandle, pipelineJob );
         }
 
     private:
@@ -327,6 +394,10 @@ namespace zp
         GraphicsPipelineState m_graphicsPipelineState;
         ShaderResource m_vertexShader;
         ShaderResource m_fragmentShader;
+
+        MaterialResource m_colorMaterial;
+        ShaderResource m_colorVertexShader;
+        ShaderResource m_colorFragmentShader;
     };
 
     namespace
@@ -342,23 +413,62 @@ namespace zp
 
         m_graphicsDevice->createSwapChain( windowHandle, 0, 0, 0, 0 );
 
-        //m_nextRenderPipeline = &s_renderPipeline;
+        BatchModeRendererConfig batchModeRendererConfig {};
+        m_batchModeRenderer = ZP_NEW_ARGS_( memoryLabel, BatchModeRenderer, &batchModeRendererConfig );
+
+        ImmediateModeRendererConfig immediateModeRendererConfig {
+            64,
+            1024,
+            1024,
+            m_graphicsDevice,
+            m_batchModeRenderer
+        };
+        m_immediateModeRenderer = ZP_NEW_ARGS_( memoryLabel, ImmediateModeRenderer, &immediateModeRendererConfig );
+
+        m_nextRenderPipeline = &s_renderPipeline;
     }
 
     void RenderSystem::destroy()
     {
         if( m_currentRenderPipeline )
         {
-            m_currentRenderPipeline->onDeactivate( m_graphicsDevice );
+            m_currentRenderPipeline->onDeactivate( this );
             m_currentRenderPipeline = nullptr;
         }
+
+        ZP_SAFE_DELETE( ImmediateModeRenderer, m_immediateModeRenderer );
+        ZP_SAFE_DELETE( BatchModeRenderer, m_batchModeRenderer );
 
         DestroyGraphicsDevice( m_graphicsDevice );
 
         m_graphicsDevice = nullptr;
     }
 
-    PreparedJobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& parentJobHandle, const PreparedJobHandle& inputHandle )
+    PreparedJobHandle RenderSystem::startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& inputHandle )
+    {
+        m_batchModeRenderer->beginFrame( frameIndex );
+        m_immediateModeRenderer->beginFrame( frameIndex );
+
+        return inputHandle;
+#if 0
+        struct StartFrameJob
+        {
+            zp_uint64_t frameIndex;
+            RenderSystem* renderSystem;
+
+            static void Execute( const JobHandle& jobHandle, const StartFrameJob* data )
+            {
+                RenderSystem* renderSystem = data->renderSystem;
+
+                renderSystem->m_batchModeRenderer->beginFrame( data->frameIndex );
+                renderSystem->m_immediateModeRenderer->beginFrame( data->frameIndex );
+            }
+        } startFrameJob { frameIndex, this };
+        return jobSystem->PrepareJobData( startFrameJob, inputHandle );
+#endif
+    }
+
+    PreparedJobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& parentJobHandle, const PreparedJobHandle& inputHandle )
     {
         struct UpdateRenderPipelineJob
         {
@@ -371,17 +481,16 @@ namespace zp
                 {
                     renderSystem->m_graphicsDevice->waitForGPU();
 
-                    if( renderSystem->m_currentRenderPipeline ) renderSystem->m_currentRenderPipeline->onDeactivate( renderSystem->m_graphicsDevice );
+                    if( renderSystem->m_currentRenderPipeline ) renderSystem->m_currentRenderPipeline->onDeactivate( renderSystem );
 
                     renderSystem->m_currentRenderPipeline = renderSystem->m_nextRenderPipeline;
 
-                    if( renderSystem->m_currentRenderPipeline ) renderSystem->m_currentRenderPipeline->onActivate( renderSystem->m_graphicsDevice );
+                    if( renderSystem->m_currentRenderPipeline ) renderSystem->m_currentRenderPipeline->onActivate( renderSystem );
                 }
             }
         } updateRenderPipelineJob { this };
 
         PreparedJobHandle gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, updateRenderPipelineJob, inputHandle );
-        PreparedJobHandle renderHandle = gpuHandle;
 
         WaitOnGPUJob waitOnGpuJob { frameIndex, m_graphicsDevice };
         gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, waitOnGpuJob, gpuHandle );
@@ -391,33 +500,57 @@ namespace zp
 
         struct ProcessRenderPipeline
         {
-            zp_uint64_t frameIndex;
-            RenderSystem* renderSystem;
+            RenderPipelineContext renderPipelineContext;
 
             static void Execute( const JobHandle& parentJobHandle, const ProcessRenderPipeline* processRenderPipeline )
             {
-                if( processRenderPipeline->renderSystem->m_currentRenderPipeline )
-                {
+                RenderPipelineContext ctx = processRenderPipeline->renderPipelineContext;
+                RenderSystem* renderSystem = ctx.m_renderSystem;
 
+                if( renderSystem->m_currentRenderPipeline )
+                {
+                    PreparedJobHandle pipelineHandle = renderSystem->m_currentRenderPipeline->onProcessPipeline( &ctx, ctx.m_jobSystem->Prepare( parentJobHandle ) );
+
+                    ctx.m_jobSystem->Schedule( pipelineHandle );
                 }
                 else
                 {
-                    CommandQueue* cmd = processRenderPipeline->renderSystem->m_graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, processRenderPipeline->frameIndex );
+                    GraphicsDevice* graphicsDevice = ctx.m_graphicsDevice;
+                    CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, ctx.m_frameIndex );
 
-                    processRenderPipeline->renderSystem->m_graphicsDevice->beginRenderPass( nullptr, cmd );
-                    processRenderPipeline->renderSystem->m_graphicsDevice->endRenderPass( cmd );
+                    graphicsDevice->beginRenderPass( nullptr, cmd );
+                    graphicsDevice->endRenderPass( cmd );
                 }
             }
-        } processRenderPipeline { frameIndex, this };
+        } processRenderPipeline { { frameIndex, m_graphicsDevice, this, jobSystem } };
         gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, processRenderPipeline, gpuHandle );
 
-        //if( m_currentRenderPipeline )
-        //{
-        //    //ZP_PROFILE_CPU_BLOCK_E( "RenderSystem - Process Render Pipeline" );
-        //
-        //    RenderPipelineContext renderPipelineContext { .m_graphicsDevice = m_graphicsDevice, .m_jobSystem = jobSystem };
-        //    gpuHandle = m_currentRenderPipeline->onProcessPipeline( &renderPipelineContext, gpuHandle );
-        //}
+        struct FinalizeBatchRenderingJob
+        {
+            RenderSystem* renderSystem;
+            zp_uint64_t frameIndex;
+
+            static void Execute( const JobHandle& parentJobHandle, const FinalizeBatchRenderingJob* data )
+            {
+                {
+                    VertexVUC tris[] = {
+                        { { 0, 0, 0 }, {}, zp_debug_color( data->frameIndex % 255, 255 ) },
+                        { { 1, 0, 0 }, {}, Color::green },
+                        { { 0, 1, 0 }, {}, Color::blue }
+                    };
+
+                    zp_handle_t cmd = data->renderSystem->m_immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, ZP_ARRAY_SIZE( tris ), ZP_ARRAY_SIZE( tris ) );
+
+                    data->renderSystem->m_immediateModeRenderer->addTriangles( cmd, tris );
+
+                    data->renderSystem->m_immediateModeRenderer->end( cmd );
+                }
+
+                data->renderSystem->m_immediateModeRenderer->process( data->renderSystem->m_batchModeRenderer );
+                data->renderSystem->m_batchModeRenderer->process( data->renderSystem->m_graphicsDevice );
+            }
+        } finalizeBatchRenderingJob { this, frameIndex };
+        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, finalizeBatchRenderingJob, gpuHandle );
 
         SubmitGPUJob submitGpuJob { frameIndex, m_graphicsDevice };
         gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, submitGpuJob, gpuHandle );
@@ -426,43 +559,5 @@ namespace zp
         gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, presentGpuJob, gpuHandle );
 
         return gpuHandle;
-#if 0
-        if( m_nextRenderPipeline != m_currentRenderPipeline )
-        {
-            m_graphicsDevice->waitForGPU();
-
-            if( m_currentRenderPipeline ) m_currentRenderPipeline->onDeactivate( m_graphicsDevice );
-
-            m_currentRenderPipeline = m_nextRenderPipeline;
-
-            if( m_currentRenderPipeline ) m_currentRenderPipeline->onActivate( m_graphicsDevice );
-        }
-
-        //m_graphicsDevice->waitForGPU();
-
-        PreparedJobHandle gpuHandle = inputHandle;
-
-        WaitOnGPUJob waitOnGpuJob { s_frameIndex, m_graphicsDevice };
-        //gpuHandle = jobSystem->PrepareJobData( waitOnGpuJob, gpuHandle );
-
-        BeginFrameGPUJob beginFrameGpuJob { s_frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareJobData( beginFrameGpuJob, gpuHandle );
-
-        if( m_currentRenderPipeline )
-        {
-            //ZP_PROFILE_CPU_BLOCK_E( "RenderSystem - Process Render Pipeline" );
-
-            RenderPipelineContext renderPipelineContext { .m_graphicsDevice = m_graphicsDevice, .m_jobSystem = jobSystem };
-            gpuHandle = m_currentRenderPipeline->onProcessPipeline( &renderPipelineContext, gpuHandle );
-        }
-
-        SubmitGPUJob submitGpuJob { s_frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareJobData( submitGpuJob, gpuHandle );
-
-        PresentGPUJob presentGpuJob { s_frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareJobData( presentGpuJob, gpuHandle );
-        s_frameIndex++;
-        return gpuHandle;
-#endif
     }
 }

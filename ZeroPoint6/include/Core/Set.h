@@ -13,33 +13,20 @@
 
 namespace zp
 {
-    template<typename T>
-    struct EqualityComparer
-    {
-        typedef const T& const_reference;
-
-        zp_hash64_t hash( const_reference val )
-        {
-            return zp_fnv64_1a( &val, sizeof( T ));
-        }
-
-        zp_bool_t equals( const_reference lh, const_reference rh )
-        {
-            return lh == rh;
-        }
-    };
-
-    template<typename T, typename Comparer = EqualityComparer<T>, typename Allocator = MemoryLabelAllocator>
+    template<typename T, typename H = zp_hash64_t, typename Comparer = EqualityComparer <T, H>, typename Allocator = MemoryLabelAllocator>
     class Set
     {
     public:
         static const zp_size_t npos = -1;
+        static constexpr H nhash = zp_fnv_1a<H>( nullptr, 0 );
 
         typedef T value_type;
         typedef T& reference;
         typedef const T& const_reference;
         typedef T* pointer;
         typedef const T* const_pointer;
+        typedef H hash_value;
+        typedef const H const_hash_value;
 
         class SetIterator;
 
@@ -53,6 +40,11 @@ namespace zp
 
         typedef Allocator allocator_value;
         typedef const allocator_value& allocator_const_reference;
+
+        typedef Set<T, H, Comparer, Allocator> self_value;
+        typedef const Set<T, H, Comparer, Allocator>& const_self_reference;
+        typedef const Set<T, H, Comparer, Allocator>* const_self_pointer;
+        typedef Set<T, H, Comparer, Allocator>* self_pointer;
 
         Set();
 
@@ -86,9 +78,9 @@ namespace zp
 
         zp_bool_t contains( const_reference value ) const;
 
-        zp_size_t size() const;
+        [[nodiscard]] zp_size_t size() const;
 
-        zp_bool_t isEmpty() const;
+        [[nodiscard]] zp_bool_t isEmpty() const;
 
         void clear();
 
@@ -111,7 +103,7 @@ namespace zp
 
         struct SetEntry
         {
-            zp_hash64_t hash;
+            hash_value hash;
             zp_size_t next;
             value_type value;
         };
@@ -127,7 +119,6 @@ namespace zp
         comparer_value m_cmp;
         allocator_value m_allocator;
 
-        typedef Set<T, Comparer, Allocator> self;
 
     public:
         class SetIterator
@@ -135,7 +126,7 @@ namespace zp
         private:
             SetIterator();
 
-            SetIterator( const self* set, zp_size_t index );
+            SetIterator( self_pointer set, zp_size_t index );
 
         public:
             ~SetIterator() = default;
@@ -155,7 +146,7 @@ namespace zp
             zp_bool_t operator!=( const SetIterator& other ) const;
 
         private:
-            const self* m_set;
+            self_pointer m_set;
             zp_size_t m_current;
 
             friend class Set;
@@ -166,7 +157,7 @@ namespace zp
         private:
             SetConstIterator();
 
-            SetConstIterator( const self* set, zp_size_t index );
+            SetConstIterator( const_self_pointer set, zp_size_t index );
 
         public:
             ~SetConstIterator() = default;
@@ -184,47 +175,49 @@ namespace zp
             zp_bool_t operator!=( const SetConstIterator& other ) const;
 
         private:
-            const self* m_hashSet;
-            zp_size_t m_next;
+            const_self_pointer m_set;
             zp_size_t m_current;
 
             friend class Set;
         };
     };
+}
 
-    //
-    //
-    //
+//
+//
+//
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set()
+namespace zp
+{
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set()
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
         , m_count( 0 )
         , m_freeCount( 0 )
         , m_freeList( 0 )
-        , m_cmp( comparer_value())
-        , m_allocator( allocator_value())
+        , m_cmp( comparer_value() )
+        , m_allocator( allocator_value() )
     {
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( zp_size_t capacity )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( zp_size_t capacity )
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
         , m_count( 0 )
         , m_freeCount( 0 )
         , m_freeList( 0 )
-        , m_cmp( comparer_value())
-        , m_allocator( allocator_value())
+        , m_cmp( comparer_value() )
+        , m_allocator( allocator_value() )
     {
         ensureCapacity( capacity, false );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( comparer_const_reference cmp )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( comparer_const_reference cmp )
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
@@ -232,25 +225,25 @@ namespace zp
         , m_freeCount( 0 )
         , m_freeList( 0 )
         , m_cmp( cmp )
-        , m_allocator( allocator_value())
+        , m_allocator( allocator_value() )
     {
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( allocator_const_reference allocator )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( allocator_const_reference allocator )
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
         , m_count( 0 )
         , m_freeCount( 0 )
         , m_freeList( 0 )
-        , m_cmp( comparer_value())
+        , m_cmp( comparer_value() )
         , m_allocator( allocator )
     {
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( zp_size_t capacity, comparer_const_reference cmp )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( zp_size_t capacity, comparer_const_reference cmp )
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
@@ -258,41 +251,27 @@ namespace zp
         , m_freeCount( 0 )
         , m_freeList( 0 )
         , m_cmp( cmp )
-        , m_allocator( allocator_value())
+        , m_allocator( allocator_value() )
     {
         ensureCapacity( capacity, false );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( zp_size_t capacity, allocator_const_reference allocator )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( zp_size_t capacity, allocator_const_reference allocator )
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
         , m_count( 0 )
         , m_freeCount( 0 )
         , m_freeList( 0 )
-        , m_cmp( comparer_value())
+        , m_cmp( comparer_value() )
         , m_allocator( allocator )
     {
         ensureCapacity( capacity, false );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( zp_size_t capacity, comparer_const_reference cmp, allocator_const_reference allocator )
-        : m_entries( nullptr )
-        , m_buckets( nullptr )
-        , m_capacity( 0 )
-        , m_count( 0 )
-        , m_freeCount( 0 )
-        , m_freeList( 0 )
-        , m_cmp( cmp )
-        , m_allocator( allocator )
-    {
-        ensureCapacity( capacity, false );
-    }
-
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::Set( comparer_const_reference cmp, allocator_const_reference allocator )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( zp_size_t capacity, comparer_const_reference cmp, allocator_const_reference allocator )
         : m_entries( nullptr )
         , m_buckets( nullptr )
         , m_capacity( 0 )
@@ -302,29 +281,43 @@ namespace zp
         , m_cmp( cmp )
         , m_allocator( allocator )
     {
+        ensureCapacity( capacity, false );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::~Set()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::Set( comparer_const_reference cmp, allocator_const_reference allocator )
+        : m_entries( nullptr )
+        , m_buckets( nullptr )
+        , m_capacity( 0 )
+        , m_count( 0 )
+        , m_freeCount( 0 )
+        , m_freeList( 0 )
+        , m_cmp( cmp )
+        , m_allocator( allocator )
+    {
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::~Set()
     {
         destroy();
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_bool_t Set<T, Comparer, Allocator>::add( const_reference value )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::add( const_reference value )
     {
         if( m_buckets == nullptr )
         {
             ensureCapacity( 4, false );
         }
 
-        const zp_hash64_t hash = m_cmp.hash( value );
+        const_hash_value hash = m_cmp.hash( value );
         zp_size_t index = hash % m_capacity;
         zp_size_t numSteps = 0;
 
         for( zp_size_t b = m_buckets[ index ]; b != npos; b = m_entries[ b ].next )
         {
-            if( m_entries[ b ].hash == hash && m_cmp.equals( m_entries[ b ].value, value ))
+            if( m_entries[ b ].hash == hash && m_cmp.equals( m_entries[ b ].value, value ) )
             {
                 return false;
             }
@@ -363,20 +356,20 @@ namespace zp
         return true;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_bool_t Set<T, Comparer, Allocator>::remove( const_reference value )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::remove( const_reference value )
     {
         zp_bool_t removed = false;
 
         if( m_buckets != nullptr )
         {
-            const zp_hash64_t hash = m_cmp.hash( value );
+            const_hash_value hash = m_cmp.hash( value );
             const zp_size_t index = hash % m_capacity;
             zp_size_t removeIndex = npos;
 
             for( zp_size_t b = m_buckets[ index ]; b != npos; b = m_entries[ b ].next )
             {
-                if( m_entries[ b ].hash == hash && m_cmp.equals( m_entries[ b ].value, value ))
+                if( m_entries[ b ].hash == hash && m_cmp.equals( m_entries[ b ].value, value ) )
                 {
                     if( removeIndex == npos )
                     {
@@ -389,7 +382,7 @@ namespace zp
 
                     m_entries[ b ].hash = npos;
                     m_entries[ b ].next = m_freeList;
-                    (&m_entries[ b ].value)->~value_type();
+                    ( &m_entries[ b ].value )->~value_type();
 
                     m_freeList = b;
                     ++m_freeCount;
@@ -405,17 +398,17 @@ namespace zp
         return removed;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::unionWith( const_pointer ptr, zp_size_t count )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::unionWith( const_pointer ptr, zp_size_t count )
     {
         for( zp_size_t i = 0; i < count; ++i )
         {
-            add( *(ptr + i));
+            add( *( ptr + i ) );
         }
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::unionWith( const_iterator begin, const_iterator end )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::unionWith( const_iterator begin, const_iterator end )
     {
         for( ; begin != end; ++begin )
         {
@@ -423,17 +416,17 @@ namespace zp
         }
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::exceptWith( const_pointer ptr, zp_size_t count )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::exceptWith( const_pointer ptr, zp_size_t count )
     {
         for( zp_size_t i = 0; i < count; ++i )
         {
-            remove( *(ptr + i));
+            remove( *( ptr + i ) );
         }
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::exceptWith( const_iterator begin, const_iterator end )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::exceptWith( const_iterator begin, const_iterator end )
     {
         for( ; begin != end; ++begin )
         {
@@ -441,27 +434,27 @@ namespace zp
         }
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_bool_t Set<T, Comparer, Allocator>::contains( const_reference value ) const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::contains( const_reference value ) const
     {
         const zp_size_t index = findIndex( value );
         return index != npos;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_size_t Set<T, Comparer, Allocator>::size() const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_size_t Set<T, H, Comparer, Allocator>::size() const
     {
         return m_count - m_freeCount;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_bool_t Set<T, Comparer, Allocator>::isEmpty() const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::isEmpty() const
     {
-        return (m_count - m_freeCount) == 0;
+        return ( m_count - m_freeCount ) == 0;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::clear()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::clear()
     {
         if( m_count > 0 )
         {
@@ -472,7 +465,7 @@ namespace zp
 
             for( zp_size_t i = 0; i < m_count; ++i )
             {
-                (m_entries + i)->~SetEntry();
+                ( m_entries + i )->~SetEntry();
             }
 
             m_freeList = npos;
@@ -481,14 +474,14 @@ namespace zp
         }
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::reserve( zp_size_t size )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::reserve( zp_size_t size )
     {
         ensureCapacity( size, false );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::destroy()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::destroy()
     {
         clear();
 
@@ -501,11 +494,11 @@ namespace zp
         m_capacity = 0;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::iterator Set<T, Comparer, Allocator>::begin()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::iterator Set<T, H, Comparer, Allocator>::begin()
     {
         zp_size_t index = 0;
-        while( index < m_count && m_entries[ index ].hash == npos )
+        while( index < m_count && m_entries[ index ].hash == nhash )
         {
             ++index;
         }
@@ -513,17 +506,17 @@ namespace zp
         return iterator( this, index );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::iterator Set<T, Comparer, Allocator>::end()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::iterator Set<T, H, Comparer, Allocator>::end()
     {
         return iterator( this, m_count );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::const_iterator Set<T, Comparer, Allocator>::begin() const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::const_iterator Set<T, H, Comparer, Allocator>::begin() const
     {
         zp_size_t index = 0;
-        while( index < m_count && m_entries[ index ].hash == npos )
+        while( index < m_count && m_entries[ index ].hash == nhash )
         {
             ++index;
         }
@@ -531,14 +524,14 @@ namespace zp
         return const_iterator( this, index );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::const_iterator Set<T, Comparer, Allocator>::end() const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::const_iterator Set<T, H, Comparer, Allocator>::end() const
     {
         return const_iterator( this, m_count );
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::ensureCapacity( zp_size_t capacity, zp_bool_t forceRehash )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::ensureCapacity( zp_size_t capacity, zp_bool_t forceRehash )
     {
         if( capacity > m_capacity )
         {
@@ -562,7 +555,7 @@ namespace zp
                 {
                     for( zp_size_t i = 0; i < m_count; ++i )
                     {
-                        if( entries[ i ].hash != npos )
+                        if( entries[ i ].hash != nhash )
                         {
                             entries[ i ].hash = m_cmp.hash( entries[ i ].value );
                         }
@@ -571,9 +564,9 @@ namespace zp
 
                 for( zp_size_t i = 0; i < m_count; ++i )
                 {
-                    if( entries[ i ].hash != npos )
+                    if( entries[ i ].hash != nhash )
                     {
-                        zp_size_t index = entries[ i ].hash % capacity;
+                        const zp_size_t index = entries[ i ].hash % capacity;
                         entries[ i ].next = buckets[ index ];
                         buckets[ index ] = i;
                     }
@@ -596,17 +589,17 @@ namespace zp
         }
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_size_t Set<T, Comparer, Allocator>::findIndex( const_reference value ) const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_size_t Set<T, H, Comparer, Allocator>::findIndex( const_reference value ) const
     {
         zp_size_t index = npos;
 
         if( m_buckets != nullptr )
         {
-            const zp_hash64_t hash = m_cmp.hash( value );
+            const_hash_value hash = m_cmp.hash( value );
             for( zp_size_t b = m_buckets[ hash % m_capacity ]; b != npos; b = m_entries[ b ].next )
             {
-                if( m_entries[ b ].hash == hash && m_cmp.equals( m_entries[ b ].value, value ))
+                if( m_entries[ b ].hash == hash && m_cmp.equals( m_entries[ b ].value, value ) )
                 {
                     index = b;
                     break;
@@ -621,26 +614,26 @@ namespace zp
     //
     //
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::SetIterator::SetIterator()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::SetIterator::SetIterator()
         : m_set( nullptr )
         , m_current( 0 )
     {
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    Set<T, Comparer, Allocator>::SetIterator::SetIterator( const self* set, zp_size_t index )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::SetIterator::SetIterator( self_pointer set, zp_size_t index )
         : m_set( set )
         , m_current( index )
     {
 
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::SetIterator::operator++()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::SetIterator::operator++()
     {
         zp_size_t idx = m_current + 1;
-        while( idx < m_set->m_count && m_set->m_entries[ idx ].hash == npos )
+        while( idx < m_set->m_count && m_set->m_entries[ idx ].hash == nhash )
         {
             ++idx;
         }
@@ -649,11 +642,11 @@ namespace zp
 
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    void Set<T, Comparer, Allocator>::SetIterator::operator++( int )
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::SetIterator::operator++( int )
     {
         zp_size_t idx = m_current + 1;
-        while( idx < m_set->m_count && m_set->m_entries[ idx ].hash == npos )
+        while( idx < m_set->m_count && m_set->m_entries[ idx ].hash == nhash )
         {
             ++idx;
         }
@@ -661,34 +654,103 @@ namespace zp
         m_current = idx;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::pointer Set<T, Comparer, Allocator>::SetIterator::operator->()
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::pointer Set<T, H, Comparer, Allocator>::SetIterator::operator->()
     {
         return &m_set->m_entries[ m_current ].value;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::const_pointer Set<T, Comparer, Allocator>::SetIterator::operator->() const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::const_pointer Set<T, H, Comparer, Allocator>::SetIterator::operator->() const
     {
         return &m_set->m_entries[ m_current ].value;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    typename Set<T, Comparer, Allocator>::const_reference Set<T, Comparer, Allocator>::SetIterator::operator*() const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::const_reference Set<T, H, Comparer, Allocator>::SetIterator::operator*() const
     {
         return m_set->m_entries[ m_current ].value;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_bool_t Set<T, Comparer, Allocator>::SetIterator::operator==( const SetIterator& other ) const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::SetIterator::operator==( const SetIterator& other ) const
     {
         return m_set == other.m_set && m_current == other.m_current;
     }
 
-    template<typename T, typename Comparer, typename Allocator>
-    zp_bool_t Set<T, Comparer, Allocator>::SetIterator::operator!=( const SetIterator& other ) const
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::SetIterator::operator!=( const SetIterator& other ) const
     {
-        return !(operator==( other ));
+        return !( operator==( other ) );
+    }
+
+    //
+    //
+    //
+
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::SetConstIterator::SetConstIterator()
+        : m_set( nullptr )
+        , m_current( 0 )
+    {
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    Set<T, H, Comparer, Allocator>::SetConstIterator::SetConstIterator( const_self_pointer set, zp_size_t index )
+        : m_set( set )
+        , m_current( index )
+    {
+
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::SetConstIterator::operator++()
+    {
+        zp_size_t idx = m_current + 1;
+        while( idx < m_set->m_count && m_set->m_entries[ idx ].hash == nhash )
+        {
+            ++idx;
+        }
+
+        m_current = idx;
+
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    void Set<T, H, Comparer, Allocator>::SetConstIterator::operator++( int )
+    {
+        zp_size_t idx = m_current + 1;
+        while( idx < m_set->m_count && m_set->m_entries[ idx ].hash == nhash )
+        {
+            ++idx;
+        }
+
+        m_current = idx;
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::const_pointer Set<T, H, Comparer, Allocator>::SetConstIterator::operator->() const
+    {
+        return &m_set->m_entries[ m_current ].value;
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    typename Set<T, H, Comparer, Allocator>::const_reference Set<T, H, Comparer, Allocator>::SetConstIterator::operator*() const
+    {
+        return m_set->m_entries[ m_current ].value;
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::SetConstIterator::operator==( const SetConstIterator& other ) const
+    {
+        return m_set == other.m_set && m_current == other.m_current;
+    }
+
+    template<typename T, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Set<T, H, Comparer, Allocator>::SetConstIterator::operator!=( const SetConstIterator& other ) const
+    {
+        return !( operator==( other ) );
     }
 
 }

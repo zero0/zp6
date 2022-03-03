@@ -25,8 +25,10 @@ set(ZP_PLATFORM_SRC
         )
 
 set(ZP_RENDERING_SRC
+        "src/Rendering/BatchModeRenderer.cpp"
         "src/Rendering/GraphicsDevice.cpp"
         "src/Rendering/GraphicsResource.cpp"
+        "src/Rendering/ImmediateModeRenderer.cpp"
         "src/Rendering/RenderSystem.cpp"
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.cpp"
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}RenderingEngine.cpp"
@@ -34,9 +36,12 @@ set(ZP_RENDERING_SRC
         )
 
 set(ZP_ENGINE_SRC
+        "src/Engine/AssetSystem.cpp"
         "src/Engine/Component.cpp"
         "src/Engine/Engine.cpp"
         "src/Engine/Entity.cpp"
+        "src/Engine/EntityComponentManager.cpp"
+        "src/Engine/EntityQuery.cpp"
         "src/Engine/JobSystem.cpp"
         )
 
@@ -60,8 +65,10 @@ set(ZP_CORE_HEADERS
         "include/Core/Common.h"
         "include/Core/Defines.h"
         "include/Core/Macros.h"
+        "include/Core/Map.h"
         "include/Core/Math.h"
         "include/Core/Profiler.h"
+        "include/Core/Queue.h"
         "include/Core/Set.h"
         "include/Core/Types.h"
         "include/Core/Vector.h"
@@ -69,12 +76,15 @@ set(ZP_CORE_HEADERS
 
 set(ZP_ENGINE_HEADERS
         "include/Engine/ApplicationEntryPoint.h"
+        "include/Engine/AssetSystem.h"
         "include/Engine/BaseComponentSystem.h"
         "include/Engine/Component.h"
         "include/Engine/ComponentSignature.h"
         "include/Engine/Engine.h"
         "include/Engine/EnginePipeline.h"
         "include/Engine/Entity.h"
+        "include/Engine/EntityComponentManager.h"
+        "include/Engine/EntityQuery.h"
         "include/Engine/JobSystem.h"
         "include/Engine/MemoryLabels.h"
         "include/Engine/ModuleEntryPointAPI.h"
@@ -86,11 +96,16 @@ set(ZP_PLATFORM_HEADERS
         )
 
 set(ZP_RENDERING_HEADERS
-        "include/Rendering/GraphicsCommandBuffer.h"
+        "include/Rendering/BatchModeRenderer.h"
         "include/Rendering/GraphicsDevice.h"
+        "include/Rendering/GraphicsResource.h"
+        "include/Rendering/ImmediateModeRenderer.h"
+        "include/Rendering/Material.h"
+        "include/Rendering/RenderPass.h"
         "include/Rendering/RenderPipeline.h"
         "include/Rendering/RenderSystem.h"
         "include/Rendering/Shader.h"
+        "include/Rendering/Texture.h"
         "include/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.h"
         )
 
@@ -142,6 +157,7 @@ target_link_options(${ZP_TARGET}
 target_link_libraries(${ZP_TARGET}
         PRIVATE "${VulkanSDK}/Lib/vulkan-1.lib"
         PRIVATE "${VulkanSDK}/Lib/VkLayer_utils.lib"
+        PRIVATE "rpcrt4.lib"
         )
 #endif ()
 

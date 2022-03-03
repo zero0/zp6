@@ -47,6 +47,10 @@ typedef signed int zp_ptrdiff_t;
 typedef unsigned int zp_ptr_t;
 #endif
 
+//
+//
+//
+
 typedef zp_uint64_t zp_hash64_t;
 
 struct zp_hash128_t
@@ -62,7 +66,7 @@ ZP_FORCEINLINE zp_bool_t operator==( const zp_hash128_t& lh, const zp_hash128_t&
 
 ZP_FORCEINLINE zp_bool_t operator!=( const zp_hash128_t& lh, const zp_hash128_t& rh )
 {
-    return !(lh.m32 == rh.m32 && lh.m10 == rh.m10);
+    return !( lh.m32 == rh.m32 && lh.m10 == rh.m10 );
 }
 
 ZP_FORCEINLINE zp_bool_t operator<( const zp_hash128_t& lh, const zp_hash128_t& rh )
@@ -74,6 +78,52 @@ ZP_FORCEINLINE zp_bool_t operator>( const zp_hash128_t& lh, const zp_hash128_t& 
 {
     return lh.m32 != rh.m32 ? lh.m32 > rh.m32 : lh.m10 > rh.m10;
 }
+
+ZP_FORCEINLINE zp_size_t operator%( const zp_hash128_t& lh, zp_size_t rh )
+{
+    return lh.m10 % rh;
+}
+
+//
+//
+//
+
+struct zp_guid128_t
+{
+    zp_uint64_t m32;
+    zp_uint64_t m10;
+
+    constexpr explicit operator zp_hash128_t() const
+    {
+        return { m32, m10 };
+    }
+};
+
+ZP_FORCEINLINE zp_bool_t operator==( const zp_guid128_t& lh, const zp_guid128_t& rh )
+{
+    return lh.m32 == rh.m32 && lh.m10 == rh.m10;
+}
+
+ZP_FORCEINLINE zp_bool_t operator!=( const zp_guid128_t& lh, const zp_guid128_t& rh )
+{
+    return !( lh.m32 == rh.m32 && lh.m10 == rh.m10 );
+}
+
+ZP_FORCEINLINE zp_bool_t operator<( const zp_guid128_t& lh, const zp_guid128_t& rh )
+{
+    return lh.m32 != rh.m32 ? lh.m32 < rh.m32 : lh.m10 < rh.m10;
+}
+
+ZP_FORCEINLINE zp_bool_t operator>( const zp_guid128_t& lh, const zp_guid128_t& rh )
+{
+    return lh.m32 != rh.m32 ? lh.m32 > rh.m32 : lh.m10 > rh.m10;
+}
+
+
+
+//
+//
+//
 
 typedef zp_uint64_t zp_time_t;
 

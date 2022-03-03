@@ -13,12 +13,19 @@
 #include "Core/Math.h"
 
 #include "Engine/JobSystem.h"
+#include "Engine/EntityComponentManager.h"
 
 #include "Rendering/GraphicsDevice.h"
 #include "Rendering/RenderPipeline.h"
 
 namespace zp
 {
+    enum CameraType
+    {
+        ZP_CAMERA_TYPE_GAME,
+        ZP_CAMERA_TYPE_DEBUG,
+    };
+
     enum CameraProjectionType
     {
         ZP_CAMERA_PROJECTION_ORTHOGRAPHIC,
@@ -48,9 +55,17 @@ namespace zp
         Viewport viewport;
         ScissorRect scissorRect;
         zp_float32_t fov;
+        CameraType type;
         CameraProjectionType projectionType;
         CameraClearMode clearMode;
+        Color clearColor;
+        zp_float32_t clearDepth;
+        zp_uint32_t clearStencil;
     };
+
+    class ImmediateModeRenderer;
+
+    class BatchModeRenderer;
 
     class RenderSystem
     {
@@ -65,12 +80,32 @@ namespace zp
 
         void destroy();
 
-        PreparedJobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& parentJobHandle, const PreparedJobHandle& inputHandle );
+        PreparedJobHandle startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& inputHandle );
+
+        PreparedJobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& parentJobHandle, const PreparedJobHandle& inputHandle );
+
+        GraphicsDevice* getGraphicsDevice()
+        {
+            return m_graphicsDevice;
+        }
+
+        ImmediateModeRenderer* getImmediateModeRenderer()
+        {
+            return m_immediateModeRenderer;
+        }
+
+        BatchModeRenderer* getBatchModeRenderer()
+        {
+            return m_batchModeRenderer;
+        }
 
     private:
         GraphicsDevice* m_graphicsDevice;
         RenderPipeline* m_currentRenderPipeline;
         RenderPipeline* m_nextRenderPipeline;
+
+        ImmediateModeRenderer* m_immediateModeRenderer;
+        BatchModeRenderer* m_batchModeRenderer;
 
     public:
         const MemoryLabel memoryLabel;

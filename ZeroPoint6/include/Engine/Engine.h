@@ -20,6 +20,7 @@
 #include "Engine/EnginePipeline.h"
 #include "Engine/Entity.h"
 #include "Engine/Component.h"
+#include "Engine/EntityComponentManager.h"
 
 #include "Rendering/RenderSystem.h"
 
@@ -34,9 +35,9 @@ namespace zp
 
         ~Engine();
 
-        zp_bool_t isRunning() const;
+        [[nodiscard]] zp_bool_t isRunning() const;
 
-        zp_int32_t getExitCode() const;
+        [[nodiscard]] zp_int32_t getExitCode() const;
 
         void initialize();
 
@@ -54,33 +55,33 @@ namespace zp
 
         void advanceFrame();
 
-        zp_uint64_t getFrameCount() const
+        [[nodiscard]] zp_uint64_t getFrameCount() const
         {
             return m_frameCount;
         }
 
-        ModuleEntryPointAPI* getModuleAPI() const
+        [[nodiscard]] ModuleEntryPointAPI* getModuleAPI() const
         {
             return m_moduleAPI;
         }
 
-        JobSystem* getJobSystem() const
+        [[nodiscard]] JobSystem* getJobSystem() const
         {
             return m_jobSystem;
         }
 
-        RenderSystem* getRenderSystem() const
+        [[nodiscard]] RenderSystem* getRenderSystem() const
         {
             return m_renderSystem;
         }
 
-        EntityComponentManager* getEntityComponentManager() const
+        [[nodiscard]] EntityComponentManager* getEntityComponentManager() const
         {
             return m_entityComponentManager;
         }
 
     private:
-        enum EngineState : zp_uint8_t
+        enum class EngineState : zp_uint8_t
         {
             Idle,
             Initializing,
@@ -114,7 +115,9 @@ namespace zp
         Profiler* m_profiler;
 #endif
 
-        zp_size_t m_frameCount;
+        zp_uint64_t m_frameCount;
+        zp_time_t m_frameTime;
+        zp_time_t m_timeFrequencyS;
 
         zp_int32_t m_exitCode;
         EngineState m_nextEngineState;

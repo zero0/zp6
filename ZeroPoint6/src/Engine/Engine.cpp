@@ -12,7 +12,6 @@
 
 #include "Rendering/RenderSystem.h"
 #include "Rendering/GraphicsDevice.h"
-#include <functional>
 
 namespace zp
 {
@@ -31,9 +30,11 @@ namespace zp
         , m_profiler( nullptr )
 #endif
         , m_frameCount( 0 )
+        , m_frameTime( 0 )
+        , m_timeFrequencyS( zp_time_frequency() )
         , m_exitCode( 0 )
-        , m_nextEngineState( Idle )
-        , m_currentEngineState( Idle )
+        , m_nextEngineState( EngineState::Idle )
+        , m_currentEngineState( EngineState::Idle )
         , memoryLabel( memoryLabel )
     {
     }
@@ -45,7 +46,7 @@ namespace zp
 
     zp_bool_t Engine::isRunning() const
     {
-        return m_currentEngineState != Exit;
+        return m_currentEngineState != EngineState::Exit;
     }
 
     zp_int32_t Engine::getExitCode() const
@@ -60,7 +61,14 @@ namespace zp
         GetPlatform()->SetThreadIdealProcessor( mainThreadHandle, 0 );
 
 #if ZP_USE_PROFILER
-        m_profiler = ZP_NEW( Profiling, Profiler );
+        ProfilerCreateDesc profilerCreateDesc {};
+        profilerCreateDesc.maxThreadCount = 4;
+        profilerCreateDesc.maxFramesToCapture = 120;
+        profilerCreateDesc.maxCPUEventsPerThread = 128;
+        profilerCreateDesc.maxMemoryEventsPerThread = 128;
+        profilerCreateDesc.maxGPUEventsPerThread = 4;
+        
+        m_profiler = ZP_NEW_ARGS( Profiling, Profiler, &profilerCreateDesc );
 
         Profiler::InitializeProfilerThread();
 #endif
@@ -125,6 +133,7 @@ namespace zp
         m_entityComponentManager->registerComponent<ScaleComponentData>();
         m_entityComponentManager->registerComponent<ChildComponentData>();
 
+        // Common Tags
         m_entityComponentManager->registerTag<DestroyedTag>();
         m_entityComponentManager->registerTag<DisabledTag>();
         m_entityComponentManager->registerTag<StaticTag>();
@@ -176,7 +185,7 @@ namespace zp
 
     void Engine::startEngine()
     {
-        m_nextEngineState = Initializing;
+        m_nextEngineState = EngineState::Initializing;
 
         if( m_moduleAPI )
         {
@@ -186,7 +195,7 @@ namespace zp
 
     void Engine::stopEngine()
     {
-        m_nextEngineState = Idle;
+        m_nextEngineState = EngineState::Idle;
 
         if( m_moduleAPI )
         {
@@ -196,13 +205,13 @@ namespace zp
 
     void Engine::restart()
     {
-        m_nextEngineState = Restart;
+        m_nextEngineState = EngineState::Restart;
     }
 
     void Engine::exit( zp_int32_t exitCode )
     {
         m_exitCode = exitCode;
-        m_nextEngineState = Exit;
+        m_nextEngineState = EngineState::Exit;
     }
 
     struct InitializationJob;
@@ -227,21 +236,22 @@ namespace zp
 
         static void Execute( const JobHandle& parentJobHandle, const BeginFrameJob* data )
         {
-            PreparedJobHandle parentPreparedHandle = data->engine->getJobSystem()->Prepare( parentJobHandle );
+            JobSystem* jobSystem = data->engine->getJobSystem();
 
-            PreparedJobHandle renderHandle = data->engine->getJobSystem()->PrepareChildJob( parentPreparedHandle, nullptr );
+            PreparedJobHandle parentPreparedHandle = jobSystem->Prepare( parentJobHandle );
 
-           PreparedJobHandle renderSystemHandle = data->engine->getRenderSystem()->processSystem( data->engine->getFrameCount(), data->engine->getJobSystem(), parentPreparedHandle, renderHandle );
+            PreparedJobHandle renderHandle = jobSystem->PrepareChildJob( parentPreparedHandle, nullptr );
+
+            PreparedJobHandle renderSystemHandle = data->engine->getRenderSystem()->processSystem( data->engine->getFrameCount(), jobSystem, data->engine->getEntityComponentManager(), parentPreparedHandle, renderHandle );
 
             EndFrameJob endFrameJob {
                 data->engine
             };
-            data->engine->getJobSystem()->PrepareJobData( endFrameJob, renderSystemHandle );
+            jobSystem->PrepareJobData( endFrameJob, renderSystemHandle );
 
-            data->engine->getJobSystem()->Schedule( renderHandle );
+            jobSystem->Schedule( renderHandle );
         }
     };
-
 
     struct LateUpdateJob
     {
@@ -276,7 +286,18 @@ namespace zp
 
         static void Execute( const JobHandle& parentJobHandle, const FixedUpdateJob* data )
         {
+            EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
 
+            EntityQuery activeTransformEntities {};
+            activeTransformEntities.notIncludedTags = entityComponentManager->getTagSignature<DisabledTag>();
+            activeTransformEntities.requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData>();
+
+            EntityQueryIterator iterator {};
+            entityComponentManager->iterateEntities( &activeTransformEntities, &iterator );
+
+            while( iterator.next() )
+            {
+            };
 
             UpdateJob updateJob {
                 data->engine
@@ -291,18 +312,24 @@ namespace zp
 
         static void Execute( const JobHandle& parentJobHandle, const StartJob* data )
         {
-            std::function func = [data]( Entity entity, const ComponentSignature& componentSignature ) -> void
+            EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
+
+            // replay command buffers
+            entityComponentManager->replayCommandBuffers();
+
+            // destroy tagged entities
+            EntityQuery destroyedEntityQuery {};
+            destroyedEntityQuery.requiredTags = entityComponentManager->getTagSignature<DestroyedTag>();
+
+            EntityQueryIterator iterator {};
+            entityComponentManager->iterateEntities( &destroyedEntityQuery, &iterator );
+
+            while( iterator.next() )
             {
-                data->engine->getEntityComponentManager()->destroyEntity( entity );
+                iterator.destroyEntity();
             };
 
-            auto rr = func.target<EntityQueryCallback>();
-
-            EntityQuery destroyedEntityQuery {};
-            destroyedEntityQuery.tagsOnly = true;
-            destroyedEntityQuery.componentSignature.addTag( data->engine->getEntityComponentManager()->getTagType<DestroyedTag>());
-
-            //data->engine->getEntityComponentManager()->findEntities( &destroyedEntityQuery, *rr );
+            data->engine->getRenderSystem()->startSystem( data->engine->getFrameCount(), data->engine->getJobSystem(), {} );
 
             FixedUpdateJob fixedUpdateJob {
                 data->engine
@@ -311,14 +338,40 @@ namespace zp
         }
     };
 
+#if ZP_USE_PROFILER
+
+    struct AdvanceProfilerFrameJob
+    {
+        Engine* engine;
+
+        static void Execute( const JobHandle& parentJobHandle, const AdvanceProfilerFrameJob* data )
+        {
+            ZP_PROFILE_ADVANCE_FRAME( data->engine->getFrameCount() );
+
+            StartJob startJob {
+                data->engine
+            };
+            data->engine->getJobSystem()->ScheduleJobData( startJob );
+        }
+    };
+
+#endif
+
     void EndFrameJob::Execute( const JobHandle& parentJobHandle, const EndFrameJob* data )
     {
         data->engine->advanceFrame();
 
+#if ZP_USE_PROFILER
+        AdvanceProfilerFrameJob advanceProfilerJob {
+            data->engine
+        };
+        data->engine->getJobSystem()->ScheduleJobData( advanceProfilerJob );
+#else
         StartJob startJob {
             data->engine
         };
         data->engine->getJobSystem()->ScheduleJobData( startJob );
+#endif
     }
 
 
@@ -337,7 +390,6 @@ namespace zp
 
     void Engine::process()
     {
-
         if( m_windowHandle )
         {
             zp_int32_t exitCode;
@@ -355,24 +407,29 @@ namespace zp
 
         switch( m_currentEngineState )
         {
-            case Idle:
+            case EngineState::Idle:
                 break;
-            case Initializing:
+            case EngineState::Initializing:
             {
+                ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
+
                 InitializationJob initializationJob {
                     this
                 };
                 m_jobSystem->ScheduleJobData( initializationJob );
 
-                m_nextEngineState = Running;
+                m_nextEngineState = EngineState::Running;
             }
                 break;
-            case Running:
+            case EngineState::Running:
             {
                 zp_yield_current_thread();
             }
                 break;
-            case Exit:
+            case EngineState::Exit:
+                break;
+
+            case EngineState::Restart:
                 break;
         }
 
@@ -489,8 +546,14 @@ namespace zp
     {
         ++m_frameCount;
 
+        const zp_time_t now = zp_time_now();
+        const zp_time_t totalCPUTime = now - m_frameTime;
+        m_frameTime = now;
+
+        const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
+
         char windowTitle[64];
-        zp_snprintf( windowTitle, "ZeroPoint 6 Frame:%d", m_frameCount );
+        zp_snprintf( windowTitle, "ZeroPoint 6 Frame:%d (%f ms)", m_frameCount, durationMS );
 
         GetPlatform()->SetWindowTitle( m_windowHandle, windowTitle );
 

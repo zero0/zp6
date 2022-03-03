@@ -49,7 +49,7 @@ namespace zp
 
         void destroyRenderPass( RenderPass* renderPass ) final;
 
-        void createGraphicsPipeline( const GraphicsPipelineStateDesc* graphicsPipelineStateDesc, GraphicsPipelineState* graphicsPipelineState ) final;
+        void createGraphicsPipeline( const GraphicsPipelineStateCreateDesc* graphicsPipelineStateCreateDesc, GraphicsPipelineState* graphicsPipelineState ) final;
 
         void destroyGraphicsPipeline( GraphicsPipelineState* graphicsPipelineState ) final;
 
@@ -64,6 +64,18 @@ namespace zp
         void createShader( const ShaderDesc* shaderDesc, Shader* shader ) final;
 
         void destroyShader( Shader* shader ) final;
+
+        void createTexture( const TextureCreateDesc* textureCreateDesc, Texture* texture ) final;
+
+        void destroyTexture( Texture* texture ) final;
+
+        void createSampler( const SamplerCreateDesc* samplerCreateDesc, Sampler* sampler ) final;
+
+        void destroySampler( Sampler* sampler ) final;
+
+        void mapBuffer( zp_size_t offset, zp_size_t size, GraphicsBuffer* graphicsBuffer, void** memory ) final;
+
+        void unmapBuffer( GraphicsBuffer* graphicsBuffer ) final;
 
 #pragma endregion
 
@@ -81,21 +93,27 @@ namespace zp
 
         void bindVertexBuffers( zp_uint32_t firstBinding, zp_uint32_t bindingCount, const GraphicsBuffer** graphicsBuffers, zp_size_t* offsets, CommandQueue* commandQueue ) final;
 
+        void updateTexture( const TextureUpdateDesc* textureUpdateDesc, const Texture* dstTexture, CommandQueue* commandQueue ) final;
+
+        void updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc, const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue ) final;
+
 #pragma endregion
 
 #pragma region Draw Commands
 
         void draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
 
+        void drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
+
 #pragma endregion
 
 #pragma region Profiler Markers
 
-        void beginEventLabel( const char* eventLabel, CommandQueue* commandQueue ) final;
+        void beginEventLabel( const char* eventLabel, const Color& color, CommandQueue* commandQueue ) final;
 
         void endEventLabel( CommandQueue* commandQueue ) final;
 
-        void markEventLabel( const char* eventLabel, CommandQueue* commandQueue ) final;
+        void markEventLabel( const char* eventLabel, const Color& color, CommandQueue* commandQueue ) final;
 
 #pragma endregion
 
@@ -104,7 +122,7 @@ namespace zp
         struct QueueFamilies
         {
             zp_uint32_t graphicsFamily;
-            zp_uint32_t copyFamily;
+            zp_uint32_t transferFamily;
             zp_uint32_t computeFamily;
             zp_uint32_t presentFamily;
         };
@@ -113,9 +131,15 @@ namespace zp
         {
             VkSemaphore vkSwapChainAcquireSemaphore;
             VkSemaphore vkRenderFinishedSemaphore;
-            VkFence vkInFlightFence;
+            VkFence vkInFlightFences;
             VkFence vkSwapChainImageAcquiredFence;
             zp_uint32_t swapChainImageIndex;
+
+#if ZP_USE_PROFILER
+            VkQueryPool vkPipelineStatisticsQueryPool;
+            VkQueryPool vkTimestampQueryPool;
+#endif
+            GraphicsBufferAllocator perFrameStagingBuffer;
 
             zp_size_t commandQueueCount;
             zp_size_t commandQueueCapacity;
@@ -137,7 +161,7 @@ namespace zp
         VkPipelineCache m_vkPipelineCache;
 
         VkCommandPool m_vkGraphicsCommandPool;
-        VkCommandPool m_vkCopyCommandPool;
+        VkCommandPool m_vkTransferCommandPool;
         VkCommandPool m_vkComputeCommandPool;
 
         VkFormat m_vkSwapChainFormat;
@@ -148,14 +172,14 @@ namespace zp
         VkDebugUtilsMessengerEXT m_vkDebugMessenger;
 #endif
 
-        Vector <VkImage> m_swapChainImages;
-        Vector <VkImageView> m_swapChainImageViews;
-        Vector <VkFramebuffer> m_swapChainFrameBuffers;
-        Vector <VkFence> m_swapChainInFlightFences;
+        Vector<VkImage> m_swapChainImages;
+        Vector<VkImageView> m_swapChainImageViews;
+        Vector<VkFramebuffer> m_swapChainFrameBuffers;
+        Vector<VkFence> m_swapChainInFlightFences;
 
+        GraphicsBuffer m_stagingBuffer;
 
         QueueFamilies m_queueFamilies;
-
     };
 }
 

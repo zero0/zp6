@@ -15,6 +15,7 @@ namespace zp
     enum
     {
         ShaderStage_Count = 6,
+        kMaxShaderEntryPointNameSize = 32,
     };
 
     enum ShaderStage
@@ -45,7 +46,7 @@ namespace zp
         zp_handle_t shader;
 
         ShaderStage shaderStage;
-        char entryPointName[32];
+        char entryPointName[kMaxShaderEntryPointNameSize];
     };
 
     typedef GraphicsResource <Shader> ShaderResource;

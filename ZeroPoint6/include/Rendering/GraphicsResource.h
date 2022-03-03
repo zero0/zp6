@@ -22,9 +22,8 @@ namespace zp
         zp_size_t m_refCount;
     };
 
-
     template<typename T>
-    class GraphicsResource : public BaseGraphicsResource
+    class GraphicsResource final : public BaseGraphicsResource
     {
     public:
         const T& get() const
@@ -47,7 +46,6 @@ namespace zp
             return &m_resource;
         }
 
-
     private:
         T m_resource;
     };
@@ -67,12 +65,6 @@ namespace zp
         GraphicsResourceHandle()
             : m_resource( nullptr )
         {
-        }
-
-        explicit GraphicsResourceHandle( const_ref_resource resource )
-            : m_resource( &resource )
-        {
-            m_resource->addRef();
         }
 
         explicit GraphicsResourceHandle( resource_pointer resource )
@@ -120,7 +112,6 @@ namespace zp
             return *this;
         }
 
-
         const_type_pointer data() const
         {
             return m_resource ? m_resource->data() : nullptr;
@@ -133,18 +124,28 @@ namespace zp
 
         type_pointer operator->()
         {
-            return m_resource ? &m_resource->get() : nullptr;
+            return m_resource ? m_resource->data() : nullptr;
         }
 
         const_type_pointer operator->() const
         {
-            return m_resource ? &m_resource->get() : nullptr;
+            return m_resource ? m_resource->data() : nullptr;
         }
 
         void release()
         {
             if( m_resource ) m_resource->removeRef();
             m_resource = nullptr;
+        }
+
+        [[nodiscard]] zp_hash64_t hash() const
+        {
+            return static_cast<zp_hash64_t>( m_resource );
+        }
+
+        [[nodiscard]] zp_bool_t isValid() const
+        {
+            return m_resource != nullptr;
         }
 
     private:

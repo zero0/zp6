@@ -25,7 +25,7 @@ namespace zp
 
         LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
         {
-            auto windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA));
+            auto windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
 
             switch( uMessage )
             {
@@ -57,17 +57,17 @@ namespace zp
                     if( windowCallbacks && windowCallbacks->onWindowResize )
                     {
                         auto pos = reinterpret_cast<LPWINDOWPOS >( lParam );
-                        if((~pos->flags & SWP_NOSIZE) == SWP_NOSIZE )
+                        if( ( ~pos->flags & SWP_NOSIZE ) == SWP_NOSIZE )
                         {
-                            DWORD style = ::GetWindowLong( hWnd, GWL_STYLE);
-                            DWORD exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE);
+                            DWORD style = ::GetWindowLong( hWnd, GWL_STYLE );
+                            DWORD exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE );
 
                             RECT rc;
                             ::SetRectEmpty( &rc );
                             ::AdjustWindowRectEx( &rc, style, false, exStyle );
 
-                            zp_int32_t width = pos->cx - (rc.right - rc.left);
-                            zp_int32_t height = pos->cy - (rc.bottom - rc.top);
+                            zp_int32_t width = pos->cx - ( rc.right - rc.left );
+                            zp_int32_t height = pos->cy - ( rc.bottom - rc.top );
 
                             windowCallbacks->onWindowResize( hWnd, width, height );
                         }
@@ -169,9 +169,9 @@ namespace zp
         wc.lpfnWndProc = WinProc;
         wc.hInstance = hInstance;
         wc.hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH ));
-        wc.hIcon = LoadIcon( hInstance, IDI_APPLICATION);
-        wc.hIconSm = LoadIcon( hInstance, IDI_APPLICATION);
-        wc.hCursor = LoadCursor( hInstance, IDC_ARROW);
+        wc.hIcon = LoadIcon( hInstance, IDI_APPLICATION );
+        wc.hIconSm = LoadIcon( hInstance, IDI_APPLICATION );
+        wc.hCursor = LoadCursor( hInstance, IDC_ARROW );
         wc.lpszMenuName = nullptr;
         wc.lpszClassName = kZeroPointClassName;
 
@@ -217,7 +217,7 @@ namespace zp
         zp_bool_t isRunning = true;
 
         MSG msg;
-        while( ::PeekMessage( &msg, static_cast<HWND >(windowHandle), 0, 0, PM_REMOVE ))
+        while( ::PeekMessage( &msg, static_cast<HWND >(windowHandle), 0, 0, PM_REMOVE ) )
         {
             if( msg.message == WM_QUIT )
             {
@@ -239,7 +239,7 @@ namespace zp
     void Platform::CloseWindow( zp_handle_t windowHandle )
     {
         HWND hWnd = static_cast<HWND>( windowHandle);
-        HINSTANCE hInstance = (HINSTANCE)GetWindowLongPtr( hWnd, GWLP_HINSTANCE);
+        HINSTANCE hInstance = (HINSTANCE)GetWindowLongPtr( hWnd, GWLP_HINSTANCE );
 
         ::DestroyWindow( hWnd );
         ::UnregisterClass( "", hInstance );
@@ -253,8 +253,8 @@ namespace zp
     void Platform::SetWindowSize( zp_handle_t windowHandle, const zp_int32_t width, const zp_int32_t height )
     {
         HWND hWnd = static_cast<HWND>( windowHandle);
-        LONG style = ::GetWindowLong( hWnd, GWL_STYLE);
-        LONG exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE);
+        LONG style = ::GetWindowLong( hWnd, GWL_STYLE );
+        LONG exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE );
 
         RECT r { 0, 0, width, height };
         ::AdjustWindowRectEx( &r, style, false, exStyle );
@@ -270,7 +270,7 @@ namespace zp
         const zp_size_t systemPageSize = systemInfo.dwPageSize;
 
         const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
-        const zp_size_t allocationInPageSize = (requestedSize & (systemPageSize - 1)) + requestedSize;
+        const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
 
         void* ptr = ::VirtualAlloc( baseAddress, allocationInPageSize, MEM_RESERVE, PAGE_NOACCESS );
 
@@ -290,7 +290,7 @@ namespace zp
         const zp_size_t systemPageSize = systemInfo.dwPageSize;
 
         const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
-        const zp_size_t allocationInPageSize = (requestedSize & (systemPageSize - 1)) + requestedSize;
+        const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
         return allocationInPageSize;
     }
 
@@ -304,7 +304,7 @@ namespace zp
         const zp_size_t systemPageSize = systemInfo.dwPageSize;
 
         const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
-        const zp_size_t allocationInPageSize = (requestedSize & (systemPageSize - 1)) + requestedSize;
+        const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
         *ptr = (char*)*ptr + allocationInPageSize;
         return page;
     }
@@ -314,25 +314,116 @@ namespace zp
         ::VirtualFree( ptr, size, MEM_DECOMMIT );
     }
 
-    zp_handle_t Platform::OpenFileHandle( const char* filePath )
+    zp_handle_t Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, FileCachingMode fileCachingMode )
     {
+        DWORD access = 0;
+        DWORD shareMode = 0;
+        DWORD attributes = 0;
+
+        switch( openFileMode )
+        {
+            case ZP_OPEN_FILE_MODE_READ:
+                access = FILE_GENERIC_READ;
+                shareMode = FILE_SHARE_READ;
+                attributes = FILE_ATTRIBUTE_READONLY;
+                break;
+
+            case ZP_OPEN_FILE_MODE_WRITE:
+                access = FILE_GENERIC_WRITE;
+                shareMode = FILE_SHARE_WRITE;
+                attributes = FILE_ATTRIBUTE_NORMAL;
+                break;
+
+            case ZP_OPEN_FILE_MODE_READ_WRITE:
+                access = FILE_ALL_ACCESS;
+                shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+                attributes = FILE_ATTRIBUTE_NORMAL;
+                break;
+
+            default:
+                ZP_INVALID_CODE_PATH();
+                break;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_SEQUENTIAL )
+        {
+            attributes |= FILE_FLAG_SEQUENTIAL_SCAN;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_RANDOM_ACCESS )
+        {
+            attributes |= FILE_FLAG_RANDOM_ACCESS;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_NO_BUFFERING )
+        {
+            attributes |= FILE_FLAG_NO_BUFFERING;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_WRITE_THROUGH )
+        {
+            attributes |= FILE_FLAG_WRITE_THROUGH;
+        }
+
         zp_handle_t fileHandle = ::CreateFile(
             filePath,
-            GENERIC_READ,
-            FILE_SHARE_READ,
+            access,
+            shareMode,
             nullptr,
             OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_READONLY,
+            attributes,
             nullptr );
         return fileHandle;
     }
 
-    void Platform::SeekFile( zp_handle_t fileHandle, const zp_ptrdiff_t distanceToMoveInBytes, const int moveMethod )
+    zp_handle_t Platform::OpenTempFileHandle( FileCachingMode fileCachingMode )
+    {
+        char pathBuffer[MAX_PATH];
+        char fileNameBuffer[MAX_PATH];
+
+        const UINT unique = 0x000000000000FFFF & zp_time_now();
+        const DWORD pathLength = ::GetTempPath( ZP_ARRAY_SIZE( pathBuffer ), pathBuffer );
+        ::GetTempFileName( pathBuffer, "tmp", unique, fileNameBuffer );
+
+        DWORD attributes = FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE;
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_SEQUENTIAL )
+        {
+            attributes |= FILE_FLAG_SEQUENTIAL_SCAN;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_RANDOM_ACCESS )
+        {
+            attributes |= FILE_FLAG_RANDOM_ACCESS;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_NO_BUFFERING )
+        {
+            attributes |= FILE_FLAG_NO_BUFFERING;
+        }
+
+        if( fileCachingMode & ZP_FILE_CACHING_MODE_WRITE_THROUGH )
+        {
+            attributes |= FILE_FLAG_WRITE_THROUGH;
+        }
+
+        zp_handle_t fileHandle = ::CreateFile(
+            fileNameBuffer,
+            FILE_ALL_ACCESS,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            nullptr,
+            CREATE_ALWAYS,
+            attributes,
+            nullptr );
+        return fileHandle;
+    }
+
+    void Platform::SeekFile( zp_handle_t fileHandle, const zp_ptrdiff_t distanceToMoveInBytes, const MoveMethod moveMethod )
     {
         LARGE_INTEGER distance = {};
         distance.QuadPart = distanceToMoveInBytes;
 
-        const DWORD moveMethodMapping[] = {
+        constexpr DWORD moveMethodMapping[] = {
             FILE_BEGIN,
             FILE_CURRENT,
             FILE_END
@@ -343,8 +434,8 @@ namespace zp
 
     zp_size_t Platform::GetFileSize( zp_handle_t fileHandle ) const
     {
-        LARGE_INTEGER fileSize = {};
-        BOOL ok = ::GetFileSizeEx( fileHandle, &fileSize );
+        LARGE_INTEGER fileSize {};
+        const BOOL ok = ::GetFileSizeEx( fileHandle, &fileSize );
         return ok ? static_cast<zp_size_t>(fileSize.QuadPart) : 0;
     }
 
@@ -356,9 +447,16 @@ namespace zp
     zp_size_t Platform::ReadFile( zp_handle_t fileHandle, void* buffer, const zp_size_t bytesToRead )
     {
         DWORD bytesRead = 0;
-        BOOL ok = ::ReadFile( fileHandle, buffer, bytesToRead, &bytesRead, nullptr );
-
+        const BOOL ok = ::ReadFile( fileHandle, buffer, bytesToRead, &bytesRead, nullptr );
         return ok ? bytesRead : 0;
+    }
+
+    zp_size_t Platform::WriteFile( zp_handle_t fileHandle, const void* data, const zp_size_t size )
+    {
+        DWORD bytesWritten = 0;
+        const BOOL ok = ::WriteFile( fileHandle, data, size, &bytesWritten, nullptr );
+
+        return ok ? bytesWritten : 0;
     }
 
     zp_handle_t Platform::LoadExternalLibrary( const char* libraryPath )
@@ -373,7 +471,7 @@ namespace zp
     {
         if( libraryHandle )
         {
-            ::FreeLibrary( static_cast<HMODULE>(libraryHandle));
+            ::FreeLibrary( static_cast<HMODULE>(libraryHandle) );
         }
     }
 
@@ -385,7 +483,7 @@ namespace zp
 
     zp_handle_t Platform::AllocateThreadPool( zp_uint32_t minThreads, zp_uint32_t maxThreads )
     {
-        void* mem = ::HeapAlloc( ::GetProcessHeap(), HEAP_NO_SERIALIZE, sizeof( TP_CALLBACK_ENVIRON ));
+        void* mem = ::HeapAlloc( ::GetProcessHeap(), HEAP_NO_SERIALIZE, sizeof( TP_CALLBACK_ENVIRON ) );
 
         auto callbackEnviron = static_cast<PTP_CALLBACK_ENVIRON>( mem);
         ::InitializeThreadpoolEnvironment( callbackEnviron );
@@ -468,7 +566,7 @@ namespace zp
         THREADNAME_INFO info;
         info.dwType = 0x1000;
         info.szName = threadName;
-        info.dwThreadID = ::GetThreadId( static_cast<HANDLE>( threadHandle ));
+        info.dwThreadID = ::GetThreadId( static_cast<HANDLE>( threadHandle ) );
         info.dwFlags = 0;
 
 #pragma warning(push)
@@ -491,7 +589,7 @@ namespace zp
 
     zp_int32_t Platform::GetThreadPriority( zp_handle_t threadHandle )
     {
-        const zp_int32_t priority = ::GetThreadPriority( static_cast<HANDLE>( threadHandle));
+        const zp_int32_t priority = ::GetThreadPriority( static_cast<HANDLE>( threadHandle) );
         return priority;
     }
 
@@ -532,5 +630,29 @@ namespace zp
         SYSTEM_INFO info;
         ::GetSystemInfo( &info );
         return info.dwNumberOfProcessors;
+    }
+
+    zp_int32_t Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message )
+    {
+        HWND hWnd = static_cast<HWND>( windowHandle );
+        UINT type = MB_ICONINFORMATION | MB_ABORTRETRYIGNORE | MB_DEFBUTTON1;
+
+        int id = ::MessageBox( hWnd, message, title, type );
+
+        zp_int32_t result = -1;
+        switch( id )
+        {
+            case IDABORT:
+                result = 0;
+                break;
+            case IDRETRY:
+                result = 1;
+                break;
+            case IDIGNORE:
+                result = 2;
+                break;
+        }
+
+        return result;
     }
 }

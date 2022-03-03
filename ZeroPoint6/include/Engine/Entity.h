@@ -24,6 +24,7 @@ namespace zp
 
     typedef void (*EntityQueryCallback)( Entity entity, const ComponentSignature& signature );
 
+    class EntityQueryIterator;
 
     class EntityManager
     {
@@ -44,21 +45,7 @@ namespace zp
 
         void setSignature( Entity entity, const ComponentSignature& signature );
 
-        void findEntitiesAll( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
-
-        void findEntitiesAny( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
-
-        void findEntitiesWithTagsAll( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
-
-        void findEntitiesWithTagsAny( const ComponentSignature& signature, EntityQueryCallback entityQueryCallback ) const;
-
-        void findEntitiesAll( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
-
-        void findEntitiesAny( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
-
-        void findEntitiesWithTagsAll( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
-
-        void findEntitiesWithTagsAny( const ComponentSignature& signature, Vector<Entity>& foundEntities ) const;
+        zp_bool_t nextEntity( EntityQueryIterator* entityQueryIterator ) const;
 
     private:
         MemoryLabel m_entityMemoryLabel;

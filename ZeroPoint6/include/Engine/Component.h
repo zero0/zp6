@@ -5,6 +5,7 @@
 #ifndef ZP_COMPONENT_H
 #define ZP_COMPONENT_H
 
+#include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/Common.h"
@@ -26,11 +27,13 @@ namespace zp
         kMaxEntitiesPerArchetype = 64,
     };
 
+    typedef void (* DestroyComponentDataCallback)( void* componentData, zp_size_t componentSize );
 
     struct ComponentDescriptor
     {
         zp_hash64_t typeHash;
         zp_size_t size;
+        DestroyComponentDataCallback destroyCallback;
     };
 
     struct TagDescriptor
@@ -41,10 +44,12 @@ namespace zp
     struct ComponentBlockArchetype
     {
         ComponentSignature componentSignature;
-        zp_size_t totalStride;
-        zp_size_t componentOffset[kMaxComponentsPerArchetype];
+        zp_uint32_t totalStride;
+        zp_uint32_t componentCount;
+        zp_uint32_t componentSize[kMaxComponentsPerArchetype];
+        zp_uint32_t componentOffset[kMaxComponentsPerArchetype];
         ComponentType componentType[kMaxComponentsPerArchetype];
-        zp_uint8_t componentCount;
+        DestroyComponentDataCallback destroyCallbacks[kMaxComponentsPerArchetype];
     };
 
     class ComponentArchetypeManager
@@ -68,10 +73,7 @@ namespace zp
 
         void* getComponentData( Entity entity, ComponentType componentType );
 
-        void setComponentData( Entity entity, ComponentType componentType, void* data, zp_size_t length );
-
-    public:
-        const MemoryLabel memoryLabel;
+        void setComponentData( Entity entity, ComponentType componentType, const void* data, zp_size_t length );
 
     private:
         zp_size_t getEntityIndex( const Entity entity ) const;
@@ -99,14 +101,21 @@ namespace zp
 
         Vector<EntityMap> m_entityMap;
         Vector<Entity> m_entities;
+
+    public:
+        const MemoryLabel memoryLabel;
     };
+
+    //
+    //
+    //
 
     class ComponentManager
     {
     ZP_NONCOPYABLE( ComponentManager );
 
     public:
-        ComponentManager( MemoryLabel memoryLabel );
+        explicit ComponentManager( MemoryLabel memoryLabel );
 
         ComponentType registerComponent( ComponentDescriptor* componentDescriptor );
 
@@ -118,7 +127,9 @@ namespace zp
 
         ComponentType getComponentTypeFromTypeHash( zp_hash64_t typeHash ) const;
 
-        TagType getTagTypeForTypeHash( zp_hash64_t typeHash ) const;
+        TagType getTagTypeFromTypeHash( zp_hash64_t typeHash ) const;
+
+        zp_size_t getComponentDataSize( ComponentType componentType ) const;
 
     private:
         struct RegisteredComponent
@@ -126,6 +137,7 @@ namespace zp
             zp_hash64_t typeHash;
             zp_size_t size;
             ComponentType type;
+            DestroyComponentDataCallback destroyCallback;
         };
 
         struct RegisteredTag
@@ -141,216 +153,6 @@ namespace zp
         RegisteredTag m_tags[kMaxTagTypes];
 
         Vector<ComponentArchetypeManager*> m_componentArchetypes;
-
-    public:
-        const MemoryLabel memoryLabel;
-    };
-
-    struct EntityQuery
-    {
-        ComponentSignature componentSignature;
-        ZP_BOOL32( tagsOnly );
-        ZP_BOOL32( allStructureMatches );
-        ZP_BOOL32( allTagsMatches );
-    };
-
-    //
-    //
-    //
-
-    template<typename T0>
-    struct EntityQueryCallbackT
-    {
-        typedef void (* Func)( Entity, T0* );
-    };
-
-    template<typename T0, typename T1>
-    struct EntityQueryCallbackTT
-    {
-        typedef void (* Func)( Entity, T0*, T1* );
-    };
-
-    template<typename C0>
-    struct EntityQueryCallbackC
-    {
-        typedef void (* Func)( Entity, const C0* );
-    };
-
-    template<typename C0, typename C1>
-    struct EntityQueryCallbackCC
-    {
-        typedef void (* Func)( Entity, const C0*, const C1* );
-    };
-
-    template<typename T0, typename C1>
-    struct EntityQueryCallbackTC
-    {
-        typedef void (* Func)( Entity, T0*, const C1* );
-    };
-
-    //
-    //
-    //
-
-    class EntityComponentManager
-    {
-    public:
-        explicit EntityComponentManager( MemoryLabel memoryLabel );
-
-        ~EntityComponentManager();
-
-        Entity createEntity();
-
-        Entity createEntity( ComponentSignature componentSignature );
-
-        void destroyEntity( Entity entity );
-
-        void setEntityComponentSignature( Entity entity, ComponentSignature newComponentSignature );
-
-        void registerComponentSignature( ComponentSignature componentSignature );
-
-        ComponentType getComponentType( zp_hash64_t typeHash ) const;
-
-        TagType getTagType( zp_hash64_t typeHash ) const;
-
-        void findEntities( const EntityQuery* entityQuery, EntityQueryCallback entityQueryCallback ) const;
-
-        void findEntities( const EntityQuery* entityQuery, Vector<Entity>& foundEntities ) const;
-
-        const void* getComponentDataReadOnly( Entity entity, ComponentType componentType ) const;
-
-        void* getComponentData( Entity entity, ComponentType componentType );
-
-        template<typename T0>
-        void queryEntities( const EntityQuery* entityQuery, typename EntityQueryCallbackT<T0>::Func callback )
-        {
-            const ComponentType componentType = getComponentType < T0 > ();
-
-            Vector<Entity> foundEntities( 16, MemoryLabels::Temp );
-            findEntities( entityQuery, foundEntities );
-
-            for( Entity entity: foundEntities )
-            {
-                T0* data0 = static_cast<T0*>( getComponentData( entity, componentType ));
-
-                callback( entity, data0 );
-            }
-        }
-
-        template<typename C0>
-        void queryEntities( const EntityQuery* entityQuery, typename EntityQueryCallbackC<C0>::Func callback )
-        {
-            const ComponentType componentType = getComponentType < C0 > ();
-
-            Vector<Entity> foundEntities( 16, MemoryLabels::Temp );
-            findEntities( entityQuery, foundEntities );
-
-            for( Entity entity: foundEntities )
-            {
-                const C0* data0 = static_cast<const C0*>( getComponentDataReadOnly( entity, componentType ));
-
-                callback( entity, data0 );
-            }
-        }
-
-
-        template<typename T0, typename C1>
-        void queryEntities( const EntityQuery* entityQuery, typename EntityQueryCallbackTC<T0, C1>::Func callback )
-        {
-            const ComponentType componentType0 = getComponentType < T0 > ();
-            const ComponentType componentType1 = getComponentType < C1 > ();
-
-            Vector<Entity> foundEntities( 16, MemoryLabels::Temp );
-            findEntities( entityQuery, foundEntities );
-
-            for( Entity entity: foundEntities )
-            {
-                T0* data0 = static_cast<T0*>( getComponentData( entity, componentType0 ));
-                const C1* data1 = static_cast<const C1*>( getComponentDataReadOnly( entity, componentType1 ));
-
-                callback( entity, data0, data1 );
-            }
-        }
-
-        template<typename T>
-        ComponentType getComponentType() const
-        {
-            const zp_hash64_t typeHash = zp_type_hash<T>();
-            return m_componentManager.getComponentTypeFromTypeHash( typeHash );
-        }
-
-        template<typename T>
-        TagType getTagType() const
-        {
-            const zp_hash64_t typeHash = zp_type_hash<T>();
-            return m_componentManager.getTagTypeForTypeHash( typeHash );
-        }
-
-        template<typename T>
-        ComponentType registerComponent()
-        {
-            ComponentDescriptor componentDescriptor {
-                .typeHash = zp_type_hash<T>(),
-                .size = sizeof( T ),
-            };
-
-            return m_componentManager.registerComponent( &componentDescriptor );
-        }
-
-        template<typename T>
-        TagType registerTag()
-        {
-            TagDescriptor tagDescriptor {
-                .typeHash = zp_type_hash<T>()
-            };
-
-            return m_componentManager.registerTag( &tagDescriptor );
-        }
-
-        template<typename T>
-        void setComponentData( Entity entity, const T& data )
-        {
-            const zp_hash64_t typeHash = zp_type_hash<T>();
-            ComponentType componentType = m_componentManager.getComponentTypeFromTypeHash( typeHash );
-
-            const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
-            ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-            archetypeManager->setComponentData( entity, componentType, &data, sizeof( T ));
-        }
-
-        template<typename T>
-        const T* getComponentDataReadOnly( Entity entity ) const
-        {
-            const zp_hash64_t typeHash = zp_type_hash<T>();
-            const ComponentType componentType = m_componentManager.getComponentTypeFromTypeHash( typeHash );
-
-            const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
-            ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-            void* data = archetypeManager->getComponentData( entity, componentType );
-
-            T* componentData = static_cast<T*>( data );
-            return componentData;
-        }
-
-        template<typename T>
-        T* getComponentData( Entity entity )
-        {
-            const zp_hash64_t typeHash = zp_type_hash<T>();
-            const ComponentType componentType = m_componentManager.getComponentTypeFromTypeHash( typeHash );
-
-            const ComponentSignature& componentSignature = m_entityManager.getSignature( entity );
-            ComponentArchetypeManager* archetypeManager = m_componentManager.getComponentArchetype( componentSignature );
-            void* data = archetypeManager->getComponentData( entity, componentType );
-
-            T* componentData = static_cast<T*>( data );
-            return componentData;
-        }
-
-    protected:
-
-    private:
-        EntityManager m_entityManager;
-        ComponentManager m_componentManager;
 
     public:
         const MemoryLabel memoryLabel;
