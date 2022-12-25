@@ -135,6 +135,8 @@ namespace zp
             VkFence vkSwapChainImageAcquiredFence;
             zp_uint32_t swapChainImageIndex;
 
+            VkDescriptorPool vkDescriptorPool;
+
 #if ZP_USE_PROFILER
             VkQueryPool vkPipelineStatisticsQueryPool;
             VkQueryPool vkTimestampQueryPool;
@@ -158,6 +160,7 @@ namespace zp
         VkSwapchainKHR m_vkSwapChain;
         VkRenderPass m_vkSwapChainRenderPass;
 
+        VkDescriptorPool m_vkDescriptorPool;
         VkPipelineCache m_vkPipelineCache;
 
         VkCommandPool m_vkGraphicsCommandPool;
