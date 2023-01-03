@@ -850,6 +850,7 @@ namespace zp
         , m_vkRenderQueues {}
         , m_vkSwapChain( VK_NULL_HANDLE )
         , m_vkSwapChainRenderPass( VK_NULL_HANDLE )
+        , m_vkDescriptorPool( VK_NULL_HANDLE )
         , m_vkPipelineCache( VK_NULL_HANDLE )
         , m_vkGraphicsCommandPool( VK_NULL_HANDLE )
         , m_vkTransferCommandPool( VK_NULL_HANDLE )
@@ -1125,6 +1126,41 @@ namespace zp
 
             createBuffer( &graphicsBufferDesc, &m_stagingBuffer );
         }
+
+        // create descriptor pool
+        {
+            VkDescriptorPoolSize poolSizes[] {
+                {
+                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    128,
+                },
+                {
+                    VK_DESCRIPTOR_TYPE_SAMPLER,
+                    8,
+                },
+                {
+                    VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                    32,
+                }
+            };
+
+            VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {};
+            descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+            descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+            descriptorPoolCreateInfo.maxSets = 4;
+            descriptorPoolCreateInfo.pPoolSizes = poolSizes;
+            descriptorPoolCreateInfo.poolSizeCount = ZP_ARRAY_SIZE( poolSizes );
+
+            HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool ) );
+
+            VkDescriptorSetAllocateInfo descriptorSetAllocateInfo {};
+            descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            descriptorSetAllocateInfo.descriptorPool = m_vkDescriptorPool;
+            descriptorSetAllocateInfo.descriptorSetCount = 0;
+
+            VkDescriptorSet dd;
+            HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &dd ) );
+        }
     }
 
     VulkanGraphicsDevice::~VulkanGraphicsDevice()
@@ -1134,6 +1170,9 @@ namespace zp
         destroySwapChain();
 
         destroyBuffer( &m_stagingBuffer );
+
+        vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, nullptr );
+        m_vkDescriptorPool = {};
 
         vkDestroyCommandPool( m_vkLocalDevice, m_vkGraphicsCommandPool, nullptr );
         vkDestroyCommandPool( m_vkLocalDevice, m_vkTransferCommandPool, nullptr );
@@ -1396,6 +1435,7 @@ namespace zp
         timestampQueryPoolCreateInfo.queryCount = 16;
 #endif
 
+
         zp_size_t perFrameStagingBufferOffset = 0;
         const zp_size_t perFrameStagingBufferSize = m_stagingBuffer.size / kBufferedFrameCount;
 
@@ -1406,8 +1446,7 @@ namespace zp
             HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, nullptr,
                                    &perFrameData.vkRenderFinishedSemaphore ) );
             HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, nullptr, &perFrameData.vkInFlightFences ) );
-            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, nullptr,
-                               &perFrameData.vkSwapChainImageAcquiredFence ) );
+            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, nullptr, &perFrameData.vkSwapChainImageAcquiredFence ) );
 #if ZP_USE_PROFILER
             HR( vkCreateQueryPool( m_vkLocalDevice, &pipelineStatsQueryPoolCreateInfo, nullptr,
                                    &perFrameData.vkPipelineStatisticsQueryPool ) );
@@ -1971,6 +2010,10 @@ namespace zp
     void VulkanGraphicsDevice::createPipelineLayout( const PipelineLayoutDesc* pipelineLayoutDesc,
                                                      PipelineLayout* pipelineLayout )
     {
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {};
+
+        VkSamplerCreateInfo samplerCreateInfo {};
+
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {};
         pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutCreateInfo.setLayoutCount = 0;

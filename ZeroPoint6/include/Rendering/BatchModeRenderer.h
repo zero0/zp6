@@ -15,6 +15,11 @@
 
 namespace zp
 {
+    enum
+    {
+        kMaxCachedPerFrame = 2;
+    };
+
     class GraphicsDevice;
 
     struct BatchModeRenderCommandHandle
@@ -46,6 +51,8 @@ namespace zp
         Bounds3Df worldBounds;
     };
 
+    struct BatchModeCullingResults;
+
     struct BatchModeRendererConfig
     {
     };
@@ -70,6 +77,12 @@ namespace zp
         BatchModeRenderCommand* requestTempRenderCommand();
 
     private:
+        struct PerFrameData
+        {
+            GraphicsBufferAllocator perDrawAllocator;
+        };
+
+        PerFrameData m_perFrameData[kMaxCachedPerFrame];
         zp_uint64_t m_currentFrame;
 
         Vector<BatchModeRenderCommand> m_tempBatchRenderCommands;

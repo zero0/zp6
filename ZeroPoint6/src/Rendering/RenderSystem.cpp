@@ -578,15 +578,28 @@ namespace zp
             static void Execute( const JobHandle& parentJobHandle, const FinalizeBatchRenderingJob* data )
             {
                 {
+                    const zp_float32_t n = -1.f;
+                    const zp_float32_t p = 1.f;
+                    const zp_float32_t z = 0.f;
+
                     VertexVUC tris[] = {
                         { { 0, 0, 0 }, {}, zp_debug_color( data->frameIndex % 255, 255 ) },
                         { { 1, 0, 0 }, {}, Color::green },
                         { { 0, 1, 0 }, {}, Color::blue }
                     };
 
-                    zp_handle_t cmd = data->renderSystem->m_immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, ZP_ARRAY_SIZE( tris ), ZP_ARRAY_SIZE( tris ) );
+                    VertexVUC quads[] = {
+                        { { n, n, 0 }, {}, Color::red },
+                        { { n, z, 0 }, {}, Color::green },
+                        { { z, z, 0 }, {}, Color::blue },
+                        { { z, n, 0 }, {}, Color::white },
+                    };
+
+                    zp_handle_t cmd = data->renderSystem->m_immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 16, 32 );
 
                     data->renderSystem->m_immediateModeRenderer->addTriangles( cmd, tris );
+
+                    data->renderSystem->m_immediateModeRenderer->addQuads( cmd, quads );
 
                     data->renderSystem->m_immediateModeRenderer->end( cmd );
                 }

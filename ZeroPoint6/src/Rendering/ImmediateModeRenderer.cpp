@@ -212,12 +212,12 @@ namespace zp
         for( zp_size_t i = 0; i < triangleCount; ++i )
         {
             cmd->indexBuffer[ index + 0 ] = index + 0;
-            cmd->indexBuffer[ index + 1 ] = index + 2;
-            cmd->indexBuffer[ index + 2 ] = index + 1;
+            cmd->indexBuffer[ index + 1 ] = index + 1;
+            cmd->indexBuffer[ index + 2 ] = index + 2;
 
-            cmd->indexBuffer[ index + 3 ] = index + 0;
+            cmd->indexBuffer[ index + 3 ] = index + 2;
             cmd->indexBuffer[ index + 4 ] = index + 3;
-            cmd->indexBuffer[ index + 5 ] = index + 2;
+            cmd->indexBuffer[ index + 5 ] = index + 0;
             index += 6;
         }
 
