@@ -20,7 +20,7 @@ namespace zp
     enum : zp_size_t
     {
         kJobTotalSize = 4 KB,
-        kJobPaddingSize = kJobTotalSize - (sizeof( JobWorkFunc* ) + sizeof( Job* ) + sizeof( Job* ) + sizeof( zp_size_t )),
+        kJobPaddingSize = kJobTotalSize - ( sizeof( JobWorkFunc* ) + sizeof( Job* ) + sizeof( Job* ) + sizeof( zp_size_t ) ),
     };
 
     struct Job
@@ -61,7 +61,7 @@ namespace zp
         explicit JobHandle( Job* job );
 
     public:
-        zp_bool_t isDone() const;
+        [[nodiscard]] zp_bool_t isDone() const;
 
         void complete();
 
@@ -90,9 +90,13 @@ namespace zp
 
         Job* steal();
 
-        zp_bool_t isEmpty() const;
+        [[nodiscard]] zp_bool_t isEmpty() const;
 
-        zp_size_t count() const;
+        [[nodiscard]] zp_size_t count() const;
+
+        [[nodiscard]] zp_bool_t canSteal() const;
+
+        void setCanSteal( zp_bool_t canSteal );
 
     private:
         Job** m_jobs;
@@ -101,6 +105,7 @@ namespace zp
 
         zp_size_t m_bottom;
         zp_size_t m_top;
+        ZP_BOOL32( m_canSteal );
 
     public:
         const MemoryLabel memoryLabel;
@@ -121,6 +126,12 @@ namespace zp
         JobSystem( MemoryLabel memoryLabel, zp_size_t threadCount );
 
         ~JobSystem();
+
+        void ExitJobThreads();
+
+        //
+        //
+        //
 
         PreparedJobHandle Prepare( const JobHandle& jobHandle ) const;
 
@@ -169,7 +180,7 @@ namespace zp
         template<typename T>
         PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const T& data )
         {
-            return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ));
+            return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
         }
 
         template<typename T>
@@ -181,7 +192,7 @@ namespace zp
         template<typename T>
         PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data )
         {
-            return PrepareChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ));
+            return PrepareChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
         }
 
         template<typename T>
@@ -197,7 +208,7 @@ namespace zp
         template<typename T>
         JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const T& data )
         {
-            return ScheduleJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ));
+            return ScheduleJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
         }
 
         template<typename T>
@@ -209,7 +220,7 @@ namespace zp
         template<typename T>
         JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data )
         {
-            return ScheduleChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ));
+            return ScheduleChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
         }
 
         template<typename T>
@@ -249,6 +260,7 @@ namespace zp
             Wrapper <T> wrapper { T::Execute, zp_move( data ) };
             return PrepareChildJob( parentJobHandle, Wrapper<T>::WrapperJob, wrapper, dependency );
         }
+
         //
         //
         //
@@ -280,6 +292,7 @@ namespace zp
             Wrapper <T> wrapper { T::Execute, zp_move( data ) };
             return ScheduleParentJob( parentJobHandle, Wrapper<T>::WrapperJob, wrapper, dependency );
         }
+
     private:
         template<typename T>
         struct Wrapper
@@ -292,7 +305,10 @@ namespace zp
             static void WrapperJob( Job* job, void* data )
             {
                 auto ptr = static_cast<Wrapper<T>*>( data );
-                if( ptr->func ) ptr->func( JobHandle( job ), &ptr->data );
+                if( ptr->func )
+                {
+                    ptr->func( JobHandle( job ), &ptr->data );
+                }
             }
         };
 

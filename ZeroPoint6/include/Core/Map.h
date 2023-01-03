@@ -75,6 +75,10 @@ namespace zp
 
         [[nodiscard]] zp_bool_t isEmpty() const;
 
+        zp_bool_t get( key_const_reference key, value_reference value ) const;
+
+        zp_bool_t get( key_const_reference key, value_pointer value ) const;
+
         zp_bool_t get( key_const_reference key, value_pointer_reference value ) const;
 
         zp_bool_t get( key_const_reference key, value_pointer_pointer value ) const;
@@ -322,6 +326,32 @@ namespace zp
     {
         const zp_bool_t empty = m_count == m_freeCount;
         return empty;
+    }
+
+    template<typename Key, typename Value, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Map<Key, Value, H, Comparer, Allocator>::get( key_const_reference key, value_reference value ) const
+    {
+        const zp_size_t index = findIndex( key );
+        const zp_bool_t found = index != npos;
+        if( found )
+        {
+            value = m_entries[ index ].value;
+        }
+
+        return found;
+    }
+
+    template<typename Key, typename Value, typename H, typename Comparer, typename Allocator>
+    zp_bool_t Map<Key, Value, H, Comparer, Allocator>::get( key_const_reference key, value_pointer value ) const
+    {
+        const zp_size_t index = findIndex( key );
+        const zp_bool_t found = index != npos;
+        if( found )
+        {
+            *value = m_entries[ index ].value;
+        }
+
+        return found;
     }
 
     template<typename Key, typename Value, typename H, typename Comparer, typename Allocator>

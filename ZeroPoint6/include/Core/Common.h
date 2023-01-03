@@ -38,7 +38,7 @@ zp_int32_t zp_snprintf( char (& dest)[Size], const char* format, Args ... args )
 
 #if ZP_USE_ASSERTIONS
 #define ZP_ASSERT( t )                  do { if( !(t) ) { zp_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); }} while( false )
-#define ZP_ASSERT_MSG( t, msg )         do { if( !(t) ) { zp_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, msg ); }} while( false )
+#define ZP_ASSERT_MSG( t, msg )         do { if( !(t) ) { zp_printfln( "Assertion failed %s:%d - %s: %s", __FILE__, __LINE__, #t, msg ); }} while( false )
 #define ZP_INVALID_CODE_PATH()          do { zp_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
 #define ZP_INVALID_CODE_PATH_MSG( msg ) do { zp_printfln( "Invalid Code Path %s:%d - %s", __FILE__, __LINE__, msg ); } while( false )
 #else // !ZP_USE_ASSERTIONS

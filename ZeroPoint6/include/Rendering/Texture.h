@@ -70,15 +70,15 @@ namespace zp
         SamplerAddressMode addressModeU;
         SamplerAddressMode addressModeV;
         SamplerAddressMode addressModeW;
-        zp_float32_t mipLodBias;
-        zp_bool_t anisotropyEnabled;
-        zp_float32_t maxAnisotropy;
-        zp_bool_t compareEnabled;
         CompareOp compareOp;
+        zp_float32_t mipLodBias;
+        zp_float32_t maxAnisotropy;
         zp_float32_t minLod;
         zp_float32_t maxLod;
         BorderColor borderColor;
-        zp_bool_t unnormalizedCoordinates;
+        ZP_BOOL32( anisotropyEnabled );
+        ZP_BOOL32( compareEnabled );
+        ZP_BOOL32( unnormalizedCoordinates );
     };
 
     struct Sampler

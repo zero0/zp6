@@ -102,19 +102,27 @@ namespace zp
     //
 
     const Color Color::clear = { .r = 0, .g = 0, .b = 0, .a = 0 };
+
     const Color Color::black = { .r = 0, .g = 0, .b = 0, .a = 1 };
+
     const Color Color::white = { .r = 1, .g = 1, .b = 1, .a = 1 };
 
     const Color Color::red = { .r = 1, .g = 0, .b = 0, .a = 1 };
+
     const Color Color::green = { .r = 0, .g = 1, .b = 0, .a = 1 };
+
     const Color Color::blue = { .r = 0, .g = 0, .b = 1, .a = 1 };
 
     const Color Color::yellow = { .r = 1, .g = 1, .b = 0, .a = 1 };
+
     const Color Color::cyan = { .r = 0, .g = 1, .b = 1, .a = 1 };
+
     const Color Color::magenta = { .r = 1, .g = 0, .b = 1, .a = 1 };
 
     const Color Color::gray25 = { .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
+
     const Color Color::gray50 = { .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
+
     const Color Color::gray75 = { .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
 
     //
@@ -122,24 +130,35 @@ namespace zp
     //
 
     constexpr zp_uint8_t f = 0xFF;
+
     constexpr zp_uint8_t c = 0xC0;
+
     constexpr zp_uint8_t h = 0x80;
+
     constexpr zp_uint8_t q = 0x40;
 
     const Color32 Color32::clear = { .r = 0, .g = 0, .b = 0, .a = 0 };
+
     const Color32 Color32::black = { .r = 0, .g = 0, .b = 0, .a = f };
+
     const Color32 Color32::white = { .r = f, .g = f, .b = f, .a = f };
 
     const Color32 Color32::red = { .r = f, .g = 0, .b = 0, .a = f };
+
     const Color32 Color32::green = { .r = 0, .g = f, .b = 0, .a = f };
+
     const Color32 Color32::blue = { .r = 0, .g = 0, .b = f, .a = f };
 
     const Color32 Color32::yellow = { .r = f, .g = f, .b = 0, .a = f };
+
     const Color32 Color32::cyan = { .r = 0, .g = f, .b = f, .a = f };
+
     const Color32 Color32::magenta = { .r = f, .g = 0, .b = f, .a = f };
 
     const Color32 Color32::gray25 = { .r = q, .g = q, .b = q, .a = f };
+
     const Color32 Color32::gray50 = { .r = h, .g = h, .b = h, .a = f };
+
     const Color32 Color32::gray75 = { .r = c, .g = c, .b = c, .a = f };
 
     //
@@ -162,37 +181,37 @@ namespace zp
 
             ZP_FORCEINLINE __m128 _mm_abs_ps( __m128 a )
             {
-                return _mm_and_ps( a, _mm_castsi128_ps( _mm_set1_epi32( (int)0x80000000 ) ) );
+                return _mm_and_ps( a, _mm_castsi128_ps( _mm_set1_epi32((int) 0x80000000 )));
             }
 
             ZP_FORCEINLINE zp_float32_t _mm_hadd_ps( __m128 a )
             {
-                const __m128 t = _mm_add_ps( a, _mm_movehl_ps( a, a ) );
-                return _mm_cvtss_f32( _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 ) ) ) );
+                const __m128 t = _mm_add_ps( a, _mm_movehl_ps( a, a ));
+                return _mm_cvtss_f32( _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 ))));
             }
 
             ZP_FORCEINLINE __m128 _mm_normalize_ps( __m128 a )
             {
                 const __m128 v = _mm_mul_ps( a, a );
-                const __m128 t = _mm_add_ps( v, _mm_movehl_ps( v, v ) );
-                const __m128 f = _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 ) ) );
-                const __m128 l = _mm_rsqrt_ps( _mm_shuffle_ps( f, f, _MM_SHUFFLE( 0, 0, 0, 0 ) ) );
+                const __m128 t = _mm_add_ps( v, _mm_movehl_ps( v, v ));
+                const __m128 f = _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 )));
+                const __m128 l = _mm_rsqrt_ps(_mm_shuffle_ps( f, f, _MM_SHUFFLE( 0, 0, 0, 0 )));
                 return _mm_mul_ps( a, l );
             }
 
             ZP_FORCEINLINE zp_float32_t _mm_length_ps( __m128 a )
             {
                 const __m128 v = _mm_mul_ps( a, a );
-                const __m128 t = _mm_add_ps( v, _mm_movehl_ps( v, v ) );
-                const __m128 f = _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 ) ) );
-                return _mm_cvtss_f32( _mm_sqrt_ss( f ) );
+                const __m128 t = _mm_add_ps( v, _mm_movehl_ps( v, v ));
+                const __m128 f = _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 )));
+                return _mm_cvtss_f32( _mm_sqrt_ss( f ));
             }
 
             ZP_FORCEINLINE zp_float32_t _mm_lengthsq_ps( __m128 a )
             {
                 const __m128 v = _mm_mul_ps( a, a );
-                const __m128 t = _mm_add_ps( v, _mm_movehl_ps( v, v ) );
-                const __m128 f = _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 ) ) );
+                const __m128 t = _mm_add_ps( v, _mm_movehl_ps( v, v ));
+                const __m128 f = _mm_add_ss( t, _mm_shuffle_ps( t, t, _MM_SHUFFLE( 1, 1, 1, 1 )));
                 return _mm_cvtss_f32( f );
             }
 
@@ -200,7 +219,7 @@ namespace zp
             {
                 const __m128 ma = _mm_set1_ps( a );
                 const __m128 nma = _mm_sub_ps( _mm_set1_ps( 1 ), ma );
-                return _mm_add_ps( _mm_mul_ps( x, nma ), _mm_mul_ps( y, ma ) );
+                return _mm_add_ps( _mm_mul_ps( x, nma ), _mm_mul_ps( y, ma ));
             }
 
             ZP_FORCEINLINE __m128 _mm_lerpunclamp_ps( __m128 x, __m128 y, zp_float32_t a )
@@ -214,8 +233,8 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Color r {};
-            _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, zp_clamp01( a ) ) );
+            ZP_ALIGN16 Color r {};
+            _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, zp_clamp01( a )));
             return r;
         }
 
@@ -224,8 +243,8 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Color r {};
-            _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, a ) );
+            ZP_ALIGN16 Color r {};
+            _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, a ));
             return r;
         }
 
@@ -234,8 +253,8 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Color r {};
-            _mm_store_ps( r.rgba, _mm_lerp_ps( mx, my, zp_clamp01( a ) ) );
+            ZP_ALIGN16 Color r {};
+            _mm_store_ps( r.rgba, _mm_lerp_ps( mx, my, zp_clamp01( a )));
             return r;
         }
 
@@ -246,10 +265,10 @@ namespace zp
             const __m128 lc2 = _mm_setr_ps( lh.c2.x, lh.c2.y, lh.c2.z, lh.c2.w );
             const __m128 lc3 = _mm_setr_ps( lh.c3.x, lh.c3.y, lh.c3.z, lh.c3.w );
 
-            __m128 col0 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c0.x ) );
-            __m128 col1 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c1.x ) );
-            __m128 col2 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c2.x ) );
-            __m128 col3 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c3.x ) );
+            __m128 col0 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c0.x ));
+            __m128 col1 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c1.x ));
+            __m128 col2 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c2.x ));
+            __m128 col3 = _mm_mul_ps( lc0, _mm_set1_ps( rh.c3.x ));
 
             col0 = _mm_fmadd_ps( lc1, _mm_set1_ps( rh.c0.y ), col0 );
             col1 = _mm_fmadd_ps( lc1, _mm_set1_ps( rh.c1.y ), col1 );
@@ -266,7 +285,7 @@ namespace zp
             col2 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c2.w ), col2 );
             col3 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c3.w ), col3 );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Matrix4x4f r {};
+            ZP_ALIGN16 Matrix4x4f r {};
             _mm_storer_ps( r.m[ 0 ], col0 );
             _mm_storer_ps( r.m[ 1 ], col1 );
             _mm_storer_ps( r.m[ 2 ], col2 );
@@ -284,7 +303,7 @@ namespace zp
 
             _MM_TRANSPOSE4_PS( lc0, lc1, lc2, lc3 );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Matrix4x4f r {};
+            ZP_ALIGN16 Matrix4x4f r {};
             _mm_storer_ps( r.m[ 0 ], lc0 );
             _mm_storer_ps( r.m[ 1 ], lc1 );
             _mm_storer_ps( r.m[ 2 ], lc2 );
@@ -295,12 +314,12 @@ namespace zp
 
         Vector4f Mul( const Vector4f& lh, const Matrix4x4f& rh )
         {
-            __m128 col0 = _mm_mul_ps( _mm_set1_ps( lh.x ), _mm_setr_ps( rh.c0.x, rh.c1.x, rh.c2.x, rh.c3.x ) );
+            __m128 col0 = _mm_mul_ps( _mm_set1_ps( lh.x ), _mm_setr_ps( rh.c0.x, rh.c1.x, rh.c2.x, rh.c3.x ));
             col0 = _mm_fmadd_ps( _mm_set1_ps( lh.y ), _mm_setr_ps( rh.c0.y, rh.c1.y, rh.c2.y, rh.c3.y ), col0 );
             col0 = _mm_fmadd_ps( _mm_set1_ps( lh.z ), _mm_setr_ps( rh.c0.z, rh.c1.z, rh.c2.z, rh.c3.z ), col0 );
             col0 = _mm_fmadd_ps( _mm_set1_ps( lh.w ), _mm_setr_ps( rh.c0.w, rh.c1.w, rh.c2.w, rh.c3.w ), col0 );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Vector4f r {};
+            ZP_ALIGN16 Vector4f r {};
             _mm_storer_ps( r.m, col0 );
 
             return r;
@@ -311,7 +330,7 @@ namespace zp
             const __m128 mmin = _mm_setr_ps( lh.xMin, lh.yMin, lh.zMin, 1 );
             const __m128 mmax = _mm_setr_ps( lh.xMax, lh.yMax, lh.zMax, 1 );
 
-            const __m128 mrcp2 = _mm_rcp_ps( _mm_set1_ps( 2 ) );
+            const __m128 mrcp2 = _mm_rcp_ps( _mm_set1_ps( 2 ));
             const __m128 mcenter = _mm_mul_ps( _mm_add_ps( mmax, mmin ), mrcp2 );
             const __m128 mextents = _mm_mul_ps( _mm_sub_ps( mmax, mmin ), mrcp2 );
 
@@ -320,20 +339,20 @@ namespace zp
             const __m128 mcz = _mm_setr_ps( rh.c0.z, rh.c1.z, rh.c2.z, rh.c3.z );
             const __m128 mcw = _mm_setr_ps( rh.c0.w, rh.c1.w, rh.c2.w, rh.c3.w );
 
-            __m128 tcenter = _mm_mul_ps( _mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 0, 0, 0, 0 ) ), mcx );
-            tcenter = _mm_fmadd_ps( _mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 1, 1, 1, 1 ) ), mcy, tcenter );
-            tcenter = _mm_fmadd_ps( _mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 2, 2, 2, 2 ) ), mcz, tcenter );
-            tcenter = _mm_fmadd_ps( _mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 3, 3, 3, 3 ) ), mcw, tcenter );
+            __m128 tcenter = _mm_mul_ps(_mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 0, 0, 0, 0 )), mcx );
+            tcenter = _mm_fmadd_ps(_mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 1, 1, 1, 1 )), mcy, tcenter );
+            tcenter = _mm_fmadd_ps(_mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 2, 2, 2, 2 )), mcz, tcenter );
+            tcenter = _mm_fmadd_ps(_mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 3, 3, 3, 3 )), mcw, tcenter );
 
-            __m128 textents = _mm_mul_ps( _mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 0, 0, 0, 0 ) ), _mm_abs_ps( mcx ) );
-            textents = _mm_fmadd_ps( _mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 1, 1, 1, 1 ) ), _mm_abs_ps( mcy ), textents );
-            textents = _mm_fmadd_ps( _mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 2, 2, 2, 2 ) ), _mm_abs_ps( mcz ), textents );
-            textents = _mm_fmadd_ps( _mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 3, 3, 3, 3 ) ), _mm_abs_ps( mcw ), textents );
+            __m128 textents = _mm_mul_ps(_mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 0, 0, 0, 0 )), _mm_abs_ps( mcx ));
+            textents = _mm_fmadd_ps(_mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 1, 1, 1, 1 )), _mm_abs_ps( mcy ), textents );
+            textents = _mm_fmadd_ps(_mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 2, 2, 2, 2 )), _mm_abs_ps( mcz ), textents );
+            textents = _mm_fmadd_ps(_mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 3, 3, 3, 3 )), _mm_abs_ps( mcw ), textents );
 
-            ZP_DECLSPEC_ALIGN( 16 ) zp_float32_t fmin[4];
-            ZP_DECLSPEC_ALIGN( 16 ) zp_float32_t fmax[4];
-            _mm_storer_ps( fmin, _mm_sub_ps( tcenter, textents ) );
-            _mm_storer_ps( fmax, _mm_add_ps( tcenter, textents ) );
+            ZP_ALIGN16 zp_float32_t fmin[4];
+            ZP_ALIGN16 zp_float32_t fmax[4];
+            _mm_storer_ps( fmin, _mm_sub_ps( tcenter, textents ));
+            _mm_storer_ps( fmax, _mm_add_ps( tcenter, textents ));
 
             Bounds3Df r {
                 fmin[ 0 ], fmin[ 1 ], fmin[ 2 ],
@@ -344,22 +363,22 @@ namespace zp
 
         zp_float32_t Dot( const Vector2f& lh, const Vector2f& rh )
         {
-            return _mm_hadd_ps( _mm_mul_ps( _mm_setr_ps( lh.x, lh.y, 0, 0 ), _mm_setr_ps( rh.x, rh.y, 0, 0 ) ) );
+            return _mm_hadd_ps( _mm_mul_ps( _mm_setr_ps( lh.x, lh.y, 0, 0 ), _mm_setr_ps( rh.x, rh.y, 0, 0 )));
         }
 
         zp_float32_t Dot( const Vector3f& lh, const Vector3f& rh )
         {
-            return _mm_hadd_ps( _mm_mul_ps( _mm_setr_ps( lh.x, lh.y, lh.z, 0 ), _mm_setr_ps( rh.x, rh.y, rh.z, 0 ) ) );
+            return _mm_hadd_ps( _mm_mul_ps( _mm_setr_ps( lh.x, lh.y, lh.z, 0 ), _mm_setr_ps( rh.x, rh.y, rh.z, 0 )));
         }
 
         zp_float32_t Dot( const Vector4f& lh, const Vector4f& rh )
         {
-            const __m128 t0 = _mm_mul_ps( _mm_setr_ps( lh.x, lh.y, lh.z, lh.w ), _mm_setr_ps( rh.x, rh.y, rh.z, rh.w ) );
-            const __m128 t1 = _mm_shuffle_ps( t0, t0, _MM_SHUFFLE( 1, 0, 3, 2 ) );
+            const __m128 t0 = _mm_mul_ps( _mm_setr_ps( lh.x, lh.y, lh.z, lh.w ), _mm_setr_ps( rh.x, rh.y, rh.z, rh.w ));
+            const __m128 t1 = _mm_shuffle_ps( t0, t0, _MM_SHUFFLE( 1, 0, 3, 2 ));
             const __m128 t2 = _mm_add_ps( t0, t1 );
-            const __m128 t3 = _mm_shuffle_ps( t2, t2, _MM_SHUFFLE( 2, 3, 0, 1 ) );
+            const __m128 t3 = _mm_shuffle_ps( t2, t2, _MM_SHUFFLE( 2, 3, 0, 1 ));
 
-            return _mm_cvtss_f32( _mm_add_ps( t3, t2 ) );
+            return _mm_cvtss_f32( _mm_add_ps( t3, t2 ));
         }
 
         Vector3f Cross( const Vector3f& lh, const Vector3f& rh )
@@ -367,17 +386,17 @@ namespace zp
             const __m128 a = _mm_setr_ps( lh.x, lh.y, lh.z, 0 );
             const __m128 b = _mm_setr_ps( rh.x, rh.y, rh.z, 0 );
 
-            const __m128 s0 = _mm_shuffle_ps( a, a, _MM_SHUFFLE( 3, 0, 2, 1 ) );
-            const __m128 s1 = _mm_shuffle_ps( b, b, _MM_SHUFFLE( 3, 1, 0, 2 ) );
+            const __m128 s0 = _mm_shuffle_ps( a, a, _MM_SHUFFLE( 3, 0, 2, 1 ));
+            const __m128 s1 = _mm_shuffle_ps( b, b, _MM_SHUFFLE( 3, 1, 0, 2 ));
             const __m128 s2 = _mm_mul_ps( s0, s1 );
 
-            const __m128 s3 = _mm_shuffle_ps( a, a, _MM_SHUFFLE( 3, 1, 0, 2 ) );
-            const __m128 s4 = _mm_shuffle_ps( b, b, _MM_SHUFFLE( 3, 0, 2, 1 ) );
+            const __m128 s3 = _mm_shuffle_ps( a, a, _MM_SHUFFLE( 3, 1, 0, 2 ));
+            const __m128 s4 = _mm_shuffle_ps( b, b, _MM_SHUFFLE( 3, 0, 2, 1 ));
             const __m128 s5 = _mm_mul_ps( s3, s4 );
 
             const __m128 x = _mm_sub_ps( s2, s5 );
 
-            ZP_DECLSPEC_ALIGN( 16 ) zp_float32_t m[4];
+            ZP_ALIGN16 zp_float32_t m[4];
             _mm_storer_ps( m, x );
 
             Vector3f r { m[ 0 ], m[ 1 ], m[ 2 ] };
@@ -424,8 +443,8 @@ namespace zp
         {
             const __m128 v = _mm_setr_ps( lh.x, lh.y, 0, 0 );
 
-            ZP_DECLSPEC_ALIGN( 16 ) zp_float32_t m[4];
-            _mm_storer_ps( m, _mm_normalize_ps( v ) );
+            ZP_ALIGN16 zp_float32_t m[4];
+            _mm_storer_ps( m, _mm_normalize_ps( v ));
 
             Vector2f r { m[ 0 ], m[ 1 ] };
             return r;
@@ -435,8 +454,8 @@ namespace zp
         {
             const __m128 v = _mm_setr_ps( lh.x, lh.y, lh.z, 0 );
 
-            ZP_DECLSPEC_ALIGN( 16 ) zp_float32_t m[4];
-            _mm_storer_ps( m, _mm_normalize_ps( v ) );
+            ZP_ALIGN16 zp_float32_t m[4];
+            _mm_storer_ps( m, _mm_normalize_ps( v ));
 
             Vector3f r { m[ 0 ], m[ 1 ], m[ 2 ] };
             return r;
@@ -446,8 +465,34 @@ namespace zp
         {
             const __m128 v = _mm_setr_ps( lh.x, lh.y, lh.z, lh.w );
 
-            ZP_DECLSPEC_ALIGN( 16 ) Vector4f r;
-            _mm_storer_ps( r.m, _mm_normalize_ps( v ) );
+            ZP_ALIGN16 Vector4f r;
+            _mm_storer_ps( r.m, _mm_normalize_ps( v ));
+
+            return r;
+        }
+
+        Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale )
+        {
+            const __m128 rtf = _mm_setr_ps( orthoRect.right(), orthoRect.top(), zFar, 0 );
+            const __m128 lbn = _mm_setr_ps( orthoRect.left(), orthoRect.bottom(), zNear, 0 );
+
+            const __m128 rtfMlbn = _mm_sub_ps( rtf, lbn );
+            const __m128 rtfPlbn = _mm_add_ps( rtf, lbn );
+
+            const __m128 invRtfMlbn = _mm_rcp_ps( rtfMlbn );
+            const __m128 scale = _mm_setr_ps( orthoScale, orthoScale, -orthoScale, 0 );
+            const __m128 s = _mm_mul_ps( scale, invRtfMlbn );
+
+            const __m128 c0 = _mm_shuffle_ps( s, _mm_setzero_ps(), _MM_SHUFFLE( 0, 3, 0, 0 ));
+            const __m128 c1 = _mm_shuffle_ps( s, _mm_setzero_ps(), _MM_SHUFFLE( 3, 1, 0, 0 ));
+            const __m128 c2 = _mm_shuffle_ps( _mm_setzero_ps(), s, _MM_SHUFFLE( 0, 0, 2, 3 ));
+            const __m128 c3 = _mm_add_ps( _mm_mul_ps( _mm_mul_ps( rtfPlbn, invRtfMlbn ), _mm_setr_ps( -1, -1, -1, 0 )), _mm_setr_ps( 0, 0, 0, 1 ));
+
+            ZP_ALIGN16 Matrix4x4f r {};
+            _mm_storer_ps( r.c0.m, c0 );
+            _mm_storer_ps( r.c1.m, c1 );
+            _mm_storer_ps( r.c2.m, c2 );
+            _mm_storer_ps( r.c3.m, c3 );
 
             return r;
         }

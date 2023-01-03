@@ -23,13 +23,13 @@ constexpr T zp_max( const T& a, const T& b )
 template<typename T>
 constexpr T zp_min3( const T& a, const T& b, const T& c )
 {
-    return zp_min( a, zp_min( b, c ) );
+    return zp_min( a, zp_min( b, c ));
 }
 
 template<typename T>
 constexpr T zp_max3( const T& a, const T& b, const T& c )
 {
-    return zp_max( a, zp_max( b, c ) );
+    return zp_max( a, zp_max( b, c ));
 }
 
 template<typename T>
@@ -124,6 +124,7 @@ namespace zp
     };
 
     typedef Vector2<zp_int32_t> Vector2i;
+
     typedef Vector2<zp_float32_t> Vector2f;
 
     template<typename T>
@@ -138,11 +139,27 @@ namespace zp
             };
         };
 
+        explicit Vector3( T x ) : x( x )
+            , y( T {} )
+            , z( T {} )
+        {}
+
+        Vector3( T x, T y ) : x( x )
+            , y( y )
+            , z( T {} )
+        {}
+
+        Vector3( T x, T y, T z ) : x( x )
+            , y( y )
+            , z( z )
+        {}
+
         static const Vector3 zero;
         static const Vector3 one;
     };
 
     typedef Vector3<zp_int32_t> Vector3i;
+
     typedef Vector3<zp_float32_t> Vector3f;
 
     template<typename T>
@@ -162,6 +179,7 @@ namespace zp
     };
 
     typedef Vector4<zp_int32_t> Vector4i;
+
     typedef Vector4<zp_float32_t> Vector4f;
 
     struct Quaternion
@@ -178,6 +196,7 @@ namespace zp
     };
 
     typedef Offset2D<zp_int32_t> Offset2Di;
+
     typedef Offset2D<zp_float32_t> Offset2Df;
 
     template<typename T>
@@ -187,6 +206,7 @@ namespace zp
     };
 
     typedef Size2D<zp_int32_t> Size2Di;
+
     typedef Size2D<zp_float32_t> Size2Df;
 
     template<typename T>
@@ -238,6 +258,7 @@ namespace zp
     };
 
     typedef Bounds2D<zp_int32_t> Bounds2Di;
+
     typedef Bounds2D<zp_float32_t> Bounds2Df;
 
     template<typename T>
@@ -253,19 +274,72 @@ namespace zp
 
         Offset2D<T> max() const
         {
-            return { offset.x + size.width, offset.y + size.height };
+            return { .x = offset.x + size.width, .y = offset.y + size.height };
         }
 
         Offset2D<T> center() const
         {
             return {
-                ( offset.x + size.width ) / static_cast<T>( 2 ),
-                ( offset.y + size.height ) / static_cast<T>( 2 )
+                .x = ( offset.x + size.width ) / static_cast<T>( 2 ),
+                .y = ( offset.y + size.height ) / static_cast<T>( 2 )
+            };
+        }
+
+        T left() const
+        {
+            return offset.x;
+        }
+
+        T right() const
+        {
+            return offset.x + size.width;
+        }
+
+        T top() const
+        {
+            return offset.y + size.height;
+        }
+
+        T bottom() const
+        {
+            return offset.y;
+        }
+
+        Offset2D<T> topLeft() const
+        {
+            return {
+                .x = offset.x,
+                .y = offset.y + size.height
+            };
+        }
+
+        Offset2D<T> topRight() const
+        {
+            return {
+                .x = offset.x + size.width,
+                .y = offset.y + size.height
+            };
+        }
+
+        Offset2D<T> bottomLeft() const
+        {
+            return {
+                .x = offset.x,
+                .y = offset.y
+            };
+        }
+
+        Offset2D<T> bottomRight() const
+        {
+            return {
+                .x = offset.x + size.width,
+                .y = offset.y
             };
         }
     };
 
     typedef Rect2D<zp_int32_t> Rect2Di;
+
     typedef Rect2D<zp_float32_t> Rect2Df;
 
     template<typename T>
@@ -275,6 +349,7 @@ namespace zp
     };
 
     typedef Size3D<zp_int32_t> Size3Di;
+
     typedef Size3D<zp_float32_t> Size3Df;
 
     template<typename T>
@@ -284,6 +359,7 @@ namespace zp
     };
 
     typedef Offset3D<zp_int32_t> Offset3Di;
+
     typedef Offset3D<zp_float32_t> Offset3Df;
 
     template<typename T>
@@ -352,6 +428,7 @@ namespace zp
     };
 
     typedef Bounds3D<zp_int32_t> Bounds3Di;
+
     typedef Bounds3D<zp_float32_t> Bounds3Df;
 
     struct Color
@@ -495,6 +572,7 @@ namespace zp
 
         Vector4f Normalize( const Vector4f& lh );
 
+        Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale = 2.f );
     }
 }
 
@@ -557,10 +635,10 @@ constexpr zp::Color32 zp_debug_color32( zp_size_t index, zp_size_t count )
     const zp::Color color = zp_debug_color( index, count );
 
     zp::Color32 r {};
-    r.r = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.r * 0xFF ) );
-    r.g = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.g * 0xFF ) );
-    r.b = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.b * 0xFF ) );
-    r.a = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.a * 0xFF ) );
+    r.r = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.r * 0xFF ));
+    r.g = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.g * 0xFF ));
+    r.b = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.b * 0xFF ));
+    r.a = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.a * 0xFF ));
     return r;
 }
 

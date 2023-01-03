@@ -38,15 +38,17 @@ zp_int32_t zp_printf( const char* text, ... )
     char szBuff[kPrintBufferSize];
     va_list arg;
     va_start( arg, text );
-    const zp_int32_t write = _vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
+    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
     va_end( arg );
 
-
-#if !ZP_DEBUG
-    OutputDebugString( szBuff );
-#else
-    printf_s( szBuff );
+#if ZP_DEBUG
+    if( ::IsDebuggerPresent() )
+    {
+        ::OutputDebugString( szBuff );
+    }
 #endif
+
+    ::fprintf_s( stdout, szBuff );
 
     return write;
 }
@@ -57,27 +59,30 @@ zp_int32_t zp_printfln( const char* text, ... )
 
     va_list arg;
     va_start( arg, text );
-    const zp_int32_t write = _vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
+    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
     va_end( arg );
 
     szBuff[ write ] = '\n';
     szBuff[ write + 1 ] = '\0';
 
-
-#if !ZP_DEBUG
-    OutputDebugString( szBuff );
-#else
-    printf_s( szBuff );
+#if ZP_DEBUG
+    if( ::IsDebuggerPresent() )
+    {
+        ::OutputDebugString( szBuff );
+    }
 #endif
 
-    return write;
+    ::fprintf_s( stdout, szBuff );
+    ::fflush( stdout );
+
+    return write + 1;
 }
 
 zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... )
 {
     va_list args;
     va_start( args, format );
-    const zp_int32_t write = _vsnprintf_s( dest, destSize, destSize, format, args );
+    const zp_int32_t write = ::_vsnprintf_s( dest, destSize, destSize, format, args );
     va_end( args );
 
     return write;
@@ -85,12 +90,12 @@ zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... 
 
 void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength )
 {
-    memcpy_s( dst, dstLength, src, srcLength );
+    ::memcpy_s( dst, dstLength, src, srcLength );
 }
 
 void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value )
 {
-    memset( dst, value, dstLength );
+    ::memset( dst, value, dstLength );
 }
 
 zp_time_t zp_time_now()
@@ -99,7 +104,7 @@ zp_time_t zp_time_now()
 
 #if ZP_OS_WINDOWS
     LARGE_INTEGER val;
-    QueryPerformanceCounter( &val );
+    ::QueryPerformanceCounter( &val );
     time = val.QuadPart;
 #endif
 
@@ -112,7 +117,7 @@ zp_time_t zp_time_frequency()
 
 #if ZP_OS_WINDOWS
     LARGE_INTEGER val;
-    QueryPerformanceCounter( &val );
+    ::QueryPerformanceCounter( &val );
     frequency = val.QuadPart;
 #endif
 
@@ -124,7 +129,7 @@ zp_uint64_t zp_time_cycle()
     zp_uint64_t cycles;
 
 #if ZP_OS_WINDOWS
-    cycles = __rdtsc();
+    cycles = ::__rdtsc();
 #endif
 
     return cycles;
@@ -135,7 +140,7 @@ zp_uint32_t zp_current_thread_id()
     zp_uint32_t id;
 
 #if ZP_OS_WINDOWS
-    id = GetCurrentThreadId();
+    id = ::GetCurrentThreadId();
 #endif
 
     return id;
@@ -144,7 +149,7 @@ zp_uint32_t zp_current_thread_id()
 void zp_yield_current_thread()
 {
 #if ZP_OS_WINDOWS
-    YieldProcessor();
+    ::YieldProcessor();
 #endif
 }
 
@@ -159,14 +164,14 @@ void zp_debug_break()
 {
 #if ZP_DEBUG
 #if ZP_OS_WINDOWS
-    DebugBreak();
+    ::DebugBreak();
 #endif
 #endif
 }
 
 zp_int32_t zp_strcmp( const char* lh, const char* rh )
 {
-    return strcmp( lh, rh );
+    return ::strcmp( lh, rh );
 }
 
 zp_guid128_t zp_generate_unique_guid128()
@@ -175,7 +180,7 @@ zp_guid128_t zp_generate_unique_guid128()
 
 #if ZP_OS_WINDOWS
     UUID uuid;
-    UuidCreate( &uuid );
+    ::UuidCreate( &uuid );
 
     m3 = static_cast<zp_uint32_t>( uuid.Data1 );
     m2 = static_cast<zp_uint32_t>( uuid.Data2 << 16 ) | uuid.Data3;
@@ -197,7 +202,7 @@ zp_guid128_t zp_generate_guid128()
 
 #if ZP_OS_WINDOWS
     UUID uuid;
-    UuidCreateSequential( &uuid );
+    ::UuidCreateSequential( &uuid );
 
     m3 = static_cast<zp_uint32_t>( uuid.Data1 );
     m2 = static_cast<zp_uint32_t>( uuid.Data2 << 16 ) | uuid.Data3;
@@ -274,10 +279,10 @@ namespace
 
 zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcSize, void* dstBuffer, zp_size_t dstPosition )
 {
-    zp_size_t hashTab[ HASH_SIZE ];
+    zp_size_t hashTab[HASH_SIZE];
 
     const zp_uint8_t* inBuff = static_cast<const zp_uint8_t*>( srcBuffer );
-    zp_uint8_t* outBuff = static_cast<zp_uint8_t *>( dstBuffer );
+    zp_uint8_t* outBuff = static_cast<zp_uint8_t*>( dstBuffer );
 
     zp_int32_t literals = 0;
 
@@ -461,5 +466,6 @@ void zp_lzf_expand( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcS
             //dstPosition += len;
             //ctrl += len;
         }
-    } while( dstPosition < dstSize );
+    }
+    while( dstPosition < dstSize );
 }

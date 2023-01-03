@@ -53,4 +53,4 @@ set(PLATFORM_ARCH x64)
 set(ROOT_DIR ${PROJECT_SOURCE_DIR})
 
 add_subdirectory(ZeroPoint6)
-add_subdirectory(ShadowGame)
+#add_subdirectory(ShadowGame)

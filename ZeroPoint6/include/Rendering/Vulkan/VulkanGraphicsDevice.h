@@ -85,6 +85,8 @@ namespace zp
 
         void beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue ) final;
 
+        void nextSubpass( CommandQueue* commandQueue ) final;
+        
         void endRenderPass( CommandQueue* commandQueue ) final;
 
         void bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandQueue* commandQueue ) final;

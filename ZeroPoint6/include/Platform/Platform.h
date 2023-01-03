@@ -15,9 +15,12 @@ namespace zp
 
     typedef void (* OnWindowFocus)( zp_handle_t windowHandle, zp_bool_t isNowFocused );
 
+    typedef void (* OnWindowGetMinMaxSize)( zp_handle_t windowHandle, zp_int32_t& minWidth, zp_int32_t& minHeight, zp_int32_t& maxWidth, zp_int32_t& maxHeight );
+
     struct WindowCallbacks
     {
         zp_int32_t minWidth, minHeight, maxWidth, maxHeight;
+        OnWindowGetMinMaxSize onWindowGetMinMaxSize;
         OnWindowResize onWindowResize;
         OnWindowFocus onWindowFocus;
     };
@@ -54,6 +57,40 @@ namespace zp
         ZP_MOVE_METHOD_END,
     };
 
+    enum MessageBoxType
+    {
+        ZP_MESSAGE_BOX_TYPE_INFO,
+        ZP_MESSAGE_BOX_TYPE_WARNING,
+        ZP_MESSAGE_BOX_TYPE_ERROR,
+    };
+
+    enum MessageBoxButton
+    {
+        ZP_MESSAGE_BOX_BUTTON_OK,
+        ZP_MESSAGE_BOX_BUTTON_OK_CANCEL,
+        ZP_MESSAGE_BOX_BUTTON_RETRY_CANCEL,
+        ZP_MESSAGE_BOX_BUTTON_HELP,
+        ZP_MESSAGE_BOX_BUTTON_YES_NO,
+        ZP_MESSAGE_BOX_BUTTON_YES_NO_CANCEL,
+        ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE,
+        ZP_MESSAGE_BOX_BUTTON_CANCEL_TRY_AGAIN_CONTINUE,
+    };
+
+    enum MessageBoxResult
+    {
+        ZP_MESSAGE_BOX_RESULT_OK,
+        ZP_MESSAGE_BOX_RESULT_CANCEL,
+        ZP_MESSAGE_BOX_RESULT_RETRY,
+        ZP_MESSAGE_BOX_RESULT_HELP,
+        ZP_MESSAGE_BOX_RESULT_YES,
+        ZP_MESSAGE_BOX_RESULT_NO,
+        ZP_MESSAGE_BOX_RESULT_CLOSE,
+        ZP_MESSAGE_BOX_RESULT_ABORT,
+        ZP_MESSAGE_BOX_RESULT_IGNORE,
+        ZP_MESSAGE_BOX_RESULT_CONTINUE,
+        ZP_MESSAGE_BOX_RESULT_TRY_AGAIN,
+    };
+
     class Platform
     {
     ZP_NONCOPYABLE( Platform );
@@ -63,9 +100,9 @@ namespace zp
 
         ~Platform() = default;
 
-        zp_handle_t OpenWindow( OpenWindowDesc* desc );
+        zp_handle_t OpenWindow( const OpenWindowDesc* desc );
 
-        zp_bool_t DispatchWindowMessages( zp_handle_t windowHandle, zp_int32_t* exitCode );
+        zp_bool_t DispatchWindowMessages( zp_handle_t windowHandle, zp_int32_t& exitCode );
 
         void CloseWindow( zp_handle_t windowHandle );
 
@@ -137,7 +174,7 @@ namespace zp
 
         zp_uint32_t GetProcessorCount();
 
-        zp_int32_t ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message );
+        MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
     };
 
     Platform* GetPlatform();

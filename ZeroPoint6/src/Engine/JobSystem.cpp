@@ -25,13 +25,17 @@ namespace zp
     namespace
     {
         thread_local Job t_jobs[kJobsPerThread];
+
         thread_local zp_size_t t_allocatedJobCount;
 
         thread_local JobQueue* t_localJobQueue;
+
         thread_local zp_bool_t t_isRunning;
 
         zp_size_t g_stealJobQueueIndex;
+
         zp_size_t g_totalJobQueues;
+
         JobQueue** g_allJobQueues;
 
         Job* AllocateJob()
@@ -48,8 +52,7 @@ namespace zp
         JobQueue* GetStealJobQueue()
         {
             Atomic::IncrementSizeT( &g_stealJobQueueIndex );
-            const zp_size_t mask = g_totalJobQueues - 1;
-            return g_allJobQueues[ g_stealJobQueueIndex & mask ];
+            return g_allJobQueues[ g_stealJobQueueIndex % g_totalJobQueues ];
         }
 
         void ShutdownJobFunc( Job* job, void* data )
@@ -89,7 +92,8 @@ namespace zp
 
         void ExecuteJob( Job* job )
         {
-            if( job->func ) job->func( job, job->padding );
+            if( job->func )
+            { job->func( job, job->padding ); }
             FinishJob( job );
         }
 
@@ -99,14 +103,14 @@ namespace zp
 
             Job* job = nullptr;
 
-            if( jobQueue && !jobQueue->isEmpty())
+            if( jobQueue && !jobQueue->isEmpty() )
             {
                 job = jobQueue->pop();
             }
             else
             {
                 JobQueue* stealJobQueue = GetStealJobQueue();
-                if( stealJobQueue && stealJobQueue != jobQueue && !stealJobQueue->isEmpty())
+                if( stealJobQueue && stealJobQueue != jobQueue && !stealJobQueue->isEmpty() )
                 {
                     job = stealJobQueue->steal();
                 }
@@ -126,7 +130,7 @@ namespace zp
 
         void WaitForJob( const Job* job )
         {
-            while( !IsJobComplete( job ))
+            while( !IsJobComplete( job ) )
             {
                 Job* nextJob = GetJob();
                 if( nextJob )
@@ -161,7 +165,11 @@ namespace zp
                     ExecuteJob( job );
                 }
             }
-
+            Job* job = GetJob();
+            if( job )
+            {
+                ExecuteJob( job );
+            }
 #if ZP_USE_PROFILER
             Profiler::DestroyProfilerThread();
 #endif
@@ -221,6 +229,7 @@ namespace zp
         , m_bottom( 0 )
         , m_mask( count - 1 )
         , m_top( 0 )
+        , m_canSteal( true )
         , memoryLabel( memoryLabel )
     {
         m_jobs = static_cast<Job**>( GetAllocator( memoryLabel )->allocate( sizeof( Job ) * m_capacity, kDefaultMemoryAlignment ));
@@ -309,6 +318,16 @@ namespace zp
         return m_bottom - m_top;
     }
 
+    zp_bool_t JobQueue::canSteal() const
+    {
+        return m_canSteal;
+    }
+
+    void JobQueue::setCanSteal( zp_bool_t canSteal )
+    {
+        m_canSteal = canSteal;
+    }
+
     //
     //
     //
@@ -329,8 +348,8 @@ namespace zp
         , memoryLabel( memoryLabel )
     {
         const zp_size_t jobQueueCount = m_threadCount + 1;
-        m_threadHandles = static_cast<zp_handle_t*>(GetAllocator( memoryLabel )->allocate( sizeof( zp_handle_t ) * m_threadCount, kDefaultMemoryAlignment ));
-        m_jobQueues = static_cast<JobQueue**>(GetAllocator( memoryLabel )->allocate( sizeof( void* ) * jobQueueCount, kDefaultMemoryAlignment ));
+        m_threadHandles = ZP_MALLOC_T_ARRAY( memoryLabel, zp_handle_t, m_threadCount );
+        m_jobQueues = ZP_MALLOC_T_ARRAY( memoryLabel, JobQueue*, jobQueueCount );
 
         g_allJobQueues = m_jobQueues;
         g_stealJobQueueIndex = 0;
@@ -342,13 +361,13 @@ namespace zp
             m_jobQueues[ i ] = ZP_NEW_ARGS_( memoryLabel, JobQueue, kJobQueueCount );
         }
 
-        char threadNameBuff[32];
-        const zp_uint32_t numProcessors = GetPlatform()->GetProcessorCount();
+        const zp_uint32_t numAvailableProcessors = GetPlatform()->GetProcessorCount() - 1;
         for( zp_size_t i = 0; i < m_threadCount; ++i )
         {
             m_threadHandles[ i ] = GetPlatform()->CreateThread( WorkerThreadExec, m_jobQueues[ i ], 1 MB, nullptr );
-            GetPlatform()->SetThreadIdealProcessor( m_threadHandles[ i ], (i + 1) % numProcessors );
+            GetPlatform()->SetThreadIdealProcessor( m_threadHandles[ i ], ( i % numAvailableProcessors ) + 1 ); // proc 0 is used for main thread
 
+            char threadNameBuff[32];
             zp_snprintf( threadNameBuff, "JobThread-%d", i );
             GetPlatform()->SetThreadName( m_threadHandles[ i ], threadNameBuff );
         }
@@ -362,6 +381,27 @@ namespace zp
         const zp_size_t jobQueueCount = m_threadCount + 1;
         for( zp_size_t i = 0; i < jobQueueCount; ++i )
         {
+            ZP_SAFE_DELETE( JobQueue, m_jobQueues[ i ] );
+        }
+
+        ZP_ASSERT( g_jobSystem == this );
+        g_jobSystem = nullptr;
+        g_allJobQueues = nullptr;
+
+        ZP_FREE_( memoryLabel, m_threadHandles );
+        ZP_FREE_( memoryLabel, m_jobQueues );
+    }
+
+    void JobSystem::ExitJobThreads()
+    {
+        const zp_size_t jobQueueCount = m_threadCount + 1;
+        for( zp_size_t i = 0; i < jobQueueCount; ++i )
+        {
+            m_jobQueues[ i ]->setCanSteal( false );
+        }
+
+        for( zp_size_t i = 0; i < jobQueueCount; ++i )
+        {
             Job* job = AllocateJob();
             job->func = ShutdownJobFunc;
             job->parent = nullptr;
@@ -371,24 +411,12 @@ namespace zp
             m_jobQueues[ i ]->push( job );
         }
 
-        GetPlatform()->JoinThreads( m_threadHandles, m_threadCount );
+        //GetPlatform()->JoinThreads( m_threadHandles, m_threadCount );
 
         for( zp_size_t i = 0; i < m_threadCount; ++i )
         {
             GetPlatform()->CloseThread( m_threadHandles[ i ] );
         }
-
-        for( zp_size_t i = 0; i < jobQueueCount; ++i )
-        {
-            ZP_SAFE_DELETE( JobQueue, m_jobQueues[ i ] );
-        }
-
-        ZP_ASSERT( g_jobSystem == this );
-        g_jobSystem = nullptr;
-        g_allJobQueues = nullptr;
-
-        GetAllocator( memoryLabel )->free( m_threadHandles );
-        GetAllocator( memoryLabel )->free( m_jobQueues );
     }
 
     PreparedJobHandle JobSystem::Prepare( const JobHandle& jobHandle ) const
@@ -419,7 +447,8 @@ namespace zp
 
         zp_zero_memory_array( job->padding );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         return PreparedJobHandle( job );
     }
@@ -451,7 +480,8 @@ namespace zp
 
         zp_memcpy( job->padding, kJobPaddingSize, jobData, size );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         return PreparedJobHandle( job );
     }
@@ -483,7 +513,8 @@ namespace zp
 
         zp_zero_memory_array( job->padding );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         return PreparedJobHandle( job );
     }
@@ -517,7 +548,8 @@ namespace zp
 
         zp_memcpy( job->padding, kJobPaddingSize, jobData, size );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         return PreparedJobHandle( job );
     }
@@ -570,7 +602,8 @@ namespace zp
 
         zp_zero_memory_array( job->padding );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         t_localJobQueue->push( job );
         return JobHandle( job );
@@ -588,7 +621,8 @@ namespace zp
 
         zp_memcpy( job->padding, kJobPaddingSize, jobData, size );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         t_localJobQueue->push( job );
         return JobHandle( job );
@@ -634,7 +668,8 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         t_localJobQueue->push( job );
         return JobHandle( job );
@@ -653,7 +688,8 @@ namespace zp
 
         zp_memcpy( job->padding, kJobPaddingSize, jobData, size );
 
-        if( dependency.m_job ) dependency.m_job->next = job;
+        if( dependency.m_job )
+        { dependency.m_job->next = job; }
 
         t_localJobQueue->push( job );
         return JobHandle( job );

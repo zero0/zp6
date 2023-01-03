@@ -113,6 +113,7 @@ namespace zp
                                                  0x00000034, 0x00000017, 0x00000032, 0x0004003d,
                                                  0x00000014, 0x00000035, 0x00000034, 0x0003003e,
                                                  0x00000031, 0x00000035, 0x000100fd, 0x00010038 };
+
         const zp_uint32_t fragmentShaderCode[] = { 0x07230203, 0x00010000, 0x000d000a, 0x00000013,
                                                    0x00000000, 0x00020011, 0x00000001, 0x0006000b,
                                                    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e,
@@ -436,8 +437,8 @@ namespace zp
             m_currentRenderPipeline = nullptr;
         }
 
-        ZP_SAFE_DELETE( ImmediateModeRenderer, m_immediateModeRenderer );
-        ZP_SAFE_DELETE( BatchModeRenderer, m_batchModeRenderer );
+        //ZP_SAFE_DELETE( ImmediateModeRenderer, m_immediateModeRenderer );
+        //ZP_SAFE_DELETE( BatchModeRenderer, m_batchModeRenderer );
 
         DestroyGraphicsDevice( m_graphicsDevice );
 
@@ -481,11 +482,13 @@ namespace zp
                 {
                     renderSystem->m_graphicsDevice->waitForGPU();
 
-                    if( renderSystem->m_currentRenderPipeline ) renderSystem->m_currentRenderPipeline->onDeactivate( renderSystem );
+                    if( renderSystem->m_currentRenderPipeline )
+                    { renderSystem->m_currentRenderPipeline->onDeactivate( renderSystem ); }
 
                     renderSystem->m_currentRenderPipeline = renderSystem->m_nextRenderPipeline;
 
-                    if( renderSystem->m_currentRenderPipeline ) renderSystem->m_currentRenderPipeline->onActivate( renderSystem );
+                    if( renderSystem->m_currentRenderPipeline )
+                    { renderSystem->m_currentRenderPipeline->onActivate( renderSystem ); }
                 }
             }
         } updateRenderPipelineJob { this };
@@ -524,6 +527,48 @@ namespace zp
             }
         } processRenderPipeline { { frameIndex, m_graphicsDevice, this, jobSystem } };
         gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, processRenderPipeline, gpuHandle );
+
+        struct RenderProfilerData
+        {
+            Profiler* profiler;
+            ImmediateModeRenderer* immediateModeRenderer;
+
+            static void Execute( const JobHandle& parentJobHandle, const RenderProfilerData* renderProfilerData )
+            {
+                Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
+
+                zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * 64, 6 * 64 );
+
+                Matrix4x4f localToWorld = Math::OrthoLH( orthoRect, -10, 10 );
+                renderProfilerData->immediateModeRenderer->setLocalToWorld( cmd, localToWorld );
+
+                Rect2Df rect { .offset { .x = 10, .y = 10 }, .size { .width = 640, .height = 480 } };
+
+                Rect2Df r = rect;
+                r.size.height = 12;
+                r.size.width = 16;
+
+                for( int i = 0; i < 10; ++i )
+                {
+                    VertexVUC vertices[] = {
+                        { .vertexOS = Vector3f( r.bottomLeft().x, r.bottomLeft().y ), .uv0 = Vector2f::zero, .color = Color::white, },
+                        { .vertexOS = Vector3f( r.topLeft().x, r.topLeft().y ), .uv0 = Vector2f::zero, .color = Color::white, },
+                        { .vertexOS = Vector3f( r.topRight().x, r.topRight().y ), .uv0 = Vector2f::zero, .color = Color::white, },
+                        { .vertexOS = Vector3f( r.bottomRight().x, r.bottomRight().y ), .uv0 = Vector2f::zero, .color = Color::white, },
+                    };
+                    renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
+                    r.offset.y += r.size.height;
+                    r.size.width += 16;
+                }
+
+
+                renderProfilerData->immediateModeRenderer->end( cmd );
+            }
+        } renderProfilerDataJob {
+            .profiler = nullptr,
+            .immediateModeRenderer = m_immediateModeRenderer
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, renderProfilerDataJob, gpuHandle );
 
         struct FinalizeBatchRenderingJob
         {

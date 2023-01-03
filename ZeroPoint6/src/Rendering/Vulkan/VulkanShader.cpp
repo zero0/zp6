@@ -17,27 +17,29 @@ static VkResult CreateShader(
     const VkAllocationCallbacks* allocationCallbacks,
     void* data,
     size_t size,
-    VkShaderModule& shaderModule)
+    VkShaderModule& shaderModule )
 {
-    VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
-    shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    shaderModuleCreateInfo.codeSize = size;
-    shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(data);
+    VkShaderModuleCreateInfo shaderModuleCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .flags = 0,
+        .codeSize = size,
+        .pCode = reinterpret_cast<const uint32_t*>(data),
+    };
 
     const VkResult result = vkCreateShaderModule(
         localDevice,
         &shaderModuleCreateInfo,
         allocationCallbacks,
-        &shaderModule);
+        &shaderModule );
     return result;
 }
 
 static void DestroyShader(
     VkDevice localDevice,
     const VkAllocationCallbacks* allocationCallbacks,
-    VkShaderModule shaderModule)
+    VkShaderModule shaderModule )
 {
-    vkDestroyShaderModule(localDevice, shaderModule, allocationCallbacks);
+    vkDestroyShaderModule( localDevice, shaderModule, allocationCallbacks );
 }
 
 static VkResult CreateVertexShader(
@@ -45,14 +47,15 @@ static VkResult CreateVertexShader(
     const VkAllocationCallbacks* allocationCallbacks,
     VkShaderModule shaderModule,
     const char* name
-        )
+)
 {
-    VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {};
-    shaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    shaderStageCreateInfo.module = shaderModule;
-    shaderStageCreateInfo.pName = name == nullptr ? "main" : name;
-    shaderStageCreateInfo.pSpecializationInfo = nullptr;
+    VkPipelineShaderStageCreateInfo shaderStageCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .module = shaderModule,
+        .pName = name == nullptr ? "main" : name,
+        .pSpecializationInfo = nullptr,
+    };
 
     return VK_SUCCESS;
 }

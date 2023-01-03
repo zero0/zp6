@@ -334,6 +334,8 @@ namespace zp
 
         virtual void beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue ) = 0;
 
+        virtual void nextSubpass( CommandQueue* commandQueue ) = 0;
+
         virtual void endRenderPass( CommandQueue* commandQueue ) = 0;
 
         virtual void bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandQueue* commandQueue ) = 0;

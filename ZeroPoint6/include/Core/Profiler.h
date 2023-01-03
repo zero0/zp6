@@ -11,11 +11,13 @@
 #include "Core/Allocator.h"
 
 #if ZP_USE_PROFILER
+#ifndef __FILENAME__
 #if ZP_OS_WINDOWS
 #define __FILENAME__                        (zp_strrchr("\\" __FILE__, '\\') + 1)
 #else
 #define __FILENAME__                        (zp_strrchr("/" __FILE__, '/') + 1)
-#endif
+#endif // ZP_OS_WINDOWS
+#endif // __FILENAME__
 
 #define ZP_PROFILE_CPU_BLOCK()              ProfileBlock ZP_CONCAT(__profilerBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, nullptr, 0 )
 #define ZP_PROFILE_CPU_BLOCK_E( e )         ProfileBlock ZP_CONCAT(__profilerBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, #e, 0 )
@@ -133,6 +135,8 @@ namespace zp
 
     private:
         void registerProfilerThread( ProfilerThreadData* profilerThreadData );
+
+        void unregisterProfilerThread( ProfilerThreadData* profilerThreadData );
 
     private:
         zp_uint64_t m_currentFrame;

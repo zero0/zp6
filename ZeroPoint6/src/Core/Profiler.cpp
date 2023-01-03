@@ -39,7 +39,8 @@ namespace zp
 
             static zp_int32_t compare( const CPUProfilerEvent& lh, const CPUProfilerEvent& rh )
             {
-                return zp_cmp( lh.startTime, rh.startTime );
+                zp_int32_t cmp = zp_cmp( lh.threadId, rh.threadId );
+                return cmp == 0 ? zp_cmp( lh.startTime, rh.startTime ) : cmp;
             }
         };
 
@@ -56,7 +57,8 @@ namespace zp
 
             static zp_int32_t compare( const MemoryProfilerEvent& lh, const MemoryProfilerEvent& rh )
             {
-                return zp_cmp( lh.time, rh.time );
+                zp_int32_t cmp = zp_cmp( lh.threadId, rh.threadId );
+                return cmp == 0 ? zp_cmp( lh.time, rh.time ) : cmp;
             }
         };
 
@@ -65,6 +67,7 @@ namespace zp
             zp_uint64_t frameIndex;
 
             zp_time_t gpuDuration;
+            zp_time_t time;
 
             zp_uint32_t numDrawCalls;
             zp_uint32_t numTriangles;
@@ -80,7 +83,8 @@ namespace zp
 
             static zp_int32_t compare( const GPUProfilerEvent& lh, const GPUProfilerEvent& rh )
             {
-                return 0;
+                zp_int32_t cmp = zp_cmp( lh.threadId, rh.threadId );
+                return cmp == 0 ? zp_cmp( lh.time, rh.time ) : cmp;
             }
         };
 
@@ -107,6 +111,7 @@ namespace zp
         zp_size_t currentGPUProfilerEvent;
         zp_size_t eventStackCount;
 
+        zp_size_t threadIndex;
         zp_uint32_t threadID;
     };
 
@@ -185,6 +190,8 @@ namespace zp
 
     void Profiler::DestroyProfilerThread()
     {
+        g_profiler->unregisterProfilerThread( &t_profilerData );
+
         zp_zero_memory( &t_profilerData );
     }
 
@@ -204,7 +211,7 @@ namespace zp
         event->parentEvent = t_profilerData.eventStackCount > 0 ? t_profilerData.eventStack[ t_profilerData.eventStackCount - 1 ] : 0;
         event->userData = userData;
         event->lineNumber = lineNumber;
-        event->threadId = zp_current_thread_id();
+        event->threadId = t_profilerData.threadID;
     }
 
     zp_size_t Profiler::StartCPU( const char* filename, const char* functionName, zp_int32_t lineNumber, const char* eventName, zp_ptr_t userData )
@@ -223,7 +230,7 @@ namespace zp
         event->parentEvent = t_profilerData.eventStackCount > 0 ? t_profilerData.eventStack[ t_profilerData.eventStackCount - 1 ] : -1;
         event->userData = userData;
         event->lineNumber = lineNumber;
-        event->threadId = zp_current_thread_id();
+        event->threadId = t_profilerData.threadID;
 
         ZP_ASSERT( t_profilerData.eventStackCount != kMaxEventStackCount );
         t_profilerData.eventStack[ t_profilerData.eventStackCount++ ] = eventIndex;
@@ -256,7 +263,7 @@ namespace zp
         event->memoryFreed = memoryDesc->freed;
         event->memoryTotal = memoryDesc->total;
         event->memoryLabel = memoryDesc->memoryLabel;
-        event->threadId = zp_current_thread_id();
+        event->threadId = t_profilerData.threadID;
     }
 
     void Profiler::MarkGPU( const Profiler::GPUDesc* gpuDesc )
@@ -266,10 +273,11 @@ namespace zp
         GPUProfilerEvent* event = t_profilerData.gpuProfilerData + eventIndex;
         event->frameIndex = t_profilerData.currentFrame;
         event->gpuDuration = gpuDesc->duration;
+        event->time = zp_time_now();
         event->numDrawCalls = gpuDesc->numDrawCalls;
         event->numTriangles = gpuDesc->numTriangles;
         event->numCommands = gpuDesc->numCommands;
-        event->threadId = zp_current_thread_id();
+        event->threadId = t_profilerData.threadID;
     }
 
     void Profiler::AdvanceFrame( zp_uint64_t frameIndex )
@@ -319,12 +327,14 @@ namespace zp
             for( zp_size_t i = 0; i < m_profilerDataCount; ++i )
             {
                 ProfilerThreadData* threadData = m_profilerThreadData[ i ];
+                if( threadData )
+                {
+                    const zp_size_t cpuEventsSize = threadData->currentCPUProfilerEvent * sizeof( CPUProfilerEvent );
+                    zp_memcpy( profilerFrameBuffer, cpuEventsSize, threadData->cpuProfilerData, cpuEventsSize );
 
-                const zp_size_t cpuEventsSize = threadData->currentCPUProfilerEvent * sizeof( CPUProfilerEvent );
-                zp_memcpy( profilerFrameBuffer, cpuEventsSize, threadData->cpuProfilerData, cpuEventsSize );
-
-                profilerFrameBuffer += cpuEventsSize;
-                header->cpuEvents += threadData->currentCPUProfilerEvent;
+                    profilerFrameBuffer += cpuEventsSize;
+                    header->cpuEvents += threadData->currentCPUProfilerEvent;
+                }
             }
 
             auto cpuEventTail = reinterpret_cast<CPUProfilerEvent*>( profilerFrameBuffer );
@@ -339,12 +349,14 @@ namespace zp
             for( zp_size_t i = 0; i < m_profilerDataCount; ++i )
             {
                 ProfilerThreadData* threadData = m_profilerThreadData[ i ];
+                if( threadData )
+                {
+                    const zp_size_t memoryEventsSize = threadData->currentMemoryProfilerEvent * sizeof( MemoryProfilerEvent );
+                    zp_memcpy( profilerFrameBuffer, memoryEventsSize, threadData->memoryProfilerData, memoryEventsSize );
 
-                const zp_size_t memoryEventsSize = threadData->currentMemoryProfilerEvent * sizeof( MemoryProfilerEvent );
-                zp_memcpy( profilerFrameBuffer, memoryEventsSize, threadData->memoryProfilerData, memoryEventsSize );
-
-                profilerFrameBuffer += memoryEventsSize;
-                header->memoryEvents += threadData->currentMemoryProfilerEvent;
+                    profilerFrameBuffer += memoryEventsSize;
+                    header->memoryEvents += threadData->currentMemoryProfilerEvent;
+                }
             }
 
             auto memoryEventTail = reinterpret_cast<MemoryProfilerEvent*>( profilerFrameBuffer );
@@ -359,12 +371,14 @@ namespace zp
             for( zp_size_t i = 0; i < m_profilerDataCount; ++i )
             {
                 ProfilerThreadData* threadData = m_profilerThreadData[ i ];
+                if( threadData )
+                {
+                    const zp_size_t gpuEventsSize = threadData->currentGPUProfilerEvent * sizeof( GPUProfilerEvent );
+                    zp_memcpy( profilerFrameBuffer, gpuEventsSize, threadData->gpuProfilerData, gpuEventsSize );
 
-                const zp_size_t gpuEventsSize = threadData->currentGPUProfilerEvent * sizeof( GPUProfilerEvent );
-                zp_memcpy( profilerFrameBuffer, gpuEventsSize, threadData->gpuProfilerData, gpuEventsSize );
-
-                profilerFrameBuffer += gpuEventsSize;
-                header->gpuEvents += threadData->currentGPUProfilerEvent;
+                    profilerFrameBuffer += gpuEventsSize;
+                    header->gpuEvents += threadData->currentGPUProfilerEvent;
+                }
             }
 
             auto gpuEventTail = reinterpret_cast<GPUProfilerEvent*>( profilerFrameBuffer );
@@ -377,10 +391,13 @@ namespace zp
         for( zp_size_t i = 0; i < m_profilerDataCount; ++i )
         {
             ProfilerThreadData* threadData = m_profilerThreadData[ i ];
-            threadData->currentFrame = m_currentFrame;
-            threadData->currentCPUProfilerEvent = 0;
-            threadData->currentMemoryProfilerEvent = 0;
-            threadData->currentGPUProfilerEvent = 0;
+            if( threadData )
+            {
+                threadData->currentFrame = m_currentFrame;
+                threadData->currentCPUProfilerEvent = 0;
+                threadData->currentMemoryProfilerEvent = 0;
+                threadData->currentGPUProfilerEvent = 0;
+            }
         }
     }
 
@@ -392,9 +409,19 @@ namespace zp
         profilerThreadData->memoryProfilerData = static_cast<MemoryProfilerEvent*>( m_memoryProfilerData) + ( profilerThreadIndex * m_maxMemoryProfilerEvents );
         profilerThreadData->gpuProfilerData = static_cast<GPUProfilerEvent*>( m_gpuProfilerData) + ( profilerThreadIndex * m_maxGPUProfilerEvents );
 
+        profilerThreadData->threadIndex = profilerThreadIndex;
         profilerThreadData->threadID = zp_current_thread_id();
 
         m_profilerThreadData[ profilerThreadIndex ] = profilerThreadData;
+    }
+
+    void Profiler::unregisterProfilerThread( ProfilerThreadData* profilerThreadData )
+    {
+        profilerThreadData->currentCPUProfilerEvent = 0;
+        profilerThreadData->currentGPUProfilerEvent = 0;
+        profilerThreadData->currentMemoryProfilerEvent = 0;
+
+        m_profilerThreadData[ profilerThreadData->threadIndex ] = nullptr;
     }
 }
 

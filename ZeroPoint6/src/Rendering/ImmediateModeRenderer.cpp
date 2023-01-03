@@ -167,6 +167,8 @@ namespace zp
 
         ImmediateRenderCommand* cmd = static_cast<ImmediateRenderCommand*>( command );
         ZP_ASSERT( cmd->topology == ZP_TOPOLOGY_TRIANGLE_LIST );
+        ZP_ASSERT( count > 0 );
+        ZP_ASSERT( count % 3 == 0 );
 
         for( zp_size_t i = 0; i < count; ++i )
         {
@@ -193,6 +195,8 @@ namespace zp
 
         ImmediateRenderCommand* cmd = static_cast<ImmediateRenderCommand*>( command );
         ZP_ASSERT( cmd->topology == ZP_TOPOLOGY_TRIANGLE_LIST );
+        ZP_ASSERT( count > 0 );
+        ZP_ASSERT( count % 4 == 0 );
 
         for( zp_size_t i = 0; i < count; ++i )
         {

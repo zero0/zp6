@@ -42,6 +42,7 @@
 #endif
 #endif
 
+#define ZP_ALIGN16              ZP_DECLSPEC_ALIGN(16)
 
 #define ZP_USE_CONSOLE_COLORS   1
 

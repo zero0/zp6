@@ -88,13 +88,12 @@ namespace zp
 
     void AssetSystem::loadAssetAsync( const zp_guid128_t& assetGUID, AssetLoadCompleteCallback assetLoadCompleteCallback, void* userPtr )
     {
-        AssetLoadCommand** assetLoadCommandPtr;
-        zp_size_t* indexPtr;
+        AssetLoadCommand* assetLoadCommand;
+        zp_size_t index;
 
         // if the asset is already loaded, perform callback
-        if( m_loadedAssetIndexMap.get( assetGUID, indexPtr ) )
+        if( m_loadedAssetIndexMap.get( assetGUID, &index ) )
         {
-            const zp_size_t index = *indexPtr;
             AssetData& assetData = m_loadedAssets[ index ];
             assetData.refCount++;
 
@@ -104,10 +103,8 @@ namespace zp
             }
         }
             // if the asset is pending, add to the existing chain
-        else if( m_pendingAssetLoadCommands.get( assetGUID, assetLoadCommandPtr ) )
+        else if( m_pendingAssetLoadCommands.get( assetGUID, &assetLoadCommand ) )
         {
-            AssetLoadCommand* assetLoadCommand = *assetLoadCommandPtr;
-
             while( assetLoadCommand->nextCommand != nullptr )
             {
                 assetLoadCommand = assetLoadCommand->nextCommand;
@@ -139,10 +136,9 @@ namespace zp
 
     void AssetSystem::unloadAsset( const zp_guid128_t& assetGUID )
     {
-        zp_size_t* indexPtr;
-        if( m_loadedAssetIndexMap.get( assetGUID, indexPtr ) )
+        zp_size_t index;
+        if( m_loadedAssetIndexMap.get( assetGUID, &index ) )
         {
-            const zp_size_t index = *indexPtr;
             AssetData& assetData = m_loadedAssets[ index ];
             if( assetData.refCount > 0 )
             {
@@ -230,15 +226,15 @@ namespace zp
         m_currentlyLoadingAssets.pushBack( assetLoadCommand );
 
         AssetManifestEntry* assetManifestEntryPtr;
-        if( m_combinedAssetManifestEntries.get( assetLoadCommand->assetGUID, assetManifestEntryPtr ) )
+        if( m_combinedAssetManifestEntries.get( assetLoadCommand->assetGUID, &assetManifestEntryPtr ) )
         {
             assetLoadCommand->assetType = assetManifestEntryPtr->assetType;
             assetLoadCommand->size = assetManifestEntryPtr->assetPackUncompressedSize;
             assetLoadCommand->memoryLabel = m_assetMemoryLabels[ assetLoadCommand->assetType ];
 
-            zp_size_t* indexPtr;
-            m_loadedAssetIndexMap.get( assetManifestEntryPtr->assetPack, indexPtr );
-            const AssetData& assetPackData = m_loadedAssets[ *indexPtr ];
+            zp_size_t indexPtr;
+            m_loadedAssetIndexMap.get( assetManifestEntryPtr->assetPack, &indexPtr );
+            const AssetData& assetPackData = m_loadedAssets[ indexPtr ];
 
             if( assetManifestEntryPtr->assetPackCompressedSize != assetManifestEntryPtr->assetPackUncompressedSize )
             {

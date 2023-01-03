@@ -9,7 +9,7 @@ project(ZeroPoint VERSION ${ZP_VERSION} LANGUAGES CXX)
 set(ZP_TARGET ${PROJECT_NAME}_${PLATFORM_NAME}_${PLATFORM_ARCH})
 
 set(ZP_RENDERING_API Vulkan)
-#find_package(Vulkan REQUIRED)
+find_package(Vulkan REQUIRED)
 
 # Source Files
 set(ZP_CORE_SRC
@@ -146,17 +146,18 @@ target_link_libraries(${ZP_TARGET}
         )
 
 #if (${ZP_RENDERING_API} EQUAL Vulkan)
-cmake_path(SET VulkanSDK $ENV{VULKAN_SDK})
+#cmake_path(SET VulkanSDK $ENV{VULKAN_SDK})
 
 target_include_directories(${ZP_TARGET}
-        PRIVATE "${VulkanSDK}/Include"
+        PRIVATE ${Vulkan_INCLUDE_DIRS}
         )
 target_link_options(${ZP_TARGET}
         PRIVATE -static-libgcc -static-libstdc++ -static
         )
 target_link_libraries(${ZP_TARGET}
-        PRIVATE "${VulkanSDK}/Lib/vulkan-1.lib"
-        PRIVATE "${VulkanSDK}/Lib/VkLayer_utils.lib"
+        PRIVATE ${Vulkan_LIBRARIES}
+#        PRIVATE "${VulkanSDK}/Lib/vulkan-1.lib"
+#        PRIVATE "${VulkanSDK}/Lib/VkLayer_utils.lib"
         PRIVATE "rpcrt4.lib"
         )
 #endif ()
