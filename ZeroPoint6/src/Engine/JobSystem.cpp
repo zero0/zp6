@@ -259,7 +259,6 @@ namespace zp
 
         const zp_size_t t = m_top;
 
-
         if( t <= b )
         {
             Job* job = m_jobs[ b & m_mask ];

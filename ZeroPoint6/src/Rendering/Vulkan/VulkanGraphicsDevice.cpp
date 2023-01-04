@@ -89,6 +89,8 @@ namespace zp
 
             if( messageSeverity & messageMask )
             {
+                zp_printfln( pCallbackData->pMessage );
+
                 MessageBoxResult result = GetPlatform()->ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
                 if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
                 {
@@ -1120,14 +1122,14 @@ namespace zp
             GraphicsBufferDesc graphicsBufferDesc {};
             graphicsBufferDesc.name = "Staging Buffer";
             graphicsBufferDesc.size = stagingBufferSize;
-            graphicsBufferDesc.graphicsBufferUsageFlags =
-                ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC | ZP_GRAPHICS_BUFFER_USAGE_STORAGE;
+            graphicsBufferDesc.graphicsBufferUsageFlags = ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC | ZP_GRAPHICS_BUFFER_USAGE_STORAGE;
             graphicsBufferDesc.memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE;
 
             createBuffer( &graphicsBufferDesc, &m_stagingBuffer );
         }
 
         // create descriptor pool
+        if( false )
         {
             VkDescriptorPoolSize poolSizes[] {
                 {
@@ -1144,19 +1146,22 @@ namespace zp
                 }
             };
 
-            VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {};
-            descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            descriptorPoolCreateInfo.maxSets = 4;
-            descriptorPoolCreateInfo.pPoolSizes = poolSizes;
-            descriptorPoolCreateInfo.poolSizeCount = ZP_ARRAY_SIZE( poolSizes );
+            VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+                .maxSets = 4,
+                .poolSizeCount = ZP_ARRAY_SIZE( poolSizes ),
+                .pPoolSizes = poolSizes,
+            };
 
             HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool ) );
 
-            VkDescriptorSetAllocateInfo descriptorSetAllocateInfo {};
-            descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            descriptorSetAllocateInfo.descriptorPool = m_vkDescriptorPool;
-            descriptorSetAllocateInfo.descriptorSetCount = 0;
+            VkDescriptorSetAllocateInfo descriptorSetAllocateInfo {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                .descriptorPool = m_vkDescriptorPool,
+                .descriptorSetCount = 0,
+                .pSetLayouts = nullptr,
+            };
 
             VkDescriptorSet dd;
             HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &dd ) );
@@ -1360,6 +1365,8 @@ namespace zp
             HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, nullptr, &m_vkSwapChainRenderPass ) );
         }
 
+        m_swapChainFrameBuffers.reserve( swapChainImageCount );
+        m_swapChainFrameBuffers.resize_unsafe( swapChainImageCount );
         for( zp_size_t i = 0; i < swapChainImageCount; ++i )
         {
             VkImageViewCreateInfo imageViewCreateInfo {};
@@ -1679,13 +1686,14 @@ namespace zp
         uint32_t imageIndices[] { m_perFrameData[ frame ].swapChainImageIndex };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( swapChains ) == ZP_ARRAY_SIZE( imageIndices ) );
 
-        VkPresentInfoKHR presentInfo {};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores );
-        presentInfo.pWaitSemaphores = waitSemaphores;
-        presentInfo.swapchainCount = ZP_ARRAY_SIZE( swapChains );
-        presentInfo.pSwapchains = swapChains;
-        presentInfo.pImageIndices = imageIndices;
+        VkPresentInfoKHR presentInfo {
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores ),
+            .pWaitSemaphores = waitSemaphores,
+            .swapchainCount = ZP_ARRAY_SIZE( swapChains ),
+            .pSwapchains = swapChains,
+            .pImageIndices = imageIndices,
+        };
 
         VkResult result;
         result = vkQueuePresentKHR( m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ], &presentInfo );

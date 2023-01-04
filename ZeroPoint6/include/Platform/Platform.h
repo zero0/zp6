@@ -11,11 +11,11 @@ namespace zp
 
     typedef zp_int64_t (* ProcAddressFunc)();
 
+    typedef void (* OnWindowGetMinMaxSize)( zp_handle_t windowHandle, zp_int32_t& minWidth, zp_int32_t& minHeight, zp_int32_t& maxWidth, zp_int32_t& maxHeight );
+
     typedef void (* OnWindowResize)( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
 
     typedef void (* OnWindowFocus)( zp_handle_t windowHandle, zp_bool_t isNowFocused );
-
-    typedef void (* OnWindowGetMinMaxSize)( zp_handle_t windowHandle, zp_int32_t& minWidth, zp_int32_t& minHeight, zp_int32_t& maxWidth, zp_int32_t& maxHeight );
 
     struct WindowCallbacks
     {

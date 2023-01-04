@@ -497,8 +497,6 @@ namespace zp
     zp_handle_t Platform::LoadExternalLibrary( const char* libraryPath )
     {
         HMODULE h = ::LoadLibrary( libraryPath );
-        ZP_ASSERT( h );
-
         return h;
     }
 

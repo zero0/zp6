@@ -34,6 +34,7 @@ zp_int32_t zp_snprintf( char (& dest)[Size], const char* format, Args ... args )
     return zp_snprintf( static_cast<char*>(dest), Size, format, args... );
 }
 
+#define ZP_T( t )                       #t
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS

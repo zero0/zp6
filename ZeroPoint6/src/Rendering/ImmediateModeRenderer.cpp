@@ -255,9 +255,9 @@ namespace zp
             zp_memcpy( buffer, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), perFrameData.scratchIndexBuffer, perFrameData.indexBufferLength * sizeof( zp_uint16_t ) );
             m_graphicsDevice->unmapBuffer( &perFrameData.indexBuffer );
 
-            //CommandQueue* commandQueue = m_graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_TRANSFER, m_currentFrame );
-            //m_graphicsDevice->updateBuffer( &updateVertexBufferDesc, &perFrameData.vertexBuffer, commandQueue );
-            //m_graphicsDevice->updateBuffer( &updateIndexBufferDesc, &perFrameData.indexBuffer, commandQueue );
+            //CommandQueue* commandQueue = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_TRANSFER, m_currentFrame );
+            //graphicsDevice->updateBuffer( &updateVertexBufferDesc, &perFrameData.vertexBuffer, commandQueue );
+            //graphicsDevice->updateBuffer( &updateIndexBufferDesc, &perFrameData.indexBuffer, commandQueue );
 
             ImmediateRenderCommand* command = static_cast<ImmediateRenderCommand*>(static_cast<void*>(perFrameData.commandBuffer));
             ImmediateRenderCommand* endCommand = static_cast<ImmediateRenderCommand*>(static_cast<void*>(perFrameData.commandBuffer + perFrameData.commandBufferLength));

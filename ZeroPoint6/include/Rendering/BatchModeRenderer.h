@@ -17,7 +17,7 @@ namespace zp
 {
     enum
     {
-        kMaxCachedPerFrame = 2;
+        kMaxCachedPerFrame = 2
     };
 
     class GraphicsDevice;

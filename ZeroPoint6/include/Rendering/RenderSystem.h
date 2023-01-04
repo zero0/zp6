@@ -82,7 +82,7 @@ namespace zp
 
         PreparedJobHandle startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& inputHandle );
 
-        PreparedJobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& parentJobHandle, const PreparedJobHandle& inputHandle );
+        PreparedJobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle );
 
         GraphicsDevice* getGraphicsDevice()
         {

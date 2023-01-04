@@ -162,22 +162,22 @@ namespace zp
         struct WaitOnGPUJob
         {
             zp_uint64_t frameIndex;
-            GraphicsDevice* m_graphicsDevice;
+            GraphicsDevice* graphicsDevice;
 
             static void Execute( const JobHandle& parentJobHandle, const WaitOnGPUJob* waitOnGpuJob )
             {
-                waitOnGpuJob->m_graphicsDevice->waitForGPU();
+                waitOnGpuJob->graphicsDevice->waitForGPU();
             }
         };
 
         struct BeginFrameGPUJob
         {
             zp_uint64_t frameIndex;
-            GraphicsDevice* m_graphicsDevice;
+            GraphicsDevice* graphicsDevice;
 
             static void Execute( const JobHandle& parentJobHandle, const BeginFrameGPUJob* waitOnGpuJob )
             {
-                waitOnGpuJob->m_graphicsDevice->beginFrame( waitOnGpuJob->frameIndex );
+                waitOnGpuJob->graphicsDevice->beginFrame( waitOnGpuJob->frameIndex );
             }
         };
 
@@ -437,8 +437,8 @@ namespace zp
             m_currentRenderPipeline = nullptr;
         }
 
-        //ZP_SAFE_DELETE( ImmediateModeRenderer, m_immediateModeRenderer );
-        //ZP_SAFE_DELETE( BatchModeRenderer, m_batchModeRenderer );
+        ZP_SAFE_DELETE( ImmediateModeRenderer, m_immediateModeRenderer );
+        ZP_SAFE_DELETE( BatchModeRenderer, m_batchModeRenderer );
 
         DestroyGraphicsDevice( m_graphicsDevice );
 
@@ -469,8 +469,12 @@ namespace zp
 #endif
     }
 
-    PreparedJobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& parentJobHandle, const PreparedJobHandle& inputHandle )
+    PreparedJobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle )
     {
+        ZP_PROFILE_CPU_BLOCK();
+
+        PreparedJobHandle frameJobHandle = jobSystem->PrepareJob( nullptr );
+
         struct UpdateRenderPipelineJob
         {
             RenderSystem* renderSystem;
@@ -491,15 +495,22 @@ namespace zp
                     { renderSystem->m_currentRenderPipeline->onActivate( renderSystem ); }
                 }
             }
-        } updateRenderPipelineJob { this };
+        } updateRenderPipelineJob {
+            .renderSystem = this
+        };
+        PreparedJobHandle gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, updateRenderPipelineJob, inputHandle );
 
-        PreparedJobHandle gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, updateRenderPipelineJob, inputHandle );
+        WaitOnGPUJob waitOnGpuJob {
+            .frameIndex = frameIndex,
+            .graphicsDevice = m_graphicsDevice
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, waitOnGpuJob, gpuHandle );
 
-        WaitOnGPUJob waitOnGpuJob { frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, waitOnGpuJob, gpuHandle );
-
-        BeginFrameGPUJob beginFrameGpuJob { frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, beginFrameGpuJob, gpuHandle );
+        BeginFrameGPUJob beginFrameGpuJob {
+            .frameIndex = frameIndex,
+            .graphicsDevice = m_graphicsDevice
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, beginFrameGpuJob, gpuHandle );
 
         struct ProcessRenderPipeline
         {
@@ -525,8 +536,15 @@ namespace zp
                     graphicsDevice->endRenderPass( cmd );
                 }
             }
-        } processRenderPipeline { { frameIndex, m_graphicsDevice, this, jobSystem } };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, processRenderPipeline, gpuHandle );
+        } processRenderPipeline {
+            .renderPipelineContext {
+                .m_frameIndex = frameIndex,
+                .m_graphicsDevice = m_graphicsDevice,
+                .m_renderSystem = this,
+                .m_jobSystem = jobSystem
+            }
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, processRenderPipeline, gpuHandle );
 
         struct RenderProfilerData
         {
@@ -568,12 +586,12 @@ namespace zp
             .profiler = nullptr,
             .immediateModeRenderer = m_immediateModeRenderer
         };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, renderProfilerDataJob, gpuHandle );
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, renderProfilerDataJob, gpuHandle );
 
         struct FinalizeBatchRenderingJob
         {
-            RenderSystem* renderSystem;
             zp_uint64_t frameIndex;
+            RenderSystem* renderSystem;
 
             static void Execute( const JobHandle& parentJobHandle, const FinalizeBatchRenderingJob* data )
             {
@@ -607,15 +625,24 @@ namespace zp
                 data->renderSystem->m_immediateModeRenderer->process( data->renderSystem->m_batchModeRenderer );
                 data->renderSystem->m_batchModeRenderer->process( data->renderSystem->m_graphicsDevice );
             }
-        } finalizeBatchRenderingJob { this, frameIndex };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, finalizeBatchRenderingJob, gpuHandle );
+        } finalizeBatchRenderingJob {
+            .frameIndex = frameIndex,
+            .renderSystem = this,
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, finalizeBatchRenderingJob, gpuHandle );
 
-        SubmitGPUJob submitGpuJob { frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, submitGpuJob, gpuHandle );
+        SubmitGPUJob submitGpuJob {
+            .frameIndex = frameIndex,
+            .m_graphicsDevice = m_graphicsDevice
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, submitGpuJob, gpuHandle );
 
-        PresentGPUJob presentGpuJob { frameIndex, m_graphicsDevice };
-        gpuHandle = jobSystem->PrepareChildJobData( parentJobHandle, presentGpuJob, gpuHandle );
+        PresentGPUJob presentGpuJob {
+            .frameIndex = frameIndex,
+            .m_graphicsDevice = m_graphicsDevice
+        };
+        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, presentGpuJob, gpuHandle );
 
-        return gpuHandle;
+        return frameJobHandle;
     }
 }

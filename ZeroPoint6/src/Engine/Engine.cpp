@@ -86,17 +86,17 @@ namespace zp
         //
 
         m_moduleDll = GetPlatform()->LoadExternalLibrary( "" );
-        ZP_ASSERT( m_moduleDll );
+        ZP_ASSERT_MSG( m_moduleDll, "Unable to load module" );
 
         if( m_moduleDll )
         {
             auto getModuleAPI = GetPlatform()->GetProcAddress<GetModuleEntryPoint>( m_moduleDll, ZP_STR( GetModuleEntryPoint ) );
-            ZP_ASSERT( getModuleAPI );
+            ZP_ASSERT_MSG( getModuleAPI, "Unable to find " ZP_T( GetModuleEntryPoint ) );
 
             if( getModuleAPI )
             {
                 m_moduleAPI = getModuleAPI();
-                ZP_ASSERT( m_moduleAPI );
+                ZP_ASSERT_MSG( m_moduleAPI, "No " ZP_T( ModuleEntryPointAPI ) " returned" );
             }
         }
 
@@ -124,7 +124,7 @@ namespace zp
         };
         m_windowHandle = GetPlatform()->OpenWindow( &openWindowDesc );
 
-        //m_renderSystem->initialize( m_windowHandle, GraphicsDeviceFeatures::All );
+        m_renderSystem->initialize( m_windowHandle, GraphicsDeviceFeatures::All );
 
         // Register components
 
@@ -164,7 +164,7 @@ namespace zp
             m_moduleAPI->onEnginePreDestroy( this );
         }
 
-        //m_renderSystem->destroy();
+        m_renderSystem->destroy();
 
         if( m_moduleAPI )
         {
@@ -256,21 +256,13 @@ namespace zp
 
             JobSystem* jobSystem = data->engine->getJobSystem();
 
-            //PreparedJobHandle parentPreparedHandle = jobSystem->Prepare( parentJobHandle );
+            PreparedJobHandle preparedJobHandle = data->engine->getRenderSystem()->processSystem( data->engine->getFrameCount(), jobSystem, data->engine->getEntityComponentManager(), {} );
 
-            //PreparedJobHandle renderHandle = jobSystem->PrepareChildJob( parentPreparedHandle, nullptr );
-
-            PreparedJobHandle preparedJobHandle = {}; //data->engine->getRenderSystem()->processSystem( data->engine->getFrameCount(), jobSystem, data->engine->getEntityComponentManager(), parentPreparedHandle, renderHandle );
+            JobHandle renderSystemHandle = jobSystem->Schedule( preparedJobHandle );
 
             EndFrameJob endFrameJob {
                 data->engine
             };
-            //jobSystem->PrepareJobData( endFrameJob, preparedJobHandle );
-
-            //jobSystem->Schedule( renderHandle );
-
-            JobHandle renderSystemHandle = jobSystem->Schedule( preparedJobHandle );
-
             jobSystem->ScheduleJobData( endFrameJob, renderSystemHandle );
         }
     };
@@ -404,12 +396,15 @@ namespace zp
 
     void EndFrameJob::Execute( const JobHandle& parentJobHandle, const EndFrameJob* data )
     {
-        data->engine->advanceFrame();
+        if( data->engine->isRunning() )
+        {
+            data->engine->advanceFrame();
 
-        StartJob startJob {
-            data->engine
-        };
-        data->engine->getJobSystem()->ScheduleJobData( startJob );
+            StartJob startJob {
+                data->engine
+            };
+            data->engine->getJobSystem()->ScheduleJobData( startJob );
+        }
     }
 
     struct InitializationJob
