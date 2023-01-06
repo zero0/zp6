@@ -21,7 +21,33 @@ namespace zp
     {
         kJobTotalSize = 4 KB,
         kJobPaddingSize = kJobTotalSize - ( sizeof( JobWorkFunc* ) + sizeof( Job* ) + sizeof( Job* ) + sizeof( zp_size_t ) ),
+#if ZP_DEBUG
+        kJobDataDebugSize = 64,
+#else
+        kJobDataDebugSize = 0,
+#endif
+        kJobDataOffset = kJobDataDebugSize,
+        kJobDataSize = kJobPaddingSize - kJobDataOffset
     };
+
+#if ZP_DEBUG
+#define ZP_JOB_DEBUG_NAME( t )    static const char* DebugName() { return #t; }
+#else
+#define ZP_JOB_DEBUG_NAME(...)
+#endif
+
+    namespace
+    {
+        template<typename T>
+        ZP_FORCEINLINE const char* GetDebugName()
+        {
+#if ZP_DEBUG
+            return T::DebugName();
+#else
+            return nullptr;
+#endif
+        }
+    }
 
     struct Job
     {
@@ -30,7 +56,32 @@ namespace zp
         Job* next;
         zp_size_t unfinishedJobs;
         zp_uint8_t padding[kJobPaddingSize];
+
+        ZP_FORCEINLINE void* data()
+        {
+            return padding + kJobDataOffset;
+        }
+
+        ZP_FORCEINLINE const char* name()
+        {
+#if ZP_DEBUG
+            return reinterpret_cast<const char*>( padding );
+#else
+            return nullptr;
+#endif
+        }
+
+        ZP_FORCEINLINE void set_name( const char* debugName )
+        {
+#if ZP_DEBUG
+            if( debugName )
+            {
+                zp_strcpy( debugName, reinterpret_cast<char*>( padding ), kJobDataDebugSize );
+            }
+#endif
+        }
     };
+
     ZP_STATIC_ASSERT( sizeof( Job ) == kJobTotalSize );
 
     //
@@ -143,6 +194,8 @@ namespace zp
 
         PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency );
 
+        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency, const char* name );
+
         PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc );
 
         PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const PreparedJobHandle& dependency );
@@ -164,6 +217,8 @@ namespace zp
         JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const JobHandle& dependency );
 
         JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency );
+
+        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency, const char* debugName );
 
         JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc );
 
@@ -187,6 +242,12 @@ namespace zp
         PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const T& data, const PreparedJobHandle& dependency )
         {
             return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency );
+        }
+
+        template<typename T>
+        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const T& data, const PreparedJobHandle& dependency, const char* debugName )
+        {
+            return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency, debugName );
         }
 
         template<typename T>
@@ -218,6 +279,12 @@ namespace zp
         }
 
         template<typename T>
+        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const T& data, const JobHandle& dependency, const char* debugName )
+        {
+            return ScheduleJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency, debugName );
+        }
+
+        template<typename T>
         JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data )
         {
             return ScheduleChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
@@ -237,14 +304,14 @@ namespace zp
         PreparedJobHandle PrepareJobData( const T& data )
         {
             Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return PrepareJob( Wrapper<T>::WrapperJob, wrapper );
+            return PrepareJob( Wrapper<T>::WrapperJob, wrapper, {}, GetDebugName<T>() );
         }
 
         template<typename T>
         PreparedJobHandle PrepareJobData( const T& data, const PreparedJobHandle& dependency )
         {
             Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return PrepareJob( Wrapper<T>::WrapperJob, wrapper, dependency );
+            return PrepareJob( Wrapper<T>::WrapperJob, wrapper, dependency, GetDebugName<T>() );
         }
 
         template<typename T>
@@ -269,14 +336,14 @@ namespace zp
         JobHandle ScheduleJobData( const T& data )
         {
             Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return ScheduleJob( Wrapper<T>::WrapperJob, wrapper );
+            return ScheduleJob( Wrapper<T>::WrapperJob, wrapper, {}, GetDebugName<T>() );
         }
 
         template<typename T>
         JobHandle ScheduleJobData( const T& data, const JobHandle& dependency )
         {
             Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return ScheduleJob( Wrapper<T>::WrapperJob, wrapper, dependency );
+            return ScheduleJob( Wrapper<T>::WrapperJob, wrapper, dependency, GetDebugName<T>() );
         }
 
         template<typename T>
@@ -304,7 +371,7 @@ namespace zp
 
             static void WrapperJob( Job* job, void* data )
             {
-                auto ptr = static_cast<Wrapper<T>*>( data );
+                auto ptr = static_cast<Wrapper <T>*>( data );
                 if( ptr->func )
                 {
                     ptr->func( JobHandle( job ), &ptr->data );

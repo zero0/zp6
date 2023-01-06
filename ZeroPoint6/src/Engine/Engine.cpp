@@ -243,6 +243,8 @@ namespace zp
     {
         Engine* engine;
 
+        ZP_JOB_DEBUG_NAME( EndFrameJob );
+
         static void Execute( const JobHandle& parentJobHandle, const EndFrameJob* data );
     };
 
@@ -250,26 +252,36 @@ namespace zp
     {
         Engine* engine;
 
+        ZP_JOB_DEBUG_NAME( BeginFrameJob );
+
         static void Execute( const JobHandle& parentJobHandle, const BeginFrameJob* data )
         {
             ZP_PROFILE_CPU_BLOCK();
 
+            const zp_size_t frameIndex = data->engine->getFrameCount();
             JobSystem* jobSystem = data->engine->getJobSystem();
 
-            PreparedJobHandle preparedJobHandle = data->engine->getRenderSystem()->processSystem( data->engine->getFrameCount(), jobSystem, data->engine->getEntityComponentManager(), {} );
+            PreparedJobHandle preparedJobHandle = jobSystem->PrepareJob( nullptr );
+            PreparedJobHandle startJobHandle = preparedJobHandle;
 
-            JobHandle renderSystemHandle = jobSystem->Schedule( preparedJobHandle );
+            preparedJobHandle = data->engine->getRenderSystem()->startSystem( frameIndex, jobSystem, preparedJobHandle );
+
+            preparedJobHandle = data->engine->getRenderSystem()->processSystem( frameIndex, jobSystem, data->engine->getEntityComponentManager(), preparedJobHandle );
 
             EndFrameJob endFrameJob {
                 data->engine
             };
-            jobSystem->ScheduleJobData( endFrameJob, renderSystemHandle );
+            jobSystem->PrepareJobData( endFrameJob, preparedJobHandle );
+
+            jobSystem->Schedule( startJobHandle );
         }
     };
 
     struct LateUpdateJob
     {
         Engine* engine;
+
+        ZP_JOB_DEBUG_NAME( LateUpdateJob );
 
         static void Execute( const JobHandle& parentJobHandle, const LateUpdateJob* data )
         {
@@ -285,6 +297,8 @@ namespace zp
     struct UpdateJob
     {
         Engine* engine;
+
+        ZP_JOB_DEBUG_NAME( UpdateJob );
 
         static void Execute( const JobHandle& parentJobHandle, const UpdateJob* data )
         {
@@ -316,6 +330,8 @@ namespace zp
     {
         Engine* engine;
 
+        ZP_JOB_DEBUG_NAME( FixedUpdateJob );
+
         static void Execute( const JobHandle& parentJobHandle, const FixedUpdateJob* data )
         {
             ZP_PROFILE_CPU_BLOCK();
@@ -344,6 +360,8 @@ namespace zp
     struct StartJob
     {
         Engine* engine;
+
+        ZP_JOB_DEBUG_NAME( StartJob );
 
         static void Execute( const JobHandle& parentJobHandle, const StartJob* data )
         {
@@ -381,6 +399,8 @@ namespace zp
     {
         Engine* engine;
 
+        ZP_JOB_DEBUG_NAME( AdvanceProfilerFrameJob );
+
         static void Execute( const JobHandle& parentJobHandle, const AdvanceProfilerFrameJob* data )
         {
             ZP_PROFILE_ADVANCE_FRAME( data->engine->getFrameCount() );
@@ -410,6 +430,8 @@ namespace zp
     struct InitializationJob
     {
         Engine* engine;
+
+        ZP_JOB_DEBUG_NAME( InitializationJob );
 
         static void Execute( const JobHandle& parentJobHandle, const InitializationJob* data )
         {
@@ -462,6 +484,7 @@ namespace zp
                 break;
 
             case EngineState::Exit:
+                zp_printfln( "Exit" );
                 break;
 
             case EngineState::Restart:

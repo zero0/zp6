@@ -175,6 +175,12 @@ constexpr zp_hash64_t zp_type_hash()
     return hash;
 }
 
+template<typename T>
+constexpr const char* zp_type_name()
+{
+    return typeid( T ).name();
+}
+
 constexpr zp_int32_t zp_bitscan_forward( zp_uint64_t val )
 {
 #if ZP_GNUC
@@ -224,6 +230,14 @@ zp_int32_t zp_strcmp( const char* lh, const char* rh );
 //zp_size_t zp_strlen( const char* str );
 
 //zp_size_t zp_strnlen( const char* str, zp_size_t maxSize );
+
+constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength )
+{
+    for( zp_size_t i = 0; i < dstLength; ++i )
+    {
+        dstStr[ i ] = srcStr[ i ];
+    }
+}
 
 constexpr zp_size_t zp_strlen( const char* str )
 {
@@ -314,7 +328,7 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
             case '7':
             case '8':
             case '9':
-                hex = (zp_uint32_t)( c - '0' );
+                hex = (zp_uint32_t) ( c - '0' );
                 break;
 
             case 'a':
@@ -323,7 +337,7 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
             case 'd':
             case 'e':
             case 'f':
-                hex = ( (zp_uint32_t)( c - 'a' ) + 10 );
+                hex = ( (zp_uint32_t) ( c - 'a' ) + 10 );
                 break;
 
             case 'A':
@@ -332,7 +346,7 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
             case 'D':
             case 'E':
             case 'F':
-                hex = ( (zp_uint32_t)( c - 'A' ) + 10 );
+                hex = ( (zp_uint32_t) ( c - 'A' ) + 10 );
                 break;
 
             default:
@@ -363,7 +377,7 @@ constexpr zp_bool_t zp_try_uint32_to_string( const zp_uint32_t m, char* str )
             case 7:
             case 8:
             case 9:
-                lit = (char)( '0' + cur );
+                lit = (char) ( '0' + cur );
                 break;
 
             case 10:
@@ -372,7 +386,7 @@ constexpr zp_bool_t zp_try_uint32_to_string( const zp_uint32_t m, char* str )
             case 13:
             case 14:
             case 15:
-                lit = (char)( 'a' + ( cur - 10 ) );
+                lit = (char) ( 'a' + ( cur - 10 ) );
                 break;
 
             default:
@@ -397,7 +411,7 @@ constexpr zp_bool_t zp_try_parse_hash64( const char* str, zp_hash64_t* hash )
 
         if( ok )
         {
-            *hash = ( (zp_uint64_t)m1 << 32 ) | m0;
+            *hash = ( (zp_uint64_t) m1 << 32 ) | m0;
         }
     }
 
@@ -407,8 +421,8 @@ constexpr zp_bool_t zp_try_parse_hash64( const char* str, zp_hash64_t* hash )
 constexpr zp_bool_t zp_try_hash64_to_string( const zp_hash64_t& hash, char* str )
 {
     zp_bool_t ok;
-    const zp_uint32_t m1 { (zp_uint32_t)( hash >> 32 ) };
-    const zp_uint32_t m0 { (zp_uint32_t)hash };
+    const zp_uint32_t m1 { (zp_uint32_t) ( hash >> 32 ) };
+    const zp_uint32_t m0 { (zp_uint32_t) hash };
 
     ok = zp_try_uint32_to_string( m1, str + 0 );
     ok = ok && zp_try_uint32_to_string( m0, str + 8 );
@@ -431,8 +445,8 @@ constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_hash128_t* hash )
 
         if( ok )
         {
-            hash->m32 = ( (zp_uint64_t)m3 << 32 ) | m2;
-            hash->m10 = ( (zp_uint64_t)m1 << 32 ) | m0;
+            hash->m32 = ( (zp_uint64_t) m3 << 32 ) | m2;
+            hash->m10 = ( (zp_uint64_t) m1 << 32 ) | m0;
             //hash->m3 = m3;
             //hash->m2 = m2;
             //hash->m1 = m1;
@@ -446,10 +460,10 @@ constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_hash128_t* hash )
 constexpr zp_bool_t zp_try_hash128_to_string( const zp_hash128_t& hash, char* str )
 {
     zp_bool_t ok;
-    ok = zp_try_uint32_to_string( (zp_uint32_t)( hash.m32 >> 32 ), str + 0 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)hash.m32, str + 8 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint64_t)( hash.m10 >> 32 ), str + 16 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)hash.m10, str + 24 );
+    ok = zp_try_uint32_to_string( (zp_uint32_t) ( hash.m32 >> 32 ), str + 0 );
+    ok = ok && zp_try_uint32_to_string( (zp_uint32_t) hash.m32, str + 8 );
+    ok = ok && zp_try_uint32_to_string( (zp_uint64_t) ( hash.m10 >> 32 ), str + 16 );
+    ok = ok && zp_try_uint32_to_string( (zp_uint32_t) hash.m10, str + 24 );
     *( str + 32 ) = '\0';
 
     return ok;
@@ -479,10 +493,10 @@ constexpr zp_hash128_t zp_fnv128_1a( const void* ptr, const zp_size_t size, zp_h
         auto data = static_cast<const zp_uint8_t*>( ptr );
 
         zp_uint64_t a, b, c, d;
-        a = (zp_uint32_t)( h.m32 >> 32 );
-        b = (zp_uint32_t)( h.m32 );
-        c = (zp_uint32_t)( h.m10 >> 32 );
-        d = (zp_uint32_t)( h.m10 );
+        a = (zp_uint32_t) ( h.m32 >> 32 );
+        b = (zp_uint32_t) ( h.m32 );
+        c = (zp_uint32_t) ( h.m10 >> 32 );
+        d = (zp_uint32_t) ( h.m10 );
 
         const zp_uint32_t P128_B = 0x01000000, P128_D = 0x0000013B, P128_BD = 0xFFFEC5;
 
@@ -499,20 +513,20 @@ constexpr zp_hash128_t zp_fnv128_1a( const void* ptr, const zp_size_t size, zp_h
 
                 f = b * P128_B;
 
-                zp_uint64_t v = (zp_uint32_t)f;
+                zp_uint64_t v = (zp_uint32_t) f;
 
                 f = ( f >> 32 ) + v;
 
                 if( a > b )
                 {
-                    f += (zp_uint32_t)( ( a - b ) * P128_B );
+                    f += (zp_uint32_t) ( ( a - b ) * P128_B );
                 }
                 else if( a < b )
                 {
-                    f -= (zp_uint32_t)( ( b - a ) * P128_B );
+                    f -= (zp_uint32_t) ( ( b - a ) * P128_B );
                 }
 
-                zp_uint64_t fHigh = ( f << 32 ) + (zp_uint32_t)v;
+                zp_uint64_t fHigh = ( f << 32 ) + (zp_uint32_t) v;
                 zp_uint64_t r2 = d * P128_D;
 
                 v = ( r2 >> 32 ) + ( r2 & 0xFFFFFFFFFFFFFFF );
@@ -523,16 +537,18 @@ constexpr zp_hash128_t zp_fnv128_1a( const void* ptr, const zp_size_t size, zp_h
                 {
                     fLm = v;
                     v += ( c - d ) * P128_D;
-                    if( fLm > v ) f += 0x100000000;
+                    if( fLm > v )
+                    { f += 0x100000000; }
                 }
                 else if( c < d )
                 {
                     fLm = v;
                     v -= ( d - c ) * P128_D;
-                    if( fLm < v ) f -= 0x100000000;
+                    if( fLm < v )
+                    { f -= 0x100000000; }
                 }
 
-                fLm = ( ( (zp_uint64_t)(zp_uint32_t)v ) << 32 ) + (zp_uint32_t)r2;
+                fLm = ( ( (zp_uint64_t) (zp_uint32_t) v ) << 32 ) + (zp_uint32_t) r2;
 
                 f = fHigh + fLm + f + ( v >> 32 );
 
@@ -549,10 +565,10 @@ constexpr zp_hash128_t zp_fnv128_1a( const void* ptr, const zp_size_t size, zp_h
                 }
             }
 
-            a = (zp_uint32_t)( f >> 32 );
-            b = (zp_uint32_t)f;
-            c = (zp_uint32_t)( fLm >> 32 );
-            d = (zp_uint32_t)fLm;
+            a = (zp_uint32_t) ( f >> 32 );
+            b = (zp_uint32_t) f;
+            c = (zp_uint32_t) ( fLm >> 32 );
+            d = (zp_uint32_t) fLm;
         }
 
         h.m32 = ( a << 32 ) | b;
@@ -580,8 +596,8 @@ constexpr zp_bool_t zp_try_parse_guid128( const char* str, zp_guid128_t* guid )
 
         if( ok )
         {
-            guid->m32 = ( (zp_uint64_t)m3 << 32 ) | m2;
-            guid->m10 = ( (zp_uint64_t)m1 << 32 ) | m0;
+            guid->m32 = ( (zp_uint64_t) m3 << 32 ) | m2;
+            guid->m10 = ( (zp_uint64_t) m1 << 32 ) | m0;
             //guid->m3 = m3;
             //guid->m2 = m2;
             //guid->m1 = m1;
@@ -595,10 +611,10 @@ constexpr zp_bool_t zp_try_parse_guid128( const char* str, zp_guid128_t* guid )
 constexpr zp_bool_t zp_try_guid128_to_string( const zp_guid128_t& guid, char* str )
 {
     zp_bool_t ok;
-    ok = zp_try_uint32_to_string( (zp_uint32_t)( guid.m32 >> 32 ), str + 0 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)guid.m32, str + 8 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint64_t)( guid.m10 >> 32 ), str + 16 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)guid.m10, str + 24 );
+    ok = zp_try_uint32_to_string( (zp_uint32_t) ( guid.m32 >> 32 ), str + 0 );
+    ok = ok && zp_try_uint32_to_string( (zp_uint32_t) guid.m32, str + 8 );
+    ok = ok && zp_try_uint32_to_string( (zp_uint64_t) ( guid.m10 >> 32 ), str + 16 );
+    ok = ok && zp_try_uint32_to_string( (zp_uint32_t) guid.m10, str + 24 );
     *( str + 32 ) = '\0';
 
     return ok;
@@ -644,7 +660,8 @@ void zp_lzf_expand( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcS
 template<typename T, typename Cmp>
 constexpr void zp_qsort3( T* begin, T* end, Cmp cmp )
 {
-    if( begin >= end ) return;
+    if( begin >= end )
+    { return; }
 
     T* i;
     T* j;
@@ -788,6 +805,7 @@ namespace zp
     };
 
     typedef HashEqualityComparer<zp_hash64_t> Hash64EqualityComparer;
+
     typedef HashEqualityComparer<zp_hash128_t> Hash128EqualityComparer;
 }
 

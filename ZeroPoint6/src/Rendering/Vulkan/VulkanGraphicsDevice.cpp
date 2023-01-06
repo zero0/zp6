@@ -2350,14 +2350,17 @@ namespace zp
             CommandQueue& prevCommandQueue = frameData.commandQueues[ prevCommandQueueIndex ];
             VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( prevCommandQueue.commandBuffer );
 
-#if ZP_USE_PROFILER
-            if( prevCommandQueue.queue != ZP_RENDER_QUEUE_TRANSFER )
+            if( commandBuffer )
             {
-                vkCmdWriteTimestamp( commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, prevCommandQueueIndex * 2 + 1 );
-                //vkCmdEndQuery( commandBuffer, frameData.vkPipelineStatisticsQueryPool, 0 );
-            }
+#if ZP_USE_PROFILER
+                if( prevCommandQueue.queue != ZP_RENDER_QUEUE_TRANSFER )
+                {
+                    //vkCmdWriteTimestamp( commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, prevCommandQueueIndex * 2 + 1 );
+                    //vkCmdEndQuery( commandBuffer, frameData.vkPipelineStatisticsQueryPool, 0 );
+                }
 #endif
-            HR( vkEndCommandBuffer( commandBuffer ) );
+                HR( vkEndCommandBuffer( commandBuffer ) );
+            }
         }
 
         const VkCommandPool commandPoolMap[] {

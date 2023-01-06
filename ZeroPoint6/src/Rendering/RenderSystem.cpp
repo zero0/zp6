@@ -164,8 +164,12 @@ namespace zp
             zp_uint64_t frameIndex;
             GraphicsDevice* graphicsDevice;
 
+            ZP_JOB_DEBUG_NAME( WaitOnGPUJob );
+
             static void Execute( const JobHandle& parentJobHandle, const WaitOnGPUJob* waitOnGpuJob )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 waitOnGpuJob->graphicsDevice->waitForGPU();
             }
         };
@@ -175,8 +179,12 @@ namespace zp
             zp_uint64_t frameIndex;
             GraphicsDevice* graphicsDevice;
 
+            ZP_JOB_DEBUG_NAME( BeginFrameGPUJob );
+
             static void Execute( const JobHandle& parentJobHandle, const BeginFrameGPUJob* waitOnGpuJob )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 waitOnGpuJob->graphicsDevice->beginFrame( waitOnGpuJob->frameIndex );
             }
         };
@@ -187,8 +195,12 @@ namespace zp
             zp_uint64_t frameIndex;
             GraphicsDevice* m_graphicsDevice;
 
+            ZP_JOB_DEBUG_NAME( SubmitGPUJob );
+
             static void Execute( const JobHandle& parentJobHandle, const SubmitGPUJob* waitOnGpuJob )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 waitOnGpuJob->m_graphicsDevice->submit( waitOnGpuJob->frameIndex );
             }
         };
@@ -198,8 +210,12 @@ namespace zp
             zp_uint64_t frameIndex;
             GraphicsDevice* m_graphicsDevice;
 
+            ZP_JOB_DEBUG_NAME( PresentGPUJob );
+
             static void Execute( const JobHandle& parentJobHandle, const PresentGPUJob* presentGpuJob )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 presentGpuJob->m_graphicsDevice->present( presentGpuJob->frameIndex );
             }
         };
@@ -352,6 +368,8 @@ namespace zp
             GraphicsPipelineState* graphicsPipelineState;
             RenderPipelineContext renderPipelineContext;
 
+            ZP_JOB_DEBUG_NAME( PipelineJob );
+
             static void Execute( const JobHandle& parentJobHandle, const PipelineJob* data )
             {
                 RenderPipelineContext context = data->renderPipelineContext;
@@ -379,14 +397,14 @@ namespace zp
             }
         };
 
-        PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& parentJobHandle ) final
+        PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& inputHandle ) final
         {
             PipelineJob pipelineJob {
                 .renderPass = RenderPassResourceHandle( &m_renderPass ),
                 .graphicsPipelineState = &m_graphicsPipelineState,
                 .renderPipelineContext = *renderPipelineContext,
             };
-            return renderPipelineContext->m_jobSystem->PrepareChildJobData( parentJobHandle, pipelineJob );
+            return renderPipelineContext->m_jobSystem->PrepareJobData( pipelineJob, inputHandle );
         }
 
     private:
@@ -473,61 +491,71 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        PreparedJobHandle frameJobHandle = jobSystem->PrepareJob( nullptr );
-
-        struct UpdateRenderPipelineJob
-        {
-            RenderSystem* renderSystem;
-
-            static void Execute( const JobHandle& jobHandle, const UpdateRenderPipelineJob* data )
-            {
-                RenderSystem* renderSystem = data->renderSystem;
-                if( renderSystem->m_nextRenderPipeline != renderSystem->m_currentRenderPipeline )
-                {
-                    renderSystem->m_graphicsDevice->waitForGPU();
-
-                    if( renderSystem->m_currentRenderPipeline )
-                    { renderSystem->m_currentRenderPipeline->onDeactivate( renderSystem ); }
-
-                    renderSystem->m_currentRenderPipeline = renderSystem->m_nextRenderPipeline;
-
-                    if( renderSystem->m_currentRenderPipeline )
-                    { renderSystem->m_currentRenderPipeline->onActivate( renderSystem ); }
-                }
-            }
-        } updateRenderPipelineJob {
-            .renderSystem = this
-        };
-        PreparedJobHandle gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, updateRenderPipelineJob, inputHandle );
+        PreparedJobHandle gpuHandle = inputHandle;
 
         WaitOnGPUJob waitOnGpuJob {
             .frameIndex = frameIndex,
             .graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, waitOnGpuJob, gpuHandle );
+        gpuHandle = jobSystem->PrepareJobData( waitOnGpuJob, gpuHandle );
+
+        struct UpdateRenderPipelineJob
+        {
+            RenderSystem* renderSystem;
+
+            ZP_JOB_DEBUG_NAME( UpdateRenderPipelineJob );
+
+            static void Execute( const JobHandle& jobHandle, const UpdateRenderPipelineJob* data )
+            {
+                ZP_PROFILE_CPU_BLOCK();
+
+                RenderSystem* renderSystem = data->renderSystem;
+                if( renderSystem->m_nextRenderPipeline != renderSystem->m_currentRenderPipeline )
+                {
+                    if( renderSystem->m_currentRenderPipeline )
+                    {
+                        renderSystem->m_currentRenderPipeline->onDeactivate( renderSystem );
+                    }
+
+                    renderSystem->m_currentRenderPipeline = renderSystem->m_nextRenderPipeline;
+
+                    if( renderSystem->m_currentRenderPipeline )
+                    {
+                        renderSystem->m_currentRenderPipeline->onActivate( renderSystem );
+                    }
+                }
+            }
+        } updateRenderPipelineJob {
+            .renderSystem = this
+        };
+        gpuHandle = jobSystem->PrepareJobData( updateRenderPipelineJob, gpuHandle );
 
         BeginFrameGPUJob beginFrameGpuJob {
             .frameIndex = frameIndex,
             .graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, beginFrameGpuJob, gpuHandle );
+        gpuHandle = jobSystem->PrepareJobData( beginFrameGpuJob, gpuHandle );
 
         struct ProcessRenderPipeline
         {
             RenderPipelineContext renderPipelineContext;
 
+            ZP_JOB_DEBUG_NAME( ProcessRenderPipeline );
+
             static void Execute( const JobHandle& parentJobHandle, const ProcessRenderPipeline* processRenderPipeline )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 RenderPipelineContext ctx = processRenderPipeline->renderPipelineContext;
                 RenderSystem* renderSystem = ctx.m_renderSystem;
 
-                if( renderSystem->m_currentRenderPipeline )
-                {
-                    PreparedJobHandle pipelineHandle = renderSystem->m_currentRenderPipeline->onProcessPipeline( &ctx, ctx.m_jobSystem->Prepare( parentJobHandle ) );
-
-                    ctx.m_jobSystem->Schedule( pipelineHandle );
-                }
-                else
+                //if( renderSystem->m_currentRenderPipeline )
+                //{
+                //    PreparedJobHandle pipelineHandle = renderSystem->m_currentRenderPipeline->onProcessPipeline( &ctx, {} );
+                //
+                //    ctx.m_jobSystem->Schedule( pipelineHandle );
+                //}
+                //else
                 {
                     GraphicsDevice* graphicsDevice = ctx.m_graphicsDevice;
                     CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, ctx.m_frameIndex );
@@ -544,15 +572,19 @@ namespace zp
                 .m_jobSystem = jobSystem
             }
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, processRenderPipeline, gpuHandle );
+        gpuHandle = jobSystem->PrepareJobData( processRenderPipeline, gpuHandle );
 
         struct RenderProfilerData
         {
             Profiler* profiler;
             ImmediateModeRenderer* immediateModeRenderer;
 
+            ZP_JOB_DEBUG_NAME( RenderProfilerData );
+
             static void Execute( const JobHandle& parentJobHandle, const RenderProfilerData* renderProfilerData )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
 
                 zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * 64, 6 * 64 );
@@ -586,15 +618,19 @@ namespace zp
             .profiler = nullptr,
             .immediateModeRenderer = m_immediateModeRenderer
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, renderProfilerDataJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );
 
         struct FinalizeBatchRenderingJob
         {
             zp_uint64_t frameIndex;
             RenderSystem* renderSystem;
 
+            ZP_JOB_DEBUG_NAME( FinalizeBatchRenderingJob );
+
             static void Execute( const JobHandle& parentJobHandle, const FinalizeBatchRenderingJob* data )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 {
                     const zp_float32_t n = -1.f;
                     const zp_float32_t p = 1.f;
@@ -603,7 +639,7 @@ namespace zp
                     VertexVUC tris[] = {
                         { { 0, 0, 0 }, {}, zp_debug_color( data->frameIndex % 255, 255 ) },
                         { { 1, 0, 0 }, {}, Color::green },
-                        { { 0, 1, 0 }, {}, Color::blue }
+                        { { 0, 1, 0 }, {}, Color::blue },
                     };
 
                     VertexVUC quads[] = {
@@ -613,11 +649,11 @@ namespace zp
                         { { z, n, 0 }, {}, Color::white },
                     };
 
-                    zp_handle_t cmd = data->renderSystem->m_immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 16, 32 );
+                    zp_handle_t cmd = data->renderSystem->m_immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 3, 3 );
 
                     data->renderSystem->m_immediateModeRenderer->addTriangles( cmd, tris );
 
-                    data->renderSystem->m_immediateModeRenderer->addQuads( cmd, quads );
+                    //data->renderSystem->m_immediateModeRenderer->addQuads( cmd, quads );
 
                     data->renderSystem->m_immediateModeRenderer->end( cmd );
                 }
@@ -629,20 +665,20 @@ namespace zp
             .frameIndex = frameIndex,
             .renderSystem = this,
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, finalizeBatchRenderingJob, gpuHandle );
+        gpuHandle = jobSystem->PrepareJobData( finalizeBatchRenderingJob, gpuHandle );
 
         SubmitGPUJob submitGpuJob {
             .frameIndex = frameIndex,
             .m_graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, submitGpuJob, gpuHandle );
+        gpuHandle = jobSystem->PrepareJobData( submitGpuJob, gpuHandle );
 
         PresentGPUJob presentGpuJob {
             .frameIndex = frameIndex,
             .m_graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareChildJobData( frameJobHandle, presentGpuJob, gpuHandle );
+        gpuHandle = jobSystem->PrepareJobData( presentGpuJob, gpuHandle );
 
-        return frameJobHandle;
+        return gpuHandle;
     }
 }
