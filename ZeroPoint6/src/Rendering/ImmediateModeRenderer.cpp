@@ -178,15 +178,22 @@ namespace zp
         const zp_size_t vertexSize = sizeof( VertexVUC ) * count;
         zp_memcpy( cmd->vertexBuffer + cmd->vertexCount * cmd->vertexStride, vertexSize, vertices, vertexSize );
 
-        zp_size_t index = cmd->indexCount;
-        for( zp_size_t i = 0; i < count; ++i )
+        zp_size_t indexCount = cmd->indexCount;
+        zp_size_t vertexCount = cmd->vertexCount;
+
+        const zp_size_t triCount = count / 3;
+        for( zp_size_t i = 0; i < triCount; ++i )
         {
-            cmd->indexBuffer[ index ] = index;
-            ++index;
+            cmd->indexBuffer[ indexCount + 0 ] = vertexCount + 0;
+            cmd->indexBuffer[ indexCount + 1 ] = vertexCount + 2;
+            cmd->indexBuffer[ indexCount + 2 ] = vertexCount + 1;
+
+            indexCount += 3;
+            vertexCount += 3;
         }
 
-        cmd->indexCount = index;
-        cmd->vertexCount += count;
+        cmd->indexCount = indexCount;
+        cmd->vertexCount = vertexCount;
     }
 
     void ImmediateModeRenderer::addQuads( zp_handle_t command, const VertexVUC* vertices, zp_size_t count )
@@ -206,23 +213,26 @@ namespace zp
         const zp_size_t vertexSize = sizeof( VertexVUC ) * count;
         zp_memcpy( cmd->vertexBuffer + cmd->vertexCount * cmd->vertexStride, vertexSize, vertices, vertexSize );
 
-        const zp_size_t triangleCount = ( count / 4 ) * 6;
+        zp_size_t indexCount = cmd->indexCount;
+        zp_size_t vertexCount = cmd->vertexCount;
 
-        zp_size_t index = cmd->indexCount;
-        for( zp_size_t i = 0; i < triangleCount; ++i )
+        const zp_size_t quadCount = count / 4;
+        for( zp_size_t i = 0; i < quadCount; ++i )
         {
-            cmd->indexBuffer[ index + 0 ] = index + 0;
-            cmd->indexBuffer[ index + 1 ] = index + 1;
-            cmd->indexBuffer[ index + 2 ] = index + 2;
+            cmd->indexBuffer[ indexCount + 0 ] = vertexCount + 0;
+            cmd->indexBuffer[ indexCount + 1 ] = vertexCount + 2;
+            cmd->indexBuffer[ indexCount + 2 ] = vertexCount + 1;
 
-            cmd->indexBuffer[ index + 3 ] = index + 2;
-            cmd->indexBuffer[ index + 4 ] = index + 3;
-            cmd->indexBuffer[ index + 5 ] = index + 0;
-            index += 6;
+            cmd->indexBuffer[ indexCount + 3 ] = vertexCount + 0;
+            cmd->indexBuffer[ indexCount + 4 ] = vertexCount + 3;
+            cmd->indexBuffer[ indexCount + 5 ] = vertexCount + 2;
+
+            indexCount += 6;
+            vertexCount += 4;
         }
 
-        cmd->indexCount = index;
-        cmd->vertexCount += count;
+        cmd->indexCount = indexCount;
+        cmd->vertexCount = vertexCount;
     }
 
     void ImmediateModeRenderer::end( zp_handle_t command )

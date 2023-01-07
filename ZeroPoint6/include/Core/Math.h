@@ -23,13 +23,13 @@ constexpr T zp_max( const T& a, const T& b )
 template<typename T>
 constexpr T zp_min3( const T& a, const T& b, const T& c )
 {
-    return zp_min( a, zp_min( b, c ));
+    return zp_min( a, zp_min( b, c ) );
 }
 
 template<typename T>
 constexpr T zp_max3( const T& a, const T& b, const T& c )
 {
-    return zp_max( a, zp_max( b, c ));
+    return zp_max( a, zp_max( b, c ) );
 }
 
 template<typename T>
@@ -138,21 +138,6 @@ namespace zp
                 T x, y, z;
             };
         };
-
-        explicit Vector3( T x ) : x( x )
-            , y( T {} )
-            , z( T {} )
-        {}
-
-        Vector3( T x, T y ) : x( x )
-            , y( y )
-            , z( T {} )
-        {}
-
-        Vector3( T x, T y, T z ) : x( x )
-            , y( y )
-            , z( z )
-        {}
 
         static const Vector3 zero;
         static const Vector3 one;
@@ -532,6 +517,54 @@ namespace zp
 
     namespace Math
     {
+
+        ZP_FORCEINLINE Vector2f Vec2f( zp_float32_t x, zp_float32_t y )
+        {
+            return { .x = x, .y = y };
+        }
+
+        ZP_FORCEINLINE Vector2f Vec2f( const Vector3f& v )
+        {
+            return { .x = v.x, .y = v.y };
+        }
+
+        ZP_FORCEINLINE Vector2f Vec2f( const Vector4f& v )
+        {
+            return { .x = v.x, .y = v.y };
+        }
+
+        ZP_FORCEINLINE Vector3f Vec3f( zp_float32_t x, zp_float32_t y, zp_float32_t z )
+        {
+            return { .x = x, .y = y, .z = z };
+        }
+
+        ZP_FORCEINLINE Vector3f Vec3f( const Vector2f& v, zp_float32_t z )
+        {
+            return { .x = v.x, .y = v.y, .z = z };
+        }
+
+        ZP_FORCEINLINE Vector3f Vec3f( const Vector4f& v )
+        {
+            return { .x = v.x, .y = v.y, .z = v.z };
+        }
+
+        ZP_FORCEINLINE Vector4f Vec4f( zp_float32_t x, zp_float32_t y, zp_float32_t z, zp_float32_t w )
+        {
+            return { .x = x, .y = y, .z = z, .w = w };
+        }
+
+        ZP_FORCEINLINE Vector4f Vec4f( const Vector2f& v, zp_float32_t z, zp_float32_t w )
+        {
+            return { .x = v.x, .y = v.y, .z = z, .w = w };
+        }
+
+        ZP_FORCEINLINE Vector4f Vec4f( const Vector3f& v, zp_float32_t w )
+        {
+            return { .x = v.x, .y = v.y, .z = v.z, .w = w };
+        }
+
+        Vector3f PerspectiveDivide( const Vector4f& v );
+
         Color Lerp( const Color& x, const Color& y, zp_float32_t a );
 
         Color LerpUnclamp( const Color& x, const Color& y, zp_float32_t a );
@@ -542,7 +575,7 @@ namespace zp
 
         Matrix4x4f Transpose( const Matrix4x4f& m );
 
-        Vector4f Mul( const Vector4f& lh, const Matrix4x4f& rh );
+        Vector4f Mul( const Matrix4x4f& lh, const Vector4f& rh );
 
         Bounds3Df Mul( const Bounds3Df& lh, const Matrix4x4f& rh );
 
@@ -582,7 +615,7 @@ namespace zp
 
 constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
 {
-    zp::Color r { 0, 0, 0, 1 };
+    zp::Color c { .r = 0, .g = 0, .b = 0, .a = 1 };
 
     const zp_float32_t h = static_cast<zp_float32_t>( index + 1 ) / static_cast<zp_float32_t>( count );
     const zp_int32_t i = zp_floor_to_int( h * 6 );
@@ -591,43 +624,43 @@ constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
     switch( index % 6 )
     {
         case 0:
-            r.r = 1;
-            r.g = f;
-            r.b = 0;
+            c.r = 1;
+            c.g = f;
+            c.b = 0;
             break;
 
         case 1:
-            r.r = 1;
-            r.g = 1 - f;
-            r.b = 0;
+            c.r = 1;
+            c.g = 1 - f;
+            c.b = 0;
             break;
 
         case 2:
-            r.r = 0;
-            r.g = 1;
-            r.b = f;
+            c.r = 0;
+            c.g = 1;
+            c.b = f;
             break;
 
         case 3:
-            r.r = 0;
-            r.g = 1 - f;
-            r.b = 1;
+            c.r = 0;
+            c.g = 1 - f;
+            c.b = 1;
             break;
 
         case 4:
-            r.r = f;
-            r.g = 0;
-            r.b = 1;
+            c.r = f;
+            c.g = 0;
+            c.b = 1;
             break;
 
         case 5:
-            r.r = 1;
-            r.g = 0;
-            r.b = 1 - f;
+            c.r = 1;
+            c.g = 0;
+            c.b = 1 - f;
             break;
     }
 
-    return r;
+    return c;
 }
 
 constexpr zp::Color32 zp_debug_color32( zp_size_t index, zp_size_t count )

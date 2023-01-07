@@ -83,6 +83,8 @@ namespace zp
 
         CommandQueue* requestCommandQueue( RenderQueue queue, zp_uint64_t frameIndex ) final;
 
+        void releaseCommandQueue( CommandQueue* commandQueue ) final;
+
         void beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue ) final;
 
         void nextSubpass( CommandQueue* commandQueue ) final;
@@ -119,8 +121,9 @@ namespace zp
 
 #pragma endregion
 
-
     private:
+        VkCommandPool getCommandPool( CommandQueue* commandQueue );
+
         struct QueueFamilies
         {
             zp_uint32_t graphicsFamily;
@@ -162,12 +165,11 @@ namespace zp
         VkSwapchainKHR m_vkSwapChain;
         VkRenderPass m_vkSwapChainRenderPass;
 
-        VkDescriptorPool m_vkDescriptorPool;
         VkPipelineCache m_vkPipelineCache;
+        VkDescriptorPool m_vkDescriptorPool;
 
-        VkCommandPool m_vkGraphicsCommandPool;
-        VkCommandPool m_vkTransferCommandPool;
-        VkCommandPool m_vkComputeCommandPool;
+        VkCommandPool* m_vkCommandPools;
+        zp_size_t m_commandPoolCount;
 
         VkFormat m_vkSwapChainFormat;
         VkColorSpaceKHR m_vkSwapChainColorSpace;

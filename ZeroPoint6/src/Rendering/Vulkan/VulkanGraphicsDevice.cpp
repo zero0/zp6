@@ -281,9 +281,7 @@ namespace zp
 
         }
 
-        constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties* physicalDeviceMemoryProperties,
-                                                const zp_uint32_t typeFilter,
-                                                const VkMemoryPropertyFlags memoryPropertyFlags )
+        constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties* physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
         {
             for( uint32_t i = 0; i < physicalDeviceMemoryProperties->memoryTypeCount; i++ )
             {
@@ -776,11 +774,10 @@ namespace zp
         , m_vkRenderQueues {}
         , m_vkSwapChain( VK_NULL_HANDLE )
         , m_vkSwapChainRenderPass( VK_NULL_HANDLE )
-        , m_vkDescriptorPool( VK_NULL_HANDLE )
         , m_vkPipelineCache( VK_NULL_HANDLE )
-        , m_vkGraphicsCommandPool( VK_NULL_HANDLE )
-        , m_vkTransferCommandPool( VK_NULL_HANDLE )
-        , m_vkComputeCommandPool( VK_NULL_HANDLE )
+        , m_vkDescriptorPool( VK_NULL_HANDLE )
+        , m_vkCommandPools( nullptr )
+        , m_commandPoolCount( 0 )
         , m_vkSwapChainFormat( VK_FORMAT_UNDEFINED )
         , m_vkSwapChainColorSpace( VK_COLORSPACE_SRGB_NONLINEAR_KHR )
         , m_vkSwapChainExtent { 0, 0 }
@@ -1009,20 +1006,22 @@ namespace zp
 
         // create command pools
         {
-            VkCommandPoolCreateInfo commandPoolCreateInfo {};
-            commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            m_commandPoolCount = 0;
+            m_vkCommandPools = ZP_MALLOC_T_ARRAY( memoryLabel, VkCommandPool, 3 * 16 );
 
-            commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsFamily;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkGraphicsCommandPool ) );
-
-            commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferFamily;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkTransferCommandPool ) );
-
-            commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkComputeCommandPool ) );
+            //    VkCommandPoolCreateInfo commandPoolCreateInfo {
+            //        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            //        .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            //    };
+            //
+            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsFamily;
+            //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkGraphicsCommandPool ) );
+            //
+            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferFamily;
+            //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkTransferCommandPool ) );
+            //
+            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
+            //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkComputeCommandPool ) );
         }
 
         // create staging buffer
@@ -1091,12 +1090,18 @@ namespace zp
         vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, nullptr );
         m_vkDescriptorPool = {};
 
-        vkDestroyCommandPool( m_vkLocalDevice, m_vkGraphicsCommandPool, nullptr );
-        vkDestroyCommandPool( m_vkLocalDevice, m_vkTransferCommandPool, nullptr );
-        vkDestroyCommandPool( m_vkLocalDevice, m_vkComputeCommandPool, nullptr );
-        m_vkGraphicsCommandPool = {};
-        m_vkTransferCommandPool = {};
-        m_vkComputeCommandPool = {};
+        for( zp_size_t i = 0; i < m_commandPoolCount; ++i )
+        {
+            vkDestroyCommandPool( m_vkLocalDevice, m_vkCommandPools[ i ], nullptr );
+        }
+        ZP_FREE_( memoryLabel, m_vkCommandPools );
+
+        //vkDestroyCommandPool( m_vkLocalDevice, m_vkGraphicsCommandPool, nullptr );
+        //vkDestroyCommandPool( m_vkLocalDevice, m_vkTransferCommandPool, nullptr );
+        //vkDestroyCommandPool( m_vkLocalDevice, m_vkComputeCommandPool, nullptr );
+        //m_vkGraphicsCommandPool = {};
+        //m_vkTransferCommandPool = {};
+        //m_vkComputeCommandPool = {};
 
         vkDestroyPipelineCache( m_vkLocalDevice, m_vkPipelineCache, nullptr );
         m_vkPipelineCache = {};
@@ -1391,13 +1396,6 @@ namespace zp
 
     void VulkanGraphicsDevice::destroySwapChain()
     {
-        const VkCommandPool commandPoolMap[] {
-            m_vkGraphicsCommandPool,
-            m_vkTransferCommandPool,
-            m_vkComputeCommandPool,
-            m_vkGraphicsCommandPool
-        };
-
         for( PerFrameData& perFrameData : m_perFrameData )
         {
             vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkSwapChainAcquireSemaphore, nullptr );
@@ -1416,13 +1414,12 @@ namespace zp
                     if( perFrameData.commandQueues && perFrameData.commandQueues[ i ].commandBuffer )
                     {
                         const auto commandBuffer = static_cast<VkCommandBuffer>( perFrameData.commandQueues[ i ].commandBuffer );
-                        vkFreeCommandBuffers( m_vkLocalDevice, commandPoolMap[ perFrameData.commandQueues[ i ].queue ],
-                                              1,
-                                              &commandBuffer );
+                        const auto commandPool = static_cast<VkCommandPool>( perFrameData.commandQueues[ i ].commandBufferPool );
+                        vkFreeCommandBuffers( m_vkLocalDevice, commandPool, 1, &commandBuffer );
                     }
                 }
 
-                GetAllocator( memoryLabel )->free( perFrameData.commandQueues );
+                ZP_FREE_( memoryLabel, perFrameData.commandQueues );
             }
 
             perFrameData.vkSwapChainAcquireSemaphore = VK_NULL_HANDLE;
@@ -1476,8 +1473,7 @@ namespace zp
         PerFrameData& frameData = m_perFrameData[ frame ];
 
         uint32_t imageIndex;
-        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_vkSwapChain, UINT64_MAX,
-                                        frameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &imageIndex );
+        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_vkSwapChain, UINT64_MAX, frameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &imageIndex );
 
         if( result != VK_SUCCESS )
         {
@@ -1516,9 +1512,7 @@ namespace zp
                 zp_uint64_t timestamps[16] {};
                 VkResult r;
 
-                r = vkGetQueryPoolResults( m_vkLocalDevice, prevFrameData.vkTimestampQueryPool, 0,
-                                           prevFrameData.commandQueueCount * 2, sizeof( timestamps ), timestamps,
-                                           sizeof( zp_uint64_t ), VK_QUERY_RESULT_64_BIT );
+                r = vkGetQueryPoolResults( m_vkLocalDevice, prevFrameData.vkTimestampQueryPool, 0, prevFrameData.commandQueueCount * 2, sizeof( timestamps ), timestamps, sizeof( zp_uint64_t ), VK_QUERY_RESULT_64_BIT );
                 if( r == VK_SUCCESS )
                 {
                     zp_uint64_t totalTime = 0;
@@ -1552,29 +1546,18 @@ namespace zp
             VkCommandBuffer buffer = static_cast<VkCommandBuffer>( frameData.commandQueues[ preCommandQueueIndex ].commandBuffer );
 
 #if ZP_USE_PROFILER
-            vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
+            //vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
             //vkCmdEndQuery( buffer, frameData.vkPipelineStatisticsQueryPool, 0 );
             //vkCmdResetQueryPool( static_cast<VkCommandBuffer>( frameData.commandQueues[ preCommandQueueIndex ].commandBuffer ), frameData.vkTimestampQueryPool, commandQueueCount * 2 + 2, 16 - (commandQueueCount * 2 + 2));
 #endif
-            HR( vkEndCommandBuffer( buffer ) );
+            //HR( vkEndCommandBuffer( buffer ) );
         }
 
         VkPipelineStageFlags waitStages[] { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
-
         VkSemaphore waitSemaphores[] { frameData.vkSwapChainAcquireSemaphore };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( waitStages ) == ZP_ARRAY_SIZE( waitSemaphores ) );
 
         VkSemaphore signalSemaphores[] { frameData.vkRenderFinishedSemaphore };
-
-        VkSubmitInfo submitInfo {};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores );
-        submitInfo.pWaitSemaphores = waitSemaphores;
-        submitInfo.pWaitDstStageMask = waitStages;
-
-        submitInfo.signalSemaphoreCount = ZP_ARRAY_SIZE( signalSemaphores );
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
 
         HR( vkResetFences( m_vkLocalDevice, 1, &frameData.vkInFlightFences ) );
 
@@ -1583,8 +1566,17 @@ namespace zp
         {
             graphicsQueueCommandBuffers[ i ] = static_cast<VkCommandBuffer>( frameData.commandQueues[ i ].commandBuffer );
         }
-        submitInfo.commandBufferCount = commandQueueCount;
-        submitInfo.pCommandBuffers = graphicsQueueCommandBuffers;
+
+        VkSubmitInfo submitInfo {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores ),
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = static_cast<uint32_t>( commandQueueCount ),
+            .pCommandBuffers = graphicsQueueCommandBuffers,
+            .signalSemaphoreCount = ZP_ARRAY_SIZE( signalSemaphores ),
+            .pSignalSemaphores = signalSemaphores,
+        };
 
         HR( vkQueueSubmit( m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], 1, &submitInfo, frameData.vkInFlightFences ) );
     }
@@ -2274,7 +2266,7 @@ namespace zp
             frameData.commandQueueCapacity = newCommandQueueCapacity;
         }
 
-        if( commandQueueIndex > 0 )
+        if( false )
         {
             const zp_size_t prevCommandQueueIndex = commandQueueIndex - 1;
             CommandQueue& prevCommandQueue = frameData.commandQueues[ prevCommandQueueIndex ];
@@ -2293,18 +2285,15 @@ namespace zp
             }
         }
 
-        const VkCommandPool commandPoolMap[] {
-            m_vkGraphicsCommandPool,
-            m_vkTransferCommandPool,
-            m_vkComputeCommandPool,
-            m_vkGraphicsCommandPool
-        };
-
         CommandQueue* commandQueue = &frameData.commandQueues[ commandQueueIndex ];
         if( commandQueue->commandBuffer != VK_NULL_HANDLE && commandQueue->queue != queue )
         {
             auto commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
-            vkFreeCommandBuffers( m_vkLocalDevice, commandPoolMap[ commandQueue->queue ], 1, &commandBuffer );
+            auto commandPool = static_cast<VkCommandPool>( commandQueue->commandBufferPool );
+            vkFreeCommandBuffers( m_vkLocalDevice, commandPool, 1, &commandBuffer );
+
+            commandQueue->commandBuffer = nullptr;
+            commandQueue->commandBufferPool = nullptr;
         }
 
         commandQueue->queue = queue;
@@ -2313,9 +2302,12 @@ namespace zp
 
         if( commandQueue->commandBuffer == nullptr )
         {
+            VkCommandPool commandPool = getCommandPool( commandQueue );
+            commandQueue->commandBufferPool = commandPool;
+
             VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool = commandPoolMap[ queue ],
+                .commandPool = commandPool,
                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 .commandBufferCount = 1,
             };
@@ -2323,6 +2315,26 @@ namespace zp
             VkCommandBuffer commandBuffer;
             HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &commandBuffer ) );
             commandQueue->commandBuffer = commandBuffer;
+
+#if ZP_DEBUG
+            const char* queueNames[] {
+                "Graphics",
+                "Transfer",
+                "Compute",
+                "Present",
+            };
+            char name[64];
+            zp_snprintf( name, "%s Command Buffer #%d (%d) ", queueNames[ queue ], commandQueueIndex, zp_current_thread_id() );
+
+            VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .objectType = VK_OBJECT_TYPE_COMMAND_BUFFER,
+                .objectHandle = reinterpret_cast<uint64_t>(commandBuffer),
+                .pObjectName = name,
+            };
+
+            HR( CallDebugUtilResult( vkSetDebugUtilsObjectNameEXT, m_vkInstance, m_vkLocalDevice, &debugUtilsObjectNameInfoExt ) );
+#endif
         }
 
         VkCommandBufferBeginInfo commandBufferBeginInfo {
@@ -2336,14 +2348,23 @@ namespace zp
 #if ZP_USE_PROFILER
         if( queue != ZP_RENDER_QUEUE_TRANSFER )
         {
-            vkCmdResetQueryPool( buffer, frameData.vkTimestampQueryPool, commandQueueIndex * 2, 2 );
-            vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, frameData.vkTimestampQueryPool, commandQueueIndex * 2 );
+            //vkCmdResetQueryPool( buffer, frameData.vkTimestampQueryPool, commandQueueIndex * 2, 2 );
+            //vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, frameData.vkTimestampQueryPool, commandQueueIndex * 2 );
         }
 
         //vkCmdBeginQuery( buffer, frameData.vkPipelineStatisticsQueryPool, 0, 0 );
 #endif
 
         return commandQueue;
+    }
+
+    void VulkanGraphicsDevice::releaseCommandQueue( CommandQueue* commandQueue )
+    {
+        if( commandQueue )
+        {
+            VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
+            HR( vkEndCommandBuffer( commandBuffer ) );
+        }
     }
 
     void VulkanGraphicsDevice::beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue )
@@ -2698,4 +2719,98 @@ namespace zp
 #endif
     }
 
+    //
+    //
+    //
+
+    namespace
+    {
+        thread_local zp_bool_t t_isCommandPoolCreated;
+
+        thread_local VkCommandPool t_vkGraphicsCommandPool;
+
+        thread_local VkCommandPool t_vkTransferCommandPool;
+
+        thread_local VkCommandPool t_vkComputeCommandPool;
+    }
+
+    VkCommandPool VulkanGraphicsDevice::getCommandPool( CommandQueue* commandQueue )
+    {
+        if( !t_isCommandPoolCreated )
+        {
+            t_isCommandPoolCreated = true;
+
+            VkCommandPoolCreateInfo commandPoolCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            };
+
+            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsFamily;
+            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &t_vkGraphicsCommandPool ) );
+
+            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferFamily;
+            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &t_vkTransferCommandPool ) );
+
+            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
+            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &t_vkComputeCommandPool ) );
+
+            zp_size_t index = Atomic::AddSizeT( &m_commandPoolCount, 3 ) - 3;
+            m_vkCommandPools[ index + 0 ] = t_vkGraphicsCommandPool;
+            m_vkCommandPools[ index + 1 ] = t_vkTransferCommandPool;
+            m_vkCommandPools[ index + 2 ] = t_vkComputeCommandPool;
+
+#if ZP_DEBUG
+            {
+                char name[64];
+                zp_snprintf( name, "Graphics Command Buffer Pool (%d) ", zp_current_thread_id() );
+
+                VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                    .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
+                    .objectHandle = reinterpret_cast<uint64_t>(t_vkGraphicsCommandPool),
+                    .pObjectName = name,
+                };
+
+                HR( CallDebugUtilResult( vkSetDebugUtilsObjectNameEXT, m_vkInstance, m_vkLocalDevice, &debugUtilsObjectNameInfoExt ) );
+            }
+
+            {
+                char name[64];
+                zp_snprintf( name, "Transfer Command Buffer Pool (%d) ", zp_current_thread_id() );
+
+                VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                    .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
+                    .objectHandle = reinterpret_cast<uint64_t>(t_vkTransferCommandPool),
+                    .pObjectName = name,
+                };
+
+                HR( CallDebugUtilResult( vkSetDebugUtilsObjectNameEXT, m_vkInstance, m_vkLocalDevice, &debugUtilsObjectNameInfoExt ) );
+            }
+
+            {
+                char name[64];
+                zp_snprintf( name, "Compute Command Buffer Pool (%d) ", zp_current_thread_id() );
+
+                VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                    .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
+                    .objectHandle = reinterpret_cast<uint64_t>(t_vkComputeCommandPool),
+                    .pObjectName = name,
+                };
+
+                HR( CallDebugUtilResult( vkSetDebugUtilsObjectNameEXT, m_vkInstance, m_vkLocalDevice, &debugUtilsObjectNameInfoExt ) );
+            }
+#endif
+        }
+
+        const VkCommandPool commandPoolMap[] {
+            t_vkGraphicsCommandPool,
+            t_vkTransferCommandPool,
+            t_vkComputeCommandPool,
+            t_vkGraphicsCommandPool
+        };
+
+        return commandPoolMap[ commandQueue->queue ];
+    }
 }

@@ -60,6 +60,7 @@ namespace zp
     };
 
     typedef GraphicsResource<GraphicsBuffer> GraphicsBufferResource;
+
     typedef GraphicsResourceHandle<GraphicsBuffer> GraphicsBufferResourceHandle;
 
     struct GraphicsBufferAllocation
@@ -88,10 +89,10 @@ namespace zp
             ZP_ASSERT( ( graphicsBuffer.offset + allocated + alignedSize ) < graphicsBuffer.size );
 
             GraphicsBufferAllocation allocation {
-                graphicsBuffer.buffer,
-                graphicsBuffer.deviceMemory,
-                graphicsBuffer.offset + allocated,
-                alignedSize
+                .buffer = graphicsBuffer.buffer,
+                .deviceMemory = graphicsBuffer.deviceMemory,
+                .offset = graphicsBuffer.offset + allocated,
+                .size = alignedSize
             };
             allocated += alignedSize;
 
@@ -167,6 +168,7 @@ namespace zp
     };
 
     typedef GraphicsResource<PipelineLayout> PipelineLayoutResource;
+
     typedef GraphicsResourceHandle<PipelineLayout> PipelineLayoutResourceHandle;
 
     struct GraphicsPipelineStateCreateDesc
@@ -258,6 +260,7 @@ namespace zp
         zp_uint64_t frame;
         zp_uint64_t frameIndex;
         zp_handle_t commandBuffer;
+        zp_handle_t commandBufferPool;
         RenderQueue queue;
     };
 
@@ -331,6 +334,8 @@ namespace zp
 #pragma region Command Queue Operations
 
         virtual CommandQueue* requestCommandQueue( RenderQueue queue, zp_uint64_t frameIndex ) = 0;
+
+        virtual void releaseCommandQueue( CommandQueue* commandQueue ) = 0;
 
         virtual void beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue ) = 0;
 

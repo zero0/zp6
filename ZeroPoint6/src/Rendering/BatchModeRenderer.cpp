@@ -194,6 +194,8 @@ namespace zp
         }
 
         graphicsDevice->endRenderPass( commandQueue );
+
+        graphicsDevice->releaseCommandQueue( commandQueue );
     }
 
     BatchModeRenderCommandHandle BatchModeRenderer::acquirePersistentRenderCommand()
