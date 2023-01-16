@@ -70,7 +70,7 @@ namespace zp
 
         void FinishJob( Job* job )
         {
-            const zp_size_t unfinishedJobs = Atomic::DecrementSizeT( &job->unfinishedJobs );
+            const zp_size_t unfinishedJobs = Atomic::DecrementSizeT( &job->unfinishedJobs ) - 1;
             if( unfinishedJobs == 0 )
             {
                 Job* const parent = job->parent;

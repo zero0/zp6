@@ -40,11 +40,15 @@ namespace zp
 
         ~Queue();
 
-        zp_size_t size() const;
+        [[nodiscard]] zp_size_t size() const;
 
-        zp_bool_t isEmpty() const;
+        [[nodiscard]] zp_bool_t isEmpty() const;
 
         void enqueue( const_reference val );
+
+        void enqueueUnsafe( const_reference val );
+
+        void enqueueAtomic( const_reference val );
 
         value_type dequeue();
 
@@ -64,7 +68,6 @@ namespace zp
         void ensureCapacity( zp_size_t capacity );
 
         pointer m_data;
-        zp_size_t m_size;
         zp_size_t m_head;
         zp_size_t m_tail;
         zp_size_t m_capacity;
@@ -82,7 +85,6 @@ namespace zp
     template<typename T, typename Allocator>
     Queue<T, Allocator>::Queue()
         : m_data( nullptr )
-        , m_size( 0 )
         , m_head( 0 )
         , m_tail( 0 )
         , m_capacity( 0 )
@@ -93,7 +95,6 @@ namespace zp
     template<typename T, typename Allocator>
     Queue<T, Allocator>::Queue( allocator_const_reference allocator )
         : m_data( nullptr )
-        , m_size( 0 )
         , m_head( 0 )
         , m_tail( 0 )
         , m_capacity( 0 )
@@ -104,7 +105,6 @@ namespace zp
     template<typename T, typename Allocator>
     Queue<T, Allocator>::Queue( zp_size_t capacity )
         : m_data( nullptr )
-        , m_size( 0 )
         , m_head( 0 )
         , m_tail( 0 )
         , m_capacity( 0 )
@@ -116,7 +116,6 @@ namespace zp
     template<typename T, typename Allocator>
     Queue<T, Allocator>::Queue( zp_size_t capacity, allocator_const_reference allocator )
         : m_data( nullptr )
-        , m_size( 0 )
         , m_head( 0 )
         , m_tail( 0 )
         , m_capacity( 0 )
@@ -134,41 +133,57 @@ namespace zp
     template<typename T, typename Allocator>
     zp_size_t Queue<T, Allocator>::size() const
     {
-        return m_size;
+        return m_tail - m_head;
     }
 
     template<typename T, typename Allocator>
     zp_bool_t Queue<T, Allocator>::isEmpty() const
     {
-        return m_size == 0;
+        return m_tail == m_head;
     }
 
     template<typename T, typename Allocator>
     void Queue<T, Allocator>::enqueue( const_reference val )
     {
-        if( m_size == m_capacity )
+        if( size() == m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
 
-        m_data[ m_tail ] = val;
+        const zp_size_t index = m_tail % m_capacity;
+        ++m_tail;
 
-        m_tail = ( m_tail + 1 ) % m_capacity;
-        ++m_size;
+        m_data[ index ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    void Queue<T, Allocator>::enqueueUnsafe( const_reference val )
+    {
+        const zp_size_t index = m_tail % m_capacity;
+        ++m_tail;
+
+        m_data[ index ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    void Queue<T, Allocator>::enqueueAtomic( const_reference val )
+    {
+        const zp_size_t index = ( Atomic::IncrementSizeT( &m_tail ) - 1 ) % m_capacity;
+        m_data[ index ] = val;
     }
 
     template<typename T, typename Allocator>
     typename Queue<T, Allocator>::value_type Queue<T, Allocator>::dequeue()
     {
-        ZP_ASSERT_MSG( m_size, "Trying to dequeue from an empty Queue" );
+        ZP_ASSERT_MSG( isEmpty(), "Trying to dequeue from an empty Queue" );
 
-        pointer p = m_data + m_head;
+        const zp_size_t index = m_head % m_capacity;
+        ++m_head;
+
+        pointer p = m_data + index;
 
         value_type v = zp_move( *p );
         p->~T();
-
-        m_head = ( m_head + 1 ) % m_capacity;
-        --m_size;
 
         return zp_move( v );
     }
@@ -177,15 +192,16 @@ namespace zp
     zp_bool_t Queue<T, Allocator>::tryDequeue( reference val )
     {
         zp_bool_t removed = false;
-        if( m_size > 0 )
+        
+        if( !isEmpty() )
         {
-            pointer p = m_data + m_head;
+            const zp_size_t index = m_head % m_capacity;
+            ++m_head;
+
+            pointer p = m_data + index;
 
             val = zp_move( *p );
             p->~T();
-
-            m_head = ( m_head + 1 ) % m_capacity;
-            --m_size;
 
             removed = true;
         }
@@ -196,26 +212,30 @@ namespace zp
     template<typename T, typename Allocator>
     typename Queue<T, Allocator>::const_reference Queue<T, Allocator>::peek() const
     {
-        return m_data[ m_tail ];
+        const zp_size_t index = m_tail % m_capacity;
+        return m_data[ index ];
     }
 
     template<typename T, typename Allocator>
     void Queue<T, Allocator>::clear()
     {
-        if( m_head < m_tail )
+        const zp_size_t head = m_head % m_capacity;
+        const zp_size_t tail = m_tail % m_capacity;
+
+        if( head < tail )
         {
-            for( zp_size_t i = m_head, imax = m_tail; i < imax; ++i )
+            for( zp_size_t i = head, imax = tail; i < imax; ++i )
             {
                 ( m_data + i )->~T();
             }
         }
-        else if( m_size > 0 )
+        else if( head != tail )
         {
-            for( zp_size_t i = m_head, imax = m_capacity; i < imax; ++i )
+            for( zp_size_t i = head, imax = m_capacity; i < imax; ++i )
             {
                 ( m_data + i )->~T();
             }
-            for( zp_size_t i = 0, imax = m_tail; i < imax; ++i )
+            for( zp_size_t i = 0, imax = tail; i < imax; ++i )
             {
                 ( m_data + i )->~T();
             }
@@ -223,7 +243,6 @@ namespace zp
 
         m_head = 0;
         m_tail = 0;
-        m_size = 0;
     }
 
     template<typename T, typename Allocator>
@@ -231,7 +250,6 @@ namespace zp
     {
         m_head = 0;
         m_tail = 0;
-        m_size = 0;
     }
 
     template<typename T, typename Allocator>
@@ -270,28 +288,31 @@ namespace zp
 
         if( m_data != nullptr )
         {
-            if( m_head < m_tail )
+            const zp_size_t head = m_head % m_capacity;
+            const zp_size_t tail = m_tail % m_capacity;
+
+            if( head < tail )
             {
-                for( zp_size_t i = m_head, imax = m_tail, n = 0; i < imax; ++i, ++n )
+                for( zp_size_t i = head, imax = tail, n = 0; i < imax; ++i, ++n )
                 {
                     newData[ n ] = zp_move( m_data[ i ] );
                 }
             }
-            else if( m_size > 0 )
+            else if( head != tail )
             {
                 zp_size_t n = 0;
-                for( zp_size_t i = m_head, imax = m_capacity; i < imax; ++i, ++n )
+                for( zp_size_t i = head, imax = m_capacity; i < imax; ++i, ++n )
                 {
                     newData[ n ] = zp_move( m_data[ i ] );
                 }
-                for( zp_size_t i = 0, imax = m_tail; i < imax; ++i, ++n )
+                for( zp_size_t i = 0, imax = tail; i < imax; ++i, ++n )
                 {
                     newData[ n ] = zp_move( m_data[ i ] );
                 }
             }
 
+            m_tail = m_tail - m_head;
             m_head = 0;
-            m_tail = m_size;
 
             m_allocator.free( m_data );
             m_data = nullptr;

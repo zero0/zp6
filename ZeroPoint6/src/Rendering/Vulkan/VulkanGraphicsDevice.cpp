@@ -76,9 +76,9 @@ namespace zp
 #define CallDebugUtil( func, inst, ... )  CallDebugUtilEXT<ZP_CONCAT(PFN_, func)>( inst, #func, __VA_ARGS__ )
 
         VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                      VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                                      const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                                                      void* pUserData )
+            VkDebugUtilsMessageTypeFlagsEXT messageType,
+            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+            void* pUserData )
         {
             const zp_uint32_t messageMask = 0
                                             #if ZP_DEBUG
@@ -885,7 +885,7 @@ namespace zp
             queueFamilyProperties.resize_unsafe( queueFamilyCount );
 
             vkGetPhysicalDeviceQueueFamilyProperties( m_vkPhysicalDevice, &queueFamilyCount,
-                                                      queueFamilyProperties.data() );
+                queueFamilyProperties.data() );
 
             // find base queries
             for( zp_size_t i = 0; i < queueFamilyCount; ++i )
@@ -1152,8 +1152,7 @@ namespace zp
         Vector<VkSurfaceFormatKHR> surfaceFormats( formatCount, MemoryLabels::Temp );
         surfaceFormats.resize_unsafe( formatCount );
 
-        HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount,
-                                                  surfaceFormats.data() ) );
+        HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, surfaceFormats.data() ) );
 
         uint32_t presentModeCount = 0;
         HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_vkPhysicalDevice, m_vkSurface, &presentModeCount, VK_NULL_HANDLE ) );
@@ -1194,6 +1193,7 @@ namespace zp
         {
             swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             swapChainCreateInfo.queueFamilyIndexCount = ZP_ARRAY_SIZE( queueFamilyIndices );
+
             swapChainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
         }
         else
@@ -1217,7 +1217,7 @@ namespace zp
         }
 
         m_vkSwapChainFormat = surfaceFormat.format;
-        m_vkSwapChainColorSpace = (VkColorSpaceKHR) colorSpace;
+        m_vkSwapChainColorSpace = (VkColorSpaceKHR)colorSpace;
         m_vkSwapChainExtent = extent;
 
         uint32_t swapChainImageCount = 0;
@@ -2554,7 +2554,7 @@ namespace zp
     }
 
     void VulkanGraphicsDevice::updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc,
-                                             const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue )
+        const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue )
     {
         GraphicsBufferAllocation allocation = m_perFrameData[ commandQueue->frame ].perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->dataSize );
 

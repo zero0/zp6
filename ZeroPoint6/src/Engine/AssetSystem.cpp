@@ -1,5 +1,5 @@
 //
-// Created by phosg on 2/23/2022.
+//
 //
 
 #include "Engine/AssetSystem.h"

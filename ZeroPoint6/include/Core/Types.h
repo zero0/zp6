@@ -119,8 +119,6 @@ ZP_FORCEINLINE zp_bool_t operator>( const zp_guid128_t& lh, const zp_guid128_t& 
     return lh.m32 != rh.m32 ? lh.m32 > rh.m32 : lh.m10 > rh.m10;
 }
 
-
-
 //
 //
 //

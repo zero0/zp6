@@ -8,13 +8,14 @@
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/Allocator.h"
+#include "Core/Atomic.h"
 
 namespace zp
 {
     template<MemoryLabel MemLabel, zp_size_t Alignment = kDefaultMemoryAlignment>
     struct TypedMemoryLabelAllocator
     {
-        void* allocate( zp_size_t size ) const
+        [[nodiscard]] void* allocate( zp_size_t size ) const
         {
             void* ptr = GetAllocator( MemLabel )->allocate( size, Alignment );
             return ptr;
@@ -31,6 +32,8 @@ namespace zp
     class Vector
     {
     public:
+        typedef zp_bool_t (* EqualityComparerFunc)( const T& lh, const T& rh );
+
         static const zp_size_t npos = -1;
 
         typedef T value_type;
@@ -60,15 +63,23 @@ namespace zp
 
         const_reference at( zp_size_t index ) const;
 
-        zp_size_t size() const;
+        [[nodiscard]] zp_size_t size() const;
 
-        zp_bool_t isEmpty() const;
+        [[nodiscard]] zp_bool_t isEmpty() const;
 
-        zp_bool_t isFixed() const;
+        [[nodiscard]] zp_bool_t isFixed() const;
 
         void pushBack( const_reference val );
 
+        void pushBackUnsafe( const_reference val );
+
+        void pushBackAtomic( const_reference val );
+
         reference pushBackEmpty();
+
+        reference pushBackEmptyUnsafe();
+
+        reference pushBackEmptyAtomic();
 
         void pushFront( const_reference val );
 
@@ -82,11 +93,11 @@ namespace zp
 
         void eraseAtSwapBack( zp_size_t index );
 
-        zp_bool_t erase( const_reference val );
+        zp_bool_t erase( const_reference val, EqualityComparerFunc comparer = nullptr );
 
-        zp_bool_t eraseSwapBack( const_reference val );
+        zp_bool_t eraseSwapBack( const_reference val, EqualityComparerFunc comparer = nullptr );
 
-        zp_size_t eraseAll( const_reference val );
+        zp_size_t eraseAll( const_reference val, EqualityComparerFunc comparer = nullptr );
 
         void clear();
 
@@ -98,9 +109,9 @@ namespace zp
 
         void destroy();
 
-        zp_size_t indexOf( const_reference val ) const;
+        zp_size_t indexOf( const_reference val, EqualityComparerFunc comparer = nullptr ) const;
 
-        zp_size_t lastIndexOf( const_reference val ) const;
+        zp_size_t lastIndexOf( const_reference val, EqualityComparerFunc comparer = nullptr ) const;
 
         pointer data();
 
@@ -125,6 +136,8 @@ namespace zp
     private:
         void ensureCapacity( zp_size_t capacity );
 
+        static zp_bool_t defaultEqualityComparerFunc( const T& lh, const T& rh );
+
         pointer m_data;
         zp_size_t m_size;
         zp_size_t m_capacity;
@@ -144,7 +157,7 @@ namespace zp
         : m_data( nullptr )
         , m_size( 0 )
         , m_capacity( 0 )
-        , m_allocator( allocator_value())
+        , m_allocator( allocator_value() )
     {
     }
 
@@ -162,7 +175,7 @@ namespace zp
         : m_data( nullptr )
         , m_size( 0 )
         , m_capacity( 0 )
-        , m_allocator( allocator_value())
+        , m_allocator( allocator_value() )
     {
         ensureCapacity( capacity );
     }
@@ -230,6 +243,19 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushBackUnsafe( const_reference val )
+    {
+        m_data[ m_size++ ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushBackAtomic( const_reference val )
+    {
+        const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
+        m_data[ index ] = val;
+    }
+
+    template<typename T, typename Allocator>
     typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmpty()
     {
         if( m_size == m_capacity )
@@ -238,6 +264,22 @@ namespace zp
         }
         new( m_data + m_size ) T();
         return m_data[ m_size++ ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmptyUnsafe()
+    {
+        new( m_data + m_size ) T();
+        return m_data[ m_size++ ];
+    }
+
+    template<typename T, typename Allocator>
+    typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmptyAtomic()
+    {
+        const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
+
+        new( m_data + index ) T();
+        return m_data[ index ];
     }
 
     template<typename T, typename Allocator>
@@ -282,7 +324,7 @@ namespace zp
     {
         if( m_size )
         {
-            (m_data + --m_size)->~T();
+            ( m_data + --m_size )->~T();
         }
     }
 
@@ -305,7 +347,7 @@ namespace zp
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::eraseAt( zp_size_t index )
     {
-        (m_data + index)->~T();
+        ( m_data + index )->~T();
 
         for( zp_size_t i = index + 1; i < m_size; ++i )
         {
@@ -318,15 +360,15 @@ namespace zp
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::eraseAtSwapBack( zp_size_t index )
     {
-        (m_data + index)->~T();
+        ( m_data + index )->~T();
         m_data[ index ] = zp_move( m_data[ m_size - 1 ] );
         --m_size;
     }
 
     template<typename T, typename Allocator>
-    zp_bool_t Vector<T, Allocator>::erase( const_reference val )
+    zp_bool_t Vector<T, Allocator>::erase( const_reference val, EqualityComparerFunc comparer )
     {
-        zp_size_t index = indexOf( val );
+        zp_size_t index = indexOf( val, comparer );
         zp_bool_t found = index != npos;
 
         if( found )
@@ -338,9 +380,9 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
-    zp_bool_t Vector<T, Allocator>::eraseSwapBack( const_reference val )
+    zp_bool_t Vector<T, Allocator>::eraseSwapBack( const_reference val, EqualityComparerFunc comparer )
     {
-        zp_size_t index = indexOf( val );
+        zp_size_t index = indexOf( val, comparer );
         zp_bool_t found = index != npos;
 
         if( found )
@@ -352,13 +394,16 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
-    zp_size_t Vector<T, Allocator>::eraseAll( const_reference val )
+    zp_size_t Vector<T, Allocator>::eraseAll( const_reference val, EqualityComparerFunc comparer )
     {
         zp_size_t numErased = 0;
+
+        EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
+
         for( zp_size_t i = 0; i < m_size; ++i )
         {
             T* t = m_data + i;
-            if( *t == val )
+            if( cmp( *t, val ) )
             {
                 ++numErased;
 
@@ -370,6 +415,7 @@ namespace zp
             }
 
         }
+
         return numErased;
     }
 
@@ -423,39 +469,48 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
-    zp_size_t Vector<T, Allocator>::indexOf( const_reference val ) const
+    zp_size_t Vector<T, Allocator>::indexOf( const_reference val, EqualityComparerFunc comparer ) const
     {
         zp_size_t index = npos;
 
-        const_iterator b = m_data;
-        const_iterator e = m_data + m_size;
-        for( ; b != e; ++b )
+        if( m_size > 0 )
         {
-            if( *b == val )
-            {
-                index = b - m_data;
-                break;
-            }
+            EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
 
+            const_iterator b = m_data;
+            const_iterator e = m_data + m_size;
+            for( ; b != e; ++b )
+            {
+                if( cmp( *b, val ) )
+                {
+                    index = b - m_data;
+                    break;
+                }
+            }
         }
 
         return index;
     }
 
     template<typename T, typename Allocator>
-    zp_size_t Vector<T, Allocator>::lastIndexOf( const_reference val ) const
+    zp_size_t Vector<T, Allocator>::lastIndexOf( const_reference val, EqualityComparerFunc comparer ) const
     {
         zp_size_t index = npos;
 
-        const_iterator b = m_data;
-        const_iterator e = m_data + m_size;
-        for( ; b != e; )
+        if( m_size > 0 )
         {
-            --e;
-            if( *e == val )
+            EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
+
+            const_iterator b = m_data;
+            const_iterator e = m_data + m_size;
+            for( ; b != e; )
             {
-                index = e - m_data;
-                break;
+                --e;
+                if( cmp( *e, val ) )
+                {
+                    index = e - m_data;
+                    break;
+                }
             }
         }
 
@@ -545,6 +600,11 @@ namespace zp
         m_capacity = capacity;
     }
 
+    template<typename T, typename Allocator>
+    zp_bool_t Vector<T, Allocator>::defaultEqualityComparerFunc( const T& lh, const T& rh )
+    {
+        return lh == rh;
+    }
 };
 
 #endif //ZP_VECTOR_H
