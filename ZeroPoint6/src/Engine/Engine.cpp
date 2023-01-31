@@ -10,6 +10,7 @@
 #include "Engine/Engine.h"
 #include "Engine/TransformComponent.h"
 
+#include "Rendering/Camera.h"
 #include "Rendering/RenderSystem.h"
 #include "Rendering/GraphicsDevice.h"
 

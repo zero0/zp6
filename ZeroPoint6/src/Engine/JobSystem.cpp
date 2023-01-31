@@ -70,15 +70,20 @@ namespace zp
 
         void FinishJob( Job* job )
         {
-            const zp_size_t unfinishedJobs = Atomic::DecrementSizeT( &job->unfinishedJobs ) - 1;
+            // TODO: fix segfault when exiting
+            const zp_size_t unfinishedJobs = job->unfinishedJobs - 1;
+
+            Atomic::ExchangeSizeT( &job->unfinishedJobs, unfinishedJobs );
+            //const zp_size_t unfinishedJobs = Atomic::DecrementSizeT( &job->unfinishedJobs ) - 1;
+
             if( unfinishedJobs == 0 )
             {
                 Job* const parent = job->parent;
                 Job* const next = job->next;
 
-                //job->next = nullptr;
-                //job->parent = nullptr;
-                //job->func = nullptr;
+                job->next = nullptr;
+                job->parent = nullptr;
+                job->func = nullptr;
 
                 if( parent )
                 {
@@ -166,7 +171,7 @@ namespace zp
             while( t_isRunning )
             {
                 Job* job = GetJob();
-                if( job )
+                if( job && t_isRunning )
                 {
                     ExecuteJob( job );
                 }
@@ -445,7 +450,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         return PreparedJobHandle( job );
     }
@@ -458,7 +463,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         if( dependency.m_job )
         { dependency.m_job->next = job; }
@@ -491,7 +496,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         zp_memcpy( job->data(), kJobDataSize, jobData, size );
 
@@ -513,7 +518,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         job->set_name( name );
         zp_memcpy( job->data(), kJobDataSize, jobData, size );
@@ -536,7 +541,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         return PreparedJobHandle( job );
     }
@@ -551,7 +556,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         if( dependency.m_job )
         {
@@ -613,7 +618,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         t_localJobQueue->push( job );
 
@@ -644,7 +649,7 @@ namespace zp
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
-        zp_zero_memory_array( job->padding );
+        zp_zero_memory_array( job->payload );
 
         if( dependency.m_job )
         {
@@ -749,7 +754,6 @@ namespace zp
 
     JobHandle JobSystem::ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency )
     {
-
         Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
 
         Job* job = AllocateJob();

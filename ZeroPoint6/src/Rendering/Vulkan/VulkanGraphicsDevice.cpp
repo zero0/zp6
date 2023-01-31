@@ -91,18 +91,18 @@ namespace zp
             {
                 zp_printfln( pCallbackData->pMessage );
 
-                MessageBoxResult result = GetPlatform()->ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
-                if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
+                if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
                 {
-                    exit( 1 );
+                    MessageBoxResult result = GetPlatform()->ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
+                    if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
+                    {
+                        exit( 1 );
+                    }
+                    else if( result == ZP_MESSAGE_BOX_RESULT_RETRY )
+                    {
+                        zp_debug_break();
+                    }
                 }
-                else if( result == ZP_MESSAGE_BOX_RESULT_RETRY )
-                {
-                    zp_debug_break();
-                }
-
-                //zp_printfln( "validation layer: %s\n", pCallbackData->pMessage );
-                //zp_debug_break();
             }
 
             const VkBool32 shouldAbort = messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? VK_TRUE : VK_FALSE;
@@ -2053,7 +2053,7 @@ namespace zp
     {
         VkShaderModuleCreateInfo shaderModuleCreateInfo {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = shaderDesc->codeSize << 2, // codeSize in bytes -> uint
+            .codeSize = shaderDesc->codeSizeInBytes, // codeSizeInBytes in bytes -> uint
             .pCode = static_cast<const uint32_t*>( shaderDesc->codeData ),
         };
 
@@ -2061,10 +2061,10 @@ namespace zp
         HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, nullptr, &shaderModule ) );
         shader->shader = shaderModule;
         shader->shaderStage = shaderDesc->shaderStage;
-        shader->shaderHash = zp_fnv128_1a( shaderDesc->codeData, shaderDesc->codeSize );
+        shader->shaderHash = zp_fnv128_1a( shaderDesc->codeData, shaderDesc->codeSizeInBytes );
 
-        const zp_size_t length = ZP_ARRAY_SIZE( shader->entryPointName );
-        zp_memcpy( shader->entryPointName, length, shaderDesc->entryPointName, zp_strnlen( shaderDesc->entryPointName, length ) );
+        const zp_size_t maxLength = ZP_ARRAY_SIZE( shader->entryPointName );
+        zp_strcpy( shaderDesc->entryPointName, shader->entryPointName, zp_min( maxLength, zp_strlen( shaderDesc->entryPointName ) ) );
 
 #if ZP_DEBUG
         if( shaderDesc->name )

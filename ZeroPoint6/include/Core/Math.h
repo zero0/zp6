@@ -577,7 +577,7 @@ namespace zp
 
         Vector4f Mul( const Matrix4x4f& lh, const Vector4f& rh );
 
-        Bounds3Df Mul( const Bounds3Df& lh, const Matrix4x4f& rh );
+        Bounds3Df Mul( const Matrix4x4f& lh, const Bounds3Df& rh );
 
         zp_float32_t Dot( const Vector2f& lh, const Vector2f& rh );
 

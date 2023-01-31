@@ -120,6 +120,14 @@ namespace zp
 
         void DecommitMemoryPage( void* ptr, zp_size_t size );
 
+        void GetCurrentDir( char* path, zp_size_t maxPathLength );
+
+        template<zp_size_t Size>
+        void GetCurrentDir( char (&path)[ Size ] )
+        {
+            GetCurrentDir( path, Size );
+        }
+
         zp_handle_t OpenFileHandle( const char* filePath, OpenFileMode openFileMode, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
 
         zp_handle_t OpenTempFileHandle( FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );

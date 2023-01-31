@@ -82,6 +82,7 @@ namespace zp
             zp_uint8_t* commandBuffer;
             zp_uint8_t* scratchVertexBuffer;
             zp_uint16_t* scratchIndexBuffer;
+            zp_size_t commandStride;
             zp_size_t commandBufferLength;
             zp_size_t commandBufferCapacity;
             zp_size_t vertexBufferOffset;

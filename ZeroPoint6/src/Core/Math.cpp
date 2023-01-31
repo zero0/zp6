@@ -337,19 +337,19 @@ namespace zp
             return r;
         }
 
-        Bounds3Df Mul( const Bounds3Df& lh, const Matrix4x4f& rh )
+        Bounds3Df Mul( const Matrix4x4f& lh, const Bounds3Df& rh )
         {
-            const __m128 mmin = _mm_setr_ps( lh.xMin, lh.yMin, lh.zMin, 1 );
-            const __m128 mmax = _mm_setr_ps( lh.xMax, lh.yMax, lh.zMax, 1 );
+            const __m128 mmin = _mm_setr_ps( rh.xMin, rh.yMin, rh.zMin, 1 );
+            const __m128 mmax = _mm_setr_ps( rh.xMax, rh.yMax, rh.zMax, 1 );
 
             const __m128 mrcp2 = _mm_rcp_ps( _mm_set1_ps( 2 ) );
             const __m128 mcenter = _mm_mul_ps( _mm_add_ps( mmax, mmin ), mrcp2 );
             const __m128 mextents = _mm_mul_ps( _mm_sub_ps( mmax, mmin ), mrcp2 );
 
-            const __m128 mcx = _mm_setr_ps( rh.c0.x, rh.c1.x, rh.c2.x, rh.c3.x );
-            const __m128 mcy = _mm_setr_ps( rh.c0.y, rh.c1.y, rh.c2.y, rh.c3.y );
-            const __m128 mcz = _mm_setr_ps( rh.c0.z, rh.c1.z, rh.c2.z, rh.c3.z );
-            const __m128 mcw = _mm_setr_ps( rh.c0.w, rh.c1.w, rh.c2.w, rh.c3.w );
+            const __m128 mcx = _mm_setr_ps( lh.c0.x, lh.c1.x, lh.c2.x, lh.c3.x );
+            const __m128 mcy = _mm_setr_ps( lh.c0.y, lh.c1.y, lh.c2.y, lh.c3.y );
+            const __m128 mcz = _mm_setr_ps( lh.c0.z, lh.c1.z, lh.c2.z, lh.c3.z );
+            const __m128 mcw = _mm_setr_ps( lh.c0.w, lh.c1.w, lh.c2.w, lh.c3.w );
 
             __m128 tcenter = _mm_mul_ps( _mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 0, 0, 0, 0 ) ), mcx );
             tcenter = _mm_fmadd_ps( _mm_shuffle_ps( mcenter, mcenter, _MM_SHUFFLE( 1, 1, 1, 1 ) ), mcy, tcenter );

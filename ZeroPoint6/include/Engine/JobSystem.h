@@ -20,14 +20,14 @@ namespace zp
     enum : zp_size_t
     {
         kJobTotalSize = 4 KB,
-        kJobPaddingSize = kJobTotalSize - ( sizeof( JobWorkFunc* ) + sizeof( Job* ) + sizeof( Job* ) + sizeof( zp_size_t ) ),
+        kJobPayloadSize = kJobTotalSize - ( sizeof( JobWorkFunc* ) + sizeof( Job* ) + sizeof( Job* ) + sizeof( zp_size_t ) ),
 #if ZP_DEBUG
         kJobDataDebugSize = 64,
 #else
         kJobDataDebugSize = 0,
 #endif
         kJobDataOffset = kJobDataDebugSize,
-        kJobDataSize = kJobPaddingSize - kJobDataOffset
+        kJobDataSize = kJobPayloadSize - kJobDataOffset
     };
 
 #if ZP_DEBUG
@@ -55,17 +55,17 @@ namespace zp
         Job* parent;
         Job* next;
         zp_size_t unfinishedJobs;
-        zp_uint8_t padding[kJobPaddingSize];
+        zp_uint8_t payload[kJobPayloadSize];
 
         ZP_FORCEINLINE void* data()
         {
-            return padding + kJobDataOffset;
+            return payload + kJobDataOffset;
         }
 
         ZP_FORCEINLINE const char* name()
         {
 #if ZP_DEBUG
-            return reinterpret_cast<const char*>( padding );
+            return reinterpret_cast<const char*>( payload );
 #else
             return nullptr;
 #endif
@@ -76,7 +76,7 @@ namespace zp
 #if ZP_DEBUG
             if( debugName )
             {
-                zp_strcpy( debugName, reinterpret_cast<char*>( padding ), kJobDataDebugSize );
+                zp_strcpy( debugName, reinterpret_cast<char*>( payload ), kJobDataDebugSize );
             }
 #endif
         }

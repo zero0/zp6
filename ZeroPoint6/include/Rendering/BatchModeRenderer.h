@@ -15,10 +15,6 @@
 
 namespace zp
 {
-    enum
-    {
-        kMaxCachedPerFrame = 2
-    };
 
     class GraphicsDevice;
 
@@ -82,6 +78,11 @@ namespace zp
             GraphicsBufferAllocator perDrawAllocator;
         };
 
+        enum
+        {
+            kMaxCachedPerFrame = 2
+        };
+        
         PerFrameData m_perFrameData[kMaxCachedPerFrame];
         zp_uint64_t m_currentFrame;
 

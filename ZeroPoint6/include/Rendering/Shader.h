@@ -26,6 +26,8 @@ namespace zp
         ZP_SHADER_STAGE_GEOMETRY,
         ZP_SHADER_STAGE_FRAGMENT,
         ZP_SHADER_STAGE_COMPUTE,
+        ZP_SHADER_STAGE_TASK,
+        ZP_SHADER_STAGE_MESH,
     };
 
     struct ShaderDesc
@@ -33,7 +35,8 @@ namespace zp
         const char* name;
 
         const char* entryPointName;
-        zp_size_t codeSize;
+
+        zp_size_t codeSizeInBytes;
         const void* codeData;
 
         ShaderStage shaderStage;
@@ -49,8 +52,8 @@ namespace zp
         char entryPointName[kMaxShaderEntryPointNameSize];
     };
 
-    typedef GraphicsResource <Shader> ShaderResource;
-    typedef GraphicsResourceHandle <Shader> ShaderResourceHandle;
+    typedef GraphicsResource<Shader> ShaderResource;
+    typedef GraphicsResourceHandle<Shader> ShaderResourceHandle;
 }
 
 #endif //ZP_SHADER_H

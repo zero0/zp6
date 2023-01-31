@@ -152,11 +152,11 @@ namespace zp
                                                    0x00000012, 0x000100fd, 0x00010038 };
 
         const zp_uint32_t colorVertexShader[] = {
-#include "Rendering/../../bin/Shaders/debug_color.vert.spv"
+//#include "Rendering/../../bin/Shaders/debug_color.vert.spv"
         };
 
         const zp_uint32_t colorFragmentShader[] = {
-#include "Rendering/../../bin/Shaders/debug_color.frag.spv"
+//#include "Rendering/../../bin/Shaders/debug_color.frag.spv"
         };
 
         struct WaitOnGPUJob
@@ -250,33 +250,73 @@ namespace zp
 
             // create shaders
             {
-                ShaderDesc shaderDesc {};
-                shaderDesc.entryPointName = "main";
+                {
+                    ShaderDesc shaderDesc {
+                        .name = "vertex shader",
+                        .entryPointName = "main",
+                        .codeSizeInBytes = ZP_ARRAY_SIZE( vertexShaderCode ) << 2,
+                        .codeData = vertexShaderCode,
+                        .shaderStage = ZP_SHADER_STAGE_VERTEX,
+                    };
+                    graphicsDevice->createShader( &shaderDesc, m_vertexShader.data() );
+                }
 
-                shaderDesc.shaderStage = ZP_SHADER_STAGE_VERTEX;
-                shaderDesc.codeData = vertexShaderCode;
-                shaderDesc.codeSize = ZP_ARRAY_SIZE( vertexShaderCode );
-                shaderDesc.name = "vertex shader";
-                graphicsDevice->createShader( &shaderDesc, m_vertexShader.data() );
+                {
+                    ShaderDesc shaderDesc {
+                        .name = "fragment shader",
+                        .entryPointName = "main",
+                        .codeSizeInBytes = ZP_ARRAY_SIZE( fragmentShaderCode ) << 2,
+                        .codeData = fragmentShaderCode,
+                        .shaderStage = ZP_SHADER_STAGE_FRAGMENT,
+                    };
+                    graphicsDevice->createShader( &shaderDesc, m_fragmentShader.data() );
+                }
 
-                shaderDesc.shaderStage = ZP_SHADER_STAGE_FRAGMENT;
-                shaderDesc.codeData = fragmentShaderCode;
-                shaderDesc.codeSize = ZP_ARRAY_SIZE( fragmentShaderCode );
-                shaderDesc.name = "fragment shader";
-                graphicsDevice->createShader( &shaderDesc, m_fragmentShader.data() );
+                {
+                    char buff[256];
+                    GetPlatform()->GetCurrentDir( buff );
+                    zp_printfln( buff );
 
-                // color shaders
-                shaderDesc.shaderStage = ZP_SHADER_STAGE_VERTEX;
-                shaderDesc.codeData = colorVertexShader;
-                shaderDesc.codeSize = ZP_ARRAY_SIZE( colorVertexShader );
-                shaderDesc.name = "color vertex shader";
-                graphicsDevice->createShader( &shaderDesc, m_colorVertexShader.data() );
+                    zp_handle_t fileHandle = GetPlatform()->OpenFileHandle( "../../ZeroPoint6/bin/Shaders/debug_color.vert.spv", ZP_OPEN_FILE_MODE_READ );
+                    zp_size_t fileSize = GetPlatform()->GetFileSize( fileHandle );
 
-                shaderDesc.shaderStage = ZP_SHADER_STAGE_FRAGMENT;
-                shaderDesc.codeData = colorFragmentShader;
-                shaderDesc.codeSize = ZP_ARRAY_SIZE( colorFragmentShader );
-                shaderDesc.name = "color fragment shader";
-                graphicsDevice->createShader( &shaderDesc, m_colorFragmentShader.data() );
+                    void* memPtr = GetAllocator( MemoryLabels::FileIO )->allocate( fileSize, kDefaultMemoryAlignment );
+                    zp_size_t read = GetPlatform()->ReadFile( fileHandle, memPtr, fileSize );
+                    ZP_ASSERT( read == fileSize );
+                    GetPlatform()->CloseFileHandle( fileHandle );
+
+                    ShaderDesc shaderDesc {
+                        .name = "color vertex shader",
+                        .entryPointName = "main",
+                        .codeSizeInBytes = fileSize,
+                        .codeData = memPtr,
+                        .shaderStage = ZP_SHADER_STAGE_VERTEX,
+                    };
+                    graphicsDevice->createShader( &shaderDesc, m_colorVertexShader.data() );
+
+                    GetAllocator( MemoryLabels::FileIO )->free( memPtr );
+                }
+
+                {
+                    zp_handle_t fileHandle = GetPlatform()->OpenFileHandle( "../../ZeroPoint6/bin/Shaders/debug_color.frag.spv", ZP_OPEN_FILE_MODE_READ );
+                    zp_size_t fileSize = GetPlatform()->GetFileSize( fileHandle );
+
+                    void* memPtr = GetAllocator( MemoryLabels::FileIO )->allocate( fileSize, kDefaultMemoryAlignment );
+                    zp_size_t read = GetPlatform()->ReadFile( fileHandle, memPtr, fileSize );
+                    ZP_ASSERT( read == fileSize );
+                    GetPlatform()->CloseFileHandle( fileHandle );
+
+                    ShaderDesc shaderDesc {
+                        .name = "color fragment shader",
+                        .entryPointName = "main",
+                        .codeSizeInBytes = fileSize,
+                        .codeData = memPtr,
+                        .shaderStage = ZP_SHADER_STAGE_FRAGMENT,
+                    };
+                    graphicsDevice->createShader( &shaderDesc, m_colorFragmentShader.data() );
+
+                    GetAllocator( MemoryLabels::FileIO )->free( memPtr );
+                }
             }
 
             {

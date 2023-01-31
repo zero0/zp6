@@ -22,6 +22,8 @@ namespace zp
         ShaderResourceHandle tessEvalShader;
         ShaderResourceHandle geomShader;
         ShaderResourceHandle fragShader;
+        ShaderResourceHandle taskShader;
+        ShaderResourceHandle meshShader;
 
         GraphicsPipelineState materialRenderPipeline;
     };

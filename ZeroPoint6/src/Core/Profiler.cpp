@@ -292,18 +292,18 @@ namespace zp
     void Profiler::advanceFrame( const zp_uint64_t frameIndex )
     {
         CPUProfilerEvent advanceFrameEvent {
-            __FILENAME__,
-            __FUNCTION__,
-            nullptr,
-            m_currentFrame,
-            zp_time_cycle(),
-            0,
-            zp_time_now(),
-            0,
-            0,
-            0,
-            __LINE__,
-            zp_current_thread_id()
+            .filename = __FILENAME__,
+            .functionName = __FUNCTION__,
+            .eventName = nullptr,
+            .frameIndex=  m_currentFrame,
+            .startCycle = zp_time_cycle(),
+            .endCycle = 0,
+            .startTime= zp_time_now(),
+            .endTime = 0,
+            .parentEvent = 0,
+            .userData = 0,
+            .lineNumber = __LINE__,
+            .threadId = zp_current_thread_id()
         };
 
         // copy frame data into buffer

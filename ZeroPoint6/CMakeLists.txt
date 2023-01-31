@@ -97,6 +97,7 @@ set(ZP_PLATFORM_HEADERS
 
 set(ZP_RENDERING_HEADERS
         "include/Rendering/BatchModeRenderer.h"
+        "include/Rendering/Camera.h"
         "include/Rendering/GraphicsDevice.h"
         "include/Rendering/GraphicsResource.h"
         "include/Rendering/ImmediateModeRenderer.h"

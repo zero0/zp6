@@ -348,6 +348,11 @@ namespace zp
         ::VirtualFree( ptr, size, MEM_DECOMMIT );
     }
 
+    void Platform::GetCurrentDir( char* path, zp_size_t maxPathLength )
+    {
+        ::GetCurrentDirectory( maxPathLength, path );
+    }
+
     zp_handle_t Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, FileCachingMode fileCachingMode )
     {
         DWORD access = 0;

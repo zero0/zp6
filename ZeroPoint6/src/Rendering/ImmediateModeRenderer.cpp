@@ -21,16 +21,16 @@ namespace zp
         {
             zp_uint8_t* vertexBuffer;
             zp_uint16_t* indexBuffer;
-            zp_uint32_t vertexCapacity;
-            zp_uint32_t indexCapacity;
             zp_uint32_t vertexCount;
             zp_uint32_t indexCount;
             zp_uint32_t materialIndex;
-            Matrix4x4f localToWorld;
             Bounds3Df localBounds;
+            Matrix4x4f localToWorld;
             zp_uint16_t vertexStride;
             zp_uint16_t topology;
         };
+
+        constexpr zp_size_t kCommandStride = sizeof( ImmediateRenderCommand );
     }
 
     ImmediateModeRenderer::ImmediateModeRenderer( MemoryLabel memoryLabel, const ImmediateModeRendererConfig* immediateModeRendererConfig )
@@ -42,42 +42,44 @@ namespace zp
         , m_registeredMaterials( 4, memoryLabel )
         , memoryLabel( memoryLabel )
     {
-        const zp_size_t commandStride = immediateModeRendererConfig->commandCount * sizeof( ImmediateRenderCommand );
-        const zp_size_t vertexStride = immediateModeRendererConfig->vertexCount * sizeof( VertexVUC );
-        const zp_size_t indexStride = immediateModeRendererConfig->indexCount * sizeof( zp_uint16_t );
+        const zp_size_t commandBufferStride = immediateModeRendererConfig->commandCount * kCommandStride;
+        const zp_size_t vertexBufferStride = immediateModeRendererConfig->vertexCount * sizeof( VertexVUC );
+        const zp_size_t indexBufferStride = immediateModeRendererConfig->indexCount * sizeof( zp_uint16_t );
 
-        auto commandBuffer = ZP_MALLOC_T_ARRAY( memoryLabel, zp_uint8_t, commandStride * kMaxBufferedImmediateFrames );
-        auto vertexBuffer = ZP_MALLOC_T_ARRAY( memoryLabel, zp_uint8_t, vertexStride * kMaxBufferedImmediateFrames );
+        auto commandBuffer = ZP_MALLOC_T_ARRAY( memoryLabel, zp_uint8_t, commandBufferStride * kMaxBufferedImmediateFrames );
+        auto vertexBuffer = ZP_MALLOC_T_ARRAY( memoryLabel, zp_uint8_t, vertexBufferStride * kMaxBufferedImmediateFrames );
         auto indexBuffer = ZP_MALLOC_T_ARRAY( memoryLabel, zp_uint16_t, immediateModeRendererConfig->indexCount * kMaxBufferedImmediateFrames );
 
-        GraphicsBufferDesc vertexBufferDesc {};
-        vertexBufferDesc.name = "Immediate Mode Vertex Buffer";
-        vertexBufferDesc.size = vertexStride * kMaxBufferedImmediateFrames;
-        vertexBufferDesc.graphicsBufferUsageFlags = ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST;
-        vertexBufferDesc.memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE;
+        GraphicsBufferDesc vertexBufferDesc {
+            .name = "Immediate Mode Vertex Buffer",
+            .size = vertexBufferStride * kMaxBufferedImmediateFrames,
+            .graphicsBufferUsageFlags = ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST,
+            .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
+        };
         m_graphicsDevice->createBuffer( &vertexBufferDesc, &m_vertexGraphicsBuffer );
 
-        GraphicsBufferDesc indexBufferDesc {};
-        indexBufferDesc.name = "Immediate Mode Index Buffer";
-        indexBufferDesc.size = indexStride * kMaxBufferedImmediateFrames;
-        indexBufferDesc.graphicsBufferUsageFlags = ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST;
-        indexBufferDesc.memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE;
+        GraphicsBufferDesc indexBufferDesc {
+            .name = "Immediate Mode Index Buffer",
+            .size = indexBufferStride * kMaxBufferedImmediateFrames,
+            .graphicsBufferUsageFlags = ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST,
+            .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
+        };
         m_graphicsDevice->createBuffer( &indexBufferDesc, &m_indexGraphicsBuffer );
 
         for( zp_size_t i = 0; i < kMaxBufferedImmediateFrames; ++i )
         {
             PerFrameData& perFrameData = m_perFrameData[ i ];
-            perFrameData.commandBuffer = commandBuffer + ( i * commandStride );
-            perFrameData.scratchVertexBuffer = vertexBuffer + ( i * vertexStride );
+            perFrameData.commandBuffer = commandBuffer + ( i * commandBufferStride );
+            perFrameData.scratchVertexBuffer = vertexBuffer + ( i * vertexBufferStride );
             perFrameData.scratchIndexBuffer = indexBuffer + ( i * immediateModeRendererConfig->indexCount );
             perFrameData.commandBufferLength = 0;
-            perFrameData.commandBufferCapacity = commandStride;
+            perFrameData.commandBufferCapacity = commandBufferStride;
             perFrameData.vertexBufferOffset = 0;
-            perFrameData.vertexBufferCapacity = vertexStride;
+            perFrameData.vertexBufferCapacity = vertexBufferStride;
             perFrameData.indexBufferLength = 0;
             perFrameData.indexBufferCapacity = immediateModeRendererConfig->indexCount;
-            perFrameData.vertexBuffer = m_vertexGraphicsBuffer.splitBuffer( i * vertexStride, vertexStride );
-            perFrameData.indexBuffer = m_indexGraphicsBuffer.splitBuffer( i * indexStride, indexStride );
+            perFrameData.vertexBuffer = m_vertexGraphicsBuffer.splitBuffer( i * vertexBufferStride, vertexBufferStride );
+            perFrameData.indexBuffer = m_indexGraphicsBuffer.splitBuffer( i * indexBufferStride, indexBufferStride );
         }
     }
 
@@ -140,9 +142,7 @@ namespace zp
         ImmediateRenderCommand* command = static_cast<ImmediateRenderCommand*>( cmd );
         command->vertexBuffer = perFrameData.scratchVertexBuffer + vertexOffset;
         command->indexBuffer = perFrameData.scratchIndexBuffer + indexOffset;
-        command->vertexCapacity = vertexSize;
         command->vertexCount = 0;
-        command->indexCapacity = indexCount;
         command->indexCount = 0;
         command->materialIndex = materialIndex;
         command->localToWorld = Matrix4x4f::identity;
@@ -248,13 +248,15 @@ namespace zp
 
         if( perFrameData.commandBufferLength > 0 && perFrameData.vertexBufferOffset > 0 && perFrameData.indexBufferLength > 0 )
         {
-            GraphicsBufferUpdateDesc updateVertexBufferDesc {};
-            updateVertexBufferDesc.data = perFrameData.scratchVertexBuffer;
-            updateVertexBufferDesc.dataSize = perFrameData.vertexBufferOffset;
+            GraphicsBufferUpdateDesc updateVertexBufferDesc {
+                .data = perFrameData.scratchVertexBuffer,
+                .dataSize = perFrameData.vertexBufferOffset,
+            };
 
-            GraphicsBufferUpdateDesc updateIndexBufferDesc {};
-            updateIndexBufferDesc.data = perFrameData.scratchIndexBuffer;
-            updateIndexBufferDesc.dataSize = perFrameData.indexBufferLength * sizeof( zp_uint16_t );
+            GraphicsBufferUpdateDesc updateIndexBufferDesc {
+                .data = perFrameData.scratchIndexBuffer,
+                .dataSize = perFrameData.indexBufferLength * sizeof( zp_uint16_t ),
+            };
 
             void* buffer = nullptr;
             m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, &perFrameData.vertexBuffer, &buffer );
@@ -290,7 +292,7 @@ namespace zp
                 batchModeRenderCommand->firstInstance = 0;
                 batchModeRenderCommand->localToWorld = command->localToWorld;
                 batchModeRenderCommand->localBounds = command->localBounds;
-                batchModeRenderCommand->worldBounds = Math::Mul( command->localBounds, command->localToWorld );
+                batchModeRenderCommand->worldBounds = Math::Mul( command->localToWorld, command->localBounds );
             }
         }
     }
