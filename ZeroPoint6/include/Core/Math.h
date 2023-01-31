@@ -571,6 +571,8 @@ namespace zp
 
         Color LerpExact( const Color& x, const Color& y, zp_float32_t a );
 
+        Color Mul( const Color& x, const Color& y );
+
         Matrix4x4f Mul( const Matrix4x4f& lh, const Matrix4x4f& rh );
 
         Matrix4x4f Transpose( const Matrix4x4f& m );

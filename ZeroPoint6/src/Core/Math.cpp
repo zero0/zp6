@@ -270,6 +270,16 @@ namespace zp
             return r;
         }
 
+        Color Mul( const Color& x, const Color& y )
+        {
+            const __m128 mx = _mm_loadu_ps( x.rgba );
+            const __m128 my = _mm_loadu_ps( y.rgba );
+
+            ZP_ALIGN16 Color r {};
+            _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
+            return r;
+        }
+
         Matrix4x4f Mul( const Matrix4x4f& lh, const Matrix4x4f& rh )
         {
             const __m128 lc0 = _mm_setr_ps( lh.c0.x, lh.c0.y, lh.c0.z, lh.c0.w );

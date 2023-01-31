@@ -175,6 +175,8 @@ namespace zp
 
     class ProfileBlock
     {
+        ZP_NONCOPYABLE(ProfileBlock);
+
     public:
         ZP_FORCEINLINE ProfileBlock( const char* filename, const char* functionName, zp_int32_t lineNumber, const char* eventName, zp_ptr_t userData )
             : m_index( Profiler::StartCPU( filename, functionName, lineNumber, eventName, userData ) )

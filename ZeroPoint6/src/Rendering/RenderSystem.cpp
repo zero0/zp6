@@ -648,10 +648,10 @@ namespace zp
                     Vector4f v3 = Math::Mul( localToWorld, Math::Vec4f( r.bottomRight().x, r.bottomRight().y, 0.f, 1.f ) );
 
                     VertexVUC vertices[] = {
-                        { .vertexOS = Math::Vec3f( v0 ), .uv0 = Vector2f::zero, .color = Color::red },
-                        { .vertexOS = Math::Vec3f( v1 ), .uv0 = Vector2f::zero, .color = Color::green },
-                        { .vertexOS = Math::Vec3f( v2 ), .uv0 = Vector2f::zero, .color = Color::blue },
-                        { .vertexOS = Math::Vec3f( v3 ), .uv0 = Vector2f::zero, .color = Color::white },
+                        { .vertexOS = Math::Vec3f( v0 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::red, color ) },
+                        { .vertexOS = Math::Vec3f( v1 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::green, color ) },
+                        { .vertexOS = Math::Vec3f( v2 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::blue, color ) },
+                        { .vertexOS = Math::Vec3f( v3 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::white, color ) },
                     };
                     renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
                 }

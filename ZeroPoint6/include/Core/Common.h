@@ -672,7 +672,7 @@ constexpr void zp_qsort3( T* begin, T* end, Cmp cmp )
 
     while( mid <= end )
     {
-        const zp_int32_t c = cmp.compare( *mid, *pivot );
+        const zp_int32_t c = cmp( *mid, *pivot );
         if( c < 0 )
         {
             zp_move_swap( *begin, *mid );
@@ -708,7 +708,7 @@ namespace zp
     {
         typedef const T& const_reference;
 
-        zp_int32_t compare( const_reference lh, const_reference rh )
+        zp_int32_t operator()( const_reference lh, const_reference rh )
         {
             zp_int32_t cmp = 0;
             if( lh < rh )
@@ -729,7 +729,7 @@ namespace zp
     {
         typedef const T& const_reference;
 
-        zp_int32_t compare( const_reference lh, const_reference rh )
+        zp_int32_t operator()( const_reference lh, const_reference rh )
         {
             const zp_int32_t cmp = T::compare( lh, rh );
             return cmp;
