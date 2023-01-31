@@ -632,14 +632,30 @@ namespace zp
                 int count = 10;
 
                 Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
-                zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * count, 6 * count );
+                zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * (count+1), 6 * (count+1) );
 
                 Matrix4x4f localToWorld = Math::OrthoLH( orthoRect, -10, 10, orthoRect.size.width / orthoRect.size.height );
                 renderProfilerData->immediateModeRenderer->setLocalToWorld( cmd, Matrix4x4f::identity );
 
-                Rect2Df rect { .offset { .x = 0, .y = 0 }, .size { .width = 640, .height = 480 } };
-
+                Rect2Df rect { .offset { .x = 10, .y = 10 }, .size { .width = 640, .height = 480 } };
                 Rect2Df r = rect;
+
+                {
+                    Color color = Color::gray25;
+                    Vector4f v0 = Math::Mul( localToWorld, Math::Vec4f( r.bottomLeft().x, r.bottomLeft().y, 0.f, 1.f ) );
+                    Vector4f v1 = Math::Mul( localToWorld, Math::Vec4f( r.topLeft().x, r.topLeft().y, 0.f, 1.f ) );
+                    Vector4f v2 = Math::Mul( localToWorld, Math::Vec4f( r.topRight().x, r.topRight().y, 0.f, 1.f ) );
+                    Vector4f v3 = Math::Mul( localToWorld, Math::Vec4f( r.bottomRight().x, r.bottomRight().y, 0.f, 1.f ) );
+
+                    VertexVUC vertices[] = {
+                        { .vertexOS = Math::Vec3f( v0 ), .uv0 = Vector2f::zero, .color = Color::red },
+                        { .vertexOS = Math::Vec3f( v1 ), .uv0 = Vector2f::zero, .color = Color::green },
+                        { .vertexOS = Math::Vec3f( v2 ), .uv0 = Vector2f::zero, .color = Color::blue },
+                        { .vertexOS = Math::Vec3f( v3 ), .uv0 = Vector2f::zero, .color = Color::white },
+                    };
+                    renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
+                }
+
                 r.size.height = 12;
                 r.size.width = 64;
 
@@ -681,33 +697,6 @@ namespace zp
             static void Execute( const JobHandle& parentJobHandle, const FinalizeBatchRenderingJob* data )
             {
                 ZP_PROFILE_CPU_BLOCK();
-
-                {
-                    const zp_float32_t n = -1.f;
-                    const zp_float32_t p = 1.f;
-                    const zp_float32_t z = 0.f;
-
-                    VertexVUC tris[] = {
-                        { { 0, 0, 0 }, {}, zp_debug_color( data->frameIndex % 255, 255 ) },
-                        { { 1, 0, 0 }, {}, Color::blue },
-                        { { 1, 1, 0 }, {}, Color::green },
-                    };
-
-                    VertexVUC quads[] = {
-                        { { n, n, 0 }, {}, Color::red },
-                        { { n, z, 0 }, {}, Color::green },
-                        { { z, z, 0 }, {}, Color::blue },
-                        { { z, n, 0 }, {}, Color::white },
-                    };
-
-                    zp_handle_t cmd = data->renderSystem->m_immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 3, 3 );
-
-                    data->renderSystem->m_immediateModeRenderer->addTriangles( cmd, tris );
-
-                    //data->renderSystem->m_immediateModeRenderer->addQuads( cmd, quads );
-
-                    data->renderSystem->m_immediateModeRenderer->end( cmd );
-                }
 
                 data->renderSystem->m_immediateModeRenderer->process( data->renderSystem->m_batchModeRenderer );
                 data->renderSystem->m_batchModeRenderer->process( data->renderSystem->m_graphicsDevice );

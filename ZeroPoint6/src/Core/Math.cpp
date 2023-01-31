@@ -183,7 +183,7 @@ namespace zp
 
             ZP_FORCEINLINE __m128 _mm_abs_ps( __m128 a )
             {
-                return _mm_and_ps( a, _mm_castsi128_ps( _mm_set1_epi32( (int) 0x80000000 ) ) );
+                return _mm_and_ps( a, _mm_castsi128_ps( _mm_set1_epi32( (int)0x80000000 ) ) );
             }
 
             ZP_FORCEINLINE zp_float32_t _mm_hadd_ps( __m128 a )
@@ -298,10 +298,10 @@ namespace zp
             col3 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c3.w ), col3 );
 
             ZP_ALIGN16 Matrix4x4f r {};
-            _mm_storer_ps( r.m[ 0 ], col0 );
-            _mm_storer_ps( r.m[ 1 ], col1 );
-            _mm_storer_ps( r.m[ 2 ], col2 );
-            _mm_storer_ps( r.m[ 3 ], col3 );
+            _mm_storer_ps( r.c0.m, col0 );
+            _mm_storer_ps( r.c1.m, col1 );
+            _mm_storer_ps( r.c2.m, col2 );
+            _mm_storer_ps( r.c3.m, col3 );
 
             return r;
         }
@@ -326,10 +326,15 @@ namespace zp
 
         Vector4f Mul( const Matrix4x4f& lh, const Vector4f& rh )
         {
-            __m128 col0 = _mm_mul_ps( _mm_set1_ps( rh.x ), _mm_setr_ps( lh.c0.x, lh.c1.x, lh.c2.x, lh.c3.x ) );
-            col0 = _mm_fmadd_ps( _mm_set1_ps( rh.y ), _mm_setr_ps( lh.c0.y, lh.c1.y, lh.c2.y, lh.c3.y ), col0 );
-            col0 = _mm_fmadd_ps( _mm_set1_ps( rh.z ), _mm_setr_ps( lh.c0.z, lh.c1.z, lh.c2.z, lh.c3.z ), col0 );
-            col0 = _mm_fmadd_ps( _mm_set1_ps( rh.w ), _mm_setr_ps( lh.c0.w, lh.c1.w, lh.c2.w, lh.c3.w ), col0 );
+            const __m128 lc0 = _mm_setr_ps( lh.c0.x, lh.c0.y, lh.c0.z, lh.c0.w );
+            const __m128 lc1 = _mm_setr_ps( lh.c1.x, lh.c1.y, lh.c1.z, lh.c1.w );
+            const __m128 lc2 = _mm_setr_ps( lh.c2.x, lh.c2.y, lh.c2.z, lh.c2.w );
+            const __m128 lc3 = _mm_setr_ps( lh.c3.x, lh.c3.y, lh.c3.z, lh.c3.w );
+
+            __m128 col0 = _mm_mul_ps( _mm_set1_ps( rh.x ), lc0 );
+            col0 = _mm_fmadd_ps( _mm_set1_ps( rh.y ), lc1, col0 );
+            col0 = _mm_fmadd_ps( _mm_set1_ps( rh.z ), lc2, col0 );
+            col0 = _mm_fmadd_ps( _mm_set1_ps( rh.w ), lc3, col0 );
 
             ZP_ALIGN16 Vector4f r {};
             _mm_store_ps( r.m, col0 );
@@ -462,7 +467,7 @@ namespace zp
             ZP_ALIGN16 zp_float32_t m[4];
             _mm_storer_ps( m, _mm_normalize_ps( v ) );
 
-            Vector2f r { m[ 0 ], m[ 1 ] };
+            Vector2f r { .x = m[ 0 ], .y = m[ 1 ] };
             return r;
         }
 
@@ -473,7 +478,7 @@ namespace zp
             ZP_ALIGN16 zp_float32_t m[4];
             _mm_storer_ps( m, _mm_normalize_ps( v ) );
 
-            Vector3f r { m[ 0 ], m[ 1 ], m[ 2 ] };
+            Vector3f r { .x = m[ 0 ], .y = m[ 1 ], .z = m[ 2 ] };
             return r;
         }
 
@@ -489,8 +494,13 @@ namespace zp
 
         Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale )
         {
-            const __m128 rtf = _mm_setr_ps( orthoRect.right(), orthoRect.top(), zFar, 1 );
-            const __m128 lbn = _mm_setr_ps( orthoRect.left(), orthoRect.bottom(), zNear, 0 );
+            const zp_float32_t r = orthoRect.right(); //orthoRect.offset.x + ( orthoRect.size.width * 0.5f );
+            const zp_float32_t l = orthoRect.left(); //orthoRect.offset.x + ( orthoRect.size.width * -0.5f );
+            const zp_float32_t t = orthoRect.top(); //orthoRect.offset.y + ( orthoRect.size.height * 0.5f );
+            const zp_float32_t b = orthoRect.bottom(); //orthoRect.offset.y + ( orthoRect.size.height * -0.5f );
+
+            const __m128 rtf = _mm_setr_ps( r, t, zFar, 1 );
+            const __m128 lbn = _mm_setr_ps( l, b, zNear, 0 );
 
             const __m128 rtfMlbn = _mm_sub_ps( rtf, lbn );
             const __m128 rtfPlbn = _mm_add_ps( rtf, lbn );
@@ -506,13 +516,13 @@ namespace zp
             const __m128 c3 = _mm_fmadd_ps( _mm_mul_ps( rtfPlbn, invRtfMlbn ), _mm_setr_ps( -1, -1, -1, 0 ), _mm_setr_ps( 0, 0, 0, 1 ) );
 
             // NOTE: c0..3 are set up properly, no need to store reverse
-            ZP_ALIGN16 Matrix4x4f r {};
-            _mm_store_ps( r.c0.m, c0 );
-            _mm_store_ps( r.c1.m, c1 );
-            _mm_store_ps( r.c2.m, c2 );
-            _mm_store_ps( r.c3.m, c3 );
+            ZP_ALIGN16 Matrix4x4f matrix {};
+            _mm_store_ps( matrix.c0.m, c0 );
+            _mm_store_ps( matrix.c1.m, c1 );
+            _mm_store_ps( matrix.c2.m, c2 );
+            _mm_store_ps( matrix.c3.m, c3 );
 
-            return r;
+            return matrix;
         }
     }
 }
