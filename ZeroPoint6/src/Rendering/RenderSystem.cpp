@@ -466,7 +466,7 @@ namespace zp
         TestRenderPipeline s_renderPipeline;
     }
 
-    void RenderSystem::initialize( zp_handle_t windowHandle, GraphicsDeviceFeatures graphicsDeviceFeatures )
+    void RenderSystem::initialize( zp_handle_t windowHandle, const GraphicsDeviceFeatures& graphicsDeviceFeatures )
     {
         s_renderPipeline = {};
 
@@ -632,7 +632,7 @@ namespace zp
                 int count = 10;
 
                 Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
-                zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * (count+1), 6 * (count+1) );
+                zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * ( count + 1 ), 6 * ( count + 1 ) );
 
                 Matrix4x4f localToWorld = Math::OrthoLH( orthoRect, -10, 10, orthoRect.size.width / orthoRect.size.height );
                 renderProfilerData->immediateModeRenderer->setLocalToWorld( cmd, Matrix4x4f::identity );

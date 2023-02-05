@@ -160,7 +160,7 @@ namespace zp
         VkPhysicalDevice m_vkPhysicalDevice;
         VkDevice m_vkLocalDevice;
 
-        VkQueue m_vkRenderQueues[4];
+        VkQueue m_vkRenderQueues[RenderQueue_Count];
 
         VkSwapchainKHR m_vkSwapChain;
         VkRenderPass m_vkSwapChainRenderPass;

@@ -11,6 +11,9 @@
 
 namespace zp
 {
+    struct MainCameraTag
+    {};
+
     enum CameraType
     {
         ZP_CAMERA_TYPE_GAME,
@@ -45,11 +48,15 @@ namespace zp
 
         Viewport viewport;
         ScissorRect scissorRect;
+
         zp_float32_t fov;
         CameraType type;
         CameraProjectionType projectionType;
         CameraClearMode clearMode;
+
         Color clearColor;
+
+        zp_float32_t orthographicScale;
         zp_float32_t clearDepth;
         zp_uint32_t clearStencil;
     };

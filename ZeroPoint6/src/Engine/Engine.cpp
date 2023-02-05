@@ -125,7 +125,11 @@ namespace zp
         };
         m_windowHandle = GetPlatform()->OpenWindow( &openWindowDesc );
 
-        m_renderSystem->initialize( m_windowHandle, GraphicsDeviceFeatures::All );
+        GraphicsDeviceFeatures graphicsDeviceFeatures {
+            .GeometryShaderSupport = true,
+            .TessellationShaderSupport = true,
+        };
+        m_renderSystem->initialize( m_windowHandle, graphicsDeviceFeatures );
 
         // Register components
 
@@ -143,9 +147,17 @@ namespace zp
         m_entityComponentManager->registerTag<DestroyedTag>();
         m_entityComponentManager->registerTag<DisabledTag>();
         m_entityComponentManager->registerTag<StaticTag>();
+        m_entityComponentManager->registerTag<MainCameraTag>();
 
         // Render Components
         m_entityComponentManager->registerComponent<CameraComponentData>();
+
+        // Generic signatures
+        ComponentSignature mainCameraSignature {
+            .tagSignature = m_entityComponentManager->getTagSignature<MainCameraTag>(),
+            .structuralSignature = m_entityComponentManager->getComponentSignature<CameraComponentData, RigidTransformComponentData>(),
+        };
+        m_entityComponentManager->registerComponentSignature( mainCameraSignature );
 
         if( m_moduleAPI )
         {
@@ -309,7 +321,7 @@ namespace zp
 
             EntityQuery activeTransformEntities {
                 .notIncludedTags = entityComponentManager->getTagSignature<DisabledTag>(),
-                .requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData>(),
+                .requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData, ChildComponentData>(),
             };
 
             EntityQueryIterator iterator {};
@@ -374,8 +386,9 @@ namespace zp
             entityComponentManager->replayCommandBuffers();
 
             // destroy tagged entities
-            EntityQuery destroyedEntityQuery {};
-            destroyedEntityQuery.requiredTags = entityComponentManager->getTagSignature<DestroyedTag>();
+            EntityQuery destroyedEntityQuery {
+                .requiredTags = entityComponentManager->getTagSignature<DestroyedTag>(),
+            };
 
             EntityQueryIterator iterator {};
             entityComponentManager->iterateEntities( &destroyedEntityQuery, &iterator );

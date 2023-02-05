@@ -147,13 +147,13 @@ namespace zp
             isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
             // support geometry shaders
-            if( graphicsDeviceFeatures & GraphicsDeviceFeatures::GeometryShaderSupport )
+            if( graphicsDeviceFeatures.GeometryShaderSupport )
             {
                 isSuitable &= physicalDeviceFeatures.geometryShader == VK_TRUE;
             }
 
             // support tessellation shaders
-            if( graphicsDeviceFeatures & GraphicsDeviceFeatures::TessellationShaderSupport )
+            if( graphicsDeviceFeatures.TessellationShaderSupport )
             {
                 isSuitable &= physicalDeviceFeatures.tessellationShader == VK_TRUE;
             }
@@ -260,9 +260,9 @@ namespace zp
             }
             else
             {
-                VkExtent2D actualExtents = {
-                    .width= requestedWith,
-                    .height=requestedHeight
+                VkExtent2D actualExtents {
+                    .width = requestedWith,
+                    .height = requestedHeight
                 };
 
                 actualExtents.width = zp_clamp(
@@ -304,6 +304,8 @@ namespace zp
                 VK_INDEX_TYPE_UINT8_EXT,
                 VK_INDEX_TYPE_NONE_KHR,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( indexTypeMap ) == IndexBufferFormat_Count );
+
             return indexTypeMap[ indexBufferFormat ];
         }
 
@@ -344,6 +346,7 @@ namespace zp
                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( primitiveTopologyMap ) == Topology_Count );
 
             return primitiveTopologyMap[ topology ];
         }
@@ -355,6 +358,7 @@ namespace zp
                 VK_POLYGON_MODE_LINE,
                 VK_POLYGON_MODE_POINT,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( polygonModeMap ) == PolygonFillMode_Count );
 
             return polygonModeMap[ polygonFillMode ];
         }
@@ -367,6 +371,7 @@ namespace zp
                 VK_CULL_MODE_BACK_BIT,
                 VK_CULL_MODE_FRONT_AND_BACK,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( cullModeFlagsMap ) == CullMode_Count );
 
             return cullModeFlagsMap[ cullMode ];
         }
@@ -377,6 +382,7 @@ namespace zp
                 VK_FRONT_FACE_COUNTER_CLOCKWISE,
                 VK_FRONT_FACE_CLOCKWISE,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( frontFaceMap ) == FrontFaceMode_Count );
 
             return frontFaceMap[ frontFaceMode ];
         }
@@ -392,6 +398,7 @@ namespace zp
                 VK_SAMPLE_COUNT_32_BIT,
                 VK_SAMPLE_COUNT_64_BIT,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( sampleCountFlagsMap ) == SampleCount_Count );
 
             return sampleCountFlagsMap[ sampleCount ];
         }
@@ -408,6 +415,7 @@ namespace zp
                 VK_COMPARE_OP_GREATER_OR_EQUAL,
                 VK_COMPARE_OP_ALWAYS,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( compareOpMap ) == CompareOp_Count );
 
             return compareOpMap[ compareOp ];
         }
@@ -424,6 +432,7 @@ namespace zp
                 VK_STENCIL_OP_INCREMENT_AND_WRAP,
                 VK_STENCIL_OP_DECREMENT_AND_WRAP,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( stencilOpMap ) == StencilOp_Count );
 
             return stencilOpMap[ stencilOp ];
         }
@@ -445,8 +454,10 @@ namespace zp
                 VK_LOGIC_OP_COPY,
                 VK_LOGIC_OP_COPY_INVERTED,
                 VK_LOGIC_OP_INVERT,
+                VK_LOGIC_OP_NAND,
                 VK_LOGIC_OP_SET,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( logicOpMap ) == LogicOp_Count );
 
             return logicOpMap[ logicOp ];
         }
@@ -460,6 +471,7 @@ namespace zp
                 VK_BLEND_OP_MIN,
                 VK_BLEND_OP_MAX,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( blendOpMap ) == BlendOp_Count );
 
             return blendOpMap[ blendOp ];
         }
@@ -487,6 +499,7 @@ namespace zp
                 VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR,
                 VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( blendFactorMap ) == BlendFactor_Count );
 
             return blendFactorMap[ blendFactor ];
         }
@@ -509,6 +522,7 @@ namespace zp
                 VK_VERTEX_INPUT_RATE_VERTEX,
                 VK_VERTEX_INPUT_RATE_INSTANCE
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( vertexInputRateMap ) == VertexInputRate_Count );
 
             return vertexInputRateMap[ vertexInputRate ];
         }
@@ -584,7 +598,6 @@ namespace zp
                 VK_FORMAT_R32G32B32A32_UINT,
                 VK_FORMAT_R32G32B32A32_SINT,
                 VK_FORMAT_R32G32B32A32_SFLOAT,
-                VK_FORMAT_R32G32B32A32_SFLOAT,
 
                 // 10
                 VK_FORMAT_A2R10G10B10_UNORM_PACK32,
@@ -601,6 +614,7 @@ namespace zp
                 VK_FORMAT_D24_UNORM_S8_UINT,
                 VK_FORMAT_D32_SFLOAT_S8_UINT,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( formatMap ) == GraphicsFormat_Count );
 
             ZP_ASSERT( static_cast<zp_size_t>( graphicsFormat ) < ZP_ARRAY_SIZE( formatMap ) );
             return formatMap[ graphicsFormat ];
@@ -615,9 +629,10 @@ namespace zp
                 VK_SHADER_STAGE_GEOMETRY_BIT,
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 VK_SHADER_STAGE_COMPUTE_BIT,
-                VK_SHADER_STAGE_ALL_GRAPHICS,
-                VK_SHADER_STAGE_ALL
+                VK_SHADER_STAGE_TASK_BIT_EXT,
+                VK_SHADER_STAGE_MESH_BIT_EXT,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( shaderStageMap ) == ShaderStage_Count );
 
             return shaderStageMap[ shaderStage ];
         }
@@ -628,7 +643,7 @@ namespace zp
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                 VK_PIPELINE_BIND_POINT_COMPUTE,
             };
-
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( bindPointMap ) == PipelineBindPoint_Count );
             return bindPointMap[ bindPoint ];
         }
 
@@ -643,6 +658,7 @@ namespace zp
                 VK_IMAGE_TYPE_3D,
                 VK_IMAGE_TYPE_3D,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( imageTypeMap ) == TextureDimension_Count );
 
             return imageTypeMap[ textureDimension ];
         }
@@ -658,6 +674,7 @@ namespace zp
                 VK_IMAGE_VIEW_TYPE_CUBE,
                 VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( imageViewTypeMap ) == TextureDimension_Count );
 
             return imageViewTypeMap[ textureDimension ];
         }
@@ -673,6 +690,7 @@ namespace zp
                 false,
                 true,
             };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( imageTypeMap ) == TextureDimension_Count );
 
             return imageTypeMap[ textureDimension ];
         }

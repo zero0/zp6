@@ -141,7 +141,6 @@ namespace zp
         ZP_GRAPHICS_FORMAT_R16G16B16A16_SINT,
         ZP_GRAPHICS_FORMAT_R16G16B16A16_SFLOAT,
 
-
         // 32
         ZP_GRAPHICS_FORMAT_R32_UINT,
         ZP_GRAPHICS_FORMAT_R32_SINT,
@@ -174,16 +173,13 @@ namespace zp
         ZP_GRAPHICS_FORMAT_D24_UNORM_S8_UINT,
         ZP_GRAPHICS_FORMAT_D32_SFLOAT_S8_UINT,
 
+        GraphicsFormat_Count,
     };
 
-    enum GraphicsDeviceFeatures
+    struct GraphicsDeviceFeatures
     {
-        None = 0,
-
-        GeometryShaderSupport = 1 << 0,
-        TessellationShaderSupport = 1 << 1,
-
-        All = ~0,
+        ZP_BOOL32( GeometryShaderSupport );
+        ZP_BOOL32( TessellationShaderSupport );
     };
 
     enum RenderQueue
@@ -192,6 +188,7 @@ namespace zp
         ZP_RENDER_QUEUE_TRANSFER,
         ZP_RENDER_QUEUE_COMPUTE,
         ZP_RENDER_QUEUE_PRESENT,
+        RenderQueue_Count,
     };
 
     enum IndexBufferFormat
@@ -200,6 +197,7 @@ namespace zp
         ZP_INDEX_BUFFER_FORMAT_UINT32,
         ZP_INDEX_BUFFER_FORMAT_UINT8,
         ZP_INDEX_BUFFER_FORMAT_NONE,
+        IndexBufferFormat_Count,
     };
 
     enum TextureDimension
@@ -211,6 +209,7 @@ namespace zp
         ZP_TEXTURE_DIMENSION_TEXTURE_3D,
         ZP_TEXTURE_DIMENSION_TEXTURE_CUBE_MAP,
         ZP_TEXTURE_DIMENSION_TEXTURE_CUBE_MAP_ARRAY,
+        TextureDimension_Count,
     };
 
     enum TextureFormat
@@ -260,6 +259,7 @@ namespace zp
         ZP_TOPOLOGY_TRIANGLE_LIST,
         ZP_TOPOLOGY_TRIANGLE_STRIP,
         ZP_TOPOLOGY_TRIANGLE_FAN,
+        Topology_Count,
     };
 
     enum PolygonFillMode
@@ -267,6 +267,7 @@ namespace zp
         ZP_POLYGON_FILL_MODE_FILL,
         ZP_POLYGON_FILL_MODE_LINE,
         ZP_POLYGON_FILL_MODE_POINT,
+        PolygonFillMode_Count,
     };
 
     enum CullMode
@@ -275,12 +276,14 @@ namespace zp
         ZP_CULL_MODE_FRONT,
         ZP_CULL_MODE_BACK,
         ZP_CULL_MODE_FRONT_AND_BACK,
+        CullMode_Count,
     };
 
     enum FrontFaceMode
     {
         ZP_FRONT_FACE_MODE_CCW,
         ZP_FRONT_FACE_MODE_CW,
+        FrontFaceMode_Count,
     };
 
     enum SampleCount
@@ -292,6 +295,7 @@ namespace zp
         ZP_SAMPLE_COUNT_16,
         ZP_SAMPLE_COUNT_32,
         ZP_SAMPLE_COUNT_64,
+        SampleCount_Count,
     };
 
     enum CompareOp
@@ -304,6 +308,7 @@ namespace zp
         ZP_COMPARE_OP_GREATER,
         ZP_COMPARE_OP_GREATER_OR_EQUAL,
         ZP_COMPARE_OP_ALWAYS,
+        CompareOp_Count
     };
 
     enum StencilOp
@@ -316,6 +321,7 @@ namespace zp
         ZP_STENCIL_OP_INVERT,
         ZP_STENCIL_OP_INC_WRAP,
         ZP_STENCIL_OP_DEC_WRAP,
+        StencilOp_Count,
     };
 
     enum LogicOp
@@ -336,6 +342,7 @@ namespace zp
         ZP_LOGIC_OP_INVERT,
         ZP_LOGIC_OP_NAND,
         ZP_LOGIC_OP_SET,
+        LogicOp_Count,
     };
 
     enum BlendOp
@@ -345,6 +352,7 @@ namespace zp
         ZP_BLEND_OP_REVERSE_SUB,
         ZP_BLEND_OP_MIN,
         ZP_BLEND_OP_MAX,
+        BlendOp_Count,
     };
 
     enum BlendFactor
@@ -368,6 +376,7 @@ namespace zp
         ZP_BLEND_FACTOR_SRC1_ALPHA,
         ZP_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR,
         ZP_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
+        BlendFactor_Count,
     };
 
     enum ColorComponent
@@ -385,12 +394,14 @@ namespace zp
     {
         ZP_VERTEX_INPUT_RATE_VERTEX,
         ZP_VERTEX_INPUT_RATE_INSTANCE,
+        VertexInputRate_Count,
     };
 
     enum PipelineBindPoint
     {
         ZP_PIPELINE_BIND_POINT_GRAPHICS,
         ZP_PIPELINE_BIND_POINT_COMPUTE,
+        PipelineBindPoint_Count,
     };
 
     enum FilterMode

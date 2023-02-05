@@ -14,7 +14,6 @@ namespace zp
 {
     enum
     {
-        ShaderStage_Count = 6,
         kMaxShaderEntryPointNameSize = 32,
     };
 
@@ -28,6 +27,7 @@ namespace zp
         ZP_SHADER_STAGE_COMPUTE,
         ZP_SHADER_STAGE_TASK,
         ZP_SHADER_STAGE_MESH,
+        ShaderStage_Count,
     };
 
     struct ShaderDesc
