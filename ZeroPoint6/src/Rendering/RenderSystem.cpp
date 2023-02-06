@@ -621,6 +621,7 @@ namespace zp
         struct RenderProfilerData
         {
             Profiler* profiler;
+            ProfilerFrameRange range;
             ImmediateModeRenderer* immediateModeRenderer;
 
             ZP_JOB_DEBUG_NAME( RenderProfilerData );
@@ -630,6 +631,8 @@ namespace zp
                 ZP_PROFILE_CPU_BLOCK();
 
                 int count = 10;
+
+                ProfilerFrameEnumerator enumerator = renderProfilerData->profiler->captureFrames( renderProfilerData->range );
 
                 Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
                 zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * ( count + 1 ), 6 * ( count + 1 ) );
@@ -655,6 +658,7 @@ namespace zp
                     };
                     renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
                 }
+
 
                 r.size.height = 12;
                 r.size.width = 64;
@@ -682,8 +686,9 @@ namespace zp
                 renderProfilerData->immediateModeRenderer->end( cmd );
             }
         } renderProfilerDataJob {
-            .profiler = nullptr,
-            .immediateModeRenderer = m_immediateModeRenderer
+            .profiler = GetProfiler(),
+            .range = ProfilerFrameRange::Last( frameIndex, 3 ),
+            .immediateModeRenderer = m_immediateModeRenderer,
         };
         gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );
 

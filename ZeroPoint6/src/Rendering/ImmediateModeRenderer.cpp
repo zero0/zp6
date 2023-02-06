@@ -258,34 +258,32 @@ namespace zp
                 .dataSize = perFrameData.indexBufferLength * sizeof( zp_uint16_t ),
             };
 
-            void* buffer = nullptr;
-            m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, &perFrameData.vertexBuffer, &buffer );
-            zp_memcpy( buffer, perFrameData.vertexBufferOffset, perFrameData.scratchVertexBuffer, perFrameData.vertexBufferOffset );
-            m_graphicsDevice->unmapBuffer( &perFrameData.vertexBuffer );
-
-            m_graphicsDevice->mapBuffer( 0, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), &perFrameData.indexBuffer, &buffer );
-            zp_memcpy( buffer, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), perFrameData.scratchIndexBuffer, perFrameData.indexBufferLength * sizeof( zp_uint16_t ) );
-            m_graphicsDevice->unmapBuffer( &perFrameData.indexBuffer );
-
-            //CommandQueue* commandQueue = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_TRANSFER, m_currentFrame );
-            //graphicsDevice->updateBuffer( &updateVertexBufferDesc, &perFrameData.vertexBuffer, commandQueue );
-            //graphicsDevice->updateBuffer( &updateIndexBufferDesc, &perFrameData.indexBuffer, commandQueue );
-
-            ImmediateRenderCommand* command = static_cast<ImmediateRenderCommand*>(static_cast<void*>(perFrameData.commandBuffer));
+            ImmediateRenderCommand* beginCommand = static_cast<ImmediateRenderCommand*>(static_cast<void*>(perFrameData.commandBuffer));
             ImmediateRenderCommand* endCommand = static_cast<ImmediateRenderCommand*>(static_cast<void*>(perFrameData.commandBuffer + perFrameData.commandBufferLength));
 
-            for( ; command != endCommand; ++command )
+            void* vertexMemory = nullptr;
+            void* indexMemory = nullptr;
+            m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, &perFrameData.vertexBuffer, &vertexMemory );
+            m_graphicsDevice->mapBuffer( 0, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), &perFrameData.indexBuffer, &indexMemory );
+
+            zp_uint8_t* vertexBuffer = static_cast<zp_uint8_t*>( vertexMemory );
+            zp_uint8_t* indexBuffer = static_cast<zp_uint8_t*>( indexMemory );
+
+            zp_size_t vertexWriteOffset = 0;
+            zp_size_t indexWriteOffset = 0;
+
+            for( ImmediateRenderCommand* command = beginCommand; command != endCommand; ++command )
             {
                 BatchModeRenderCommand* batchModeRenderCommand = batchModeRenderer->requestTempRenderCommand();
                 batchModeRenderCommand->vertexBuffer = perFrameData.vertexBuffer;
                 batchModeRenderCommand->indexBuffer = perFrameData.indexBuffer;
                 batchModeRenderCommand->material = m_registeredMaterials[ command->materialIndex ];
-                batchModeRenderCommand->vertexBufferOffset = 0;
+                batchModeRenderCommand->vertexBufferOffset = vertexWriteOffset;
                 batchModeRenderCommand->vertexStride = command->vertexStride;
                 batchModeRenderCommand->firstVertex = 0;
                 batchModeRenderCommand->vertexCount = command->vertexCount;
                 batchModeRenderCommand->vertexOffset = 0;
-                batchModeRenderCommand->indexBufferOffset = 0;
+                batchModeRenderCommand->indexBufferOffset = indexWriteOffset;
                 batchModeRenderCommand->firstIndex = 0;
                 batchModeRenderCommand->indexCount = command->indexCount;
                 batchModeRenderCommand->instanceCount = 1;
@@ -293,7 +291,19 @@ namespace zp
                 batchModeRenderCommand->localToWorld = command->localToWorld;
                 batchModeRenderCommand->localBounds = command->localBounds;
                 batchModeRenderCommand->worldBounds = Math::Mul( command->localToWorld, command->localBounds );
+
+                zp_size_t cmdVertexSize = command->vertexCount * command->vertexStride;
+                zp_size_t cmdIndexSize = command->indexCount * sizeof( zp_uint16_t );
+
+                zp_memcpy( vertexBuffer, cmdVertexSize, command->vertexBuffer, cmdVertexSize );
+                zp_memcpy( indexBuffer, cmdIndexSize, command->indexBuffer, cmdIndexSize );
+
+                vertexBuffer += cmdVertexSize;
+                indexBuffer += cmdIndexSize;
             }
+
+            m_graphicsDevice->unmapBuffer( &perFrameData.vertexBuffer );
+            m_graphicsDevice->unmapBuffer( &perFrameData.indexBuffer );
         }
     }
 }

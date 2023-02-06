@@ -17,12 +17,38 @@ namespace zp
 
     typedef void (* OnWindowFocus)( zp_handle_t windowHandle, zp_bool_t isNowFocused );
 
+    struct WindowKeyEvent
+    {
+        zp_uint32_t keyCode;
+        zp_uint32_t repeatCount;
+        ZP_BOOL32( isCtrlDown );
+        ZP_BOOL32( isShiftDown );
+        ZP_BOOL32( isAltDown );
+        ZP_BOOL32( wasKeyDown );
+        ZP_BOOL32( isKeyReleased );
+    };
+
+    typedef void (* OnWindowKeyEvent)( zp_handle_t windowHandle, const WindowKeyEvent& windowKeyEvent );
+
+    struct WindowMouseEvent
+    {
+        zp_int32_t x;
+        zp_int32_t y;
+        zp_int32_t zDelta;
+        ZP_BOOL32( isCtrlDown );
+        ZP_BOOL32( isShiftDown );
+    };
+
+    typedef void (* OnWindowMouseEvent)( zp_handle_t windowHandle, const WindowMouseEvent& windowMouseEvent );
+
     struct WindowCallbacks
     {
         zp_int32_t minWidth, minHeight, maxWidth, maxHeight;
         OnWindowGetMinMaxSize onWindowGetMinMaxSize;
         OnWindowResize onWindowResize;
         OnWindowFocus onWindowFocus;
+        OnWindowKeyEvent onWindowKeyEvent;
+        OnWindowMouseEvent onWindowMouseEvent;
     };
 
     struct OpenWindowDesc
@@ -123,7 +149,7 @@ namespace zp
         void GetCurrentDir( char* path, zp_size_t maxPathLength );
 
         template<zp_size_t Size>
-        void GetCurrentDir( char (&path)[ Size ] )
+        void GetCurrentDir( char (& path)[Size] )
         {
             GetCurrentDir( path, Size );
         }

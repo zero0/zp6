@@ -112,53 +112,92 @@ namespace zp
                     break;
 
                 case WM_KEYDOWN:
-                {
-                }
-                    break;
-
                 case WM_KEYUP:
+                case WM_SYSKEYDOWN:
+                case WM_SYSKEYUP:
                 {
+                    if( windowCallbacks && windowCallbacks->onWindowKeyEvent )
+                    {
+                        WORD vkCode = LOWORD( wParam );                                 // virtual-key code
+
+                        WORD keyFlags = HIWORD( lParam );
+
+                        WORD scanCode = LOBYTE( keyFlags );                             // scan code
+                        BOOL isExtendedKey = ( keyFlags & KF_EXTENDED ) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
+
+                        if( isExtendedKey )
+                        {
+                            scanCode = MAKEWORD( scanCode, 0xE0 );
+                        }
+
+                        zp_bool_t wasKeyDown = ( keyFlags & KF_REPEAT ) == KF_REPEAT;        // previous key-state flag, 1 on autorepeat
+                        WORD repeatCount = LOWORD( lParam );                            // repeat count, > 0 if several keydown messages was combined into one message
+
+                        zp_bool_t isKeyReleased = ( keyFlags & KF_UP ) == KF_UP;             // transition-state flag, 1 on keyup
+                        zp_bool_t isAltKeyDown = ( keyFlags & KF_ALTDOWN ) == KF_ALTDOWN;
+                        zp_bool_t isCtrlKeyDown = GetKeyState( VK_CONTROL ) & 0x8000;
+                        zp_bool_t isShiftKeyDown = GetKeyState( VK_SHIFT ) & 0x8000;
+
+                        // if we want to distinguish these keys:
+                        switch( vkCode )
+                        {
+                            case VK_SHIFT:   // converts to VK_LSHIFT or VK_RSHIFT
+                            case VK_CONTROL: // converts to VK_LCONTROL or VK_RCONTROL
+                            case VK_MENU:    // converts to VK_LMENU or VK_RMENU
+                                vkCode = LOWORD( MapVirtualKey( scanCode, MAPVK_VSC_TO_VK_EX ) );
+                                break;
+                        }
+
+                        WindowKeyEvent event {
+                            .keyCode = vkCode,
+                            .repeatCount = repeatCount,
+                            .isCtrlDown = isCtrlKeyDown,
+                            .isShiftDown = isShiftKeyDown,
+                            .isAltDown = isAltKeyDown,
+                            .wasKeyDown = wasKeyDown,
+                            .isKeyReleased = isKeyReleased,
+                        };
+                        windowCallbacks->onWindowKeyEvent( hWnd, event );
+                    }
                 }
                     break;
 
                 case WM_MOUSEMOVE:
-                {
-                    POINTS p = MAKEPOINTS( lParam );
-                }
-                    break;
-
+                case WM_LBUTTONDOWN:
+                case WM_LBUTTONUP:
+                case WM_RBUTTONDOWN:
+                case WM_RBUTTONUP:
+                case WM_MBUTTONDOWN:
+                case WM_MBUTTONUP:
                 case WM_MOUSEWHEEL:
                 {
+                    if( windowCallbacks && windowCallbacks->onWindowMouseEvent )
+                    {
+                        const POINTS p = MAKEPOINTS( lParam );
+                        const SHORT zDelta = GET_WHEEL_DELTA_WPARAM( wParam );
+
+                        const WORD fwKeys = GET_KEYSTATE_WPARAM( wParam );
+                        const zp_bool_t isCtrlDown = ( MK_CONTROL & fwKeys ) == MK_CONTROL;
+                        const zp_bool_t isShiftDown = ( MK_SHIFT & fwKeys ) == MK_SHIFT;
+
+                        WindowMouseEvent event {
+                            .x = p.x,
+                            .y = p.y,
+                            .zDelta = zDelta,
+                            .isCtrlDown = isCtrlDown,
+                            .isShiftDown = isShiftDown,
+                        };
+                        windowCallbacks->onWindowMouseEvent( hWnd, event );
+                    }
                 }
                     break;
 
-                case WM_LBUTTONDOWN:
+                case WM_LBUTTONDBLCLK:
+                case WM_RBUTTONDBLCLK:
+                case WM_MBUTTONDBLCLK:
                 {
-                }
-                    break;
+                    POINTS p = MAKEPOINTS( lParam );
 
-                case WM_LBUTTONUP:
-                {
-                }
-                    break;
-
-                case WM_RBUTTONDOWN:
-                {
-                }
-                    break;
-
-                case WM_RBUTTONUP:
-                {
-                }
-                    break;
-
-                case WM_MBUTTONDOWN:
-                {
-                }
-                    break;
-
-                case WM_MBUTTONUP:
-                {
                 }
                     break;
 
@@ -234,7 +273,7 @@ namespace zp
         );
         ZP_ASSERT( hWnd );
 
-        ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR) desc->callbacks );
+        ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)desc->callbacks );
 
         ::ShowWindow( hWnd, SW_SHOW );
         ::UpdateWindow( hWnd );
@@ -613,7 +652,7 @@ namespace zp
         try
         {
             const DWORD MS_VC_EXCEPTION = 0x406D1388;
-            RaiseException( MS_VC_EXCEPTION, 0, sizeof( THREADNAME_INFO ) / sizeof( const ULONG_PTR* ), (const ULONG_PTR*) &info );
+            RaiseException( MS_VC_EXCEPTION, 0, sizeof( THREADNAME_INFO ) / sizeof( const ULONG_PTR* ), (const ULONG_PTR*)&info );
         }
         catch( ... )
         {

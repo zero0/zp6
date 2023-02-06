@@ -117,140 +117,138 @@ namespace zp
         //
         //
 
-        ZP_FORCEINLINE zp_size_t AddSizeT( zp_size_t * addend, zp_size_t value )
+        ZP_FORCEINLINE zp_size_t AddSizeT( zp_size_t* addend, zp_size_t value )
         {
 #if ZP_OS_WINDOWS
 #if ZP_ARCH64
-            return _InterlockedAdd64( (__int64 *) addend, (__int64)value );
+            return _InterlockedAdd64( (__int64*)addend, (__int64)value );
 #else
             return _InterlockedAdd( (long*)addend );
 #endif
 #endif
         }
 
-        ZP_FORCEINLINE zp_size_t IncrementSizeT( zp_size_t * addend )
+        ZP_FORCEINLINE zp_size_t IncrementSizeT( zp_size_t* addend )
         {
 #if ZP_OS_WINDOWS
 #if ZP_ARCH64
-            return _InterlockedIncrement64( (long long*) addend );
+            return _InterlockedIncrement64( (long long*)addend );
 #else
             return _InterlockedIncrement( (long*)addend );
 #endif
 #endif
         }
 
-        ZP_FORCEINLINE zp_size_t DecrementSizeT( zp_size_t * addend )
+        ZP_FORCEINLINE zp_size_t DecrementSizeT( zp_size_t* addend )
         {
 #if ZP_OS_WINDOWS
 #if ZP_ARCH64
-            return _InterlockedDecrement64( (long long*) addend );
+            return _InterlockedDecrement64( (long long*)addend );
 #else
             return _InterlockedDecrement( (long*)addend );
 #endif
 #endif
         }
 
-        ZP_FORCEINLINE zp_size_t ExchangeSizeT( zp_size_t * target, zp_size_t
-
-        value )
-    {
+        ZP_FORCEINLINE zp_size_t ExchangeSizeT( zp_size_t* target, zp_size_t value )
+        {
 #if ZP_OS_WINDOWS
 #if ZP_ARCH64
-        return _InterlockedExchange64((long long*)target, (long long)value );
+            return _InterlockedExchange64( (long long*)target, (long long)value );
 #else
-        return _InterlockedExchange( (long*)target, (long)value );
+            return _InterlockedExchange( (long*)target, (long)value );
 #endif
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_size_t ExchangeAddSizeT( zp_size_t* target, zp_size_t value )
-    {
+        ZP_FORCEINLINE zp_size_t ExchangeAddSizeT( zp_size_t* target, zp_size_t value )
+        {
 #if ZP_OS_WINDOWS
 #if ZP_ARCH64
-        return _InterlockedExchangeAdd64( (long long*) target, (long long) value );
+            return _InterlockedExchangeAdd64( (long long*)target, (long long)value );
 #else
-        return _InterlockedExchangeAdd( (long*)target, (long)value );
+            return _InterlockedExchangeAdd( (long*)target, (long)value );
 #endif
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_size_t CompareExchangeSizeT( zp_size_t* destination, zp_size_t exChange, zp_size_t comperand )
-    {
+        ZP_FORCEINLINE zp_size_t CompareExchangeSizeT( zp_size_t* destination, zp_size_t exChange, zp_size_t comperand )
+        {
 #if ZP_OS_WINDOWS
 #if ZP_ARCH64
-        return _InterlockedCompareExchange64( (long long*) destination, (long long) exChange, (long long) comperand );
+            return _InterlockedCompareExchange64( (long long*)destination, (long long)exChange, (long long)comperand );
 #else
-        return _InterlockedCompareExchange((long*)destination, (long)exChange, (long)comperand );
+            return _InterlockedCompareExchange((long*)destination, (long)exChange, (long)comperand );
 #endif
 #endif
-    }
-    //
-    //
-    //
+        }
+        //
+        //
+        //
 
-    ZP_FORCEINLINE zp_int64_t And( zp_int64_t* destination, zp_int64_t value )
-    {
+        ZP_FORCEINLINE zp_int64_t And( zp_int64_t* destination, zp_int64_t value )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedAnd64( destination, value );
+            return _InterlockedAnd64( destination, value );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t Or( zp_int64_t* destination, zp_int64_t value )
-    {
+        ZP_FORCEINLINE zp_int64_t Or( zp_int64_t* destination, zp_int64_t value )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedOr64( destination, value );
+            return _InterlockedOr64( destination, value );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t Xor( zp_int64_t* destination, zp_int64_t value )
-    {
+        ZP_FORCEINLINE zp_int64_t Xor( zp_int64_t* destination, zp_int64_t value )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedXor64( destination, value );
+            return _InterlockedXor64( destination, value );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t Increment( zp_int64_t* addend )
-    {
+        ZP_FORCEINLINE zp_int64_t Increment( zp_int64_t* addend )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedIncrement64( addend );
+            return _InterlockedIncrement64( addend );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t Decrement( zp_int64_t* addend )
-    {
+        ZP_FORCEINLINE zp_int64_t Decrement( zp_int64_t* addend )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedDecrement64( addend );
+            return _InterlockedDecrement64( addend );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t Add( zp_int64_t* addend, zp_int64_t value )
-    {
+        ZP_FORCEINLINE zp_int64_t Add( zp_int64_t* addend, zp_int64_t value )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedAdd64( addend, value );
+            return _InterlockedAdd64( addend, value );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t Exchange( zp_int64_t* target, zp_int64_t value )
-    {
+        ZP_FORCEINLINE zp_int64_t Exchange( zp_int64_t* target, zp_int64_t value )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedExchange64( target, value );
+            return _InterlockedExchange64( target, value );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t ExchangeAdd( zp_int64_t* target, zp_int64_t value )
-    {
+        ZP_FORCEINLINE zp_int64_t ExchangeAdd( zp_int64_t* target, zp_int64_t value )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedExchangeAdd64( target, value );
+            return _InterlockedExchangeAdd64( target, value );
 #endif
-    }
+        }
 
-    ZP_FORCEINLINE zp_int64_t CompareExchange( zp_int64_t* destination, zp_int64_t exChange, zp_int64_t comperand )
-    {
+        ZP_FORCEINLINE zp_int64_t CompareExchange( zp_int64_t* destination, zp_int64_t exChange, zp_int64_t comperand )
+        {
 #if ZP_OS_WINDOWS
-        return _InterlockedCompareExchange64( destination, exChange, comperand );
+            return _InterlockedCompareExchange64( destination, exChange, comperand );
 #endif
-    }
-};
+        }
+    };
 }
 
 #endif //ZP_ATOMIC_H
