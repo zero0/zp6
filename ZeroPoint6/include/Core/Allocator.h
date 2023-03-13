@@ -245,10 +245,10 @@ namespace zp
 
 namespace zp
 {
-    class SimpleAllocatorPolicy
+    class MallocAllocatorPolicy
     {
     public:
-        SimpleAllocatorPolicy() = default;
+        MallocAllocatorPolicy() = default;
 
         void set_memory( void* memory, zp_size_t size )
         {

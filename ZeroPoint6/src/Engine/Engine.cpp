@@ -61,9 +61,11 @@ namespace zp
         GetPlatform()->SetThreadName( mainThreadHandle, "MainThread" );
         GetPlatform()->SetThreadIdealProcessor( mainThreadHandle, 0 );
 
+        const zp_uint32_t numJobThreads = 2; // GetPlatform()->GetProcessorCount() - 1;
+
 #if ZP_USE_PROFILER
         ProfilerCreateDesc profilerCreateDesc {
-            .maxThreadCount = 4,
+            .maxThreadCount = numJobThreads + 1,
             .maxCPUEventsPerThread = 128,
             .maxMemoryEventsPerThread = 128,
             .maxGPUEventsPerThread = 4,
@@ -75,7 +77,6 @@ namespace zp
         Profiler::InitializeProfilerThread();
 #endif
 
-        const zp_uint32_t numJobThreads = 2; // GetPlatform()->GetProcessorCount() - 1;
         m_jobSystem = ZP_NEW_ARGS( Default, JobSystem, numJobThreads );
 
         m_renderSystem = ZP_NEW( Default, RenderSystem );
@@ -86,18 +87,22 @@ namespace zp
         //
         //
 
-        m_moduleDll = GetPlatform()->LoadExternalLibrary( "" );
-        ZP_ASSERT_MSG( m_moduleDll, "Unable to load module" );
-
-        if( m_moduleDll )
+        const char* moduleDLLPath = "";
+        if( !zp_strempty( moduleDLLPath ) )
         {
-            auto getModuleAPI = GetPlatform()->GetProcAddress<GetModuleEntryPoint>( m_moduleDll, ZP_STR( GetModuleEntryPoint ) );
-            ZP_ASSERT_MSG( getModuleAPI, "Unable to find " ZP_T( GetModuleEntryPoint ) );
+            m_moduleDll = GetPlatform()->LoadExternalLibrary( "" );
+            ZP_ASSERT_MSG( m_moduleDll, "Unable to load module" );
 
-            if( getModuleAPI )
+            if( m_moduleDll )
             {
-                m_moduleAPI = getModuleAPI();
-                ZP_ASSERT_MSG( m_moduleAPI, "No " ZP_T( ModuleEntryPointAPI ) " returned" );
+                auto getModuleAPI = GetPlatform()->GetProcAddress<GetModuleEntryPoint>( m_moduleDll, ZP_STR( GetModuleEntryPoint ) );
+                ZP_ASSERT_MSG( getModuleAPI, "Unable to find " ZP_STR( GetModuleEntryPoint ) );
+
+                if( getModuleAPI )
+                {
+                    m_moduleAPI = getModuleAPI();
+                    ZP_ASSERT_MSG( m_moduleAPI, "No " ZP_STR( ModuleEntryPointAPI ) " returned" );
+                }
             }
         }
 
@@ -243,7 +248,9 @@ namespace zp
         m_nextEngineState = EngineState::Exit;
     }
 
-    struct InitializationJob;
+    struct InitializeEngineJob;
+    struct InitializeModuleJob;
+    struct ProcessWindowEventsJob;
 
     struct StartJob;
     struct FixedUpdateJob;
@@ -251,6 +258,10 @@ namespace zp
     struct LateUpdateJob;
     struct BeginFrameJob;
     struct EndFrameJob;
+
+#if ZP_USE_PROFILER
+    struct AdvanceProfilerFrameJob;
+#endif
 
     struct EndFrameJob
     {
@@ -281,10 +292,7 @@ namespace zp
 
             preparedJobHandle = data->engine->getRenderSystem()->processSystem( frameIndex, jobSystem, data->engine->getEntityComponentManager(), preparedJobHandle );
 
-            EndFrameJob endFrameJob {
-                data->engine
-            };
-            jobSystem->PrepareJobData( endFrameJob, preparedJobHandle );
+            jobSystem->PrepareJobData( EndFrameJob { .engine = data->engine }, preparedJobHandle );
 
             jobSystem->Schedule( startJobHandle );
         }
@@ -300,10 +308,10 @@ namespace zp
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            BeginFrameJob beginFrameJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( beginFrameJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( BeginFrameJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     };
 
@@ -331,10 +339,10 @@ namespace zp
             {
             };
 
-            LateUpdateJob lateUpdateJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( lateUpdateJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( LateUpdateJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     };
 
@@ -363,10 +371,10 @@ namespace zp
             {
             };
 
-            UpdateJob updateJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( updateJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( UpdateJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     };
 
@@ -398,12 +406,10 @@ namespace zp
                 iterator.destroyEntity();
             };
 
-            //data->engine->getRenderSystem()->startSystem( data->engine->getFrameCount(), data->engine->getJobSystem(), {} );
-
-            FixedUpdateJob fixedUpdateJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( fixedUpdateJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( FixedUpdateJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     };
 
@@ -419,10 +425,10 @@ namespace zp
         {
             ZP_PROFILE_ADVANCE_FRAME( data->engine->getFrameCount() );
 
-            StartJob startJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( startJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( StartJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     };
 
@@ -434,29 +440,56 @@ namespace zp
         {
             data->engine->advanceFrame();
 
-            StartJob startJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( startJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( StartJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     }
 
-    struct InitializationJob
+    struct InitializeModuleJob
     {
         Engine* engine;
 
-        ZP_JOB_DEBUG_NAME( InitializationJob );
+        ZP_JOB_DEBUG_NAME( InitializeModuleJob );
 
-        static void Execute( const JobHandle& parentJobHandle, const InitializationJob* data )
+        static void Execute( const JobHandle& parentJobHandle, const InitializeModuleJob* data )
         {
-            StartJob startJob {
-                data->engine
-            };
-            data->engine->getJobSystem()->ScheduleJobData( startJob );
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( StartJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
         }
     };
 
-    void Engine::process()
+    struct InitializeEngineJob
+    {
+        Engine* engine;
+
+        ZP_JOB_DEBUG_NAME( InitializeEngineJob );
+
+        static void Execute( const JobHandle& parentJobHandle, const InitializeEngineJob* data )
+        {
+            PreparedJobHandle handle = data->engine->getJobSystem()->PrepareJobData( InitializeModuleJob {
+                .engine = data->engine
+            } );
+            data->engine->getJobSystem()->Schedule( handle );
+        }
+    };
+
+    struct ProcessWindowEventsJob
+    {
+        Engine* engine;
+
+        ZP_JOB_DEBUG_NAME( ProcessWindowEventsJob );
+
+        static void Execute( const JobHandle& parentJobHandle, const ProcessWindowEventsJob* data )
+        {
+            data->engine->processWindowEvents();
+        }
+    };
+
+    void Engine::processWindowEvents()
     {
         if( m_windowHandle )
         {
@@ -467,6 +500,11 @@ namespace zp
                 exit( exitCode );
             }
         }
+    }
+
+    void Engine::process()
+    {
+        processWindowEvents();
 
         if( m_nextEngineState != m_currentEngineState )
         {
@@ -482,10 +520,10 @@ namespace zp
             {
                 ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
 
-                InitializationJob initializationJob {
+                PreparedJobHandle handle = getJobSystem()->PrepareJobData( InitializeEngineJob {
                     .engine = this
-                };
-                m_jobSystem->ScheduleJobData( initializationJob );
+                } );
+                getJobSystem()->Schedule( handle );
 
                 m_nextEngineState = EngineState::Running;
             }

@@ -52,7 +52,7 @@ constexpr zp_float32_t zp_floor( const zp_float32_t v )
 constexpr zp_int32_t zp_floor_to_int( const zp_float32_t v )
 {
     const zp_int32_t vi { static_cast<zp_int32_t>( v ) };
-    return vi - ( static_cast<zp_float32_t >(vi) > v ? 1 : 0 );
+    return vi - ( static_cast<zp_float32_t>(vi) > v ? 1 : 0 );
 }
 
 constexpr zp_float32_t zp_ceil( const zp_float32_t v )
@@ -473,92 +473,105 @@ namespace zp
     };
 
 
+    template<typename T>
     struct Ray3D
     {
-        Vector3f position;
-        Vector3f direction;
+        Vector3<T> position;
+        Vector3<T> direction;
     };
 
+    typedef Ray3D<zp_float32_t> Ray3Df;
+
+    template<typename T>
     struct OptimizedRay3D
     {
-        Vector3f position;
-        Vector3f invDirection;
+        Vector3<T> position;
+        Vector3<T> invDirection;
     };
 
+    typedef OptimizedRay3D<zp_float32_t> OptimizedRay3Df;
+
+    template<typename T>
     struct Plane3D
     {
-        Vector3f normal;
-        zp_float32_t d;
+        Vector3<T> normal;
+        T d;
     };
+
+    typedef Plane3D<zp_float32_t> Plane3Df;
 
     struct Frustum
     {
-        Plane3D planes[6];
+        Plane3Df planes[6];
     };
 
-    struct Matrix4x4f
+    template<typename T>
+    struct Matrix4x4
     {
         union
         {
             struct
             {
-                Vector4f c0;
-                Vector4f c1;
-                Vector4f c2;
-                Vector4f c3;
+                Vector4<T> c0;
+                Vector4<T> c1;
+                Vector4<T> c2;
+                Vector4<T> c3;
             };
-            Vector4f c[4];
-            zp_float32_t m[4][4];
-            zp_float32_t v[16];
+            Vector4<T> c[4];
+            T m[4][4];
+            T v[16];
         };
 
-        static const Matrix4x4f identity;
+        static const Matrix4x4<T> identity;
+        static const Matrix4x4<T> zero;
     };
+
+    typedef Matrix4x4<zp_float32_t> Matrix4x4f;
 
     namespace Math
     {
 
-        ZP_FORCEINLINE Vector2f Vec2f( zp_float32_t x, zp_float32_t y )
+        constexpr Vector2f Vec2f( zp_float32_t x, zp_float32_t y )
         {
             return { .x = x, .y = y };
         }
 
-        ZP_FORCEINLINE Vector2f Vec2f( const Vector3f& v )
+        constexpr Vector2f Vec2f( const Vector3f& v )
         {
             return { .x = v.x, .y = v.y };
         }
 
-        ZP_FORCEINLINE Vector2f Vec2f( const Vector4f& v )
+        constexpr Vector2f Vec2f( const Vector4f& v )
         {
             return { .x = v.x, .y = v.y };
         }
 
-        ZP_FORCEINLINE Vector3f Vec3f( zp_float32_t x, zp_float32_t y, zp_float32_t z )
+        constexpr Vector3f Vec3f( zp_float32_t x, zp_float32_t y, zp_float32_t z )
         {
             return { .x = x, .y = y, .z = z };
         }
 
-        ZP_FORCEINLINE Vector3f Vec3f( const Vector2f& v, zp_float32_t z )
+        constexpr Vector3f Vec3f( const Vector2f& v, zp_float32_t z )
         {
             return { .x = v.x, .y = v.y, .z = z };
         }
 
-        ZP_FORCEINLINE Vector3f Vec3f( const Vector4f& v )
+        constexpr Vector3f Vec3f( const Vector4f& v )
         {
             return { .x = v.x, .y = v.y, .z = v.z };
         }
 
-        ZP_FORCEINLINE Vector4f Vec4f( zp_float32_t x, zp_float32_t y, zp_float32_t z, zp_float32_t w )
+        constexpr Vector4f Vec4f( zp_float32_t x, zp_float32_t y, zp_float32_t z, zp_float32_t w )
         {
             return { .x = x, .y = y, .z = z, .w = w };
         }
 
-        ZP_FORCEINLINE Vector4f Vec4f( const Vector2f& v, zp_float32_t z, zp_float32_t w )
+        constexpr Vector4f Vec4f( const Vector2f& v, zp_float32_t z, zp_float32_t w )
         {
             return { .x = v.x, .y = v.y, .z = z, .w = w };
         }
 
-        ZP_FORCEINLINE Vector4f Vec4f( const Vector3f& v, zp_float32_t w )
+        constexpr Vector4f Vec4f( const Vector3f& v, zp_float32_t w )
         {
             return { .x = v.x, .y = v.y, .z = v.z, .w = w };
         }
@@ -606,6 +619,12 @@ namespace zp
         Vector3f Normalize( const Vector3f& lh );
 
         Vector4f Normalize( const Vector4f& lh );
+
+        Vector2i Cmp( const Vector2f& lh, const Vector2f& rh );
+
+        Vector3i Cmp( const Vector3f& lh, const Vector3f& rh );
+
+        Vector4i Cmp( const Vector4f& lh, const Vector4f& rh );
 
         Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale = 2.f );
     }
@@ -669,11 +688,12 @@ constexpr zp::Color32 zp_debug_color32( zp_size_t index, zp_size_t count )
 {
     const zp::Color color = zp_debug_color( index, count );
 
-    zp::Color32 r {};
-    r.r = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.r * 0xFF ));
-    r.g = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.g * 0xFF ));
-    r.b = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.b * 0xFF ));
-    r.a = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.a * 0xFF ));
+    zp::Color32 r {
+        .r = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.r * 0xFF )),
+        .g = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.g * 0xFF )),
+        .b = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.b * 0xFF )),
+        .a = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.a * 0xFF )),
+    };
     return r;
 }
 

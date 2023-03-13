@@ -90,42 +90,55 @@ namespace zp
     //
     //
 
-    const Quaternion Quaternion::identity = { 0, 0, 0, 1 };
+    const Quaternion Quaternion::identity { 0, 0, 0, 1 };
 
-    const Matrix4x4f Matrix4x4f::identity = {
+    //
+    //
+    //
+
+    template<>
+    const Matrix4x4f Matrix4x4f::identity {
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1,
     };
 
+    template<>
+    const Matrix4x4f Matrix4x4f::zero {
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+    };
+
     //
     //
     //
 
-    const Color Color::clear = { .r = 0, .g = 0, .b = 0, .a = 0 };
+    const Color Color::clear { .r = 0, .g = 0, .b = 0, .a = 0 };
 
-    const Color Color::black = { .r = 0, .g = 0, .b = 0, .a = 1 };
+    const Color Color::black { .r = 0, .g = 0, .b = 0, .a = 1 };
 
-    const Color Color::white = { .r = 1, .g = 1, .b = 1, .a = 1 };
+    const Color Color::white { .r = 1, .g = 1, .b = 1, .a = 1 };
 
-    const Color Color::red = { .r = 1, .g = 0, .b = 0, .a = 1 };
+    const Color Color::red { .r = 1, .g = 0, .b = 0, .a = 1 };
 
-    const Color Color::green = { .r = 0, .g = 1, .b = 0, .a = 1 };
+    const Color Color::green { .r = 0, .g = 1, .b = 0, .a = 1 };
 
-    const Color Color::blue = { .r = 0, .g = 0, .b = 1, .a = 1 };
+    const Color Color::blue { .r = 0, .g = 0, .b = 1, .a = 1 };
 
-    const Color Color::yellow = { .r = 1, .g = 1, .b = 0, .a = 1 };
+    const Color Color::yellow { .r = 1, .g = 1, .b = 0, .a = 1 };
 
-    const Color Color::cyan = { .r = 0, .g = 1, .b = 1, .a = 1 };
+    const Color Color::cyan { .r = 0, .g = 1, .b = 1, .a = 1 };
 
-    const Color Color::magenta = { .r = 1, .g = 0, .b = 1, .a = 1 };
+    const Color Color::magenta { .r = 1, .g = 0, .b = 1, .a = 1 };
 
-    const Color Color::gray25 = { .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
+    const Color Color::gray25 { .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
 
-    const Color Color::gray50 = { .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
+    const Color Color::gray50 { .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
 
-    const Color Color::gray75 = { .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
+    const Color Color::gray75 { .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
 
     //
     //
@@ -139,29 +152,29 @@ namespace zp
 
     constexpr zp_uint8_t q = 0x40;
 
-    const Color32 Color32::clear = { .r = 0, .g = 0, .b = 0, .a = 0 };
+    const Color32 Color32::clear { .r = 0, .g = 0, .b = 0, .a = 0 };
 
-    const Color32 Color32::black = { .r = 0, .g = 0, .b = 0, .a = f };
+    const Color32 Color32::black { .r = 0, .g = 0, .b = 0, .a = f };
 
-    const Color32 Color32::white = { .r = f, .g = f, .b = f, .a = f };
+    const Color32 Color32::white { .r = f, .g = f, .b = f, .a = f };
 
-    const Color32 Color32::red = { .r = f, .g = 0, .b = 0, .a = f };
+    const Color32 Color32::red { .r = f, .g = 0, .b = 0, .a = f };
 
-    const Color32 Color32::green = { .r = 0, .g = f, .b = 0, .a = f };
+    const Color32 Color32::green { .r = 0, .g = f, .b = 0, .a = f };
 
-    const Color32 Color32::blue = { .r = 0, .g = 0, .b = f, .a = f };
+    const Color32 Color32::blue { .r = 0, .g = 0, .b = f, .a = f };
 
-    const Color32 Color32::yellow = { .r = f, .g = f, .b = 0, .a = f };
+    const Color32 Color32::yellow { .r = f, .g = f, .b = 0, .a = f };
 
-    const Color32 Color32::cyan = { .r = 0, .g = f, .b = f, .a = f };
+    const Color32 Color32::cyan { .r = 0, .g = f, .b = f, .a = f };
 
-    const Color32 Color32::magenta = { .r = f, .g = 0, .b = f, .a = f };
+    const Color32 Color32::magenta { .r = f, .g = 0, .b = f, .a = f };
 
-    const Color32 Color32::gray25 = { .r = q, .g = q, .b = q, .a = f };
+    const Color32 Color32::gray25 { .r = q, .g = q, .b = q, .a = f };
 
-    const Color32 Color32::gray50 = { .r = h, .g = h, .b = h, .a = f };
+    const Color32 Color32::gray50 { .r = h, .g = h, .b = h, .a = f };
 
-    const Color32 Color32::gray75 = { .r = c, .g = c, .b = c, .a = f };
+    const Color32 Color32::gray75 { .r = c, .g = c, .b = c, .a = f };
 
     //
     //
@@ -235,7 +248,7 @@ namespace zp
             const __m128 invW = _mm_rcp_ps( _mm_set1_ps( v.w ) );
             const __m128 xyzw = _mm_load_ps( v.m );
 
-            ZP_ALIGN16 zp_float32_t m[4] {};
+            ZP_ALIGN16 zp_float32_t m[4];
             _mm_store_ps( m, _mm_mul_ps( xyzw, invW ) );
             return { m[ 0 ], m[ 1 ], m[ 2 ] };
         }
@@ -500,6 +513,66 @@ namespace zp
             _mm_storer_ps( r.m, _mm_normalize_ps( v ) );
 
             return r;
+        }
+
+        Vector2i Cmp( const Vector2f& lh, const Vector2f& rh )
+        {
+            const __m128 vlh = _mm_setr_ps( lh.x, lh.y, 0, 0 );
+            const __m128 vrh = _mm_setr_ps( rh.x, rh.y, 0, 0 );
+
+            const __m128 veq = _mm_cmpeq_ps( vlh, vrh );
+            const __m128 vlt = _mm_cmplt_ps( vlh, vrh );
+
+            ZP_ALIGN16 zp_uint32_t eq[4];
+            ZP_ALIGN16 zp_uint32_t lt[4];
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
+
+            return {
+                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0 : 1,
+                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0 : 1,
+            };
+        }
+
+        Vector3i Cmp( const Vector3f& lh, const Vector3f& rh )
+        {
+            const __m128 vlh = _mm_setr_ps( lh.x, lh.y, lh.z, 0 );
+            const __m128 vrh = _mm_setr_ps( rh.x, rh.y, rh.z, 0 );
+
+            const __m128 veq = _mm_cmpeq_ps( vlh, vrh );
+            const __m128 vlt = _mm_cmplt_ps( vlh, vrh );
+
+            ZP_ALIGN16 zp_uint32_t eq[4];
+            ZP_ALIGN16 zp_uint32_t lt[4];
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
+
+            return {
+                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0 : 1,
+                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0 : 1,
+                .z = lt[ 2 ] ? -1 : eq[ 2 ] ? 0 : 1,
+            };
+        }
+
+        Vector4i Cmp( const Vector4f& lh, const Vector4f& rh )
+        {
+            const __m128 vlh = _mm_setr_ps( lh.x, lh.y, lh.z, lh.w );
+            const __m128 vrh = _mm_setr_ps( rh.x, rh.y, rh.z, rh.w );
+
+            const __m128 veq = _mm_cmpeq_ps( vlh, vrh );
+            const __m128 vlt = _mm_cmplt_ps( vlh, vrh );
+
+            ZP_ALIGN16 zp_uint32_t eq[4];
+            ZP_ALIGN16 zp_uint32_t lt[4];
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
+
+            return {
+                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0 : 1,
+                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0 : 1,
+                .z = lt[ 2 ] ? -1 : eq[ 2 ] ? 0 : 1,
+                .w = lt[ 3 ] ? -1 : eq[ 3 ] ? 0 : 1,
+            };
         }
 
         Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale )

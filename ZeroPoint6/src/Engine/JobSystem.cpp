@@ -22,6 +22,9 @@ namespace zp
         kJobQueueCount = 512
     };
 
+    ZP_STATIC_ASSERT( zp_is_pow2( kJobsPerThread ) );
+    ZP_STATIC_ASSERT( zp_is_pow2( kJobQueueCount ) );
+
     namespace
     {
         thread_local Job t_jobs[kJobsPerThread];
@@ -437,78 +440,7 @@ namespace zp
         }
     }
 
-    PreparedJobHandle JobSystem::Prepare( const JobHandle& jobHandle ) const
-    {
-        return PreparedJobHandle( jobHandle.m_job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareJob( JobWorkFunc jobWorkFunc )
-    {
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_zero_memory_array( job->payload );
-
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareJob( JobWorkFunc jobWorkFunc, const PreparedJobHandle& dependency )
-    {
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_zero_memory_array( job->payload );
-
-        if( dependency.m_job )
-        { dependency.m_job->next = job; }
-
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size )
-    {
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency )
-    {
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_zero_memory_array( job->payload );
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency, const char* name )
+    Job* JobSystem::PrepareGenericJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency, const char* name )
     {
         ZP_ASSERT( size < kJobDataSize );
 
@@ -521,86 +453,49 @@ namespace zp
         zp_zero_memory_array( job->payload );
 
         job->set_name( name );
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
+        if( jobData && size > 0 )
+        {
+            zp_memcpy( job->data(), kJobDataSize, jobData, size );
+        }
 
         if( dependency.m_job )
         {
+            Job* n = dependency.m_job->next;
             dependency.m_job->next = job;
+            job->next = n;
         }
 
-        return PreparedJobHandle( job );
+        return job;
     }
 
-    PreparedJobHandle JobSystem::PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc )
+    Job* JobSystem::PrepareGenericChildJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& parent, const PreparedJobHandle& dependency, const char* name )
     {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
+        Atomic::IncrementSizeT( &parent.m_job->unfinishedJobs );
+
+        ZP_ASSERT( size < kJobDataSize );
 
         Job* job = AllocateJob();
         job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
+        job->parent = parent.m_job;
         job->next = nullptr;
         job->unfinishedJobs = 1;
 
         zp_zero_memory_array( job->payload );
 
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const PreparedJobHandle& dependency )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_zero_memory_array( job->payload );
+        job->set_name( name );
+        if( jobData && size > 0 )
+        {
+            zp_memcpy( job->data(), kJobDataSize, jobData, size );
+        }
 
         if( dependency.m_job )
         {
+            Job* n = dependency.m_job->next;
             dependency.m_job->next = job;
+            job->next = n;
         }
 
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        return PreparedJobHandle( job );
-    }
-
-    PreparedJobHandle JobSystem::PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        return PreparedJobHandle( job );
+        return job;
     }
 
     JobHandle JobSystem::Schedule( const PreparedJobHandle& preparedJobHandle )
@@ -608,168 +503,5 @@ namespace zp
         t_localJobQueue->push( preparedJobHandle.m_job );
 
         return JobHandle( preparedJobHandle.m_job );
-    }
-
-    JobHandle JobSystem::ScheduleJob( JobWorkFunc jobWorkFunc )
-    {
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_zero_memory_array( job->payload );
-
-        t_localJobQueue->push( job );
-
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size )
-    {
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleJob( JobWorkFunc jobWorkFunc, const JobHandle& dependency )
-    {
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_zero_memory_array( job->payload );
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency )
-    {
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency, const char* debugName )
-    {
-        ZP_ASSERT( size < kJobDataSize );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = nullptr;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        job->set_name( debugName );
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const JobHandle& dependency )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
-    }
-
-    JobHandle JobSystem::ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency )
-    {
-        Atomic::IncrementSizeT( &parentJobHandle.m_job->unfinishedJobs );
-
-        Job* job = AllocateJob();
-        job->func = jobWorkFunc;
-        job->parent = parentJobHandle.m_job;
-        job->next = nullptr;
-        job->unfinishedJobs = 1;
-
-        zp_memcpy( job->data(), kJobDataSize, jobData, size );
-
-        if( dependency.m_job )
-        {
-            dependency.m_job->next = job;
-        }
-
-        t_localJobQueue->push( job );
-        return JobHandle( job );
     }
 }

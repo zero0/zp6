@@ -184,82 +184,55 @@ namespace zp
         //
         //
 
-        PreparedJobHandle Prepare( const JobHandle& jobHandle ) const;
-
-        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc );
-
-        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const PreparedJobHandle& dependency );
-
-        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size );
-
-        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency );
-
-        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency, const char* name );
-
-        PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc );
-
-        PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const PreparedJobHandle& dependency );
-
-        PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size );
-
-        PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency );
-
         JobHandle Schedule( const PreparedJobHandle& preparedJobHandle );
 
         //
         //
         //
 
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc );
-
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size );
-
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const JobHandle& dependency );
-
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency );
-
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency, const char* debugName );
-
-        JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc );
-
-        JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size );
-
-        JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const JobHandle& dependency );
-
-        JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const JobHandle& dependency );
-
-        //
-        //
-        //
+        PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc )
+        {
+            Job* job = PrepareGenericJob( jobWorkFunc, nullptr, 0, {}, nullptr );
+            return PreparedJobHandle( job );
+        }
 
         template<typename T>
         PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const T& data )
         {
-            return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
+            Job* job = PrepareGenericJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), {}, nullptr );
+            return PreparedJobHandle( job );
         }
 
         template<typename T>
         PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const T& data, const PreparedJobHandle& dependency )
         {
-            return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency );
+            Job* job = PrepareGenericJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency, nullptr );
+            return PreparedJobHandle( job );
         }
 
         template<typename T>
         PreparedJobHandle PrepareJob( JobWorkFunc jobWorkFunc, const T& data, const PreparedJobHandle& dependency, const char* debugName )
         {
-            return PrepareJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency, debugName );
+            Job* job = PrepareGenericJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency, debugName );
+            return PreparedJobHandle( job );
         }
+
+        //
+        //
+        //
 
         template<typename T>
         PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data )
         {
-            return PrepareChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
+            Job* job = PrepareGenericChildJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), parentJobHandle, {}, nullptr );
+            return PreparedJobHandle( job );
         }
 
         template<typename T>
         PreparedJobHandle PrepareChildJob( const PreparedJobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data, const PreparedJobHandle& dependency )
         {
-            return PrepareChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>( &data ), sizeof( T ), dependency );
+            Job* job = PrepareGenericChildJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), parentJobHandle, dependency, nullptr );
+            return PreparedJobHandle( job );
         }
 
         //
@@ -267,33 +240,15 @@ namespace zp
         //
 
         template<typename T>
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const T& data )
+        PreparedJobHandle PrepareJobData( T** data )
         {
-            return ScheduleJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
-        }
+            Job* job = PrepareGenericJob( Wrapper<T>::ExecuteWrapper, nullptr, sizeof( Wrapper < T > ), {}, nullptr );
 
-        template<typename T>
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const T& data, const JobHandle& dependency )
-        {
-            return ScheduleJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency );
-        }
+            auto wrapperPtr = static_cast<Wrapper <T>*>( job->data());
+            wrapperPtr->func = T::Execute;
+            *data = &wrapperPtr->data;
 
-        template<typename T>
-        JobHandle ScheduleJob( JobWorkFunc jobWorkFunc, const T& data, const JobHandle& dependency, const char* debugName )
-        {
-            return ScheduleJob( jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency, debugName );
-        }
-
-        template<typename T>
-        JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data )
-        {
-            return ScheduleChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ) );
-        }
-
-        template<typename T>
-        JobHandle ScheduleChildJob( const JobHandle& parentJobHandle, JobWorkFunc jobWorkFunc, const T& data, const JobHandle& dependency )
-        {
-            return ScheduleChildJob( parentJobHandle, jobWorkFunc, static_cast<const void*>(&data), sizeof( T ), dependency );
+            return PreparedJobHandle( job );
         }
 
         //
@@ -303,64 +258,40 @@ namespace zp
         template<typename T>
         PreparedJobHandle PrepareJobData( const T& data )
         {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return PrepareJob( Wrapper<T>::WrapperJob, wrapper, {}, GetDebugName<T>() );
+            Wrapper <T> wrapper { .func = T::Execute, .data = data };
+            return PrepareJob( Wrapper<T>::ExecuteWrapper, wrapper, {}, GetDebugName<T>() );
         }
 
         template<typename T>
         PreparedJobHandle PrepareJobData( const T& data, const PreparedJobHandle& dependency )
         {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return PrepareJob( Wrapper<T>::WrapperJob, wrapper, dependency, GetDebugName<T>() );
+            Wrapper <T> wrapper { .func = T::Execute, .data = data };
+            return PrepareJob( Wrapper<T>::ExecuteWrapper, wrapper, dependency, GetDebugName<T>() );
         }
 
         template<typename T>
         PreparedJobHandle PrepareChildJobData( const PreparedJobHandle& parentJobHandle, const T& data )
         {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return PrepareChildJob( parentJobHandle, Wrapper<T>::WrapperJob, wrapper );
+            Wrapper <T> wrapper { .func = T::Execute, .data = data };
+            return PrepareChildJob( parentJobHandle, Wrapper<T>::ExecuteWrapper, wrapper );
         }
 
         template<typename T>
         PreparedJobHandle PrepareChildJobData( const PreparedJobHandle& parentJobHandle, const T& data, const PreparedJobHandle& dependency )
         {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return PrepareChildJob( parentJobHandle, Wrapper<T>::WrapperJob, wrapper, dependency );
+            Wrapper <T> wrapper { .func = T::Execute, .data = data };
+            return PrepareChildJob( parentJobHandle, Wrapper<T>::ExecuteWrapper, wrapper, dependency );
         }
 
         //
         //
         //
-
-        template<typename T>
-        JobHandle ScheduleJobData( const T& data )
-        {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return ScheduleJob( Wrapper<T>::WrapperJob, wrapper, {}, GetDebugName<T>() );
-        }
-
-        template<typename T>
-        JobHandle ScheduleJobData( const T& data, const JobHandle& dependency )
-        {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return ScheduleJob( Wrapper<T>::WrapperJob, wrapper, dependency, GetDebugName<T>() );
-        }
-
-        template<typename T>
-        JobHandle ScheduleChildJobData( const JobHandle& parentJobHandle, const T& data )
-        {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return ScheduleChildJob( parentJobHandle, Wrapper<T>::WrapperJob, wrapper );
-        }
-
-        template<typename T>
-        JobHandle ScheduleChildJobData( const JobHandle& parentJobHandle, const T& data, const JobHandle& dependency )
-        {
-            Wrapper <T> wrapper { T::Execute, zp_move( data ) };
-            return ScheduleParentJob( parentJobHandle, Wrapper<T>::WrapperJob, wrapper, dependency );
-        }
 
     private:
+        static Job* PrepareGenericJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& dependency, const char* name );
+
+        static Job* PrepareGenericChildJob( JobWorkFunc jobWorkFunc, const void* jobData, zp_size_t size, const PreparedJobHandle& parent, const PreparedJobHandle& dependency, const char* name );
+
         template<typename T>
         struct Wrapper
         {
@@ -369,7 +300,7 @@ namespace zp
             WrapperFunc func;
             T data;
 
-            static void WrapperJob( Job* job, void* data )
+            static void ExecuteWrapper( Job* job, void* data )
             {
                 auto ptr = static_cast<Wrapper <T>*>( data );
                 if( ptr->func )

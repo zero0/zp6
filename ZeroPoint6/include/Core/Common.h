@@ -34,7 +34,6 @@ zp_int32_t zp_snprintf( char (& dest)[Size], const char* format, Args ... args )
     return zp_snprintf( static_cast<char*>(dest), Size, format, args... );
 }
 
-#define ZP_T( t )                       #t
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
@@ -71,6 +70,11 @@ constexpr T zp_upper_pow2_generic( T val )
 #else
 #define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 6>( x )
 #endif
+
+constexpr zp_bool_t zp_is_pow2( zp_uint32_t x )
+{
+    return ( x & ( x - 1 ) ) == 0;
+}
 
 void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength );
 
@@ -237,6 +241,11 @@ constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength 
     {
         dstStr[ i ] = srcStr[ i ];
     }
+}
+
+constexpr zp_bool_t zp_strempty( const char* str )
+{
+    return str == nullptr || str[ 0 ] == 0;
 }
 
 constexpr zp_size_t zp_strlen( const char* str )

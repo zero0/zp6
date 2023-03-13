@@ -53,6 +53,8 @@ namespace zp
 
         void process();
 
+        void processWindowEvents();
+
         void advanceFrame();
 
         [[nodiscard]] zp_uint64_t getFrameCount() const

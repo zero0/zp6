@@ -225,21 +225,21 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
         SystemPageAllocatorPolicy()
     );
 
-    MemoryAllocator<NullMemoryStorage, SimpleAllocatorPolicy> s_simpleAllocator(
+    MemoryAllocator<NullMemoryStorage, MallocAllocatorPolicy> s_mallocAllocator(
         NullMemoryStorage( 0 ),
-        SimpleAllocatorPolicy()
+        MallocAllocatorPolicy()
     );
 
-    RegisterAllocator( MemoryLabels::Default, &s_simpleAllocator );
+    RegisterAllocator( MemoryLabels::Default, &s_mallocAllocator );
     RegisterAllocator( MemoryLabels::String, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Graphics, &s_simpleAllocator );
+    RegisterAllocator( MemoryLabels::Graphics, &s_mallocAllocator );
     RegisterAllocator( MemoryLabels::FileIO, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Buffer, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::User, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Data, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Temp, &s_simpleAllocator );
+    RegisterAllocator( MemoryLabels::Temp, &s_mallocAllocator );
     RegisterAllocator( MemoryLabels::ThreadSafe, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Profiling, &s_simpleAllocator );
+    RegisterAllocator( MemoryLabels::Profiling, &s_mallocAllocator );
     RegisterAllocator( MemoryLabels::Debug, &s_defaultAllocator );
 
     auto engine = ZP_NEW( Default, Engine );

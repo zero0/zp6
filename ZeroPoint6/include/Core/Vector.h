@@ -144,7 +144,54 @@ namespace zp
 
         allocator_value m_allocator;
     };
-};
+}
+
+namespace zp
+{
+    template<typename T>
+    class FixedArray
+    {
+    public:
+        typedef T value_type;
+        typedef T& reference;
+        typedef const T& const_reference;
+        typedef T* pointer;
+        typedef const T* const_pointer;
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+    public:
+        FixedArray();
+
+        ~FixedArray();
+
+        FixedArray( pointer ptr, zp_size_t length );
+
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
+
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
+
+        [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
+
+        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE iterator begin();
+
+        [[nodiscard]] ZP_FORCEINLINE iterator end();
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const;
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
+
+        [[nodiscard]] ZP_FORCEINLINE FixedArray split( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE FixedArray split( zp_size_t index, zp_size_t length ) const;
+
+    private:
+        T* m_ptr;
+        zp_size_t m_length;
+    };
+}
 
 //
 // Impl
@@ -606,5 +653,93 @@ namespace zp
         return lh == rh;
     }
 };
+
+namespace zp
+{
+    template<typename T>
+    FixedArray<T>::FixedArray()
+        : m_ptr( nullptr )
+        , m_length( 0 )
+    {
+    }
+
+    template<typename T>
+    FixedArray<T>::~FixedArray()
+    {
+        m_ptr = nullptr;
+        m_length = 0;
+    }
+
+    template<typename T>
+    FixedArray<T>::FixedArray( pointer ptr, zp_size_t length )
+        : m_ptr( ptr )
+        , m_length( length )
+    {
+    }
+
+    template<typename T>
+    zp_size_t FixedArray<T>::length() const
+    {
+        return m_length;
+    }
+
+    template<typename T>
+    zp_bool_t FixedArray<T>::isEmpty() const
+    {
+        return !( m_ptr && m_length );
+    }
+
+    template<typename T>
+    FixedArray<T>::reference FixedArray<T>::operator[]( zp_size_t index )
+    {
+        ZP_ASSERT( m_ptr && index < m_length );
+        return m_ptr[ index ];
+    }
+
+    template<typename T>
+    FixedArray<T>::const_reference FixedArray<T>::operator[]( zp_size_t index ) const
+    {
+        ZP_ASSERT( m_ptr && index < m_length );
+        return m_ptr[ index ];
+    }
+
+    template<typename T>
+    FixedArray<T>::iterator FixedArray<T>::begin()
+    {
+        return m_ptr;
+    }
+
+    template<typename T>
+    FixedArray<T>::iterator FixedArray<T>::end()
+    {
+        return m_ptr + m_length;
+    }
+
+    template<typename T>
+    FixedArray<T>::const_iterator FixedArray<T>::begin() const
+    {
+        return m_ptr;
+    }
+
+    template<typename T>
+    FixedArray<T>::const_iterator FixedArray<T>::end() const
+    {
+        return m_ptr + m_length;
+    }
+
+    template<typename T>
+    FixedArray<T> FixedArray<T>::split( zp_size_t index ) const
+    {
+        ZP_ASSERT( m_ptr && index < m_length );
+        return FixedArray<T>( m_ptr + index, m_length - index );
+    }
+
+    template<typename T>
+    FixedArray<T> FixedArray<T>::split( zp_size_t index, zp_size_t length ) const
+    {
+        ZP_ASSERT( m_ptr && ( index + length ) < m_length );
+        return FixedArray<T>( m_ptr + index, length );
+    }
+}
 
 #endif //ZP_VECTOR_H
