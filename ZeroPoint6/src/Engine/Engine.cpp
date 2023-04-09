@@ -6,6 +6,8 @@
 #include "Core/Types.h"
 #include "Core/Common.h"
 
+#include "Platform/Platform.h"
+
 #include "Engine/MemoryLabels.h"
 #include "Engine/Engine.h"
 #include "Engine/TransformComponent.h"

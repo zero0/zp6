@@ -502,7 +502,7 @@ namespace zp
             .QuadPart = distanceToMoveInBytes,
         };
 
-        constexpr DWORD moveMethodMapping[] = {
+        constexpr DWORD moveMethodMapping[] {
             FILE_BEGIN,
             FILE_CURRENT,
             FILE_END

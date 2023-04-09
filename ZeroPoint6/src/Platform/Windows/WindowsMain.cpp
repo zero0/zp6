@@ -134,9 +134,9 @@ int APIENTRY OldWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lp
     wc.lpfnWndProc = WinProc;
     wc.hInstance = hInstance;
     wc.hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH ));
-    wc.hIcon = LoadIcon( nullptr, IDI_APPLICATION);
-    wc.hIconSm = LoadIcon( nullptr, IDI_APPLICATION);
-    wc.hCursor = LoadCursor( nullptr, IDC_ARROW);
+    wc.hIcon = LoadIcon( nullptr, IDI_APPLICATION );
+    wc.hIconSm = LoadIcon( nullptr, IDI_APPLICATION );
+    wc.hCursor = LoadCursor( nullptr, IDC_ARROW );
     wc.lpszMenuName = nullptr;
     wc.lpszClassName = kZeroPointClassName;
 
@@ -183,7 +183,7 @@ int APIENTRY OldWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lp
     bool isRunning = true;
     while( isRunning )
     {
-        if( ::PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ))
+        if( ::PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) )
         {
             if( msg.message == WM_QUIT )
             {
@@ -216,31 +216,89 @@ int APIENTRY OldWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lp
     return exitCode;
 }
 
+struct MemoryConfig
+{
+    zp_size_t defaultAllocatorPageSize;
+    zp_size_t tempAllocatorPageSize;
+    zp_size_t profilerPageSize;
+    zp_size_t debugPageSize;
+};
+
 int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow )
 {
     using namespace zp;
 
-    MemoryAllocator<SystemMemoryStorage, SystemPageAllocatorPolicy> s_defaultAllocator(
-        SystemMemoryStorage( nullptr, 10 MB ),
-        SystemPageAllocatorPolicy()
+    MemoryConfig memoryConfig {
+        .defaultAllocatorPageSize = 16 MB,
+        .tempAllocatorPageSize = 4 MB,
+        .profilerPageSize = 16 MB,
+        .debugPageSize = 4 MB,
+    };
+
+    //MemoryAllocator<SystemMemoryStorage, SystemPageAllocatorPolicy> s_defaultAllocator(
+    //    SystemMemoryStorage( nullptr, 10 MB ),
+    //    SystemPageAllocatorPolicy()
+    //);
+#if ZP_DEBUG
+    void* const baseAddress = reinterpret_cast<void*>(0x10000000);
+#else
+    void* const baseAddress = nullptr;
+#endif
+
+    void* systemMemory = GetPlatform()->AllocateSystemMemory( baseAddress, 128 MB );
+
+    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_defaultAllocator(
+        SystemPageMemoryStorage( &systemMemory, memoryConfig.defaultAllocatorPageSize ),
+        TlsfAllocatorPolicy(),
+        NullMemoryLock()
     );
 
-    MemoryAllocator<NullMemoryStorage, MallocAllocatorPolicy> s_mallocAllocator(
-        NullMemoryStorage( 0 ),
-        MallocAllocatorPolicy()
+    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_tempAllocator(
+        SystemPageMemoryStorage( &systemMemory, memoryConfig.tempAllocatorPageSize ),
+        TlsfAllocatorPolicy(),
+        NullMemoryLock()
     );
 
-    RegisterAllocator( MemoryLabels::Default, &s_mallocAllocator );
+#if ZP_USE_PROFILER
+    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_profilingAllocator(
+        SystemPageMemoryStorage( &systemMemory, memoryConfig.profilerPageSize ),
+        TlsfAllocatorPolicy(),
+        NullMemoryLock()
+    );
+#else
+    MemoryAllocator<NullMemoryStorage, NullAllocationPolicy, NullMemoryLock> s_profilingAllocator(
+        NullMemoryStorage,
+        NullAllocationPolicy,
+        NullMemoryLock
+    );
+#endif
+
+#if ZP_DEBUG
+    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_debugAllocator(
+        SystemPageMemoryStorage( &systemMemory, memoryConfig.debugPageSize ),
+        TlsfAllocatorPolicy(),
+        NullMemoryLock()
+    );
+#else
+    MemoryAllocator<NullMemoryStorage, NullAllocationPolicy, NullMemoryLock> s_debugAllocator(
+        NullMemoryStorage,
+        NullAllocationPolicy,
+        NullMemoryLock
+    );
+#endif
+
+
+    RegisterAllocator( MemoryLabels::Default, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::String, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Graphics, &s_mallocAllocator );
+    RegisterAllocator( MemoryLabels::Graphics, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::FileIO, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Buffer, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::User, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Data, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Temp, &s_mallocAllocator );
+    RegisterAllocator( MemoryLabels::Temp, &s_tempAllocator );
     RegisterAllocator( MemoryLabels::ThreadSafe, &s_defaultAllocator );
-    RegisterAllocator( MemoryLabels::Profiling, &s_mallocAllocator );
-    RegisterAllocator( MemoryLabels::Debug, &s_defaultAllocator );
+    RegisterAllocator( MemoryLabels::Profiling, &s_profilingAllocator );
+    RegisterAllocator( MemoryLabels::Debug, &s_debugAllocator );
 
     auto engine = ZP_NEW( Default, Engine );
     {
@@ -253,7 +311,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
             engine->process();
 
             //zp_yield_current_thread();
-        } while( engine->isRunning());
+        } while( engine->isRunning() );
 
         engine->stopEngine();
 

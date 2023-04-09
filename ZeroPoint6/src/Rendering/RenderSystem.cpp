@@ -5,6 +5,8 @@
 #include "Core/Defines.h"
 #include "Core/Profiler.h"
 
+#include "Platform/Platform.h"
+
 #include "Rendering/RenderSystem.h"
 #include "Rendering/Shader.h"
 #include "Rendering/GraphicsResource.h"
@@ -472,7 +474,7 @@ namespace zp
 
         m_graphicsDevice = CreateGraphicsDevice( memoryLabel, graphicsDeviceFeatures );
 
-        m_graphicsDevice->createSwapChain( windowHandle, 0, 0, 0, 0 );
+        m_graphicsDevice->createSwapChain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
 
         BatchModeRendererConfig batchModeRendererConfig {};
         m_batchModeRenderer = ZP_NEW_ARGS_( memoryLabel, BatchModeRenderer, &batchModeRendererConfig );

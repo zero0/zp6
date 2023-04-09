@@ -11,6 +11,7 @@
 
 #endif
 
+#include "Platform/Platform.h"
 #include "Engine/JobSystem.h"
 
 namespace zp

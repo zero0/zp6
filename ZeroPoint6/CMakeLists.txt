@@ -43,6 +43,7 @@ set(ZP_ENGINE_SRC
         "src/Engine/EntityComponentManager.cpp"
         "src/Engine/EntityQuery.cpp"
         "src/Engine/JobSystem.cpp"
+        "src/Engine/Subsystem.cpp"
         )
 
 set(ZP_SRC
@@ -88,6 +89,7 @@ set(ZP_ENGINE_HEADERS
         "include/Engine/JobSystem.h"
         "include/Engine/MemoryLabels.h"
         "include/Engine/ModuleEntryPointAPI.h"
+        "include/Engine/Subsystem.h"
         "include/Engine/TransformComponent.h"
         )
 
@@ -129,13 +131,24 @@ set(ZP_PLATFORM_MODULE
         "src/Platform/Platform-${PLATFORM_FULL_NAME}.cpp"
         )
 
+set(ZP_EXTERNAL_HEADERS
+        "external/tlsf/tlsf.h"
+        )
+
+set(ZP_EXTERNAL_SRC
+        "external/tlsf/tlsf.c"
+        )
+
 add_executable(${ZP_TARGET})
 target_sources(${ZP_TARGET}
         PRIVATE ${ZP_HEADERS}
         PRIVATE ${ZP_SRC}
+        PRIVATE ${ZP_EXTERNAL_HEADERS}
+        PRIVATE ${ZP_EXTERNAL_SRC}
         )
 target_include_directories(${ZP_TARGET}
         PRIVATE include
+        PRIVATE external
         )
 
 # add_module(CoreModule ${ZP_CORE_MODULE})

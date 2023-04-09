@@ -28,7 +28,7 @@ namespace zp
     {
         const char* name;
         zp_size_t size;
-        GraphicsBufferUsageFlags graphicsBufferUsageFlags;
+        GraphicsBufferUsageFlags usageFlags;
         MemoryPropertyFlags memoryPropertyFlags;
     };
 
@@ -47,13 +47,13 @@ namespace zp
         [[nodiscard]] GraphicsBuffer splitBuffer( zp_size_t startOffset, zp_size_t splitSize ) const
         {
             GraphicsBuffer splitBuffer {
-                buffer,
-                deviceMemory,
-                startOffset,
-                splitSize,
-                alignment,
-                usageFlags,
-                true
+                .buffer = buffer,
+                .deviceMemory = deviceMemory,
+                .offset = offset + startOffset,
+                .size = splitSize,
+                .alignment = alignment,
+                .usageFlags = usageFlags,
+                .isVirtualBuffer = true
             };
             return splitBuffer;
         }
@@ -283,7 +283,7 @@ namespace zp
 
         virtual ~GraphicsDevice() = 0;
 
-        virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, int colorSpace ) = 0;
+        virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
         virtual void destroySwapChain() = 0;
 

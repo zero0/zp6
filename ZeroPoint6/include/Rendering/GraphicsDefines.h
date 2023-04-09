@@ -394,6 +394,7 @@ namespace zp
     {
         ZP_VERTEX_INPUT_RATE_VERTEX,
         ZP_VERTEX_INPUT_RATE_INSTANCE,
+
         VertexInputRate_Count,
     };
 
@@ -401,6 +402,7 @@ namespace zp
     {
         ZP_PIPELINE_BIND_POINT_GRAPHICS,
         ZP_PIPELINE_BIND_POINT_COMPUTE,
+
         PipelineBindPoint_Count,
     };
 
@@ -408,12 +410,16 @@ namespace zp
     {
         ZP_FILTER_MODE_NEAREST,
         ZP_FILTER_MODE_LINEAR,
+
+        FilterMode_Count
     };
 
     enum MipmapMode
     {
         ZP_MIPMAP_MODE_NEAREST,
         ZP_MIPMAP_MODE_LINEAR,
+
+        MipmapMode_Count
     };
 
     enum SamplerAddressMode
@@ -423,6 +429,8 @@ namespace zp
         ZP_SAMPLER_ADDRESS_MODE_CLAMP,
         ZP_SAMPLER_ADDRESS_MODE_BORDER,
         ZP_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP,
+
+        SamplerAddressMode_Count
     };
 
     enum BorderColor
@@ -433,6 +441,39 @@ namespace zp
         ZP_BORDER_COLOR_INT_OPAQUE_BLACK,
         ZP_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
         ZP_BORDER_COLOR_INT_OPAQUE_WHITE,
+
+        BorderColor_Count
+    };
+
+    enum ColorSpace
+    {
+        ZP_COLOR_SPACE_SRGB_NONLINEAR,
+        ZP_COLOR_SPACE_DISPLAY_P3_NONLINEAR,
+        ZP_COLOR_SPACE_DISPLAY_P3_LINEAR,
+        ZP_COLOR_SPACE_REC_709_NONLINEAR,
+        ZP_COLOR_SPACE_REC_709_LINEAR,
+        ZP_COLOR_SPACE_REC_2020_LINEAR,
+
+        ColorSpace_Count
+    };
+
+    enum class DelayedDestroyType
+    {
+        Buffer,
+        Texture,
+        FrameBuffer,
+        ImageView,
+        SwapChain,
+        Shader,
+        RenderPass,
+    };
+
+    struct DelayedDestroy
+    {
+        zp_handle_t handle;
+        zp_handle_t allocator;
+        zp_uint64_t frameIndex;
+        DelayedDestroyType type;
     };
 }
 

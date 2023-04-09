@@ -8,6 +8,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Macros.h"
+#include "Core/Common.h"
 #include <new>
 
 #define ZP_NEW( l, t )                  new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l)
@@ -61,10 +62,10 @@ namespace zp
         virtual void free( void* ptr ) = 0;
     };
 
-    template<typename Storage, typename Policy>
+    template<typename Storage, typename Policy, typename Locking>
     class MemoryAllocator final : public IMemoryAllocator
     {
-        typedef MemoryAllocator<Storage, Policy> allocator_type;
+        typedef MemoryAllocator<Storage, Policy, Locking> allocator_type;
     ZP_NONCOPYABLE( MemoryAllocator );
 
     private:
@@ -74,10 +75,13 @@ namespace zp
         typedef Policy policy_value;
         typedef const Policy& policy_const_reference;
 
-    public:
-        MemoryAllocator( storage_const_reference storage, policy_const_reference policy );
+        typedef Locking lock_value;
+        typedef const Locking& lock_const_reference;
 
-        ~MemoryAllocator();
+    public:
+        MemoryAllocator( storage_const_reference storage, policy_const_reference policy, lock_const_reference locking );
+
+        ~MemoryAllocator() = default;
 
         void* allocate( zp_size_t size, zp_size_t alignment ) final;
 
@@ -86,6 +90,7 @@ namespace zp
     private:
         storage_value m_storage;
         policy_value m_policy;
+        lock_value m_lock;
     };
 
     void RegisterAllocator( MemoryLabel memoryLabel, IMemoryAllocator* memoryAllocator );
@@ -99,18 +104,18 @@ namespace zp
     struct MemoryLabelAllocator
     {
         MemoryLabelAllocator( MemoryLabel memoryLabel )
-            : memoryLabel( memoryLabel )
-            , alignment( kDefaultMemoryAlignment )
+            : alignment( kDefaultMemoryAlignment )
+            , memoryLabel( memoryLabel )
         {
         }
 
         MemoryLabelAllocator( MemoryLabel memoryLabel, zp_size_t alignment )
-            : memoryLabel( memoryLabel )
-            , alignment( alignment )
+            : alignment( alignment )
+            , memoryLabel( memoryLabel )
         {
         }
 
-        void* allocate( zp_size_t size ) const
+        [[nodiscard]] void* allocate( zp_size_t size ) const
         {
             void* ptr = GetAllocator( memoryLabel )->allocate( size, alignment );
             return ptr;
@@ -122,8 +127,8 @@ namespace zp
         }
 
     private:
-        const MemoryLabel memoryLabel;
         const zp_size_t alignment;
+        const MemoryLabel memoryLabel;
     };
 }
 
@@ -133,36 +138,52 @@ namespace zp
 
 namespace zp
 {
-    template<typename Storage, typename Policy>
-    MemoryAllocator<Storage, Policy>::MemoryAllocator(
-        storage_const_reference storage,
-        policy_const_reference policy )
+    template<typename Storage, typename Policy, typename Locking>
+    MemoryAllocator<Storage, Policy, Locking>::MemoryAllocator( storage_const_reference storage, policy_const_reference policy, lock_const_reference locking )
         : m_storage( storage )
         , m_policy( policy )
+        , m_lock( locking )
     {
-        void* memory = m_storage.memory();
-        m_policy.set_memory( memory, m_storage.size());
+        if( m_storage.is_fixed() )
+        {
+            zp_size_t requestedSize;
+            void* mem = m_storage.request_memory( 0, requestedSize );
+            m_policy.add_memory( mem, requestedSize );
+        }
     }
 
-    template<typename Storage, typename Policy>
-    MemoryAllocator<Storage, Policy>::~MemoryAllocator()
+    template<typename Storage, typename Policy, typename Locking>
+    void* MemoryAllocator<Storage, Policy, Locking>::allocate( const zp_size_t size, const zp_size_t alignment )
     {
-        m_policy.clear_memory();
+        m_lock.acquire();
+        if( !m_storage.is_fixed() )
+        {
+            const zp_size_t allocatedSize = m_policy.allocated();
+            const zp_size_t totalSize = m_policy.total();
 
-        m_storage.destroy();
-    }
+            if( ( allocatedSize + size ) >= totalSize )
+            {
+                zp_size_t requestedSize;
+                void* mem = m_storage.request_memory( size, requestedSize );
+                m_policy.add_memory( mem, requestedSize );
+            }
+        }
 
-    template<typename Storage, typename Policy>
-    void* MemoryAllocator<Storage, Policy>::allocate( const zp_size_t size, const zp_size_t alignment )
-    {
         void* ptr = m_policy.allocate( size, alignment );
+        ZP_ASSERT( ptr );
+        m_lock.release();
+
         return ptr;
     }
 
-    template<typename Storage, typename Policy>
-    void MemoryAllocator<Storage, Policy>::free( void* ptr )
+    template<typename Storage, typename Policy, typename Locking>
+    void MemoryAllocator<Storage, Policy, Locking>::free( void* ptr )
     {
+        m_lock.acquire();
+
         m_policy.free( ptr );
+
+        m_lock.release();
     }
 }
 
@@ -170,135 +191,134 @@ namespace zp
 //
 //
 
-#include "Platform/Platform.h"
-
+#pragma region Null Memory Impl
 namespace zp
 {
-    class NullMemoryStorage
+    struct NullMemoryStorage
     {
-    public:
-        NullMemoryStorage( int )
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
         {
-        }
-
-        void* memory() const
-        {
+            requestedSize = size;
             return nullptr;
         }
 
-        zp_size_t size() const
+        zp_bool_t is_fixed() const
+        {
+            return true;
+        }
+    };
+
+    struct NullAllocationPolicy
+    {
+        void add_memory( void* mem, zp_size_t size ) const
+        {
+        }
+
+        zp_size_t allocated() const
         {
             return 0;
         }
 
-        void destroy() const
+        zp_size_t total() const
         {
-        }
-    };
-
-    class SystemMemoryStorage
-    {
-    public:
-        SystemMemoryStorage( void* baseAddress, zp_size_t size )
-            : m_size( size )
-            , m_baseAddress( baseAddress )
-            , m_memory( nullptr )
-        {
-        }
-
-        ~SystemMemoryStorage()
-        {
-            if( m_memory )
-            {
-                destroy();
-            }
-        }
-
-        void* memory()
-        {
-            void* ptr = GetPlatform()->AllocateSystemMemory( m_baseAddress, m_size );
-            m_memory = GetPlatform()->CommitMemoryPage( &ptr, m_size );
-            return m_memory;
-        }
-
-        zp_size_t size() const
-        {
-            return m_size;
-        }
-
-        void destroy()
-        {
-            GetPlatform()->DecommitMemoryPage( m_memory, m_size );
-            GetPlatform()->FreeSystemMemory( m_memory );
-            m_memory = nullptr;
-        }
-
-    private:
-        zp_size_t m_size;
-        void* m_baseAddress;
-        void* m_memory;
-    };
-
-}
-
-#include <cstdlib>
-
-namespace zp
-{
-    class MallocAllocatorPolicy
-    {
-    public:
-        MallocAllocatorPolicy() = default;
-
-        void set_memory( void* memory, zp_size_t size )
-        {
-        }
-
-        void clear_memory()
-        {
+            return 0;
         }
 
         void* allocate( zp_size_t size, zp_size_t alignment )
         {
-            void* ptr = ::_aligned_malloc( size, alignment );
-            return ptr;
+            return nullptr;
         }
 
         void free( void* ptr )
         {
-            ::_aligned_free( ptr );
         }
     };
 
-    class SystemPageAllocatorPolicy
+    struct NullMemoryLock
     {
-    public:
-        void set_memory( void* memory, zp_size_t size )
+        void acquire() const
         {
-            m_memory = memory;
-            m_size = size;
-        }
+        };
 
-        void clear_memory()
+        void release() const
         {
-            m_memory = nullptr;
-            m_size = 0;
-        }
-
-        void* allocate( zp_size_t size, zp_size_t alignment )
-        {
-            return m_memory;
-        }
-
-        void free( const void* ptr )
-        {
-        }
-
-    private:
-        void* m_memory;
-        zp_size_t m_size;
+        };
     };
 
 }
+#pragma endregion
+
+#pragma region System Page Memory Allocator
+namespace zp
+{
+    class SystemPageMemoryStorage
+    {
+    public:
+        SystemPageMemoryStorage( void** systemMemory, zp_size_t pageSize );
+
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize );
+
+        zp_bool_t is_fixed() const;
+
+    private:
+        zp_size_t m_pageSize;
+        void** m_systemMemory;
+    };
+}
+#pragma endregion
+
+#pragma region Malloc Memory Allocator
+namespace zp
+{
+    struct MallocMemoryStorage
+    {
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize );
+
+        zp_bool_t is_fixed() const;
+    };
+
+    class MallocAllocatorPolicy
+    {
+    public:
+        void add_memory( void* mem, zp_size_t size );
+
+        zp_size_t allocated() const;
+
+        zp_size_t total() const;
+
+        void* allocate( zp_size_t size, zp_size_t alignment );
+
+        void free( void* ptr );
+
+    protected:
+        zp_size_t m_allocated;
+        zp_size_t m_size;
+    };
+}
+#pragma endregion
+
+#pragma region TLSF Memory Allocator
+namespace zp
+{
+    class TlsfAllocatorPolicy
+    {
+    public:
+        void add_memory( void* mem, zp_size_t size );
+
+        zp_size_t allocated() const;
+
+        zp_size_t total() const;
+
+        void* allocate( zp_size_t size, zp_size_t alignment );
+
+        void free( void* ptr );
+
+    private:
+        zp_handle_t m_tlsf;
+        zp_size_t m_allocated;
+        zp_size_t m_size;
+    };
+}
+#pragma endregion
 
 #endif //ZP_ALLOCATOR_H

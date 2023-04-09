@@ -102,7 +102,7 @@ namespace zp
             return *this;
         }
 
-        GraphicsResourceHandle& operator=( move_handle other )
+        GraphicsResourceHandle& operator=( move_handle other ) noexcept
         {
             if( m_resource ) m_resource->removeRef();
 

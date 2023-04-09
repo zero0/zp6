@@ -31,7 +31,7 @@ namespace zp
 
         ~VulkanGraphicsDevice() final;
 
-        void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, int colorSpace ) final;
+        void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
 
         void destroySwapChain() final;
 

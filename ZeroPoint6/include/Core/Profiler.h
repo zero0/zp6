@@ -89,6 +89,7 @@ namespace zp
         zp_uint64_t frameIndex;
         zp_uint64_t cycle;
         zp_time_t time;
+        zp_ptr_t memoryAddress;
         zp_uint64_t memoryAllocated;
         zp_uint64_t memoryFreed;
         zp_uint64_t memoryTotal;

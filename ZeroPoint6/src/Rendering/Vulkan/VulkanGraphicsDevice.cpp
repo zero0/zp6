@@ -11,6 +11,8 @@
 #include "Core/Atomic.h"
 #include "Core/Profiler.h"
 
+#include "Platform/Platform.h"
+
 #include "Engine/MemoryLabels.h"
 
 #include "Rendering/GraphicsDevice.h"
@@ -33,268 +35,14 @@
 #define HR( r )   r
 #endif
 
+#define FlagBits( f, z, t, v )         f |= ( (z) & (t) ) ? (v) : 0
+
 namespace zp
 {
     namespace
     {
-#if ZP_DEBUG
 
-        template<typename Func, typename ... Args>
-        VkResult CallDebugUtilResultEXT( VkInstance instance, const char* name, Args ... args )
-        {
-            VkResult result = VK_ERROR_EXTENSION_NOT_PRESENT;
-
-            auto func = reinterpret_cast<Func>(vkGetInstanceProcAddr( instance, name ));
-            if( func )
-            {
-                result = func( args... );
-            }
-
-            return result;
-        }
-
-#define CallDebugUtilResult( func, inst, ... )  CallDebugUtilResultEXT<ZP_CONCAT(PFN_, func)>( inst, #func, __VA_ARGS__ )
-
-        template<typename Func, typename ... Args>
-        VkResult CallDebugUtilEXT( VkInstance instance, const char* name, Args ... args )
-        {
-            VkResult result = VK_SUCCESS;
-
-            auto func = reinterpret_cast<Func>(vkGetInstanceProcAddr( instance, name ));
-            if( func )
-            {
-                func( args... );
-            }
-            else
-            {
-                result = VK_ERROR_EXTENSION_NOT_PRESENT;
-            }
-
-            return result;
-        }
-
-#define CallDebugUtil( func, inst, ... )  CallDebugUtilEXT<ZP_CONCAT(PFN_, func)>( inst, #func, __VA_ARGS__ )
-
-        VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-            VkDebugUtilsMessageTypeFlagsEXT messageType,
-            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-            void* pUserData )
-        {
-            const zp_uint32_t messageMask = 0
-                                            #if ZP_DEBUG
-                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
-                                            #endif
-                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-
-            if( messageSeverity & messageMask )
-            {
-                zp_printfln( pCallbackData->pMessage );
-
-                if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
-                {
-                    MessageBoxResult result = GetPlatform()->ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
-                    if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
-                    {
-                        exit( 1 );
-                    }
-                    else if( result == ZP_MESSAGE_BOX_RESULT_RETRY )
-                    {
-                        zp_debug_break();
-                    }
-                }
-            }
-
-            const VkBool32 shouldAbort = messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? VK_TRUE : VK_FALSE;
-            return shouldAbort;
-        }
-
-#endif // ZP_DEBUG
-
-#if ZP_DEBUG
-
-        const char* kValidationLayers[] = {
-            "VK_LAYER_KHRONOS_validation"
-        };
-
-#endif
-
-#define FlagBits( f, z, t, v )         f |= ( (z) & (t) ) ? (v) : 0
-
-        void FillLayerNames( const char* const*& ppEnabledLayerNames, uint32_t& enabledLayerCount )
-        {
-#if ZP_DEBUG
-            ppEnabledLayerNames = kValidationLayers;
-            enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers );
-#else
-            ppEnabledLayerNames = nullptr;
-            enabledLayerCount = 0;
-#endif
-        }
-
-        zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, GraphicsDeviceFeatures graphicsDeviceFeatures )
-        {
-            zp_bool_t isSuitable = true;
-
-            VkPhysicalDeviceProperties physicalDeviceProperties;
-            VkPhysicalDeviceFeatures physicalDeviceFeatures;
-            vkGetPhysicalDeviceProperties( physicalDevice, &physicalDeviceProperties );
-            vkGetPhysicalDeviceFeatures( physicalDevice, &physicalDeviceFeatures );
-
-            zp_printfln( "Testing %s", physicalDeviceProperties.deviceName );
-
-            // require discrete gpu
-            isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-
-            // support geometry shaders
-            if( graphicsDeviceFeatures.GeometryShaderSupport )
-            {
-                isSuitable &= physicalDeviceFeatures.geometryShader == VK_TRUE;
-            }
-
-            // support tessellation shaders
-            if( graphicsDeviceFeatures.TessellationShaderSupport )
-            {
-                isSuitable &= physicalDeviceFeatures.tessellationShader == VK_TRUE;
-            }
-
-#if ZP_USE_PROFILER
-            isSuitable &= physicalDeviceProperties.limits.timestampComputeAndGraphics == VK_TRUE;
-
-            isSuitable &= physicalDeviceFeatures.pipelineStatisticsQuery == VK_TRUE;
-#endif
-
-            const char* requiredExtensions[] {
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME
-            };
-
-            uint32_t extensionCount = 0;
-            vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE );
-
-            Vector<VkExtensionProperties> availableExtensions( extensionCount, MemoryLabels::Temp );
-            availableExtensions.resize_unsafe( extensionCount );
-
-            vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, availableExtensions.data() );
-
-            zp_uint32_t foundRequiredExtensions = 0;
-            for( const VkExtensionProperties& availableExtension : availableExtensions )
-            {
-                for( const char* requiredExtension : requiredExtensions )
-                {
-                    if( zp_strcmp( availableExtension.extensionName, requiredExtension ) == 0 )
-                    {
-                        ++foundRequiredExtensions;
-                        break;
-                    }
-                }
-            }
-
-            // check that required extensions are available
-            const zp_bool_t areExtensionsAvailable = foundRequiredExtensions == ZP_ARRAY_SIZE( requiredExtensions );
-            isSuitable &= areExtensionsAvailable;
-
-            // check that surface has formats and present modes
-            if( surface != VK_NULL_HANDLE && areExtensionsAvailable )
-            {
-                uint32_t formatCount = 0;
-                vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE );
-
-                uint32_t presentModeCount = 0;
-                vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE );
-
-                isSuitable &= formatCount != 0 && presentModeCount != 0;
-            }
-
-            return isSuitable;
-        }
-
-        VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& surfaceFormats, int format, int colorSpace )
-        {
-            VkSurfaceFormatKHR chosenFormat = surfaceFormats[ 0 ];
-
-            for( const VkSurfaceFormatKHR& surfaceFormat : surfaceFormats )
-            {
-                // VK_FORMAT_B8G8R8A8_SNORM
-                // VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-                if( surfaceFormat.format == format && surfaceFormat.colorSpace == colorSpace )
-                {
-                    chosenFormat = surfaceFormat;
-                    break;
-                }
-            }
-
-            return chosenFormat;
-        }
-
-        VkPresentModeKHR ChooseSwapChainPresentMode( const Vector<VkPresentModeKHR>& presentModes, zp_bool_t vsync )
-        {
-            VkPresentModeKHR chosenPresentMode = VK_PRESENT_MODE_FIFO_KHR;
-
-            if( !vsync )
-            {
-                for( const VkPresentModeKHR& presentMode : presentModes )
-                {
-                    if( presentMode == VK_PRESENT_MODE_MAILBOX_KHR )
-                    {
-                        chosenPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-                        break;
-                    }
-
-                    if( presentMode == VK_PRESENT_MODE_IMMEDIATE_KHR )
-                    {
-                        chosenPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-                    }
-                }
-            }
-
-            return chosenPresentMode;
-        }
-
-        VkExtent2D ChooseSwapChainExtent( const VkSurfaceCapabilitiesKHR& surfaceCapabilities, uint32_t requestedWith, uint32_t requestedHeight )
-        {
-            VkExtent2D chosenExtents;
-
-            if( surfaceCapabilities.currentExtent.width != UINT32_MAX )
-            {
-                chosenExtents = surfaceCapabilities.currentExtent;
-            }
-            else
-            {
-                VkExtent2D actualExtents {
-                    .width = requestedWith,
-                    .height = requestedHeight
-                };
-
-                actualExtents.width = zp_clamp(
-                    actualExtents.width,
-                    surfaceCapabilities.minImageExtent.width,
-                    surfaceCapabilities.maxImageExtent.width );
-                actualExtents.height = zp_clamp(
-                    actualExtents.height,
-                    surfaceCapabilities.minImageExtent.height,
-                    surfaceCapabilities.maxImageExtent.height );
-
-                chosenExtents = actualExtents;
-            }
-
-            return chosenExtents;
-
-        }
-
-        constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties* physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
-        {
-            for( uint32_t i = 0; i < physicalDeviceMemoryProperties->memoryTypeCount; i++ )
-            {
-                VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties->memoryTypes[ i ].propertyFlags;
-                if( ( typeFilter & ( 1 << i ) ) && ( flags & memoryPropertyFlags ) == memoryPropertyFlags )
-                {
-                    return i;
-                }
-            }
-
-            ZP_INVALID_CODE_PATH();
-            return 0;
-        }
+#pragma region Convert Functions
 
         constexpr VkIndexType Convert( const IndexBufferFormat indexBufferFormat )
         {
@@ -304,8 +52,8 @@ namespace zp
                 VK_INDEX_TYPE_UINT8_EXT,
                 VK_INDEX_TYPE_NONE_KHR,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( indexTypeMap ) == IndexBufferFormat_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( indexTypeMap ) == IndexBufferFormat_Count );
             return indexTypeMap[ indexBufferFormat ];
         }
 
@@ -346,8 +94,8 @@ namespace zp
                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( primitiveTopologyMap ) == Topology_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( primitiveTopologyMap ) == Topology_Count );
             return primitiveTopologyMap[ topology ];
         }
 
@@ -358,8 +106,8 @@ namespace zp
                 VK_POLYGON_MODE_LINE,
                 VK_POLYGON_MODE_POINT,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( polygonModeMap ) == PolygonFillMode_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( polygonModeMap ) == PolygonFillMode_Count );
             return polygonModeMap[ polygonFillMode ];
         }
 
@@ -371,8 +119,8 @@ namespace zp
                 VK_CULL_MODE_BACK_BIT,
                 VK_CULL_MODE_FRONT_AND_BACK,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( cullModeFlagsMap ) == CullMode_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( cullModeFlagsMap ) == CullMode_Count );
             return cullModeFlagsMap[ cullMode ];
         }
 
@@ -382,8 +130,8 @@ namespace zp
                 VK_FRONT_FACE_COUNTER_CLOCKWISE,
                 VK_FRONT_FACE_CLOCKWISE,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( frontFaceMap ) == FrontFaceMode_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( frontFaceMap ) == FrontFaceMode_Count );
             return frontFaceMap[ frontFaceMode ];
         }
 
@@ -398,8 +146,8 @@ namespace zp
                 VK_SAMPLE_COUNT_32_BIT,
                 VK_SAMPLE_COUNT_64_BIT,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( sampleCountFlagsMap ) == SampleCount_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( sampleCountFlagsMap ) == SampleCount_Count );
             return sampleCountFlagsMap[ sampleCount ];
         }
 
@@ -415,8 +163,8 @@ namespace zp
                 VK_COMPARE_OP_GREATER_OR_EQUAL,
                 VK_COMPARE_OP_ALWAYS,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( compareOpMap ) == CompareOp_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( compareOpMap ) == CompareOp_Count );
             return compareOpMap[ compareOp ];
         }
 
@@ -432,8 +180,8 @@ namespace zp
                 VK_STENCIL_OP_INCREMENT_AND_WRAP,
                 VK_STENCIL_OP_DECREMENT_AND_WRAP,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( stencilOpMap ) == StencilOp_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( stencilOpMap ) == StencilOp_Count );
             return stencilOpMap[ stencilOp ];
         }
 
@@ -457,8 +205,8 @@ namespace zp
                 VK_LOGIC_OP_NAND,
                 VK_LOGIC_OP_SET,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( logicOpMap ) == LogicOp_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( logicOpMap ) == LogicOp_Count );
             return logicOpMap[ logicOp ];
         }
 
@@ -471,8 +219,8 @@ namespace zp
                 VK_BLEND_OP_MIN,
                 VK_BLEND_OP_MAX,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( blendOpMap ) == BlendOp_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( blendOpMap ) == BlendOp_Count );
             return blendOpMap[ blendOp ];
         }
 
@@ -499,8 +247,8 @@ namespace zp
                 VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR,
                 VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( blendFactorMap ) == BlendFactor_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( blendFactorMap ) == BlendFactor_Count );
             return blendFactorMap[ blendFactor ];
         }
 
@@ -522,8 +270,8 @@ namespace zp
                 VK_VERTEX_INPUT_RATE_VERTEX,
                 VK_VERTEX_INPUT_RATE_INSTANCE
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( vertexInputRateMap ) == VertexInputRate_Count );
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( vertexInputRateMap ) == VertexInputRate_Count );
             return vertexInputRateMap[ vertexInputRate ];
         }
 
@@ -614,9 +362,9 @@ namespace zp
                 VK_FORMAT_D24_UNORM_S8_UINT,
                 VK_FORMAT_D32_SFLOAT_S8_UINT,
             };
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( formatMap ) == GraphicsFormat_Count );
-
             ZP_ASSERT( static_cast<zp_size_t>( graphicsFormat ) < ZP_ARRAY_SIZE( formatMap ) );
+
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( formatMap ) == GraphicsFormat_Count );
             return formatMap[ graphicsFormat ];
         }
 
@@ -737,6 +485,7 @@ namespace zp
                 VK_FILTER_LINEAR,
             };
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( filterMap ) == FilterMode_Count );
             return filterMap[ filterMode ];
         }
 
@@ -747,6 +496,7 @@ namespace zp
                 VK_SAMPLER_MIPMAP_MODE_LINEAR,
             };
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( mipmapModeMap ) == MipmapMode_Count );
             return mipmapModeMap[ mipmapMode ];
         }
 
@@ -760,6 +510,7 @@ namespace zp
                 VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
             };
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( samplerAddressModeMap ) == SamplerAddressMode_Count );
             return samplerAddressModeMap[ samplerAddressMode ];
         }
 
@@ -774,7 +525,270 @@ namespace zp
                 VK_BORDER_COLOR_INT_OPAQUE_WHITE,
             };
 
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( borderColorMap ) == BorderColor_Count );
             return borderColorMap[ borderColor ];
+        }
+
+        constexpr VkColorSpaceKHR Convert( ColorSpace colorSpace )
+        {
+            constexpr VkColorSpaceKHR colorSpaceMap[] {
+                VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+                VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
+                VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
+                VK_COLOR_SPACE_BT709_NONLINEAR_EXT,
+                VK_COLOR_SPACE_BT709_LINEAR_EXT,
+                VK_COLOR_SPACE_BT2020_LINEAR_EXT
+            };
+
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( colorSpaceMap ) == ColorSpace_Count );
+            return colorSpaceMap[ colorSpace ];
+        }
+
+#pragma endregion
+
+#if ZP_DEBUG
+
+        template<typename Func, typename ... Args>
+        VkResult CallDebugUtilResultEXT( VkInstance instance, const char* name, Args ... args )
+        {
+            VkResult result = VK_ERROR_EXTENSION_NOT_PRESENT;
+
+            auto func = reinterpret_cast<Func>(vkGetInstanceProcAddr( instance, name ));
+            if( func )
+            {
+                result = func( args... );
+            }
+
+            return result;
+        }
+
+#define CallDebugUtilResult( func, inst, ... )  CallDebugUtilResultEXT<ZP_CONCAT(PFN_, func)>( inst, #func, __VA_ARGS__ )
+
+        template<typename Func, typename ... Args>
+        VkResult CallDebugUtilEXT( VkInstance instance, const char* name, Args ... args )
+        {
+            VkResult result = VK_SUCCESS;
+
+            auto func = reinterpret_cast<Func>(vkGetInstanceProcAddr( instance, name ));
+            if( func )
+            {
+                func( args... );
+            }
+            else
+            {
+                result = VK_ERROR_EXTENSION_NOT_PRESENT;
+            }
+
+            return result;
+        }
+
+#define CallDebugUtil( func, inst, ... )  CallDebugUtilEXT<ZP_CONCAT(PFN_, func)>( inst, #func, __VA_ARGS__ )
+
+        VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+            VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+            VkDebugUtilsMessageTypeFlagsEXT messageType,
+            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+            void* pUserData )
+        {
+            const zp_uint32_t messageMask = 0
+                                            #if ZP_DEBUG
+                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+                                            #endif
+                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+            if( messageSeverity & messageMask )
+            {
+                zp_printfln( pCallbackData->pMessage );
+
+                if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
+                {
+                    MessageBoxResult result = GetPlatform()->ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
+                    if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
+                    {
+                        exit( 1 );
+                    }
+                    else if( result == ZP_MESSAGE_BOX_RESULT_RETRY )
+                    {
+                        zp_debug_break();
+                    }
+                }
+            }
+
+            const VkBool32 shouldAbort = messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? VK_TRUE : VK_FALSE;
+            return shouldAbort;
+        }
+
+#endif // ZP_DEBUG
+
+
+        zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, GraphicsDeviceFeatures graphicsDeviceFeatures )
+        {
+            zp_bool_t isSuitable = true;
+
+            VkPhysicalDeviceProperties physicalDeviceProperties;
+            VkPhysicalDeviceFeatures physicalDeviceFeatures;
+            vkGetPhysicalDeviceProperties( physicalDevice, &physicalDeviceProperties );
+            vkGetPhysicalDeviceFeatures( physicalDevice, &physicalDeviceFeatures );
+
+            zp_printfln( "Testing %s", physicalDeviceProperties.deviceName );
+
+            // require discrete gpu
+            isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+
+            // support geometry shaders
+            if( graphicsDeviceFeatures.GeometryShaderSupport )
+            {
+                isSuitable &= physicalDeviceFeatures.geometryShader;
+            }
+
+            // support tessellation shaders
+            if( graphicsDeviceFeatures.TessellationShaderSupport )
+            {
+                isSuitable &= physicalDeviceFeatures.tessellationShader;
+            }
+
+#if ZP_USE_PROFILER
+            isSuitable &= physicalDeviceProperties.limits.timestampComputeAndGraphics;
+
+            isSuitable &= physicalDeviceFeatures.pipelineStatisticsQuery;
+#endif
+
+            const char* kRequiredExtensions[] {
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME
+            };
+
+            uint32_t extensionCount = 0;
+            vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE );
+
+            Vector<VkExtensionProperties> availableExtensions( extensionCount, MemoryLabels::Temp );
+            availableExtensions.resize_unsafe( extensionCount );
+
+            vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, availableExtensions.data() );
+
+            zp_uint32_t foundRequiredExtensions = 0;
+            for( const VkExtensionProperties& availableExtension : availableExtensions )
+            {
+                zp_bool_t found = false;
+                for( const char* requiredExtension : kRequiredExtensions )
+                {
+                    if( zp_strcmp( availableExtension.extensionName, requiredExtension ) == 0 )
+                    {
+                        found = true;
+                        ++foundRequiredExtensions;
+                        break;
+                    }
+                }
+
+                zp_printfln( "[%c] %s", found ? 'X' : ' ', availableExtension.extensionName );
+            }
+
+            // check that required extensions are available
+            const zp_bool_t areExtensionsAvailable = foundRequiredExtensions == ZP_ARRAY_SIZE( kRequiredExtensions );
+            isSuitable &= areExtensionsAvailable;
+
+            // check that surface has formats and present modes
+            if( surface != VK_NULL_HANDLE && areExtensionsAvailable )
+            {
+                uint32_t formatCount = 0;
+                vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE );
+
+                uint32_t presentModeCount = 0;
+                vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE );
+
+                isSuitable &= formatCount != 0 && presentModeCount != 0;
+            }
+
+            return isSuitable;
+        }
+
+        VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& surfaceFormats, int format, ColorSpace colorSpace )
+        {
+            VkSurfaceFormatKHR chosenFormat = surfaceFormats[ 0 ];
+
+            VkColorSpaceKHR searchColorSpace = Convert( colorSpace );
+
+            for( const VkSurfaceFormatKHR& surfaceFormat : surfaceFormats )
+            {
+                // VK_FORMAT_B8G8R8A8_SNORM
+                if( surfaceFormat.format == format && surfaceFormat.colorSpace == searchColorSpace )
+                {
+                    chosenFormat = surfaceFormat;
+                    break;
+                }
+            }
+
+            return chosenFormat;
+        }
+
+        VkPresentModeKHR ChooseSwapChainPresentMode( const Vector<VkPresentModeKHR>& presentModes, zp_bool_t vsync )
+        {
+            VkPresentModeKHR chosenPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+
+            if( !vsync )
+            {
+                for( const VkPresentModeKHR& presentMode : presentModes )
+                {
+                    if( presentMode == VK_PRESENT_MODE_MAILBOX_KHR )
+                    {
+                        chosenPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+                        break;
+                    }
+
+                    if( presentMode == VK_PRESENT_MODE_IMMEDIATE_KHR )
+                    {
+                        chosenPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+                    }
+                }
+            }
+
+            return chosenPresentMode;
+        }
+
+        VkExtent2D ChooseSwapChainExtent( const VkSurfaceCapabilitiesKHR& surfaceCapabilities, uint32_t requestedWith, uint32_t requestedHeight )
+        {
+            VkExtent2D chosenExtents;
+
+            if( surfaceCapabilities.currentExtent.width != UINT32_MAX )
+            {
+                chosenExtents = surfaceCapabilities.currentExtent;
+            }
+            else
+            {
+                VkExtent2D actualExtents {
+                    .width = requestedWith,
+                    .height = requestedHeight
+                };
+
+                actualExtents.width = zp_clamp(
+                    actualExtents.width,
+                    surfaceCapabilities.minImageExtent.width,
+                    surfaceCapabilities.maxImageExtent.width );
+                actualExtents.height = zp_clamp(
+                    actualExtents.height,
+                    surfaceCapabilities.minImageExtent.height,
+                    surfaceCapabilities.maxImageExtent.height );
+
+                chosenExtents = actualExtents;
+            }
+
+            return chosenExtents;
+
+        }
+
+        constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties* physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
+        {
+            for( uint32_t i = 0; i < physicalDeviceMemoryProperties->memoryTypeCount; i++ )
+            {
+                VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties->memoryTypes[ i ].propertyFlags;
+                if( ( typeFilter & ( 1 << i ) ) && ( flags & memoryPropertyFlags ) == memoryPropertyFlags )
+                {
+                    return i;
+                }
+            }
+
+            ZP_INVALID_CODE_PATH();
+            return 0;
         }
     }
 
@@ -826,7 +840,8 @@ namespace zp
             .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
             .apiVersion = VK_API_VERSION_1_1,
         };
-        const char* extensions[] = {
+
+        const char* kExtensionNames[] {
             VK_KHR_SURFACE_EXTENSION_NAME,
 #if ZP_OS_WINDOWS
             VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
@@ -836,15 +851,21 @@ namespace zp
 #endif
         };
 
+        const char* kValidationLayers[] {
+#if ZP_DEBUG
+            "VK_LAYER_KHRONOS_validation"
+#endif
+        };
+
         // create instance
         VkInstanceCreateInfo instanceCreateInfo {
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             .pApplicationInfo = &applicationInfo,
-            .enabledExtensionCount = ZP_ARRAY_SIZE( extensions ),
-            .ppEnabledExtensionNames = extensions,
+            .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
+            .ppEnabledLayerNames = kValidationLayers,
+            .enabledExtensionCount = ZP_ARRAY_SIZE( kExtensionNames ),
+            .ppEnabledExtensionNames = kExtensionNames,
         };
-
-        FillLayerNames( instanceCreateInfo.ppEnabledLayerNames, instanceCreateInfo.enabledLayerCount );
 
 #if ZP_DEBUG
         // add debug info to create instance
@@ -902,15 +923,15 @@ namespace zp
             Vector<VkQueueFamilyProperties> queueFamilyProperties( queueFamilyCount, MemoryLabels::Temp );
             queueFamilyProperties.resize_unsafe( queueFamilyCount );
 
-            vkGetPhysicalDeviceQueueFamilyProperties( m_vkPhysicalDevice, &queueFamilyCount,
-                queueFamilyProperties.data() );
+            vkGetPhysicalDeviceQueueFamilyProperties( m_vkPhysicalDevice, &queueFamilyCount, queueFamilyProperties.data() );
 
             // find base queries
             for( zp_size_t i = 0; i < queueFamilyCount; ++i )
             {
                 const VkQueueFamilyProperties& queueFamilyProperty = queueFamilyProperties[ i ];
 
-                if( m_queueFamilies.graphicsFamily == VK_QUEUE_FAMILY_IGNORED && queueFamilyProperty.queueCount > 0 &&
+                if( m_queueFamilies.graphicsFamily == VK_QUEUE_FAMILY_IGNORED &&
+                    queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT )
                 {
                     m_queueFamilies.graphicsFamily = i;
@@ -924,13 +945,15 @@ namespace zp
                     }
                 }
 
-                if( m_queueFamilies.transferFamily == VK_QUEUE_FAMILY_IGNORED && queueFamilyProperty.queueCount > 0 &&
+                if( m_queueFamilies.transferFamily == VK_QUEUE_FAMILY_IGNORED &&
+                    queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_TRANSFER_BIT )
                 {
                     m_queueFamilies.transferFamily = i;
                 }
 
-                if( m_queueFamilies.computeFamily == VK_QUEUE_FAMILY_IGNORED && queueFamilyProperty.queueCount > 0 &&
+                if( m_queueFamilies.computeFamily == VK_QUEUE_FAMILY_IGNORED &&
+                    queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT )
                 {
                     m_queueFamilies.computeFamily = i;
@@ -978,7 +1001,7 @@ namespace zp
                 deviceQueueCreateInfos.pushBack( queueCreateInfo );
             }
 
-            const char* deviceExtensions[] {
+            const char* kDeviceExtensions[] {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME
             };
 
@@ -996,12 +1019,12 @@ namespace zp
                 .pNext = &synchronization2Features,
                 .queueCreateInfoCount = static_cast<uint32_t >(deviceQueueCreateInfos.size()),
                 .pQueueCreateInfos = deviceQueueCreateInfos.data(),
-                .enabledExtensionCount = ZP_ARRAY_SIZE( deviceExtensions ),
-                .ppEnabledExtensionNames = deviceExtensions,
+                .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
+                .ppEnabledLayerNames = kValidationLayers,
+                .enabledExtensionCount = ZP_ARRAY_SIZE( kDeviceExtensions ),
+                .ppEnabledExtensionNames = kDeviceExtensions,
                 .pEnabledFeatures = &deviceFeatures,
             };
-
-            FillLayerNames( localDeviceCreateInfo.ppEnabledLayerNames, localDeviceCreateInfo.enabledLayerCount );
 
             HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, nullptr, &m_vkLocalDevice ) );
 
@@ -1050,7 +1073,7 @@ namespace zp
             GraphicsBufferDesc graphicsBufferDesc {
                 .name = "Staging Buffer",
                 .size = stagingBufferSize,
-                .graphicsBufferUsageFlags = ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC | ZP_GRAPHICS_BUFFER_USAGE_STORAGE,
+                .usageFlags = ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC | ZP_GRAPHICS_BUFFER_USAGE_STORAGE,
                 .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
             };
 
@@ -1141,7 +1164,7 @@ namespace zp
         m_vkInstance = {};
     }
 
-    void VulkanGraphicsDevice::createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, int colorSpace )
+    void VulkanGraphicsDevice::createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace )
     {
 #if ZP_OS_WINDOWS
         auto hWnd = static_cast<HWND>( windowHandle );
@@ -1182,7 +1205,6 @@ namespace zp
 
         // TODO: remove when enums are created
         displayFormat = VK_FORMAT_B8G8R8A8_SNORM;
-        colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
         VkSurfaceFormatKHR surfaceFormat = ChooseSwapChainSurfaceFormat( surfaceFormats, displayFormat, colorSpace );
         VkPresentModeKHR presentMode = ChooseSwapChainPresentMode( presentModes, false );
@@ -1203,6 +1225,11 @@ namespace zp
             .imageExtent = extent,
             .imageArrayLayers = 1,
             .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            .preTransform = swapChainSupportDetails.currentTransform,
+            .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            .presentMode = presentMode,
+            .clipped = VK_TRUE,
+            .oldSwapchain = m_vkSwapChain
         };
 
         const uint32_t queueFamilyIndices[] = { m_queueFamilies.graphicsFamily, m_queueFamilies.presentFamily };
@@ -1211,7 +1238,6 @@ namespace zp
         {
             swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             swapChainCreateInfo.queueFamilyIndexCount = ZP_ARRAY_SIZE( queueFamilyIndices );
-
             swapChainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
         }
         else
@@ -1221,12 +1247,6 @@ namespace zp
             swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
         }
 
-        swapChainCreateInfo.preTransform = swapChainSupportDetails.currentTransform;
-        swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        swapChainCreateInfo.presentMode = presentMode;
-        swapChainCreateInfo.clipped = VK_TRUE;
-        swapChainCreateInfo.oldSwapchain = m_vkSwapChain;
-
         HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, nullptr, &m_vkSwapChain ) );
 
         if( swapChainCreateInfo.oldSwapchain != VK_NULL_HANDLE )
@@ -1235,7 +1255,7 @@ namespace zp
         }
 
         m_vkSwapChainFormat = surfaceFormat.format;
-        m_vkSwapChainColorSpace = (VkColorSpaceKHR)colorSpace;
+        m_vkSwapChainColorSpace = Convert( colorSpace );
         m_vkSwapChainExtent = extent;
 
         uint32_t swapChainImageCount = 0;
@@ -1334,9 +1354,9 @@ namespace zp
 
             HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, nullptr, &m_swapChainImageViews[ i ] ) );
 
-            VkImageView attachments[] = { m_swapChainImageViews[ i ] };
+            VkImageView attachments[] { m_swapChainImageViews[ i ] };
 
-            VkFramebufferCreateInfo framebufferCreateInfo = {
+            VkFramebufferCreateInfo framebufferCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                 .renderPass = m_vkSwapChainRenderPass,
                 .attachmentCount = ZP_ARRAY_SIZE( attachments ),
@@ -1723,6 +1743,7 @@ namespace zp
         zp_bool_t geometryShaderUsed = false;
         zp_bool_t fragmentShaderUsed = false;
         zp_bool_t meshShaderUsed = false;
+        zp_bool_t taskShaderUsed = false;
 
         VkPipelineShaderStageCreateInfo shaderStageCreateInfos[graphicsPipelineStateCreateDesc->shaderStageCount];
         for( zp_size_t i = 0; i < graphicsPipelineStateCreateDesc->shaderStageCount; ++i )
@@ -1743,6 +1764,8 @@ namespace zp
             tessellationEvaluationShaderUsed |= shaderStageCreateInfo.stage & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
             geometryShaderUsed |= shaderStageCreateInfo.stage & VK_SHADER_STAGE_GEOMETRY_BIT;
             fragmentShaderUsed |= shaderStageCreateInfo.stage & VK_SHADER_STAGE_FRAGMENT_BIT;
+            meshShaderUsed |= shaderStageCreateInfo.stage & VK_SHADER_STAGE_MESH_BIT_EXT;
+            taskShaderUsed |= shaderStageCreateInfo.stage & VK_SHADER_STAGE_TASK_BIT_EXT;
         }
 
         VkVertexInputBindingDescription vertexInputBindingDescriptions[graphicsPipelineStateCreateDesc->vertexBindingCount];
@@ -1995,7 +2018,7 @@ namespace zp
         VkBufferCreateInfo bufferCreateInfo {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = graphicsBufferDesc->size,
-            .usage = Convert( graphicsBufferDesc->graphicsBufferUsageFlags ),
+            .usage = Convert( graphicsBufferDesc->usageFlags ),
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         };
 
@@ -2021,7 +2044,7 @@ namespace zp
 
         graphicsBuffer->buffer = buffer;
         graphicsBuffer->deviceMemory = deviceMemory;
-        graphicsBuffer->usageFlags = graphicsBufferDesc->graphicsBufferUsageFlags;
+        graphicsBuffer->usageFlags = graphicsBufferDesc->usageFlags;
         graphicsBuffer->offset = 0;
         graphicsBuffer->size = memoryRequirements.size;
         graphicsBuffer->alignment = memoryRequirements.alignment;
