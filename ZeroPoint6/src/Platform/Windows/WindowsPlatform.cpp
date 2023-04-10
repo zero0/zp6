@@ -13,7 +13,10 @@
 #include "Core/Types.h"
 #include "Core/Math.h"
 #include "Core/Common.h"
+#include "Core/Version.h"
 #include "Platform/Platform.h"
+
+#define TestFlag( a, f, t, r )      a |= ((f) & (t)) ? (r) : 0
 
 namespace zp
 {
@@ -220,6 +223,16 @@ namespace zp
         return &s_WindowsPlatform;
     }
 
+    Platform::Platform()
+    {
+        SYSTEM_INFO systemInfo;
+        ::GetSystemInfo( &systemInfo );
+
+        m_activeProcessorMask = systemInfo.dwActiveProcessorMask;
+        m_systemPageSize = systemInfo.dwPageSize;
+        m_numProcessors = systemInfo.dwNumberOfProcessors;
+    }
+
     zp_handle_t Platform::OpenWindow( const OpenWindowDesc* desc )
     {
         HINSTANCE hInstance = desc->instanceHandle ? static_cast<HINSTANCE>(desc->instanceHandle) : ::GetModuleHandle( nullptr );
@@ -288,7 +301,7 @@ namespace zp
         HWND hWnd = static_cast<HWND>( windowHandle );
 
         MSG msg {};
-        while( ::PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) )
+        while( ::PeekMessage( &msg, hWnd, 0, 0, PM_REMOVE ) )
         {
             ::TranslateMessage( &msg );
             ::DispatchMessage( &msg );
@@ -338,13 +351,7 @@ namespace zp
 
     void* Platform::AllocateSystemMemory( void* baseAddress, const zp_size_t size )
     {
-        SYSTEM_INFO systemInfo;
-        ::GetSystemInfo( &systemInfo );
-
-        const zp_size_t systemPageSize = systemInfo.dwPageSize;
-
-        const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
-        const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
+        const zp_size_t allocationInPageSize = GetMemoryPageSize( size );
 
         void* ptr = ::VirtualAlloc( baseAddress, allocationInPageSize, MEM_RESERVE, PAGE_NOACCESS );
         return ptr;
@@ -357,10 +364,7 @@ namespace zp
 
     zp_size_t Platform::GetMemoryPageSize( const zp_size_t size ) const
     {
-        SYSTEM_INFO systemInfo;
-        ::GetSystemInfo( &systemInfo );
-
-        const zp_size_t systemPageSize = systemInfo.dwPageSize;
+        const zp_size_t systemPageSize = m_systemPageSize;
 
         const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
         const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
@@ -371,13 +375,7 @@ namespace zp
     {
         void* page = ::VirtualAlloc( *ptr, size, MEM_COMMIT, PAGE_READWRITE );
 
-        SYSTEM_INFO systemInfo;
-        ::GetSystemInfo( &systemInfo );
-
-        const zp_size_t systemPageSize = systemInfo.dwPageSize;
-
-        const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
-        const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
+        const zp_size_t allocationInPageSize = GetMemoryPageSize( size );
         *ptr = static_cast<zp_uint8_t*>( *ptr ) + allocationInPageSize;
         return page;
     }
@@ -392,7 +390,7 @@ namespace zp
         ::GetCurrentDirectory( maxPathLength, path );
     }
 
-    zp_handle_t Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, FileCachingMode fileCachingMode )
+    zp_handle_t Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode, FileCachingMode fileCachingMode )
     {
         DWORD access = 0;
         DWORD shareMode = 0;
@@ -423,25 +421,10 @@ namespace zp
                 break;
         }
 
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_SEQUENTIAL )
-        {
-            attributes |= FILE_FLAG_SEQUENTIAL_SCAN;
-        }
-
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_RANDOM_ACCESS )
-        {
-            attributes |= FILE_FLAG_RANDOM_ACCESS;
-        }
-
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_NO_BUFFERING )
-        {
-            attributes |= FILE_FLAG_NO_BUFFERING;
-        }
-
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_WRITE_THROUGH )
-        {
-            attributes |= FILE_FLAG_WRITE_THROUGH;
-        }
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_SEQUENTIAL, FILE_FLAG_SEQUENTIAL_SCAN );
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_RANDOM_ACCESS, FILE_FLAG_RANDOM_ACCESS );
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_NO_BUFFERING, FILE_FLAG_NO_BUFFERING );
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_WRITE_THROUGH, FILE_FLAG_WRITE_THROUGH );
 
         zp_handle_t fileHandle = ::CreateFile(
             filePath,
@@ -454,39 +437,32 @@ namespace zp
         return fileHandle;
     }
 
-    zp_handle_t Platform::OpenTempFileHandle( FileCachingMode fileCachingMode )
+    zp_handle_t Platform::OpenTempFileHandle( const char* tempFileNamePrefix, const char* tempFileNameExtension, FileCachingMode fileCachingMode )
     {
-        char pathBuffer[MAX_PATH];
-        char fileNameBuffer[MAX_PATH];
+        char tempPath[MAX_PATH];
+        ::GetTempPath( ZP_ARRAY_SIZE( tempPath ), tempPath );
 
-        const UINT unique = 0x000000000000FFFF & zp_time_now();
-        const DWORD pathLength = ::GetTempPath( ZP_ARRAY_SIZE( pathBuffer ), pathBuffer );
-        ::GetTempFileName( pathBuffer, "tmp", unique, fileNameBuffer );
+        char tempRootPath[MAX_PATH];
+        zp_snprintf( tempRootPath, "%s%c%s%c", tempPath, '\\', "ZeroPoint " ZP_VERSION, '\\' );
+
+        ::CreateDirectory( tempRootPath, nullptr );
+
+        char tempFileName[MAX_PATH];
+        const zp_time_t unique = zp_time_now();
+        zp_snprintf( tempFileName, "%s-%x.%s", tempFileNamePrefix ? tempFileNamePrefix : "tmp", unique, tempFileNameExtension ? tempFileNameExtension : "tmp" );
+
+        char finalFileNamePath[MAX_PATH];
+        zp_snprintf( finalFileNamePath, "%s%c%s", tempRootPath, '\\', tempFileName );
 
         DWORD attributes = FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE;
 
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_SEQUENTIAL )
-        {
-            attributes |= FILE_FLAG_SEQUENTIAL_SCAN;
-        }
-
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_RANDOM_ACCESS )
-        {
-            attributes |= FILE_FLAG_RANDOM_ACCESS;
-        }
-
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_NO_BUFFERING )
-        {
-            attributes |= FILE_FLAG_NO_BUFFERING;
-        }
-
-        if( fileCachingMode & ZP_FILE_CACHING_MODE_WRITE_THROUGH )
-        {
-            attributes |= FILE_FLAG_WRITE_THROUGH;
-        }
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_SEQUENTIAL, FILE_FLAG_SEQUENTIAL_SCAN );
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_RANDOM_ACCESS, FILE_FLAG_RANDOM_ACCESS );
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_NO_BUFFERING, FILE_FLAG_NO_BUFFERING );
+        TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_WRITE_THROUGH, FILE_FLAG_WRITE_THROUGH );
 
         zp_handle_t fileHandle = ::CreateFile(
-            fileNameBuffer,
+            finalFileNamePath,
             FILE_ALL_ACCESS,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             nullptr,
@@ -678,13 +654,10 @@ namespace zp
 
     void Platform::SetThreadIdealProcessor( zp_handle_t threadHandle, zp_uint32_t processorIndex )
     {
-        SYSTEM_INFO systemInfo;
-        ::GetSystemInfo( &systemInfo );
-
-        processorIndex = zp_clamp<zp_uint32_t>( processorIndex, 0, systemInfo.dwNumberOfProcessors );
+        processorIndex = zp_clamp<zp_uint32_t>( processorIndex, 0, m_numProcessors );
 
         const zp_uint64_t requestedMask = 1 << processorIndex;
-        if( systemInfo.dwActiveProcessorMask & requestedMask )
+        if( m_activeProcessorMask & requestedMask )
         {
             PROCESSOR_NUMBER processorNumber {
                 .Number = static_cast<BYTE>( 0xFFu & processorIndex )
@@ -704,11 +677,9 @@ namespace zp
         ::WaitForMultipleObjects( threadHandleCount, threadHandles, true, INFINITE );
     }
 
-    zp_uint32_t Platform::GetProcessorCount()
+    zp_uint32_t Platform::GetProcessorCount() const
     {
-        SYSTEM_INFO info;
-        ::GetSystemInfo( &info );
-        return info.dwNumberOfProcessors;
+        return m_numProcessors;
     }
 
     MessageBoxResult Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton )

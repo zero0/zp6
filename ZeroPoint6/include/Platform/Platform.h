@@ -67,6 +67,15 @@ namespace zp
         ZP_OPEN_FILE_MODE_READ_WRITE,
     };
 
+    enum CreateFileMode
+    {
+        ZP_CREATE_FILE_MODE_OPEN,
+        ZP_CREATE_FILE_MODE_OPEN_NEW,
+        ZP_CREATE_FILE_MODE_CREATE,
+        ZP_CREATE_FILE_MODE_CREATE_NEW,
+        ZP_CREATE_FILE_MODE_TRUNCATE,
+    };
+
     enum FileCachingMode
     {
         ZP_FILE_CACHING_MODE_DEFAULT = 0,
@@ -122,7 +131,7 @@ namespace zp
     ZP_NONCOPYABLE( Platform );
 
     public:
-        Platform() = default;
+        Platform();
 
         ~Platform() = default;
 
@@ -154,9 +163,9 @@ namespace zp
             GetCurrentDir( path, Size );
         }
 
-        zp_handle_t OpenFileHandle( const char* filePath, OpenFileMode openFileMode, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
+        zp_handle_t OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode = ZP_CREATE_FILE_MODE_OPEN, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
 
-        zp_handle_t OpenTempFileHandle( FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
+        zp_handle_t OpenTempFileHandle( const char* tempFileNamePrefix = nullptr, const char* tempFileNameExtension = nullptr, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
 
         void SeekFile( zp_handle_t fileHandle, zp_ptrdiff_t distanceToMoveInBytes, MoveMethod moveMethod );
 
@@ -206,9 +215,14 @@ namespace zp
 
         void JoinThreads( zp_handle_t* threadHandles, zp_size_t threadHandleCount );
 
-        zp_uint32_t GetProcessorCount();
+        [[nodiscard]] zp_uint32_t GetProcessorCount() const;
 
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
+
+    private:
+        zp_uint64_t m_activeProcessorMask;
+        zp_size_t m_systemPageSize;
+        zp_uint32_t m_numProcessors;
     };
 
     Platform* GetPlatform();

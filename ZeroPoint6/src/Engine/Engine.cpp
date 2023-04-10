@@ -493,7 +493,7 @@ namespace zp
 
     void Engine::processWindowEvents()
     {
-        if( m_windowHandle )
+        //if( m_windowHandle )
         {
             zp_int32_t exitCode;
             const zp_bool_t isRunning = GetPlatform()->DispatchWindowMessages( m_windowHandle, exitCode );

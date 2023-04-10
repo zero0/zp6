@@ -287,7 +287,6 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     );
 #endif
 
-
     RegisterAllocator( MemoryLabels::Default, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::String, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Graphics, &s_defaultAllocator );
