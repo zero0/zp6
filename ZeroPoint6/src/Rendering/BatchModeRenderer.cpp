@@ -176,7 +176,8 @@ namespace zp
                     if( cmd->indexCount > 0 )
                     {
                         const GraphicsBuffer* vertexBuffers[] { &cmd->vertexBuffer };
-                        graphicsDevice->bindVertexBuffers( 0, 1, vertexBuffers, nullptr, commandQueue );
+                        zp_size_t offsets[] { cmd->vertexBufferOffset };
+                        graphicsDevice->bindVertexBuffers( 0, 1, vertexBuffers, offsets, commandQueue );
 
                         graphicsDevice->bindIndexBuffer( &cmd->indexBuffer, ZP_INDEX_BUFFER_FORMAT_UINT16, cmd->indexBufferOffset, commandQueue );
 

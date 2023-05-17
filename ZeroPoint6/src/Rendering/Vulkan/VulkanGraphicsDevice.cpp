@@ -844,18 +844,15 @@ namespace zp
             else
             {
                 VkExtent2D actualExtents {
-                    .width = requestedWith,
-                    .height = requestedHeight
+                    .width = zp_clamp(
+                        requestedWith,
+                        surfaceCapabilities.minImageExtent.width,
+                        surfaceCapabilities.maxImageExtent.width ),
+                    .height = zp_clamp(
+                        requestedHeight,
+                        surfaceCapabilities.minImageExtent.height,
+                        surfaceCapabilities.maxImageExtent.height )
                 };
-
-                actualExtents.width = zp_clamp(
-                    actualExtents.width,
-                    surfaceCapabilities.minImageExtent.width,
-                    surfaceCapabilities.maxImageExtent.width );
-                actualExtents.height = zp_clamp(
-                    actualExtents.height,
-                    surfaceCapabilities.minImageExtent.height,
-                    surfaceCapabilities.maxImageExtent.height );
 
                 chosenExtents = actualExtents;
             }
@@ -2508,7 +2505,7 @@ namespace zp
         ZP_ASSERT( graphicsBuffer->usageFlags & ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER );
 
         const VkIndexType indexType = Convert( indexBufferFormat );
-        const VkDeviceSize bufferOffset = offset + graphicsBuffer->offset;
+        const VkDeviceSize bufferOffset = graphicsBuffer->offset + offset;
         vkCmdBindIndexBuffer( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), static_cast<VkBuffer>( graphicsBuffer->buffer), bufferOffset, indexType );
     }
 

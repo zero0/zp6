@@ -73,6 +73,7 @@ namespace zp
             perFrameData.scratchVertexBuffer = vertexBuffer + ( i * vertexBufferStride );
             perFrameData.scratchIndexBuffer = indexBuffer + ( i * immediateModeRendererConfig->indexCount );
             perFrameData.commandBufferLength = 0;
+            perFrameData.commandStride = kCommandStride;
             perFrameData.commandBufferCapacity = commandBufferStride;
             perFrameData.vertexBufferOffset = 0;
             perFrameData.vertexBufferCapacity = vertexBufferStride;
@@ -127,17 +128,21 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_size_t vertexSize = vertexCount * sizeof( VertexVUC );
-        const zp_size_t commandStride = sizeof( ImmediateRenderCommand );
-
         const zp_size_t frame = m_currentFrame % kMaxBufferedImmediateFrames;
         PerFrameData& perFrameData = m_perFrameData[ frame ];
 
-        const zp_size_t commandOffset = Atomic::ExchangeAddSizeT( &perFrameData.commandBufferLength, commandStride );
-        const zp_size_t vertexOffset = Atomic::ExchangeAddSizeT( &perFrameData.vertexBufferOffset, vertexSize );
-        const zp_size_t indexOffset = Atomic::ExchangeAddSizeT( &perFrameData.indexBufferLength, indexCount );
+        const zp_size_t vertexSize = vertexCount * sizeof( VertexVUC );
+        const zp_size_t commandStride = perFrameData.commandStride;
+
+        const zp_size_t commandOffset = Atomic::AddSizeT( &perFrameData.commandBufferLength, commandStride ) - commandStride;
+        const zp_size_t vertexOffset = Atomic::AddSizeT( &perFrameData.vertexBufferOffset, vertexSize ) - vertexSize;
+        const zp_size_t indexOffset = Atomic::AddSizeT( &perFrameData.indexBufferLength, indexCount ) - indexCount;
 
         zp_handle_t cmd = perFrameData.commandBuffer + commandOffset;
+
+        ZP_ASSERT( perFrameData.commandBufferLength < perFrameData.commandBufferCapacity );
+        ZP_ASSERT( perFrameData.vertexBufferOffset < perFrameData.vertexBufferCapacity );
+        ZP_ASSERT( perFrameData.indexBufferLength < perFrameData.indexBufferCapacity );
 
         ImmediateRenderCommand* command = static_cast<ImmediateRenderCommand*>( cmd );
         command->vertexBuffer = perFrameData.scratchVertexBuffer + vertexOffset;
@@ -300,6 +305,9 @@ namespace zp
 
                 vertexBuffer += cmdVertexSize;
                 indexBuffer += cmdIndexSize;
+
+                vertexWriteOffset += cmdVertexSize;
+                indexWriteOffset += cmdIndexSize;
             }
 
             m_graphicsDevice->unmapBuffer( perFrameData.vertexBuffer );

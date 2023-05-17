@@ -26,7 +26,7 @@ namespace zp
         zp_int32_t compareCPU( const CPUProfilerEvent& lh, const CPUProfilerEvent& rh )
         {
             zp_int32_t cmp = zp_cmp( lh.threadId, rh.threadId );
-            return cmp == 0 ? zp_cmp( lh.startTime, rh.startTime ) : cmp;
+            return cmp == 0 ? -zp_cmp( lh.startTime, rh.startTime ) : cmp;
         }
 
         zp_int32_t compareMemory( const MemoryProfilerEvent& lh, const MemoryProfilerEvent& rh )
@@ -198,7 +198,8 @@ namespace zp
         event->endTime = zp_time_now();
         event->endCycle = zp_time_cycle();
 
-        if( t_profilerData.eventStackCount > 0 )
+        ZP_ASSERT(t_profilerData.eventStackCount > 0 );
+        //if( t_profilerData.eventStackCount > 0 )
         {
             --t_profilerData.eventStackCount;
         }
@@ -297,9 +298,9 @@ namespace zp
         }
 
         ProfilerFrameEnumerator enumerator( range.startFrame, frameCount, m_profilerFrameBuffers );
-        enumerator.minCPUTime = minCPUTTime;
-        enumerator.maxCPUTime = maxCPUTime;
-        
+        //enumerator.minCPUTime = minCPUTTime;
+        //enumerator.maxCPUTime = maxCPUTime;
+
         return enumerator;
     }
 

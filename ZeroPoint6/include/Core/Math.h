@@ -640,7 +640,7 @@ constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
 
     const zp_float32_t h = static_cast<zp_float32_t>( index + 1 ) / static_cast<zp_float32_t>( count );
     const zp_int32_t i = zp_floor_to_int( h * 6 );
-    const zp_float32_t f = h * static_cast<zp_float32_t>( 6 - i );
+    const zp_float32_t f = h * static_cast<zp_float32_t>( 5 - i );
 
     switch( index % 6 )
     {
@@ -652,7 +652,7 @@ constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
 
         case 1:
             c.r = 1;
-            c.g = 1 - f;
+            c.g = zp_abs( 1 - f );
             c.b = 0;
             break;
 
@@ -664,7 +664,7 @@ constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
 
         case 3:
             c.r = 0;
-            c.g = 1 - f;
+            c.g = zp_abs( 1 - f );
             c.b = 1;
             break;
 
@@ -677,7 +677,7 @@ constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
         case 5:
             c.r = 1;
             c.g = 0;
-            c.b = 1 - f;
+            c.b = zp_abs( 1 - f );
             break;
     }
 

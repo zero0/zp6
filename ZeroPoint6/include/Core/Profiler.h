@@ -19,11 +19,11 @@
 #endif // ZP_OS_WINDOWS
 #endif // __FILENAME__
 
-#define ZP_PROFILE_CPU_BLOCK()              ProfileBlock( __FILENAME__, __FUNCTION__, __LINE__, nullptr, 0 )
-#define ZP_PROFILE_CPU_BLOCK_E( e )         ProfileBlock( __FILENAME__, __FUNCTION__, __LINE__, #e, 0 )
+#define ZP_PROFILE_CPU_BLOCK()              ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, nullptr, 0 )
+#define ZP_PROFILE_CPU_BLOCK_E( e )         ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, #e, 0 )
 
-#define ZP_PROFILE_CPU_BLOCK_V( v )         ProfileBlock( __FILENAME__, __FUNCTION__, __LINE__, nullptr, v )
-#define ZP_PROFILE_CPU_BLOCK_EV( e, v )     ProfileBlock( __FILENAME__, __FUNCTION__, __LINE__, #e, v )
+#define ZP_PROFILE_CPU_BLOCK_V( v )         ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, nullptr, v )
+#define ZP_PROFILE_CPU_BLOCK_EV( e, v )     ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( __FILENAME__, __FUNCTION__, __LINE__, #e, v )
 
 #define ZP_PROFILE_CPU_MARK( e )            do { zp::Profiler::CPUDesc __cpuDesc { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = e, .userData = 0, .lineNumber = __LINE__, }; zp::Profiler::MarkCPU( __cpuDesc ); } while( false )
 #define ZP_PROFILE_CPU_MARK_V( e, v )       do { zp::Profiler::CPUDesc __cpuDesc { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = e, .userData = (v), .lineNumber = __LINE__, }; zp::Profiler::MarkCPU( __cpuDesc ); } while( false )
@@ -152,10 +152,9 @@ namespace zp
             const zp_size_t cpuProfilerEventCount;
             const zp_size_t memoryProfilerEventCount;
             const zp_size_t gpuProfilerEventCount;
+            const zp_time_t minCPUTime;
+            const zp_time_t maxCPUTime;
         };
-
-        zp_time_t minCPUTime;
-        zp_time_t maxCPUTime;
 
         [[nodiscard]] zp_size_t count() const
         {

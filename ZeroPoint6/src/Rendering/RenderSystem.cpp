@@ -163,7 +163,6 @@ namespace zp
 
         struct WaitOnGPUJob
         {
-            zp_uint64_t frameIndex;
             GraphicsDevice* graphicsDevice;
 
             ZP_JOB_DEBUG_NAME( WaitOnGPUJob );
@@ -481,8 +480,8 @@ namespace zp
 
         ImmediateModeRendererConfig immediateModeRendererConfig {
             64,
-            1024,
-            1024,
+            1024 * 16,
+            1024 * 16,
             m_graphicsDevice,
             m_batchModeRenderer
         };
@@ -538,7 +537,6 @@ namespace zp
         PreparedJobHandle gpuHandle = inputHandle;
 
         WaitOnGPUJob waitOnGpuJob {
-            .frameIndex = frameIndex,
             .graphicsDevice = m_graphicsDevice
         };
         gpuHandle = jobSystem->PrepareJobData( waitOnGpuJob, gpuHandle );
@@ -632,9 +630,10 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                int count = 10;
+                int count = 0;
 
                 ProfilerFrameEnumerator enumerator = renderProfilerData->profiler->captureFrames( renderProfilerData->range );
+
 
                 Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
                 zp_handle_t cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * ( count + 1 ), 6 * ( count + 1 ) );
@@ -642,7 +641,7 @@ namespace zp
                 Matrix4x4f localToWorld = Math::OrthoLH( orthoRect, -10, 10, orthoRect.size.width / orthoRect.size.height );
                 renderProfilerData->immediateModeRenderer->setLocalToWorld( cmd, Matrix4x4f::identity );
 
-                Rect2Df rect { .offset { .x = 10, .y = 10 }, .size { .width = 640, .height = 480 } };
+                Rect2Df rect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 480 } };
                 Rect2Df r = rect;
 
                 {
@@ -661,7 +660,52 @@ namespace zp
                     renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
                 }
 
+                renderProfilerData->immediateModeRenderer->end( cmd );
 
+                const zp_float32_t frameWidth = rect.size.width / (float)enumerator.count();
+                for( zp_size_t i = 0; i < enumerator.count(); ++i )
+                {
+                    zp_float32_t baseOffset = static_cast<zp_float32_t >(i) * frameWidth;
+                    r = { .offset { .x = 0, .y = 0 }, .size { .width = 0, .height = 16 } };
+
+                    auto frame = enumerator[ i ];
+                    zp_uint64_t minTime = frame.cpuProfilerEventCount > 0 ? frame.cpuProfilerEvents[ 0 ].startCycle : 0;
+                    zp_uint64_t maxTime = frame.cpuProfilerEventCount > 0 ? frame.cpuProfilerEvents[ frame.cpuProfilerEventCount - 1 ].endCycle : minTime;
+                    zp_float32_t cpuDuration = static_cast<zp_float32_t >(maxTime - minTime);
+
+                    cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * ( frame.cpuProfilerEventCount ), 6 * ( frame.cpuProfilerEventCount ) );
+
+                    for( zp_size_t c = 0; c < frame.cpuProfilerEventCount; ++c )
+                    {
+                        auto cpu = frame.cpuProfilerEvents + c;
+
+                        zp_float32_t duration = static_cast<zp_float32_t >(cpu->endCycle - cpu->startCycle) / cpuDuration;
+                        zp_float32_t xOffset = static_cast<zp_float32_t >(cpu->startCycle - minTime) / cpuDuration;
+
+                        r.offset.x = baseOffset + xOffset * frameWidth;
+                        r.size.width = duration * frameWidth;
+
+                        Color color = zp_debug_color( cpu->threadId % 255, 255 );
+                        Vector4f v0 = Math::Mul( localToWorld, Math::Vec4f( r.bottomLeft().x, r.bottomLeft().y, 0.f, 1.f ) );
+                        Vector4f v1 = Math::Mul( localToWorld, Math::Vec4f( r.topLeft().x, r.topLeft().y, 0.f, 1.f ) );
+                        Vector4f v2 = Math::Mul( localToWorld, Math::Vec4f( r.topRight().x, r.topRight().y, 0.f, 1.f ) );
+                        Vector4f v3 = Math::Mul( localToWorld, Math::Vec4f( r.bottomRight().x, r.bottomRight().y, 0.f, 1.f ) );
+
+                        VertexVUC vertices[] = {
+                            { .vertexOS = Math::Vec3f( v0 ), .uv0 = Vector2f::zero, .color = color },
+                            { .vertexOS = Math::Vec3f( v1 ), .uv0 = Vector2f::zero, .color = color },
+                            { .vertexOS = Math::Vec3f( v2 ), .uv0 = Vector2f::zero, .color = color },
+                            { .vertexOS = Math::Vec3f( v3 ), .uv0 = Vector2f::zero, .color = color },
+                        };
+                        renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
+
+                        r.offset.y += r.size.height;
+                    }
+
+                    renderProfilerData->immediateModeRenderer->end( cmd );
+                }
+#if 0
+                r = rect;
                 r.size.height = 12;
                 r.size.width = 64;
 
@@ -684,12 +728,11 @@ namespace zp
                     r.offset.y += r.size.height + 2;
                     r.size.width += 16;
                 }
-
-                renderProfilerData->immediateModeRenderer->end( cmd );
+#endif
             }
         } renderProfilerDataJob {
             .profiler = GetProfiler(),
-            .range = ProfilerFrameRange::Last( frameIndex, 3 ),
+            .range = ProfilerFrameRange::Last( frameIndex, 1 ),
             .immediateModeRenderer = m_immediateModeRenderer,
         };
         gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );
