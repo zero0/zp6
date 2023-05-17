@@ -263,8 +263,8 @@ namespace zp
 
             void* vertexMemory = nullptr;
             void* indexMemory = nullptr;
-            m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, &perFrameData.vertexBuffer, &vertexMemory );
-            m_graphicsDevice->mapBuffer( 0, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), &perFrameData.indexBuffer, &indexMemory );
+            m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, perFrameData.vertexBuffer, &vertexMemory );
+            m_graphicsDevice->mapBuffer( 0, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), perFrameData.indexBuffer, &indexMemory );
 
             zp_uint8_t* vertexBuffer = static_cast<zp_uint8_t*>( vertexMemory );
             zp_uint8_t* indexBuffer = static_cast<zp_uint8_t*>( indexMemory );
@@ -302,8 +302,8 @@ namespace zp
                 indexBuffer += cmdIndexSize;
             }
 
-            m_graphicsDevice->unmapBuffer( &perFrameData.vertexBuffer );
-            m_graphicsDevice->unmapBuffer( &perFrameData.indexBuffer );
+            m_graphicsDevice->unmapBuffer( perFrameData.vertexBuffer );
+            m_graphicsDevice->unmapBuffer( perFrameData.indexBuffer );
         }
     }
 }

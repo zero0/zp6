@@ -85,7 +85,7 @@ namespace zp
 
         GraphicsBufferAllocation allocate( zp_size_t size )
         {
-            const zp_size_t alignedSize = ( size + ( graphicsBuffer.alignment - 1 ) ) & -graphicsBuffer.alignment;
+            const zp_size_t alignedSize = ZP_ALIGN_SIZE( size, graphicsBuffer.alignment );
             ZP_ASSERT( ( graphicsBuffer.offset + allocated + alignedSize ) < graphicsBuffer.size );
 
             GraphicsBufferAllocation allocation {
@@ -324,9 +324,9 @@ namespace zp
 
         virtual void destroySampler( Sampler* sampler ) = 0;
 
-        virtual void mapBuffer( zp_size_t offset, zp_size_t size, GraphicsBuffer* graphicsBuffer, void** memory ) = 0;
+        virtual void mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory ) = 0;
 
-        virtual void unmapBuffer( GraphicsBuffer* graphicsBuffer ) = 0;
+        virtual void unmapBuffer( const GraphicsBuffer& graphicsBuffer ) = 0;
 
 #pragma endregion
 
@@ -358,7 +358,19 @@ namespace zp
 
         virtual void draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandQueue* commandQueue ) = 0;
 
+        virtual void drawIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) = 0;
+
         virtual void drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue ) = 0;
+
+        virtual void drawIndexedIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) = 0;
+
+#pragma endregion
+
+#pragma region Compute Dispatch Commands
+
+        virtual void dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue ) = 0;
+
+        virtual void dispatchIndirect( const GraphicsBuffer& buffer, CommandQueue* commandQueue ) = 0;
 
 #pragma endregion
 

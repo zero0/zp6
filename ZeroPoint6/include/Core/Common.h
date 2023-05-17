@@ -587,6 +587,24 @@ constexpr zp_hash128_t zp_fnv128_1a( const void* ptr, const zp_size_t size, zp_h
     return h;
 }
 
+template<typename T>
+constexpr zp_hash128_t zp_fnv128_1a( const T* value, zp_size_t count, zp_hash128_t h = { .m32 = 0x6c62272e07bb0142, .m10 = 0x62b821756295c58d } )
+{
+    return zp_fnv128_1a( static_cast<const void*>(value), sizeof( T ) * count, h );
+}
+
+template<typename T>
+constexpr zp_hash128_t zp_fnv128_1a( const T& value, zp_hash128_t h = { .m32 = 0x6c62272e07bb0142, .m10 = 0x62b821756295c58d } )
+{
+    return zp_fnv128_1a( static_cast<const void*>(&value), sizeof( T ), h );
+}
+
+template<typename T, zp_size_t Count>
+constexpr zp_hash128_t zp_fnv128_1a( const T( & array )[Count], zp_hash128_t h = { .m32 = 0x6c62272e07bb0142, .m10 = 0x62b821756295c58d } )
+{
+    return zp_fnv128_1a( static_cast<const void*>(array), sizeof( T ) * Count, h );
+}
+
 zp_guid128_t zp_generate_unique_guid128();
 
 zp_guid128_t zp_generate_guid128();

@@ -9,6 +9,7 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/Vector.h"
+#include "Core/Map.h"
 
 #include "Rendering/GraphicsDevice.h"
 
@@ -73,9 +74,9 @@ namespace zp
 
         void destroySampler( Sampler* sampler ) final;
 
-        void mapBuffer( zp_size_t offset, zp_size_t size, GraphicsBuffer* graphicsBuffer, void** memory ) final;
+        void mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory ) final;
 
-        void unmapBuffer( GraphicsBuffer* graphicsBuffer ) final;
+        void unmapBuffer( const GraphicsBuffer& graphicsBuffer ) final;
 
 #pragma endregion
 
@@ -107,7 +108,19 @@ namespace zp
 
         void draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
 
+        void drawIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue );
+
         void drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
+
+        void drawIndexedIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue );
+
+#pragma endregion
+
+#pragma region Compute Dispatch Commands
+
+        void dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue );
+
+        void dispatchIndirect( const GraphicsBuffer& buffer, CommandQueue* commandQueue );
 
 #pragma endregion
 
@@ -123,6 +136,8 @@ namespace zp
 
     private:
         VkCommandPool getCommandPool( CommandQueue* commandQueue );
+
+        VkDescriptorSetLayout getDescriptorSetLayout( const VkDescriptorSetLayoutCreateInfo& createInfo );
 
         struct QueueFamilies
         {
@@ -183,6 +198,8 @@ namespace zp
         Vector<VkImageView> m_swapChainImageViews;
         Vector<VkFramebuffer> m_swapChainFrameBuffers;
         Vector<VkFence> m_swapChainInFlightFences;
+
+        Map<zp_hash128_t, VkDescriptorSetLayout, zp_hash128_t> m_descriptorSetLayoutCache;
 
         GraphicsBuffer m_stagingBuffer;
 

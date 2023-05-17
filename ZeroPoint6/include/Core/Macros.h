@@ -11,6 +11,8 @@
 
 #define ZP_ARRAY_SIZE(a)  ( sizeof( a ) / sizeof( a[ 0 ] ) )
 
+#define ZP_ALIGN_SIZE(s,a)  ( ( (s) + ( (a) - 1 ) ) & -(a) )
+
 #define ZP_FG_BLACK     "30"
 #define ZP_FG_RED       "31"
 #define ZP_FG_GREEN     "32"
