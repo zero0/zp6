@@ -62,7 +62,7 @@ namespace zp
 
         void destroyBuffer( GraphicsBuffer* graphicsBuffer ) final;
 
-        void createShader( const ShaderDesc* shaderDesc, Shader* shader ) final;
+        void createShader( const ShaderDesc& shaderDesc, Shader* shader ) final;
 
         void destroyShader( Shader* shader ) final;
 
@@ -174,6 +174,8 @@ namespace zp
         VkSurfaceKHR m_vkSurface;
         VkPhysicalDevice m_vkPhysicalDevice;
         VkDevice m_vkLocalDevice;
+
+        VkAllocationCallbacks m_vkAllocationCallbacks;
 
         VkQueue m_vkRenderQueues[RenderQueue_Count];
 

@@ -312,7 +312,7 @@ namespace zp
 
         virtual void destroyBuffer( GraphicsBuffer* graphicsBuffer ) = 0;
 
-        virtual void createShader( const ShaderDesc* shaderDesc, Shader* shader ) = 0;
+        virtual void createShader( const ShaderDesc& shaderDesc, Shader* shader ) = 0;
 
         virtual void destroyShader( Shader* shader ) = 0;
 

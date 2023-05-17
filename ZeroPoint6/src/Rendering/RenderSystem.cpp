@@ -256,22 +256,22 @@ namespace zp
                     ShaderDesc shaderDesc {
                         .name = "vertex shader",
                         .entryPointName = "main",
-                        .codeSizeInBytes = ZP_ARRAY_SIZE( vertexShaderCode ) << 2,
+                        .codeSizeInBytes = ZP_ARRAY_SIZE( vertexShaderCode ) * sizeof( zp_uint32_t ),
                         .codeData = vertexShaderCode,
                         .shaderStage = ZP_SHADER_STAGE_VERTEX,
                     };
-                    graphicsDevice->createShader( &shaderDesc, m_vertexShader.data() );
+                    graphicsDevice->createShader( shaderDesc, m_vertexShader.data() );
                 }
 
                 {
                     ShaderDesc shaderDesc {
                         .name = "fragment shader",
                         .entryPointName = "main",
-                        .codeSizeInBytes = ZP_ARRAY_SIZE( fragmentShaderCode ) << 2,
+                        .codeSizeInBytes = ZP_ARRAY_SIZE( fragmentShaderCode ) * sizeof( zp_uint32_t ),
                         .codeData = fragmentShaderCode,
                         .shaderStage = ZP_SHADER_STAGE_FRAGMENT,
                     };
-                    graphicsDevice->createShader( &shaderDesc, m_fragmentShader.data() );
+                    graphicsDevice->createShader( shaderDesc, m_fragmentShader.data() );
                 }
 
                 {
@@ -294,7 +294,7 @@ namespace zp
                         .codeData = memPtr,
                         .shaderStage = ZP_SHADER_STAGE_VERTEX,
                     };
-                    graphicsDevice->createShader( &shaderDesc, m_colorVertexShader.data() );
+                    graphicsDevice->createShader( shaderDesc, m_colorVertexShader.data() );
 
                     GetAllocator( MemoryLabels::FileIO )->free( memPtr );
                 }
@@ -315,7 +315,7 @@ namespace zp
                         .codeData = memPtr,
                         .shaderStage = ZP_SHADER_STAGE_FRAGMENT,
                     };
-                    graphicsDevice->createShader( &shaderDesc, m_colorFragmentShader.data() );
+                    graphicsDevice->createShader( shaderDesc, m_colorFragmentShader.data() );
 
                     GetAllocator( MemoryLabels::FileIO )->free( memPtr );
                 }

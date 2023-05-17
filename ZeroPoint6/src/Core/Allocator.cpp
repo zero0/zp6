@@ -97,6 +97,12 @@ namespace zp
         return mem;
     }
 
+    void* MallocAllocatorPolicy::reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
+    {
+        void* mem = _aligned_realloc( ptr, size, alignment );
+        return mem;
+    }
+
     void MallocAllocatorPolicy::free( void* ptr )
     {
         _aligned_free( ptr );
@@ -133,6 +139,12 @@ namespace zp
     {
         void* mem = tlsf_memalign( m_tlsf, alignment, size );
         m_allocated += tlsf_block_size( mem );
+        return mem;
+    }
+
+    void* TlsfAllocatorPolicy::reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
+    {
+        void* mem = tlsf_realloc( m_tlsf, ptr, size );
         return mem;
     }
 

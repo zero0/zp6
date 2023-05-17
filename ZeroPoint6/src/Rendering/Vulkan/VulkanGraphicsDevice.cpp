@@ -864,11 +864,11 @@ namespace zp
 
         }
 
-        constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties* physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
+        constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
         {
-            for( uint32_t i = 0; i < physicalDeviceMemoryProperties->memoryTypeCount; i++ )
+            for( uint32_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++ )
             {
-                VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties->memoryTypes[ i ].propertyFlags;
+                VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties.memoryTypes[ i ].propertyFlags;
                 if( ( typeFilter & ( 1 << i ) ) && ( flags & memoryPropertyFlags ) == memoryPropertyFlags )
                 {
                     return i;
@@ -877,6 +877,24 @@ namespace zp
 
             ZP_INVALID_CODE_PATH();
             return 0;
+        }
+
+        void* AllocationCallback( void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope )
+        {
+            IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
+            return allocator->allocate( size, alignment );
+        }
+
+        void* ReallocationCallback( void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope )
+        {
+            IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
+            return allocator->reallocate( pOriginal, size, alignment );
+        }
+
+        void FreeCallback( void* pUserData, void* pMemory )
+        {
+            IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
+            allocator->free( pMemory );
         }
     }
 
@@ -891,6 +909,12 @@ namespace zp
         , m_vkSurface( VK_NULL_HANDLE )
         , m_vkPhysicalDevice( VK_NULL_HANDLE )
         , m_vkLocalDevice( VK_NULL_HANDLE )
+        , m_vkAllocationCallbacks {
+            .pUserData = GetAllocator( memoryLabel ),
+            .pfnAllocation = AllocationCallback,
+            .pfnReallocation = ReallocationCallback,
+            .pfnFree = FreeCallback,
+        }
         , m_vkRenderQueues {}
         , m_vkSwapChain( VK_NULL_HANDLE )
         , m_vkSwapChainRenderPass( VK_NULL_HANDLE )
@@ -921,6 +945,7 @@ namespace zp
         , m_currentFrameIndex( 0 )
     {
         zp_zero_memory_array( m_perFrameData );
+
 
         VkApplicationInfo applicationInfo {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -969,7 +994,7 @@ namespace zp
 
         instanceCreateInfo.pNext = &createInstanceDebugMessengerInfo;
 #endif
-        HR( vkCreateInstance( &instanceCreateInfo, nullptr, &m_vkInstance ) );
+        HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
 
 #if ZP_DEBUG
         // create debug messenger
@@ -981,7 +1006,7 @@ namespace zp
             .pUserData = nullptr, // Optional
         };
 
-        HR( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, nullptr, &m_vkDebugMessenger ) );
+        HR( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger ) );
         //HR( CreateDebugUtilsMessengerEXT( m_vkInstance, &createDebugMessengerInfo, nullptr, &m_vkDebugMessenger ));
 #endif
 
@@ -1116,7 +1141,7 @@ namespace zp
                 .pEnabledFeatures = &deviceFeatures,
             };
 
-            HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, nullptr, &m_vkLocalDevice ) );
+            HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
 
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.graphicsFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ] );
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.transferFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ] );
@@ -1132,7 +1157,7 @@ namespace zp
                 .pInitialData = nullptr,
             };
 
-            HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, nullptr, &m_vkPipelineCache ) );
+            HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
         }
 
         // create command pools
@@ -1195,7 +1220,7 @@ namespace zp
                 .pPoolSizes = poolSizes,
             };
 
-            HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool ) );
+            HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
         }
     }
 
@@ -1211,16 +1236,16 @@ namespace zp
         auto e = m_descriptorSetLayoutCache.end();
         for( ; b != e; ++b )
         {
-            vkDestroyDescriptorSetLayout( m_vkLocalDevice, b.value(), nullptr );
+            vkDestroyDescriptorSetLayout( m_vkLocalDevice, b.value(), &m_vkAllocationCallbacks );
         }
         m_descriptorSetLayoutCache.clear();
 
-        vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, nullptr );
+        vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, &m_vkAllocationCallbacks );
         m_vkDescriptorPool = {};
 
         for( zp_size_t i = 0; i < m_commandPoolCount; ++i )
         {
-            vkDestroyCommandPool( m_vkLocalDevice, m_vkCommandPools[ i ], nullptr );
+            vkDestroyCommandPool( m_vkLocalDevice, m_vkCommandPools[ i ], &m_vkAllocationCallbacks );
         }
         ZP_FREE_( memoryLabel, m_vkCommandPools );
 
@@ -1231,23 +1256,23 @@ namespace zp
         //m_vkTransferCommandPool = {};
         //m_vkComputeCommandPool = {};
 
-        vkDestroyPipelineCache( m_vkLocalDevice, m_vkPipelineCache, nullptr );
+        vkDestroyPipelineCache( m_vkLocalDevice, m_vkPipelineCache, &m_vkAllocationCallbacks );
         m_vkPipelineCache = {};
 
-        vkDestroyDevice( m_vkLocalDevice, nullptr );
+        vkDestroyDevice( m_vkLocalDevice, &m_vkAllocationCallbacks );
         m_vkLocalDevice = {};
         m_vkPhysicalDevice = {};
         zp_zero_memory_array( m_vkRenderQueues );
 
-        vkDestroySurfaceKHR( m_vkInstance, m_vkSurface, nullptr );
+        vkDestroySurfaceKHR( m_vkInstance, m_vkSurface, &m_vkAllocationCallbacks );
         m_vkSurface = {};
 
 #if ZP_DEBUG
-        CallDebugUtil( vkDestroyDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, m_vkDebugMessenger, nullptr );
+        CallDebugUtil( vkDestroyDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, m_vkDebugMessenger, &m_vkAllocationCallbacks );
         m_vkDebugMessenger = {};
 #endif
 
-        vkDestroyInstance( m_vkInstance, nullptr );
+        vkDestroyInstance( m_vkInstance, &m_vkAllocationCallbacks );
         m_vkInstance = {};
     }
 
@@ -1264,7 +1289,7 @@ namespace zp
             .hwnd = hWnd,
         };
 
-        HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, nullptr, &m_vkSurface ) );
+        HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface ) );
 
         VkBool32 surfaceSupported;
         HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, m_queueFamilies.presentFamily, m_vkSurface, &surfaceSupported ) );
@@ -1334,11 +1359,11 @@ namespace zp
             swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
         }
 
-        HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, nullptr, &m_vkSwapChain ) );
+        HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, &m_vkAllocationCallbacks, &m_vkSwapChain ) );
 
         if( swapChainCreateInfo.oldSwapchain != VK_NULL_HANDLE )
         {
-            vkDestroySwapchainKHR( m_vkLocalDevice, swapChainCreateInfo.oldSwapchain, nullptr );
+            vkDestroySwapchainKHR( m_vkLocalDevice, swapChainCreateInfo.oldSwapchain, &m_vkAllocationCallbacks );
         }
 
         m_vkSwapChainFormat = surfaceFormat.format;
@@ -1361,7 +1386,7 @@ namespace zp
         {
             if( m_vkSwapChainRenderPass )
             {
-                vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainRenderPass, nullptr );
+                vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainRenderPass, &m_vkAllocationCallbacks );
             }
 
             VkAttachmentDescription colorAttachment {
@@ -1405,7 +1430,7 @@ namespace zp
                 .pDependencies = &subPassDependency,
             };
 
-            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, nullptr, &m_vkSwapChainRenderPass ) );
+            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_vkSwapChainRenderPass ) );
         }
 
         m_swapChainFrameBuffers.reserve( swapChainImageCount );
@@ -1435,11 +1460,11 @@ namespace zp
             if( m_swapChainImageViews[ i ] != VK_NULL_HANDLE )
             {
                 // TODO: destroy in a few frames
-                vkDestroyImageView( m_vkLocalDevice, m_swapChainImageViews[ i ], nullptr );
+                vkDestroyImageView( m_vkLocalDevice, m_swapChainImageViews[ i ], &m_vkAllocationCallbacks );
                 m_swapChainImageViews[ i ] = VK_NULL_HANDLE;
             }
 
-            HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, nullptr, &m_swapChainImageViews[ i ] ) );
+            HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapChainImageViews[ i ] ) );
 
             VkImageView attachments[] { m_swapChainImageViews[ i ] };
 
@@ -1456,11 +1481,11 @@ namespace zp
             if( m_swapChainFrameBuffers[ i ] != VK_NULL_HANDLE )
             {
                 // TODO: destroy in a few frames
-                vkDestroyFramebuffer( m_vkLocalDevice, m_swapChainFrameBuffers[ i ], nullptr );
+                vkDestroyFramebuffer( m_vkLocalDevice, m_swapChainFrameBuffers[ i ], &m_vkAllocationCallbacks );
                 m_swapChainFrameBuffers[ i ] = VK_NULL_HANDLE;
             }
 
-            HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, nullptr, &m_swapChainFrameBuffers[ i ] ) );
+            HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapChainFrameBuffers[ i ] ) );
         }
 
         // swap chain sync
@@ -1500,13 +1525,13 @@ namespace zp
 
         for( PerFrameData& perFrameData : m_perFrameData )
         {
-            HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, nullptr, &perFrameData.vkSwapChainAcquireSemaphore ) );
-            HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, nullptr, &perFrameData.vkRenderFinishedSemaphore ) );
-            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, nullptr, &perFrameData.vkInFlightFences ) );
-            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, nullptr, &perFrameData.vkSwapChainImageAcquiredFence ) );
+            HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainAcquireSemaphore ) );
+            HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkRenderFinishedSemaphore ) );
+            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkInFlightFences ) );
+            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainImageAcquiredFence ) );
 #if ZP_USE_PROFILER
-            HR( vkCreateQueryPool( m_vkLocalDevice, &pipelineStatsQueryPoolCreateInfo, nullptr, &perFrameData.vkPipelineStatisticsQueryPool ) );
-            HR( vkCreateQueryPool( m_vkLocalDevice, &timestampQueryPoolCreateInfo, nullptr, &perFrameData.vkTimestampQueryPool ) );
+            HR( vkCreateQueryPool( m_vkLocalDevice, &pipelineStatsQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkPipelineStatisticsQueryPool ) );
+            HR( vkCreateQueryPool( m_vkLocalDevice, &timestampQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkTimestampQueryPool ) );
 #endif
             perFrameData.perFrameStagingBuffer.graphicsBuffer = m_stagingBuffer.splitBuffer( perFrameStagingBufferOffset, perFrameStagingBufferSize );
             perFrameData.perFrameStagingBuffer.allocated = 0;
@@ -1523,14 +1548,14 @@ namespace zp
     {
         for( PerFrameData& perFrameData : m_perFrameData )
         {
-            vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkSwapChainAcquireSemaphore, nullptr );
-            vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkRenderFinishedSemaphore, nullptr );
-            vkDestroyFence( m_vkLocalDevice, perFrameData.vkInFlightFences, nullptr );
-            vkDestroyFence( m_vkLocalDevice, perFrameData.vkSwapChainImageAcquiredFence, nullptr );
+            vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkSwapChainAcquireSemaphore, &m_vkAllocationCallbacks );
+            vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkRenderFinishedSemaphore, &m_vkAllocationCallbacks );
+            vkDestroyFence( m_vkLocalDevice, perFrameData.vkInFlightFences, &m_vkAllocationCallbacks );
+            vkDestroyFence( m_vkLocalDevice, perFrameData.vkSwapChainImageAcquiredFence, &m_vkAllocationCallbacks );
 
 #if ZP_USE_PROFILER
-            vkDestroyQueryPool( m_vkLocalDevice, perFrameData.vkPipelineStatisticsQueryPool, nullptr );
-            vkDestroyQueryPool( m_vkLocalDevice, perFrameData.vkTimestampQueryPool, nullptr );
+            vkDestroyQueryPool( m_vkLocalDevice, perFrameData.vkPipelineStatisticsQueryPool, &m_vkAllocationCallbacks );
+            vkDestroyQueryPool( m_vkLocalDevice, perFrameData.vkTimestampQueryPool, &m_vkAllocationCallbacks );
 #endif
             if( perFrameData.commandQueues )
             {
@@ -1564,27 +1589,27 @@ namespace zp
 
         for( VkFramebuffer swapChainFramebuffer : m_swapChainFrameBuffers )
         {
-            vkDestroyFramebuffer( m_vkLocalDevice, swapChainFramebuffer, nullptr );
+            vkDestroyFramebuffer( m_vkLocalDevice, swapChainFramebuffer, &m_vkAllocationCallbacks );
         }
         m_swapChainFrameBuffers.clear();
 
-        vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainRenderPass, nullptr );
+        vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainRenderPass, &m_vkAllocationCallbacks );
         m_vkSwapChainRenderPass = {};
 
         for( VkImageView swapChainImageView : m_swapChainImageViews )
         {
-            vkDestroyImageView( m_vkLocalDevice, swapChainImageView, nullptr );
+            vkDestroyImageView( m_vkLocalDevice, swapChainImageView, &m_vkAllocationCallbacks );
         }
         m_swapChainImageViews.clear();
         m_swapChainImages.clear();
 
         for( VkFence& inFlightFence : m_swapChainInFlightFences )
         {
-            vkDestroyFence( m_vkLocalDevice, inFlightFence, nullptr );
+            vkDestroyFence( m_vkLocalDevice, inFlightFence, &m_vkAllocationCallbacks );
         }
         m_swapChainInFlightFences.clear();
 
-        vkDestroySwapchainKHR( m_vkLocalDevice, m_vkSwapChain, nullptr );
+        vkDestroySwapchainKHR( m_vkLocalDevice, m_vkSwapChain, &m_vkAllocationCallbacks );
         m_vkSwapChain = {};
     }
 
@@ -1798,7 +1823,7 @@ namespace zp
         };
 
         VkRenderPass vkRenderPass;
-        HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassCreateInfo, nullptr, &vkRenderPass ) );
+        HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
 
         renderPass->internalRenderPass = vkRenderPass;
 
@@ -1807,7 +1832,7 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyRenderPass( RenderPass* renderPass )
     {
-        vkDestroyRenderPass( m_vkLocalDevice, static_cast<VkRenderPass>( renderPass->internalRenderPass), nullptr );
+        vkDestroyRenderPass( m_vkLocalDevice, static_cast<VkRenderPass>( renderPass->internalRenderPass), &m_vkAllocationCallbacks );
         renderPass->internalRenderPass = nullptr;
     }
 
@@ -2035,7 +2060,7 @@ namespace zp
         };
 
         VkPipeline pipeline;
-        HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &pipeline ) );
+        HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &pipeline ) );
         graphicsPipelineState->pipelineState = pipeline;
         graphicsPipelineState->pipelineHash = zp_fnv128_1a( graphicsPipelineCreateInfo );
 
@@ -2044,7 +2069,7 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyGraphicsPipeline( GraphicsPipelineState* graphicsPipelineState )
     {
-        vkDestroyPipeline( m_vkLocalDevice, static_cast<VkPipeline>( graphicsPipelineState->pipelineState ), nullptr );
+        vkDestroyPipeline( m_vkLocalDevice, static_cast<VkPipeline>( graphicsPipelineState->pipelineState ), &m_vkAllocationCallbacks );
         graphicsPipelineState->pipelineState = nullptr;
     }
 
@@ -2063,7 +2088,7 @@ namespace zp
         };
 
         VkPipelineLayout layout;
-        HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, nullptr, &layout ) );
+        HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, &m_vkAllocationCallbacks, &layout ) );
         pipelineLayout->layout = layout;
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, pipelineLayoutDesc->name, VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout );
@@ -2071,12 +2096,11 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyPipelineLayout( PipelineLayout* pipelineLayout )
     {
-        vkDestroyPipelineLayout( m_vkLocalDevice, static_cast<VkPipelineLayout>( pipelineLayout->layout ), nullptr );
+        vkDestroyPipelineLayout( m_vkLocalDevice, static_cast<VkPipelineLayout>( pipelineLayout->layout ), &m_vkAllocationCallbacks );
         pipelineLayout->layout = nullptr;
     }
 
-    void
-    VulkanGraphicsDevice::createBuffer( const GraphicsBufferDesc* graphicsBufferDesc, GraphicsBuffer* graphicsBuffer )
+    void VulkanGraphicsDevice::createBuffer( const GraphicsBufferDesc* graphicsBufferDesc, GraphicsBuffer* graphicsBuffer )
     {
         VkBufferCreateInfo bufferCreateInfo {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -2086,7 +2110,7 @@ namespace zp
         };
 
         VkBuffer buffer;
-        HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, nullptr, &buffer ) );
+        HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &buffer ) );
 
         VkMemoryRequirements memoryRequirements;
         vkGetBufferMemoryRequirements( m_vkLocalDevice, buffer, &memoryRequirements );
@@ -2097,11 +2121,11 @@ namespace zp
         VkMemoryAllocateInfo memoryAllocateInfo {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memoryRequirements.size,
-            .memoryTypeIndex = FindMemoryTypeIndex( &physicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc->memoryPropertyFlags ) ),
+            .memoryTypeIndex = FindMemoryTypeIndex( physicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc->memoryPropertyFlags ) ),
         };
-
+        VkAllocationCallbacks ff;
         VkDeviceMemory deviceMemory;
-        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, nullptr, &deviceMemory ) );
+        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &deviceMemory ) );
 
         HR( vkBindBufferMemory( m_vkLocalDevice, buffer, deviceMemory, 0 ) );
 
@@ -2122,12 +2146,12 @@ namespace zp
         {
             if( graphicsBuffer->buffer )
             {
-                vkDestroyBuffer( m_vkLocalDevice, static_cast<VkBuffer>( graphicsBuffer->buffer ), nullptr );
+                vkDestroyBuffer( m_vkLocalDevice, static_cast<VkBuffer>( graphicsBuffer->buffer ), &m_vkAllocationCallbacks );
             }
 
             if( graphicsBuffer->deviceMemory )
             {
-                vkFreeMemory( m_vkLocalDevice, static_cast<VkDeviceMemory>( graphicsBuffer->deviceMemory ), nullptr );
+                vkFreeMemory( m_vkLocalDevice, static_cast<VkDeviceMemory>( graphicsBuffer->deviceMemory ), &m_vkAllocationCallbacks );
             }
         }
 
@@ -2141,29 +2165,29 @@ namespace zp
         graphicsBuffer->usageFlags = {};
     }
 
-    void VulkanGraphicsDevice::createShader( const ShaderDesc* shaderDesc, Shader* shader )
+    void VulkanGraphicsDevice::createShader( const ShaderDesc& shaderDesc, Shader* shader )
     {
         VkShaderModuleCreateInfo shaderModuleCreateInfo {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = shaderDesc->codeSizeInBytes, // codeSizeInBytes in bytes -> uint
-            .pCode = static_cast<const uint32_t*>( shaderDesc->codeData ),
+            .codeSize = shaderDesc.codeSizeInBytes, // codeSizeInBytes in bytes -> uint
+            .pCode = static_cast<const uint32_t*>( shaderDesc.codeData ),
         };
 
         VkShaderModule shaderModule;
-        HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, nullptr, &shaderModule ) );
+        HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
         shader->shader = shaderModule;
-        shader->shaderStage = shaderDesc->shaderStage;
-        shader->shaderHash = zp_fnv128_1a( shaderDesc->codeData, shaderDesc->codeSizeInBytes );
+        shader->shaderStage = shaderDesc.shaderStage;
+        shader->shaderHash = zp_fnv128_1a( shaderDesc.codeData, shaderDesc.codeSizeInBytes );
 
         const zp_size_t maxLength = ZP_ARRAY_SIZE( shader->entryPointName );
-        zp_strcpy( shaderDesc->entryPointName, shader->entryPointName, zp_min( maxLength, zp_strlen( shaderDesc->entryPointName ) ) );
+        zp_strcpy( shaderDesc.entryPointName, shader->entryPointName, zp_min( maxLength, zp_strlen( shaderDesc.entryPointName ) ) );
 
-        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, shaderDesc->name, VK_OBJECT_TYPE_SHADER_MODULE, shaderModule );
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, shaderDesc.name, VK_OBJECT_TYPE_SHADER_MODULE, shaderModule );
     }
 
     void VulkanGraphicsDevice::destroyShader( Shader* shader )
     {
-        vkDestroyShaderModule( m_vkLocalDevice, static_cast<VkShaderModule>( shader->shader ), nullptr );
+        vkDestroyShaderModule( m_vkLocalDevice, static_cast<VkShaderModule>( shader->shader ), &m_vkAllocationCallbacks );
         shader->shader = nullptr;
     }
 
@@ -2190,7 +2214,7 @@ namespace zp
         };
 
         VkImage image;
-        HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, nullptr, &image ) );
+        HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, &m_vkAllocationCallbacks, &image ) );
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "Image", VK_OBJECT_TYPE_IMAGE, image );
 
@@ -2203,11 +2227,11 @@ namespace zp
         VkMemoryAllocateInfo memoryAllocateInfo {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memoryRequirements.size,
-            .memoryTypeIndex = FindMemoryTypeIndex( &physicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( textureCreateDesc->memoryPropertyFlags ) ),
+            .memoryTypeIndex = FindMemoryTypeIndex( physicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( textureCreateDesc->memoryPropertyFlags ) ),
         };
 
         VkDeviceMemory deviceMemory;
-        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, nullptr, &deviceMemory ) );
+        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &deviceMemory ) );
 
         HR( vkBindImageMemory( m_vkLocalDevice, image, deviceMemory, 0 ) );
 
@@ -2232,7 +2256,7 @@ namespace zp
         };
 
         VkImageView imageView;
-        HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, nullptr, &imageView ) );
+        HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &imageView ) );
 
         texture->textureDimension = textureCreateDesc->textureDimension;
         texture->textureFormat = textureCreateDesc->textureFormat;
@@ -2251,17 +2275,17 @@ namespace zp
     {
         if( texture->textureViewHandle )
         {
-            vkDestroyImageView( m_vkLocalDevice, static_cast<VkImageView>(texture->textureViewHandle), nullptr );
+            vkDestroyImageView( m_vkLocalDevice, static_cast<VkImageView>(texture->textureViewHandle), &m_vkAllocationCallbacks );
         }
 
         if( texture->textureMemoryHandle )
         {
-            vkFreeMemory( m_vkLocalDevice, static_cast<VkDeviceMemory>( texture->textureMemoryHandle ), nullptr );
+            vkFreeMemory( m_vkLocalDevice, static_cast<VkDeviceMemory>( texture->textureMemoryHandle ), &m_vkAllocationCallbacks );
         }
 
         if( texture->textureHandle )
         {
-            vkDestroyImage( m_vkLocalDevice, static_cast<VkImage>( texture->textureHandle ), nullptr );
+            vkDestroyImage( m_vkLocalDevice, static_cast<VkImage>( texture->textureHandle ), &m_vkAllocationCallbacks );
         }
 
         texture->textureHandle = nullptr;
@@ -2291,7 +2315,7 @@ namespace zp
         };
 
         VkSampler vkSampler;
-        HR( vkCreateSampler( m_vkLocalDevice, &samplerCreateInfo, nullptr, &vkSampler ) );
+        HR( vkCreateSampler( m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &vkSampler ) );
 
         sampler->samplerHandle = vkSampler;
 
@@ -2302,7 +2326,7 @@ namespace zp
     {
         if( sampler->samplerHandle )
         {
-            vkDestroySampler( m_vkLocalDevice, static_cast<VkSampler>( sampler->samplerHandle ), nullptr );
+            vkDestroySampler( m_vkLocalDevice, static_cast<VkSampler>( sampler->samplerHandle ), &m_vkAllocationCallbacks );
         }
 
         sampler->samplerHandle = nullptr;
@@ -2845,13 +2869,13 @@ namespace zp
             };
 
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsFamily;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &t_vkGraphicsCommandPool ) );
+            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkGraphicsCommandPool ) );
 
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferFamily;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &t_vkTransferCommandPool ) );
+            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkTransferCommandPool ) );
 
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &t_vkComputeCommandPool ) );
+            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkComputeCommandPool ) );
 
             zp_size_t index = Atomic::AddSizeT( &m_commandPoolCount, 3 ) - 3;
             m_vkCommandPools[ index + 0 ] = t_vkGraphicsCommandPool;
@@ -2880,7 +2904,7 @@ namespace zp
         VkDescriptorSetLayout layout;
         if( !m_descriptorSetLayoutCache.get( hash, &layout ) )
         {
-            HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &createInfo, nullptr, &layout ) );
+            HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &createInfo, &m_vkAllocationCallbacks, &layout ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, layout, "Descriptor Set Layout #%d (%d)", m_descriptorSetLayoutCache.size(), zp_current_thread_id() );
 

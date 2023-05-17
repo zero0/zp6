@@ -81,7 +81,7 @@ ZP_FORCEINLINE zp_bool_t operator>( const zp_hash128_t& lh, const zp_hash128_t& 
 
 ZP_FORCEINLINE zp_size_t operator%( const zp_hash128_t& lh, zp_size_t rh )
 {
-    return lh.m10 % rh;
+    return ( lh.m32 ^ lh.m10 ) % rh;
 }
 
 //
@@ -95,7 +95,7 @@ struct zp_guid128_t
 
     constexpr explicit operator zp_hash128_t() const
     {
-        return { m32, m10 };
+        return { .m32 = m32, .m10 = m10 };
     }
 };
 

@@ -59,6 +59,8 @@ namespace zp
     public:
         virtual void* allocate( zp_size_t size, zp_size_t alignment ) = 0;
 
+        virtual void* reallocate( void* ptr, zp_size_t size, zp_size_t alignent ) = 0;
+
         virtual void free( void* ptr ) = 0;
     };
 
@@ -84,6 +86,8 @@ namespace zp
         ~MemoryAllocator() = default;
 
         void* allocate( zp_size_t size, zp_size_t alignment ) final;
+
+        void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment ) final;
 
         void free( void* ptr ) final;
 
@@ -177,6 +181,30 @@ namespace zp
     }
 
     template<typename Storage, typename Policy, typename Locking>
+    void* MemoryAllocator<Storage, Policy, Locking>::reallocate( void* oldPtr, const zp_size_t size, const zp_size_t alignment )
+    {
+        m_lock.acquire();
+        if( !m_storage.is_fixed() )
+        {
+            const zp_size_t allocatedSize = m_policy.allocated();
+            const zp_size_t totalSize = m_policy.total();
+
+            if( ( allocatedSize + size ) >= totalSize )
+            {
+                zp_size_t requestedSize;
+                void* mem = m_storage.request_memory( size, requestedSize );
+                m_policy.add_memory( mem, requestedSize );
+            }
+        }
+
+        void* ptr = m_policy.reallocate( oldPtr, size, alignment );
+        ZP_ASSERT( ptr );
+        m_lock.release();
+
+        return ptr;
+    }
+
+    template<typename Storage, typename Policy, typename Locking>
     void MemoryAllocator<Storage, Policy, Locking>::free( void* ptr )
     {
         m_lock.acquire();
@@ -225,6 +253,11 @@ namespace zp
         }
 
         void* allocate( zp_size_t size, zp_size_t alignment )
+        {
+            return nullptr;
+        }
+
+        void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
         {
             return nullptr;
         }
@@ -288,6 +321,8 @@ namespace zp
 
         void* allocate( zp_size_t size, zp_size_t alignment );
 
+        void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment );
+
         void free( void* ptr );
 
     protected:
@@ -310,6 +345,8 @@ namespace zp
         zp_size_t total() const;
 
         void* allocate( zp_size_t size, zp_size_t alignment );
+
+        void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment );
 
         void free( void* ptr );
 
