@@ -448,8 +448,8 @@ namespace zp
             constexpr VkFormat formatMap[] {
                 VK_FORMAT_UNDEFINED,
             };
+            ZP_ASSERT( ZP_ARRAY_SIZE( formatMap ) == TextureFormat_Count );
 
-            ZP_ASSERT( static_cast<zp_size_t>( textureFormat ) < ZP_ARRAY_SIZE( formatMap ) );
             return formatMap[ textureFormat ];
         }
 
@@ -829,6 +829,7 @@ namespace zp
         }
     //, m_commandQueueCount( 0 )
     //, m_commandQueues( 4, memoryLabel )
+        , m_currentFrameIndex( 0 )
     {
         zp_zero_memory_array( m_perFrameData );
 
@@ -1047,8 +1048,9 @@ namespace zp
 
         // create command pools
         {
+            const zp_size_t threadCount = 16;
             m_commandPoolCount = 0;
-            m_vkCommandPools = ZP_MALLOC_T_ARRAY( memoryLabel, VkCommandPool, 3 * 16 );
+            m_vkCommandPools = ZP_MALLOC_T_ARRAY( memoryLabel, VkCommandPool, 3 * threadCount );
 
             //    VkCommandPoolCreateInfo commandPoolCreateInfo {
             //        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -1081,42 +1083,30 @@ namespace zp
         }
 
         // create descriptor pool
-        if( false )
         {
-            VkDescriptorPoolSize poolSizes[] {
-                {
-                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                    128,
-                },
-                {
-                    VK_DESCRIPTOR_TYPE_SAMPLER,
-                    8,
-                },
-                {
-                    VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                    32,
-                }
+            const VkDescriptorPoolSize poolSizes[] {
+                { .type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, .descriptorCount = 128 },
+                { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = 128 }
             };
 
             VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                 .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-                .maxSets = 4,
+                .maxSets = 128,
                 .poolSizeCount = ZP_ARRAY_SIZE( poolSizes ),
                 .pPoolSizes = poolSizes,
             };
 
             HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool ) );
-
-            VkDescriptorSetAllocateInfo descriptorSetAllocateInfo {
-                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-                .descriptorPool = m_vkDescriptorPool,
-                .descriptorSetCount = 0,
-                .pSetLayouts = nullptr,
-            };
-
-            VkDescriptorSet dd;
-            HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &dd ) );
         }
     }
 
@@ -1507,6 +1497,8 @@ namespace zp
 
         VkResult result;
 
+        m_currentFrameIndex = frameIndex;
+
         const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
         PerFrameData& frameData = m_perFrameData[ frame ];
 
@@ -1570,11 +1562,11 @@ namespace zp
         frameData.commandQueueCount = 0;
     }
 
-    void VulkanGraphicsDevice::submit( zp_uint64_t frameIndex )
+    void VulkanGraphicsDevice::submit()
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
+        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
         PerFrameData& frameData = m_perFrameData[ frame ];
 
         const zp_size_t commandQueueCount = frameData.commandQueueCount;
@@ -1619,11 +1611,11 @@ namespace zp
         HR( vkQueueSubmit( m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], 1, &submitInfo, frameData.vkInFlightFences ) );
     }
 
-    void VulkanGraphicsDevice::present( zp_uint64_t frameIndex )
+    void VulkanGraphicsDevice::present(  )
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
+        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
 
         VkSemaphore waitSemaphores[] { m_perFrameData[ frame ].vkRenderFinishedSemaphore };
 
@@ -2277,11 +2269,11 @@ namespace zp
         vkUnmapMemory( m_vkLocalDevice, deviceMemory );
     }
 
-    CommandQueue* VulkanGraphicsDevice::requestCommandQueue( RenderQueue queue, zp_uint64_t frameIndex )
+    CommandQueue* VulkanGraphicsDevice::requestCommandQueue( RenderQueue queue )
     {
         queue = ZP_RENDER_QUEUE_GRAPHICS;
 
-        const zp_size_t frame = frameIndex & ( kBufferedFrameCount - 1 );
+        const zp_size_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
         PerFrameData& frameData = m_perFrameData[ frame ];
 
         const zp_size_t commandQueueIndex = Atomic::IncrementSizeT( &frameData.commandQueueCount ) - 1;
@@ -2339,7 +2331,6 @@ namespace zp
 
         commandQueue->queue = queue;
         commandQueue->frame = frame;
-        commandQueue->frameIndex = frameIndex;
 
         if( commandQueue->commandBuffer == nullptr )
         {

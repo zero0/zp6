@@ -203,7 +203,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                waitOnGpuJob->m_graphicsDevice->submit( waitOnGpuJob->frameIndex );
+                waitOnGpuJob->m_graphicsDevice->submit();
             }
         };
 
@@ -218,7 +218,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                presentGpuJob->m_graphicsDevice->present( presentGpuJob->frameIndex );
+                presentGpuJob->m_graphicsDevice->present();
             }
         };
     }
@@ -427,7 +427,7 @@ namespace zp
 
                 context.endRenderPass();
 #endif
-                CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, context.m_frameIndex );
+                CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
 
                 graphicsDevice->beginRenderPass( data->renderPass.data(), cmd );
 
@@ -602,7 +602,7 @@ namespace zp
                 else
                 {
                     GraphicsDevice* graphicsDevice = ctx.m_graphicsDevice;
-                    CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, ctx.m_frameIndex );
+                    CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
 
                     graphicsDevice->beginRenderPass( nullptr, cmd );
                     graphicsDevice->endRenderPass( cmd );

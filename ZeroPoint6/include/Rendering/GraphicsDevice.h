@@ -258,7 +258,6 @@ namespace zp
     struct CommandQueue
     {
         zp_uint64_t frame;
-        zp_uint64_t frameIndex;
         zp_handle_t commandBuffer;
         zp_handle_t commandBufferPool;
         RenderQueue queue;
@@ -289,9 +288,9 @@ namespace zp
 
         virtual void beginFrame( zp_uint64_t frameIndex ) = 0;
 
-        virtual void submit( zp_uint64_t frameIndex ) = 0;
+        virtual void submit() = 0;
 
-        virtual void present( zp_uint64_t frameIndex ) = 0;
+        virtual void present() = 0;
 
         virtual void waitForGPU() = 0;
 
@@ -333,7 +332,7 @@ namespace zp
 
 #pragma region Command Queue Operations
 
-        virtual CommandQueue* requestCommandQueue( RenderQueue queue, zp_uint64_t frameIndex ) = 0;
+        virtual CommandQueue* requestCommandQueue( RenderQueue queue ) = 0;
 
         virtual void releaseCommandQueue( CommandQueue* commandQueue ) = 0;
 

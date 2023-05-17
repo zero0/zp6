@@ -149,7 +149,7 @@ namespace zp
         zp_hash128_t prevMaterial {};
 
         // process commands
-        CommandQueue* commandQueue = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS, m_currentFrame );
+        CommandQueue* commandQueue = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
 
         graphicsDevice->beginRenderPass( nullptr, commandQueue );
 

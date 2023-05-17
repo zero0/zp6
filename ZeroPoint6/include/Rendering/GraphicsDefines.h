@@ -209,12 +209,15 @@ namespace zp
         ZP_TEXTURE_DIMENSION_TEXTURE_3D,
         ZP_TEXTURE_DIMENSION_TEXTURE_CUBE_MAP,
         ZP_TEXTURE_DIMENSION_TEXTURE_CUBE_MAP_ARRAY,
+
         TextureDimension_Count,
     };
 
     enum TextureFormat
     {
         ZP_TEXTURE_FORMAT_UNKNOWN,
+
+        TextureFormat_Count,
     };
 
     enum TextureUsage

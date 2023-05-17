@@ -37,9 +37,9 @@ namespace zp
 
         void beginFrame( zp_uint64_t frameIndex ) final;
 
-        void submit( zp_uint64_t frameIndex ) final;
+        void submit() final;
 
-        void present( zp_uint64_t frameIndex ) final;
+        void present() final;
 
         void waitForGPU() final;
 
@@ -81,14 +81,14 @@ namespace zp
 
 #pragma region Command Queue Operations
 
-        CommandQueue* requestCommandQueue( RenderQueue queue, zp_uint64_t frameIndex ) final;
+        CommandQueue* requestCommandQueue( RenderQueue queue ) final;
 
         void releaseCommandQueue( CommandQueue* commandQueue ) final;
 
         void beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue ) final;
 
         void nextSubpass( CommandQueue* commandQueue ) final;
-        
+
         void endRenderPass( CommandQueue* commandQueue ) final;
 
         void bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandQueue* commandQueue ) final;
@@ -187,6 +187,8 @@ namespace zp
         GraphicsBuffer m_stagingBuffer;
 
         QueueFamilies m_queueFamilies;
+
+        zp_uint64_t m_currentFrameIndex;
     };
 }
 
