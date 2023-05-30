@@ -15,7 +15,7 @@ namespace zp
     struct SubsystemHandle
     {
     public:
-        zp_bool_t isValid() const;
+        [[nodiscard]] zp_bool_t isValid() const { return m_subsystem != nullptr; }
 
         T* operator->() { return m_subsystem; }
 

@@ -687,12 +687,6 @@ void zp_lzf_expand( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcS
 template<typename T, typename Cmp>
 constexpr void zp_qsort3( T* begin, T* end, Cmp cmp )
 {
-    if( begin >= end )
-    { return; }
-
-    T* i;
-    T* j;
-
     // partition
     T* mid = begin;
     T* pivot = end;
@@ -717,11 +711,18 @@ constexpr void zp_qsort3( T* begin, T* end, Cmp cmp )
         }
     }
 
-    i = begin - 1;
-    j = mid;
+    T* i = begin - 1;
+    T* j = mid;
 
-    zp_qsort3( begin, i, cmp );
-    zp_qsort3( j, end, cmp );
+    if( begin < i )
+    {
+        zp_qsort3( begin, i, cmp );
+    }
+
+    if( j < end )
+    {
+        zp_qsort3( j, end, cmp );
+    }
 };
 
 //
@@ -737,16 +738,7 @@ namespace zp
 
         zp_int32_t operator()( const_reference lh, const_reference rh )
         {
-            zp_int32_t cmp = 0;
-            if( lh < rh )
-            {
-                cmp = -1;
-            }
-            else if( rh < lh )
-            {
-                cmp = 1;
-            }
-
+            const zp_int32_t cmp = lh < rh ? -1 : rh < lh ? 1 : 0;
             return cmp;
         }
     };

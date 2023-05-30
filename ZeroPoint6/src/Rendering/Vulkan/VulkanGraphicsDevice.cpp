@@ -893,6 +893,62 @@ namespace zp
             IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
             allocator->free( pMemory );
         }
+
+        void DestroyDelayedDestroyHandle( VkInstance vkInstance, VkDevice vkLocalDevice, const DelayedDestroy& delayedDestroy )
+        {
+            auto allocator = static_cast<const VkAllocationCallbacks*>( delayedDestroy.allocator);
+            switch( delayedDestroy.type )
+            {
+                case DelayedDestroyType::Buffer:
+                    vkDestroyBuffer( vkLocalDevice, static_cast<VkBuffer>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::BufferView:
+                    vkDestroyBufferView( vkLocalDevice, static_cast<VkBufferView>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Image:
+                    vkDestroyImage( vkLocalDevice, static_cast<VkImage>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::ImageView:
+                    vkDestroyImageView( vkLocalDevice, static_cast<VkImageView>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::FrameBuffer:
+                    vkDestroyFramebuffer( vkLocalDevice, static_cast<VkFramebuffer>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Swapchain:
+                    vkDestroySwapchainKHR( vkLocalDevice, static_cast<VkSwapchainKHR>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Surface:
+                    vkDestroySurfaceKHR( vkInstance, static_cast<VkSurfaceKHR>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Shader:
+                    vkDestroyShaderModule( vkLocalDevice, static_cast<VkShaderModule>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::RenderPass:
+                    vkDestroyRenderPass( vkLocalDevice, static_cast<VkRenderPass>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Sampler:
+                    vkDestroySampler( vkLocalDevice, static_cast<VkSampler>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Fence:
+                    vkDestroyFence( vkLocalDevice, static_cast<VkFence>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Semaphore:
+                    vkDestroySemaphore( vkLocalDevice, static_cast<VkSemaphore>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Pipeline:
+                    vkDestroyPipeline( vkLocalDevice, static_cast<VkPipeline>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::PipelineLayout:
+                    vkDestroyPipelineLayout( vkLocalDevice, static_cast<VkPipelineLayout>(delayedDestroy.handle), allocator );
+                    break;
+                case DelayedDestroyType::Memory:
+                    vkFreeMemory( vkLocalDevice, static_cast<VkDeviceMemory>(delayedDestroy.handle), allocator );
+                    break;
+                default:
+                    ZP_INVALID_CODE_PATH_MSG( "DelayedDestroyType not defined" );
+                    break;
+            }
+        }
     }
 
     //
@@ -930,6 +986,8 @@ namespace zp
         , m_swapChainFrameBuffers( 4, memoryLabel )
         , m_swapChainInFlightFences( 4, memoryLabel )
         , m_descriptorSetLayoutCache( 64, memoryLabel )
+        , m_samplerCache( 16, memoryLabel )
+        , m_delayedDestroy( 64, memoryLabel )
         , m_stagingBuffer {}
         , m_queueFamilies {
             .graphicsFamily = VK_QUEUE_FAMILY_IGNORED,
@@ -983,8 +1041,12 @@ namespace zp
         // add debug info to create instance
         VkDebugUtilsMessengerCreateInfoEXT createInstanceDebugMessengerInfo {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
             .pfnUserCallback = DebugCallback,
             .pUserData = nullptr, // Optional
         };
@@ -997,8 +1059,12 @@ namespace zp
         // create debug messenger
         VkDebugUtilsMessengerCreateInfoEXT createDebugMessengerInfo {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
             .pfnUserCallback = DebugCallback,
             .pUserData = nullptr, // Optional
         };
@@ -1025,6 +1091,9 @@ namespace zp
                     break;
                 }
             }
+
+            ZP_ASSERT( m_vkPhysicalDevice );
+            vkGetPhysicalDeviceMemoryProperties( m_vkPhysicalDevice, &m_vkPhysicalDeviceMemoryProperties );
         }
 
         // create local device and queue families
@@ -1227,6 +1296,8 @@ namespace zp
 
         destroySwapChain();
 
+        destroyAllDelayedDestroy();
+
         destroyBuffer( &m_stagingBuffer );
 
         auto b = m_descriptorSetLayoutCache.begin();
@@ -1322,7 +1393,7 @@ namespace zp
         uint32_t imageCount = swapChainSupportDetails.minImageCount + 1;
         if( swapChainSupportDetails.maxImageCount > 0 )
         {
-            imageCount = imageCount < swapChainSupportDetails.maxImageCount ? imageCount : swapChainSupportDetails.maxImageCount;
+            imageCount = zp_min( imageCount, swapChainSupportDetails.maxImageCount );
         }
 
         VkSwapchainCreateInfoKHR swapChainCreateInfo {
@@ -1618,6 +1689,8 @@ namespace zp
 
         m_currentFrameIndex = frameIndex;
 
+        processDelayedDestroy();
+
         const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
         PerFrameData& frameData = m_perFrameData[ frame ];
 
@@ -1829,7 +1902,16 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyRenderPass( RenderPass* renderPass )
     {
-        vkDestroyRenderPass( m_vkLocalDevice, static_cast<VkRenderPass>( renderPass->internalRenderPass), &m_vkAllocationCallbacks );
+        const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+        m_delayedDestroy[ index ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = renderPass->internalRenderPass,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index,
+            .type = DelayedDestroyType::RenderPass,
+        };
+
         renderPass->internalRenderPass = nullptr;
     }
 
@@ -1854,7 +1936,7 @@ namespace zp
                 .pNext = nullptr,
                 .flags = 0,
                 .stage = stage,
-                .module = static_cast<VkShaderModule>( srcShaderStage->shader ),
+                .module = static_cast<VkShaderModule>( srcShaderStage->shaderHandle ),
                 .pName = srcShaderStage->entryPointName,
                 .pSpecializationInfo = nullptr,
             };
@@ -2066,7 +2148,16 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyGraphicsPipeline( GraphicsPipelineState* graphicsPipelineState )
     {
-        vkDestroyPipeline( m_vkLocalDevice, static_cast<VkPipeline>( graphicsPipelineState->pipelineState ), &m_vkAllocationCallbacks );
+        const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+        m_delayedDestroy[ index ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = graphicsPipelineState->pipelineState,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index,
+            .type = DelayedDestroyType::Pipeline,
+        };
+
         graphicsPipelineState->pipelineState = nullptr;
     }
 
@@ -2093,7 +2184,16 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyPipelineLayout( PipelineLayout* pipelineLayout )
     {
-        vkDestroyPipelineLayout( m_vkLocalDevice, static_cast<VkPipelineLayout>( pipelineLayout->layout ), &m_vkAllocationCallbacks );
+        const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+        m_delayedDestroy[ index ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = pipelineLayout->layout,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index,
+            .type = DelayedDestroyType::PipelineLayout
+        };
+
         pipelineLayout->layout = nullptr;
     }
 
@@ -2112,15 +2212,12 @@ namespace zp
         VkMemoryRequirements memoryRequirements;
         vkGetBufferMemoryRequirements( m_vkLocalDevice, buffer, &memoryRequirements );
 
-        VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
-        vkGetPhysicalDeviceMemoryProperties( m_vkPhysicalDevice, &physicalDeviceMemoryProperties );
-
         VkMemoryAllocateInfo memoryAllocateInfo {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memoryRequirements.size,
-            .memoryTypeIndex = FindMemoryTypeIndex( physicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc->memoryPropertyFlags ) ),
+            .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc->memoryPropertyFlags ) ),
         };
-        VkAllocationCallbacks ff;
+
         VkDeviceMemory deviceMemory;
         HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &deviceMemory ) );
 
@@ -2141,15 +2238,23 @@ namespace zp
     {
         if( !graphicsBuffer->isVirtualBuffer )
         {
-            if( graphicsBuffer->buffer )
-            {
-                vkDestroyBuffer( m_vkLocalDevice, static_cast<VkBuffer>( graphicsBuffer->buffer ), &m_vkAllocationCallbacks );
-            }
+            const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 2, false );
 
-            if( graphicsBuffer->deviceMemory )
-            {
-                vkFreeMemory( m_vkLocalDevice, static_cast<VkDeviceMemory>( graphicsBuffer->deviceMemory ), &m_vkAllocationCallbacks );
-            }
+            m_delayedDestroy[ index + 0 ] = {
+                .frameIndex = m_currentFrameIndex,
+                .handle = graphicsBuffer->buffer,
+                .allocator = &m_vkAllocationCallbacks,
+                .order = index + 0,
+                .type = DelayedDestroyType::Buffer
+            };
+
+            m_delayedDestroy[ index + 1 ] = {
+                .frameIndex = m_currentFrameIndex,
+                .handle = graphicsBuffer->deviceMemory,
+                .allocator = &m_vkAllocationCallbacks,
+                .order = index + 1,
+                .type = DelayedDestroyType::Memory
+            };
         }
 
         graphicsBuffer->buffer = nullptr;
@@ -2172,7 +2277,7 @@ namespace zp
 
         VkShaderModule shaderModule;
         HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
-        shader->shader = shaderModule;
+        shader->shaderHandle = shaderModule;
         shader->shaderStage = shaderDesc.shaderStage;
         shader->shaderHash = zp_fnv128_1a( shaderDesc.codeData, shaderDesc.codeSizeInBytes );
 
@@ -2184,8 +2289,17 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyShader( Shader* shader )
     {
-        vkDestroyShaderModule( m_vkLocalDevice, static_cast<VkShaderModule>( shader->shader ), &m_vkAllocationCallbacks );
-        shader->shader = nullptr;
+        const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+        m_delayedDestroy[ index ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = shader->shaderHandle,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index,
+            .type = DelayedDestroyType::Shader
+        };
+
+        shader->shaderHandle = nullptr;
     }
 
     void VulkanGraphicsDevice::createTexture( const TextureCreateDesc* textureCreateDesc, Texture* texture )
@@ -2218,13 +2332,10 @@ namespace zp
         VkMemoryRequirements memoryRequirements;
         vkGetImageMemoryRequirements( m_vkLocalDevice, image, &memoryRequirements );
 
-        VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
-        vkGetPhysicalDeviceMemoryProperties( m_vkPhysicalDevice, &physicalDeviceMemoryProperties );
-
         VkMemoryAllocateInfo memoryAllocateInfo {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memoryRequirements.size,
-            .memoryTypeIndex = FindMemoryTypeIndex( physicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( textureCreateDesc->memoryPropertyFlags ) ),
+            .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( textureCreateDesc->memoryPropertyFlags ) ),
         };
 
         VkDeviceMemory deviceMemory;
@@ -2270,20 +2381,29 @@ namespace zp
 
     void VulkanGraphicsDevice::destroyTexture( Texture* texture )
     {
-        if( texture->textureViewHandle )
-        {
-            vkDestroyImageView( m_vkLocalDevice, static_cast<VkImageView>(texture->textureViewHandle), &m_vkAllocationCallbacks );
-        }
+        const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 3, false );
 
-        if( texture->textureMemoryHandle )
-        {
-            vkFreeMemory( m_vkLocalDevice, static_cast<VkDeviceMemory>( texture->textureMemoryHandle ), &m_vkAllocationCallbacks );
-        }
-
-        if( texture->textureHandle )
-        {
-            vkDestroyImage( m_vkLocalDevice, static_cast<VkImage>( texture->textureHandle ), &m_vkAllocationCallbacks );
-        }
+        m_delayedDestroy[ index + 0 ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = texture->textureViewHandle,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index + 0,
+            .type = DelayedDestroyType::ImageView,
+        };
+        m_delayedDestroy[ index + 1 ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = texture->textureMemoryHandle,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index + 0,
+            .type = DelayedDestroyType::Memory,
+        };
+        m_delayedDestroy[ index + 2 ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = texture->textureHandle,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index + 0,
+            .type = DelayedDestroyType::Image,
+        };
 
         texture->textureHandle = nullptr;
         texture->textureMemoryHandle = nullptr;
@@ -2321,10 +2441,14 @@ namespace zp
 
     void VulkanGraphicsDevice::destroySampler( Sampler* sampler )
     {
-        if( sampler->samplerHandle )
-        {
-            vkDestroySampler( m_vkLocalDevice, static_cast<VkSampler>( sampler->samplerHandle ), &m_vkAllocationCallbacks );
-        }
+        const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+        m_delayedDestroy[ index ] = {
+            .frameIndex = m_currentFrameIndex,
+            .handle = sampler->samplerHandle,
+            .allocator = &m_vkAllocationCallbacks,
+            .order = index,
+            .type = DelayedDestroyType::Sampler,
+        };
 
         sampler->samplerHandle = nullptr;
     }
@@ -2909,5 +3033,60 @@ namespace zp
         }
 
         return layout;
+    }
+
+    void VulkanGraphicsDevice::processDelayedDestroy()
+    {
+        ZP_PROFILE_CPU_BLOCK();
+
+        const zp_size_t kMaxFrameDistance = 3;
+        if( !m_delayedDestroy.isEmpty() )
+        {
+            Vector<DelayedDestroy> handlesToDestroy( m_delayedDestroy.size(), MemoryLabels::Temp );
+
+            // get delayed destroy handles that are too old
+            for( zp_size_t i = 0; i < m_delayedDestroy.size(); ++i )
+            {
+                const DelayedDestroy& delayedDestroy = m_delayedDestroy[ i ];
+                if( delayedDestroy.handle == nullptr )
+                {
+                    m_delayedDestroy.eraseAtSwapBack( i );
+                    --i;
+                }
+                else if( m_currentFrameIndex < delayedDestroy.frameIndex || m_currentFrameIndex - delayedDestroy.frameIndex >= kMaxFrameDistance )
+                {
+                    handlesToDestroy.pushBack( delayedDestroy );
+
+                    m_delayedDestroy.eraseAtSwapBack( i );
+                    --i;
+                }
+            }
+
+            if( !handlesToDestroy.isEmpty() )
+            {
+                // sort delayed destroy handles by how they were allocated
+                handlesToDestroy.sort( []( const DelayedDestroy& a, const DelayedDestroy& b )
+                {
+                    return zp_cmp( a.order, b.order );
+                } );
+
+                // destroy each delayed destroy handle
+                for( const DelayedDestroy& delayedDestroy : handlesToDestroy )
+                {
+                    DestroyDelayedDestroyHandle( m_vkInstance, m_vkLocalDevice, delayedDestroy );
+                }
+            }
+        }
+    }
+
+    void VulkanGraphicsDevice::destroyAllDelayedDestroy()
+    {
+        // destroy each delayed destroy handle
+        for( const DelayedDestroy& delayedDestroy : m_delayedDestroy )
+        {
+            DestroyDelayedDestroyHandle( m_vkInstance, m_vkLocalDevice, delayedDestroy );
+        }
+
+        m_delayedDestroy.clear();
     }
 }

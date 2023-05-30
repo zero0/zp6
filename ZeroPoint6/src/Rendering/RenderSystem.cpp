@@ -253,7 +253,7 @@ namespace zp
             {
                 {
                     ShaderDesc shaderDesc {
-                        .name = "vertex shader",
+                        .name = "vertex shaderHandle",
                         .entryPointName = "main",
                         .codeSizeInBytes = ZP_ARRAY_SIZE( vertexShaderCode ) * sizeof( zp_uint32_t ),
                         .codeData = vertexShaderCode,
@@ -264,7 +264,7 @@ namespace zp
 
                 {
                     ShaderDesc shaderDesc {
-                        .name = "fragment shader",
+                        .name = "fragment shaderHandle",
                         .entryPointName = "main",
                         .codeSizeInBytes = ZP_ARRAY_SIZE( fragmentShaderCode ) * sizeof( zp_uint32_t ),
                         .codeData = fragmentShaderCode,
@@ -287,7 +287,7 @@ namespace zp
                     GetPlatform()->CloseFileHandle( fileHandle );
 
                     ShaderDesc shaderDesc {
-                        .name = "color vertex shader",
+                        .name = "color vertex shaderHandle",
                         .entryPointName = "main",
                         .codeSizeInBytes = fileSize,
                         .codeData = memPtr,
@@ -308,7 +308,7 @@ namespace zp
                     GetPlatform()->CloseFileHandle( fileHandle );
 
                     ShaderDesc shaderDesc {
-                        .name = "color fragment shader",
+                        .name = "color fragment shaderHandle",
                         .entryPointName = "main",
                         .codeSizeInBytes = fileSize,
                         .codeData = memPtr,
@@ -675,7 +675,7 @@ namespace zp
 
                     cmd = renderProfilerData->immediateModeRenderer->begin( 0, ZP_TOPOLOGY_TRIANGLE_LIST, 4 * ( frame.cpuProfilerEventCount ), 6 * ( frame.cpuProfilerEventCount ) );
 
-                    for( zp_size_t c = 0; c < frame.cpuProfilerEventCount; ++c )
+                    for( zp_size_t c = 0; c < zp_min(10ULL,frame.cpuProfilerEventCount); ++c )
                     {
                         auto cpu = frame.cpuProfilerEvents + c;
 

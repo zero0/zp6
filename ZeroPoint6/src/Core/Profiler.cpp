@@ -26,7 +26,7 @@ namespace zp
         zp_int32_t compareCPU( const CPUProfilerEvent& lh, const CPUProfilerEvent& rh )
         {
             zp_int32_t cmp = zp_cmp( lh.threadId, rh.threadId );
-            return cmp == 0 ? -zp_cmp( lh.startTime, rh.startTime ) : cmp;
+            return cmp;// == 0 ? -zp_cmp( lh.startTime, rh.startTime ) : cmp;
         }
 
         zp_int32_t compareMemory( const MemoryProfilerEvent& lh, const MemoryProfilerEvent& rh )
@@ -293,8 +293,8 @@ namespace zp
                 }
             }
 
-            CPUProfilerEvent* endCPUEvent = reinterpret_cast<CPUProfilerEvent*>( profilerFrameBuffer );
-            zp_qsort3( startCPUEvent, endCPUEvent, compareCPU );
+            //CPUProfilerEvent* endCPUEvent = reinterpret_cast<CPUProfilerEvent*>( profilerFrameBuffer );
+            //zp_qsort3( startCPUEvent, endCPUEvent, compareCPU );
         }
 
         ProfilerFrameEnumerator enumerator( range.startFrame, frameCount, m_profilerFrameBuffers );
@@ -312,7 +312,7 @@ namespace zp
             ProfilerThreadData* threadData = m_profilerThreadData[ i ];
             if( threadData )
             {
-                Atomic::ExchangeSizeT( &threadData->currentFrame, frameIndex );
+                Atomic::Exchange( &threadData->currentFrame, frameIndex );
             }
         }
     }

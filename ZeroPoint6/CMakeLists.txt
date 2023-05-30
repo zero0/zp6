@@ -107,8 +107,11 @@ set(ZP_RENDERING_HEADERS
         "include/Rendering/RenderPass.h"
         "include/Rendering/RenderPipeline.h"
         "include/Rendering/RenderSystem.h"
+        "include/Rendering/RenderTarget.h"
+        "include/Rendering/Sampler.h"
         "include/Rendering/Shader.h"
         "include/Rendering/Texture.h"
+        "include/Rendering/Swapchain.h"
         "include/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.h"
         )
 

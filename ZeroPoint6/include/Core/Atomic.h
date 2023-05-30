@@ -248,6 +248,17 @@ namespace zp
             return _InterlockedCompareExchange64( destination, exChange, comperand );
 #endif
         }
+
+        //
+        //
+        //
+
+        ZP_FORCEINLINE zp_uint64_t Exchange( zp_uint64_t* target, zp_uint64_t value )
+        {
+#if ZP_OS_WINDOWS
+            return static_cast<zp_uint64_t>( _InterlockedExchange64( reinterpret_cast<__int64*>( target ), static_cast<__int64>( value ) ) );
+#endif
+        }
     };
 }
 

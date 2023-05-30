@@ -61,30 +61,6 @@ namespace zp
 
     typedef GraphicsResource<Texture> TextureResource;
     typedef GraphicsResourceHandle<Texture> TextureResourceHandle;
-
-    struct SamplerCreateDesc
-    {
-        FilterMode magFilter;
-        FilterMode minFilter;
-        MipmapMode mipmapMode;
-        SamplerAddressMode addressModeU;
-        SamplerAddressMode addressModeV;
-        SamplerAddressMode addressModeW;
-        CompareOp compareOp;
-        zp_float32_t mipLodBias;
-        zp_float32_t maxAnisotropy;
-        zp_float32_t minLod;
-        zp_float32_t maxLod;
-        BorderColor borderColor;
-        ZP_BOOL32( anisotropyEnabled );
-        ZP_BOOL32( compareEnabled );
-        ZP_BOOL32( unnormalizedCoordinates );
-    };
-
-    struct Sampler
-    {
-        zp_handle_t samplerHandle;
-    };
 }
 
 #endif //ZP_TEXTURE_H

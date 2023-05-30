@@ -65,7 +65,11 @@ namespace zp
 
         [[nodiscard]] zp_size_t size() const;
 
+        [[nodiscard]] zp_size_t sizeAtomic() const;
+
         [[nodiscard]] zp_bool_t isEmpty() const;
+
+        [[nodiscard]] zp_bool_t isEmptyAtomic() const;
 
         [[nodiscard]] zp_bool_t isFixed() const;
 
@@ -80,6 +84,8 @@ namespace zp
         reference pushBackEmptyUnsafe();
 
         reference pushBackEmptyAtomic();
+
+        zp_size_t pushBackEmptyRangeAtomic( zp_size_t count, zp_bool_t initialize = true );
 
         void pushFront( const_reference val );
 
@@ -112,6 +118,15 @@ namespace zp
         zp_size_t indexOf( const_reference val, EqualityComparerFunc comparer = nullptr ) const;
 
         zp_size_t lastIndexOf( const_reference val, EqualityComparerFunc comparer = nullptr ) const;
+
+        template<typename Cmp>
+        void sort( Cmp cmp )
+        {
+            if( m_size > 1 )
+            {
+                zp_qsort3( begin(), end() - 1, cmp );
+            }
+        }
 
         pointer data();
 
@@ -268,9 +283,21 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::sizeAtomic() const
+    {
+        return Atomic::AddSizeT( m_size, 0 );
+    }
+
+    template<typename T, typename Allocator>
     zp_bool_t Vector<T, Allocator>::isEmpty() const
     {
         return m_size == 0;
+    }
+
+    template<typename T, typename Allocator>
+    zp_bool_t Vector<T, Allocator>::isEmptyAtomic() const
+    {
+        return Atomic::AddSizeT( m_size, 0 ) == 0;
     }
 
     template<typename T, typename Allocator>
@@ -327,6 +354,22 @@ namespace zp
 
         new( m_data + index ) T();
         return m_data[ index ];
+    }
+
+    template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::pushBackEmptyRangeAtomic( zp_size_t count, zp_bool_t initialize )
+    {
+        const zp_size_t index = Atomic::AddSizeT( &m_size, count ) - count;
+
+        if( initialize )
+        {
+            for( zp_size_t i = index, imax = index + count; i < imax; ++i )
+            {
+                new( m_data + i ) T();
+            }
+        }
+
+        return index;
     }
 
     template<typename T, typename Allocator>

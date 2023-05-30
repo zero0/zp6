@@ -144,7 +144,7 @@ namespace zp
 
         // sort
         const StaticFunctionComparer<BatchRenderCommandSort> comparer {};
-        zp_qsort3( sortedBatchRenderCommands.begin(), sortedBatchRenderCommands.end() - 1, comparer );
+        sortedBatchRenderCommands.sort( comparer );
 
         zp_hash128_t prevMaterial {};
 

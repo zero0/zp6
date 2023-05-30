@@ -24,6 +24,20 @@ namespace zp
 
     typedef GraphicsResource<RenderPass> RenderPassResource;
     typedef GraphicsResourceHandle<RenderPass> RenderPassResourceHandle;
+
+    class RenderPassBuilder
+    {
+    ZP_NONCOPYABLE( RenderPassBuilder );
+    public:
+        RenderPassBuilder( MemoryLabel memoryLabel );
+
+        ~RenderPassBuilder();
+
+    private:
+
+    public:
+        MemoryLabel memoryLabel;
+    };
 }
 
 #endif //ZP_RENDERPASS_H

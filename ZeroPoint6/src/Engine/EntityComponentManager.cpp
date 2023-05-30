@@ -84,7 +84,7 @@ namespace zp
         Entity entity = m_currentEntity++;
 
         EntityComponentCommandCreateEntity cmd {
-            entity
+            .entity = entity
         };
 
         write( m_buffer, m_length, ZP_ENTITY_COMPONENT_COMMAND_TYPE_CREATE_ENTITY );
@@ -99,8 +99,8 @@ namespace zp
         Entity entity = m_currentEntity++;
 
         EntityComponentCommandCreateEntityWithSignature cmd {
-            entity,
-            componentSignature
+            .entity = entity,
+            .componentSignature = componentSignature
         };
 
         write( m_buffer, m_length, ZP_ENTITY_COMPONENT_COMMAND_TYPE_CREATE_ENTITY_WITH_SIGNATURE );
@@ -113,9 +113,9 @@ namespace zp
     {
         ZP_ASSERT( m_length < m_capacity );
         EntityComponentCommandSetComponentData cmd {
-            entity,
-            componentType,
-            size
+            .entity = entity,
+            .componentType = componentType,
+            .size = size
         };
 
         write( m_buffer, m_length, ZP_ENTITY_COMPONENT_COMMAND_TYPE_SET_COMPONENT_DATA );

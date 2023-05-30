@@ -117,7 +117,7 @@ zp_time_t zp_time_frequency()
 
 #if ZP_OS_WINDOWS
     LARGE_INTEGER val;
-    ::QueryPerformanceCounter( &val );
+    ::QueryPerformanceFrequency( &val );
     frequency = val.QuadPart;
 #endif
 

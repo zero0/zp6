@@ -46,7 +46,7 @@ namespace zp
     {
         zp_hash128_t shaderHash;
 
-        zp_handle_t shader;
+        zp_handle_t shaderHandle;
 
         ShaderStage shaderStage;
         char entryPointName[kMaxShaderEntryPointNameSize];

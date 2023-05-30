@@ -14,6 +14,7 @@
 
 #include "Rendering/RenderPass.h"
 #include "Rendering/GraphicsResource.h"
+#include "Rendering/Sampler.h"
 #include "Rendering/Shader.h"
 #include "Rendering/Texture.h"
 
@@ -180,7 +181,7 @@ namespace zp
         RenderPassResourceHandle renderPass;
         zp_uint32_t subPass;
 
-        // shader states
+        // shaderHandle states
         zp_size_t shaderStageCount;
         ShaderResourceHandle shaderStages[ShaderStage_Count];
 

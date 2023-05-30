@@ -108,19 +108,19 @@ namespace zp
 
         void draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
 
-        void drawIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue );
+        void drawIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) final;
 
         void drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
 
-        void drawIndexedIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue );
+        void drawIndexedIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) final;
 
 #pragma endregion
 
 #pragma region Compute Dispatch Commands
 
-        void dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue );
+        void dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue ) final;
 
-        void dispatchIndirect( const GraphicsBuffer& buffer, CommandQueue* commandQueue );
+        void dispatchIndirect( const GraphicsBuffer& buffer, CommandQueue* commandQueue ) final;
 
 #pragma endregion
 
@@ -138,6 +138,10 @@ namespace zp
         VkCommandPool getCommandPool( CommandQueue* commandQueue );
 
         VkDescriptorSetLayout getDescriptorSetLayout( const VkDescriptorSetLayoutCreateInfo& createInfo );
+
+        void processDelayedDestroy();
+
+        void destroyAllDelayedDestroy();
 
         struct QueueFamilies
         {
@@ -174,6 +178,7 @@ namespace zp
         VkSurfaceKHR m_vkSurface;
         VkPhysicalDevice m_vkPhysicalDevice;
         VkDevice m_vkLocalDevice;
+        VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties;
 
         VkAllocationCallbacks m_vkAllocationCallbacks;
 
@@ -202,6 +207,9 @@ namespace zp
         Vector<VkFence> m_swapChainInFlightFences;
 
         Map<zp_hash128_t, VkDescriptorSetLayout, zp_hash128_t> m_descriptorSetLayoutCache;
+        Map<zp_hash128_t, VkSampler, zp_hash128_t> m_samplerCache;
+
+        Vector<DelayedDestroy> m_delayedDestroy;
 
         GraphicsBuffer m_stagingBuffer;
 

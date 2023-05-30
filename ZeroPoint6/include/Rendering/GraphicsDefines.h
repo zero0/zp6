@@ -463,19 +463,28 @@ namespace zp
     enum class DelayedDestroyType
     {
         Buffer,
-        Texture,
-        FrameBuffer,
+        BufferView,
+        Image,
         ImageView,
-        SwapChain,
+        FrameBuffer,
+        Swapchain,
+        Surface,
         Shader,
         RenderPass,
+        Sampler,
+        Fence,
+        Semaphore,
+        Pipeline,
+        PipelineLayout,
+        Memory,
     };
 
     struct DelayedDestroy
     {
+        zp_uint64_t frameIndex;
         zp_handle_t handle;
         zp_handle_t allocator;
-        zp_uint64_t frameIndex;
+        zp_size_t order;
         DelayedDestroyType type;
     };
 }
