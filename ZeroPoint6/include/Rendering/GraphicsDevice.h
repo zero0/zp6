@@ -258,7 +258,7 @@ namespace zp
 
     struct CommandQueue
     {
-        zp_uint64_t frame;
+        zp_uint64_t frameIndex;
         zp_handle_t commandBuffer;
         zp_handle_t commandBufferPool;
         RenderQueue queue;

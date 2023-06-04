@@ -22,7 +22,6 @@ namespace zp
         kBufferedFrameCount = 4,
     };
 
-
     class VulkanGraphicsDevice final : public GraphicsDevice
     {
     ZP_NONCOPYABLE( VulkanGraphicsDevice );
@@ -171,6 +170,10 @@ namespace zp
             zp_size_t commandQueueCapacity;
             CommandQueue* commandQueues;
         };
+
+        PerFrameData& getCurrentFrameData();
+
+        PerFrameData& getFrameData( zp_uint64_t frameIndex );
 
         PerFrameData m_perFrameData[kBufferedFrameCount];
 

@@ -1691,8 +1691,7 @@ namespace zp
 
         processDelayedDestroy();
 
-        const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
-        PerFrameData& frameData = m_perFrameData[ frame ];
+        PerFrameData& frameData = getCurrentFrameData();
 
         uint32_t imageIndex;
         result = vkAcquireNextImageKHR( m_vkLocalDevice, m_vkSwapChain, UINT64_MAX, frameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &imageIndex );
@@ -1758,8 +1757,7 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
-        PerFrameData& frameData = m_perFrameData[ frame ];
+        PerFrameData& frameData = getCurrentFrameData();
 
         const zp_size_t commandQueueCount = frameData.commandQueueCount;
         if( commandQueueCount > 0 )
@@ -1807,12 +1805,12 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
+        PerFrameData& frameData = getCurrentFrameData();
 
-        VkSemaphore waitSemaphores[] { m_perFrameData[ frame ].vkRenderFinishedSemaphore };
+        VkSemaphore waitSemaphores[] { frameData.vkRenderFinishedSemaphore };
 
         VkSwapchainKHR swapChains[] { m_vkSwapChain };
-        uint32_t imageIndices[] { m_perFrameData[ frame ].swapChainImageIndex };
+        uint32_t imageIndices[] { frameData.swapChainImageIndex };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( swapChains ) == ZP_ARRAY_SIZE( imageIndices ) );
 
         VkPresentInfoKHR presentInfo {
@@ -2470,8 +2468,7 @@ namespace zp
     {
         queue = ZP_RENDER_QUEUE_GRAPHICS;
 
-        const zp_size_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
-        PerFrameData& frameData = m_perFrameData[ frame ];
+        PerFrameData& frameData = getCurrentFrameData();
 
         const zp_size_t commandQueueIndex = Atomic::IncrementSizeT( &frameData.commandQueueCount ) - 1;
         if( commandQueueIndex == frameData.commandQueueCapacity )
@@ -2527,7 +2524,7 @@ namespace zp
         }
 
         commandQueue->queue = queue;
-        commandQueue->frame = frame;
+        commandQueue->frameIndex = m_currentFrameIndex;
 
         if( commandQueue->commandBuffer == nullptr )
         {
@@ -2595,11 +2592,11 @@ namespace zp
             }
         };
 
+        PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
         VkRenderPassBeginInfo renderPassBeginInfo {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .pNext = nullptr,
             .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_vkSwapChainRenderPass,
-            .framebuffer = m_swapChainFrameBuffers[ m_perFrameData[ commandQueue->frame ].swapChainImageIndex ],
+            .framebuffer = m_swapChainFrameBuffers[ frameData.swapChainImageIndex ],
             .renderArea { .offset = { 0, 0 }, .extent = m_vkSwapChainExtent },
             .clearValueCount = ZP_ARRAY_SIZE( clearValues ),
             .pClearValues = clearValues,
@@ -2649,7 +2646,8 @@ namespace zp
 
     void VulkanGraphicsDevice::updateTexture( const TextureUpdateDesc* textureUpdateDesc, const Texture* dstTexture, CommandQueue* commandQueue )
     {
-        GraphicsBufferAllocation allocation = m_perFrameData[ commandQueue->frame ].perFrameStagingBuffer.allocate( textureUpdateDesc->textureDataSize );
+        PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
+        GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( textureUpdateDesc->textureDataSize );
 
         auto commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
         const zp_uint32_t mipCount = textureUpdateDesc->maxMipLevel - textureUpdateDesc->minMipLevel;
@@ -2775,7 +2773,8 @@ namespace zp
 
     void VulkanGraphicsDevice::updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc, const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue )
     {
-        GraphicsBufferAllocation allocation = m_perFrameData[ commandQueue->frame ].perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->dataSize );
+        PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
+        GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->dataSize );
 
         VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
 
@@ -2998,7 +2997,7 @@ namespace zp
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
             HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkComputeCommandPool ) );
 
-            zp_size_t index = Atomic::AddSizeT( &m_commandPoolCount, 3 ) - 3;
+            const zp_size_t index = Atomic::AddSizeT( &m_commandPoolCount, 3 ) - 3;
             m_vkCommandPools[ index + 0 ] = t_vkGraphicsCommandPool;
             m_vkCommandPools[ index + 1 ] = t_vkTransferCommandPool;
             m_vkCommandPools[ index + 2 ] = t_vkComputeCommandPool;
@@ -3053,7 +3052,7 @@ namespace zp
                     m_delayedDestroy.eraseAtSwapBack( i );
                     --i;
                 }
-                else if( m_currentFrameIndex < delayedDestroy.frameIndex || m_currentFrameIndex - delayedDestroy.frameIndex >= kMaxFrameDistance )
+                else if( m_currentFrameIndex < delayedDestroy.frameIndex || ( m_currentFrameIndex - delayedDestroy.frameIndex ) >= kMaxFrameDistance )
                 {
                     handlesToDestroy.pushBack( delayedDestroy );
 
@@ -3088,5 +3087,17 @@ namespace zp
         }
 
         m_delayedDestroy.clear();
+    }
+
+    VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getCurrentFrameData()
+    {
+        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
+        return m_perFrameData[ frame ];
+    }
+
+    VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getFrameData( zp_uint64_t frameIndex )
+    {
+        const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
+        return m_perFrameData[ frame ];
     }
 }
