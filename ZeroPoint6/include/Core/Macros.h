@@ -6,8 +6,16 @@
 #define ZP_CONCAT_(a, b)  a ## b
 #define ZP_CONCAT(a, b)   ZP_CONCAT_( a, b )
 
-#define ZP_NAMEOF(x)      #x
-#define ZP_STR(x)         #x
+#if ZP_USE_UTF8_LITERALS
+#define ZP_T(x)    ZP_CONCAT(u8, x)
+#else
+#define ZP_T(x)    x
+#endif
+
+#define ZP_NAMEOF(x)      ZP_T(#x)
+#define ZP_STR(x)         { .str = (x), .length = zp_strlen( (x) ) }
+#define ZP_STR_T(x)       { .str = ZP_T(x), .length = zp_strlen( ZP_T(x) ) }
+#define ZP_STR_NAMEOF(x)  { .str = ZP_T(#x), .length = zp_strlen( ZP_T(#x) ) }
 
 #define ZP_ARRAY_SIZE(a)  ( sizeof( a ) / sizeof( a[ 0 ] ) )
 

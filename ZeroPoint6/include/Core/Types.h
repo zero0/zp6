@@ -47,6 +47,12 @@ typedef signed int zp_ptrdiff_t;
 typedef unsigned int zp_ptr_t;
 #endif
 
+#if ZP_USE_UTF8_LITERALS
+typedef char8_t zp_char8_t;
+#else
+typedef char zp_char8_t;
+#endif
+
 //
 //
 //

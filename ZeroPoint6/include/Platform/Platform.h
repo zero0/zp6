@@ -4,6 +4,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Macros.h"
+#include "Core/String.h"
 
 namespace zp
 {
@@ -141,7 +142,7 @@ namespace zp
 
         void CloseWindow( zp_handle_t windowHandle );
 
-        void SetWindowTitle( zp_handle_t windowHandle, const char* title );
+        void SetWindowTitle( zp_handle_t windowHandle, const String& title );
 
         void SetWindowSize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
 
@@ -184,9 +185,9 @@ namespace zp
         ProcAddressFunc GetProcAddress( zp_handle_t libraryHandle, const char* name );
 
         template<typename T>
-        T GetProcAddress( zp_handle_t libraryHandle, const char* name )
+        T GetProcAddress( zp_handle_t libraryHandle, const String& name )
         {
-            return (T)GetProcAddress( libraryHandle, name );
+            return (T)GetProcAddress( libraryHandle, name.c_str() );
         }
 
         zp_handle_t AllocateThreadPool( zp_uint32_t minThreads, zp_uint32_t maxThreads );
@@ -201,7 +202,7 @@ namespace zp
 
         zp_uint32_t GetThreadId( zp_handle_t threadHandle ) const;
 
-        void SetThreadName( zp_handle_t threadHandle, const char* threadName );
+        void SetThreadName( zp_handle_t threadHandle, const String& threadName );
 
         void SetThreadPriority( zp_handle_t threadHandle, zp_int32_t priority );
 

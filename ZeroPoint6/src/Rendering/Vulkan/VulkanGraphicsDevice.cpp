@@ -550,7 +550,7 @@ namespace zp
 
         zp_hash128_t CalculateHash( const VkDescriptorSetLayoutCreateInfo& createInfo )
         {
-            zp_hash128_t hash = zp_fnv128_1a( ZP_STR( VkDescriptorSetLayoutCreateInfo ) );
+            zp_hash128_t hash = zp_fnv128_1a( ZP_NAMEOF( VkDescriptorSetLayoutCreateInfo ) );
             hash = zp_fnv128_1a( createInfo.flags, hash );
             hash = zp_fnv128_1a( createInfo.bindingCount, hash );
 
@@ -568,7 +568,7 @@ namespace zp
 
         zp_hash128_t CalculateHash( const VkRenderPassCreateInfo& createInfo )
         {
-            zp_hash128_t hash = zp_fnv128_1a( ZP_STR( VkRenderPassCreateInfo ) );
+            zp_hash128_t hash = zp_fnv128_1a( ZP_NAMEOF( VkRenderPassCreateInfo ) );
             hash = zp_fnv128_1a( createInfo.flags, hash );
 
             hash = zp_fnv128_1a( createInfo.attachmentCount, hash );
@@ -710,7 +710,7 @@ namespace zp
 
 #pragma endregion
 
-        zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, GraphicsDeviceFeatures graphicsDeviceFeatures )
+        zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
             zp_bool_t isSuitable = true;
 
@@ -725,13 +725,13 @@ namespace zp
             isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
             // support geometry shaders
-            if( graphicsDeviceFeatures.GeometryShaderSupport )
+            if( graphicsDeviceDesc.geometryShaderSupport )
             {
                 isSuitable &= physicalDeviceFeatures.geometryShader;
             }
 
             // support tessellation shaders
-            if( graphicsDeviceFeatures.TessellationShaderSupport )
+            if( graphicsDeviceDesc.tessellationShaderSupport )
             {
                 isSuitable &= physicalDeviceFeatures.tessellationShader;
             }
@@ -955,8 +955,8 @@ namespace zp
     //
     //
 
-    VulkanGraphicsDevice::VulkanGraphicsDevice( MemoryLabel memoryLabel, GraphicsDeviceFeatures graphicsDeviceFeatures )
-        : GraphicsDevice( memoryLabel )
+    VulkanGraphicsDevice::VulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc )
+        : GraphicsDevice()
         , m_perFrameData {}
         , m_vkInstance( VK_NULL_HANDLE )
         , m_vkSurface( VK_NULL_HANDLE )
@@ -998,15 +998,15 @@ namespace zp
         //, m_commandQueueCount( 0 )
         //, m_commandQueues( 4, memoryLabel )
         , m_currentFrameIndex( 0 )
+        , memoryLabel( memoryLabel )
     {
         zp_zero_memory_array( m_perFrameData );
 
-
         VkApplicationInfo applicationInfo {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-            .pApplicationName = "ZeroPoint 6 Application",
+            .pApplicationName = graphicsDeviceDesc.appName ? graphicsDeviceDesc.appName : "ZeroPoint Application",
             .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
-            .pEngineName = "ZeroPoint 6",
+            .pEngineName = "ZeroPoint",
             .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
             .apiVersion = VK_API_VERSION_1_1,
         };
@@ -1085,7 +1085,7 @@ namespace zp
 
             for( const VkPhysicalDevice& physicalDevice : physicalDevices )
             {
-                if( IsPhysicalDeviceSuitable( physicalDevice, m_vkSurface, graphicsDeviceFeatures ) )
+                if( IsPhysicalDeviceSuitable( physicalDevice, m_vkSurface, graphicsDeviceDesc ) )
                 {
                     m_vkPhysicalDevice = physicalDevice;
                     break;
@@ -2297,7 +2297,7 @@ namespace zp
             .type = DelayedDestroyType::Shader
         };
 
-        shader->shaderHandle = nullptr;
+        *shader = {};
     }
 
     void VulkanGraphicsDevice::createTexture( const TextureCreateDesc* textureCreateDesc, Texture* texture )
@@ -2307,9 +2307,9 @@ namespace zp
             .imageType = Convert( textureCreateDesc->textureDimension ),
             .format = Convert( textureCreateDesc->textureFormat ),
             .extent {
-                .width =  static_cast<uint32_t>( textureCreateDesc->size.width ),
-                .height = static_cast<uint32_t>( textureCreateDesc->size.height ),
-                .depth =  static_cast<uint32_t>( IsTextureArray( textureCreateDesc->textureDimension ) ? textureCreateDesc->size.depth : 1 ),
+                .width =  textureCreateDesc->size.width,
+                .height = textureCreateDesc->size.height,
+                .depth =  IsTextureArray( textureCreateDesc->textureDimension ) ? zp_max( textureCreateDesc->size.depth, 1lu ) : 1,
             },
             .mipLevels = textureCreateDesc->mipCount,
             .arrayLayers = textureCreateDesc->arrayLayers,
@@ -2364,15 +2364,15 @@ namespace zp
         VkImageView imageView;
         HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &imageView ) );
 
-        texture->textureDimension = textureCreateDesc->textureDimension;
-        texture->textureFormat = textureCreateDesc->textureFormat;
-        texture->usage = textureCreateDesc->usage;
-
-        texture->size = textureCreateDesc->size;
-
-        texture->textureHandle = image;
-        texture->textureViewHandle = imageView;
-        texture->textureMemoryHandle = deviceMemory;
+        *texture = {
+            .textureDimension = textureCreateDesc->textureDimension,
+            .textureFormat = textureCreateDesc->textureFormat,
+            .usage = textureCreateDesc->usage,
+            .size = textureCreateDesc->size,
+            .textureHandle = image,
+            .textureViewHandle = imageView,
+            .textureMemoryHandle = deviceMemory,
+        };
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "Image View", VK_OBJECT_TYPE_IMAGE_VIEW, imageView );
     }
@@ -2392,21 +2392,19 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = texture->textureMemoryHandle,
             .allocator = &m_vkAllocationCallbacks,
-            .order = index + 0,
+            .order = index + 1,
             .type = DelayedDestroyType::Memory,
         };
         m_delayedDestroy[ index + 2 ] = {
             .frameIndex = m_currentFrameIndex,
             .handle = texture->textureHandle,
             .allocator = &m_vkAllocationCallbacks,
-            .order = index + 0,
+            .order = index + 2,
             .type = DelayedDestroyType::Image,
         };
 
-        texture->textureHandle = nullptr;
-        texture->textureMemoryHandle = nullptr;
-        texture->textureViewHandle = nullptr;
-    }
+        *texture = {};
+    };
 
     void VulkanGraphicsDevice::createSampler( const SamplerCreateDesc* samplerCreateDesc, Sampler* sampler )
     {
@@ -2432,7 +2430,9 @@ namespace zp
         VkSampler vkSampler;
         HR( vkCreateSampler( m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &vkSampler ) );
 
-        sampler->samplerHandle = vkSampler;
+        *sampler = {
+            .samplerHandle = vkSampler,
+        };
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "Sampler", VK_OBJECT_TYPE_SAMPLER, vkSampler );
     }
@@ -2448,8 +2448,8 @@ namespace zp
             .type = DelayedDestroyType::Sampler,
         };
 
-        sampler->samplerHandle = nullptr;
-    }
+        *sampler = {};
+    };
 
     void
     VulkanGraphicsDevice::mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory )
@@ -2466,6 +2466,7 @@ namespace zp
 
     CommandQueue* VulkanGraphicsDevice::requestCommandQueue( RenderQueue queue )
     {
+        // TODO: remove when other queues are supported
         queue = ZP_RENDER_QUEUE_GRAPHICS;
 
         PerFrameData& frameData = getCurrentFrameData();
@@ -2530,7 +2531,6 @@ namespace zp
         {
             VkCommandPool commandPool = getCommandPool( commandQueue );
             commandQueue->commandBufferPool = commandPool;
-
             VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                 .commandPool = commandPool,
@@ -2557,6 +2557,7 @@ namespace zp
         VkCommandBufferBeginInfo commandBufferBeginInfo {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            .pInheritanceInfo = nullptr,
         };
 
         VkCommandBuffer buffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
@@ -2573,6 +2574,11 @@ namespace zp
 #endif
 
         return commandQueue;
+    }
+
+    CommandQueue* VulkanGraphicsDevice::requestCommandQueue( CommandQueue* parentCommandQueue )
+    {
+        return nullptr;
     }
 
     void VulkanGraphicsDevice::releaseCommandQueue( CommandQueue* commandQueue )
@@ -2615,8 +2621,7 @@ namespace zp
         vkCmdEndRenderPass( static_cast<VkCommandBuffer>(commandQueue->commandBuffer) );
     }
 
-    void
-    VulkanGraphicsDevice::bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandQueue* commandQueue )
     {
         vkCmdBindPipeline( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), Convert( bindPoint ), static_cast<VkPipeline>(graphicsPipelineState->pipelineState) );
     }
@@ -2774,7 +2779,7 @@ namespace zp
     void VulkanGraphicsDevice::updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc, const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue )
     {
         PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
-        GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->dataSize );
+        GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->size );
 
         VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
 
@@ -2785,7 +2790,7 @@ namespace zp
             void* dstMemory {};
             HR( vkMapMemory( m_vkLocalDevice, deviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
-            zp_memcpy( dstMemory, allocation.size, graphicsBufferUpdateDesc->data, graphicsBufferUpdateDesc->dataSize );
+            zp_memcpy( dstMemory, allocation.size, graphicsBufferUpdateDesc->data, graphicsBufferUpdateDesc->size );
 
             VkMappedMemoryRange flushMemoryRange {
                 .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,

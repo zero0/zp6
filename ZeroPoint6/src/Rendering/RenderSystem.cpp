@@ -467,11 +467,11 @@ namespace zp
         TestRenderPipeline s_renderPipeline;
     }
 
-    void RenderSystem::initialize( zp_handle_t windowHandle, const GraphicsDeviceFeatures& graphicsDeviceFeatures )
+    void RenderSystem::initialize( zp_handle_t windowHandle, const GraphicsDeviceDesc& graphicsDeviceDesc )
     {
         s_renderPipeline = {};
 
-        m_graphicsDevice = CreateGraphicsDevice( memoryLabel, graphicsDeviceFeatures );
+        m_graphicsDevice = CreateGraphicsDevice( memoryLabel, graphicsDeviceDesc );
 
         m_graphicsDevice->createSwapChain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
 

@@ -169,11 +169,6 @@ void zp_debug_break()
 #endif
 }
 
-zp_int32_t zp_strcmp( const char* lh, const char* rh )
-{
-    return ::strcmp( lh, rh );
-}
-
 zp_guid128_t zp_generate_unique_guid128()
 {
     zp_uint32_t m3, m2, m1, m0;

@@ -325,12 +325,12 @@ namespace zp
         }
     }
 
-    void Platform::SetWindowTitle( zp_handle_t windowHandle, const char* title )
+    void Platform::SetWindowTitle( zp_handle_t windowHandle, const String& title )
     {
         HWND hWnd = static_cast<HWND>( windowHandle);
         if( ::IsWindow( hWnd ) )
         {
-            ::SetWindowText( hWnd, title );
+            ::SetWindowText( hWnd, title.c_str() );
         }
     }
 
@@ -601,7 +601,7 @@ namespace zp
         return static_cast<zp_uint32_t>( threadId );
     }
 
-    void Platform::SetThreadName( zp_handle_t threadHandle, const char* threadName )
+    void Platform::SetThreadName( zp_handle_t threadHandle, const String& threadName )
     {
         //::SetThreadDescription();
 
@@ -618,7 +618,7 @@ namespace zp
 
         THREADNAME_INFO info {
             .dwType = 0x1000,
-            .szName = threadName,
+            .szName = threadName.c_str(),
             .dwThreadID = ::GetThreadId( static_cast<HANDLE>( threadHandle ) ),
             .dwFlags = 0,
         };

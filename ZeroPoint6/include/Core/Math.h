@@ -335,6 +335,8 @@ namespace zp
 
     typedef Size3D<zp_int32_t> Size3Di;
 
+    typedef Size3D<zp_uint32_t> Size3Du;
+
     typedef Size3D<zp_float32_t> Size3Df;
 
     template<typename T>

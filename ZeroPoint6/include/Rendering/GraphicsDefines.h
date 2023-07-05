@@ -176,12 +176,6 @@ namespace zp
         GraphicsFormat_Count,
     };
 
-    struct GraphicsDeviceFeatures
-    {
-        ZP_BOOL32( GeometryShaderSupport );
-        ZP_BOOL32( TessellationShaderSupport );
-    };
-
     enum RenderQueue
     {
         ZP_RENDER_QUEUE_GRAPHICS,

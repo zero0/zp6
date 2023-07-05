@@ -6,6 +6,7 @@
 #include "Core/Common.h"
 #include "Core/Allocator.h"
 #include "Core/Profiler.h"
+#include "Core/String.h"
 
 #include "Engine/MemoryLabels.h"
 

@@ -21,15 +21,16 @@ namespace zp
     {
         kBufferedFrameCount = 4,
     };
+    ZP_STATIC_ASSERT( zp_is_pow2( kBufferedFrameCount ) );
 
     class VulkanGraphicsDevice final : public GraphicsDevice
     {
     ZP_NONCOPYABLE( VulkanGraphicsDevice );
 
     public:
-        VulkanGraphicsDevice( MemoryLabel memoryLabel, GraphicsDeviceFeatures graphicsDeviceFeatures );
+        VulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc );
 
-        ~VulkanGraphicsDevice() final;
+        ~VulkanGraphicsDevice();
 
         void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
 
@@ -82,6 +83,8 @@ namespace zp
 #pragma region Command Queue Operations
 
         CommandQueue* requestCommandQueue( RenderQueue queue ) final;
+
+        CommandQueue* requestCommandQueue( CommandQueue* parentCommandQueue ) final;
 
         void releaseCommandQueue( CommandQueue* commandQueue ) final;
 
@@ -219,6 +222,9 @@ namespace zp
         QueueFamilies m_queueFamilies;
 
         zp_uint64_t m_currentFrameIndex;
+
+    public:
+        const MemoryLabel memoryLabel;
     };
 }
 

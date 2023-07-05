@@ -17,6 +17,7 @@ set(ZP_CORE_SRC
         "src/Core/Common.cpp"
         "src/Core/Math.cpp"
         "src/Core/Profiler.cpp"
+        "src/Core/String.cpp"
         )
 
 set(ZP_PLATFORM_SRC
@@ -71,6 +72,7 @@ set(ZP_CORE_HEADERS
         "include/Core/Profiler.h"
         "include/Core/Queue.h"
         "include/Core/Set.h"
+        "include/Core/String.h"
         "include/Core/Types.h"
         "include/Core/Vector.h"
         )
@@ -100,6 +102,7 @@ set(ZP_PLATFORM_HEADERS
 set(ZP_RENDERING_HEADERS
         "include/Rendering/BatchModeRenderer.h"
         "include/Rendering/Camera.h"
+        "include/Rendering/GraphicsBuffer.h"
         "include/Rendering/GraphicsDevice.h"
         "include/Rendering/GraphicsResource.h"
         "include/Rendering/ImmediateModeRenderer.h"

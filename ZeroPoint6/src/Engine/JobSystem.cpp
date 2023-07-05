@@ -391,7 +391,7 @@ namespace zp
 
             char threadNameBuff[32];
             zp_snprintf( threadNameBuff, "JobThread-%d", i );
-            GetPlatform()->SetThreadName( m_threadHandles[ i ], threadNameBuff );
+            GetPlatform()->SetThreadName( m_threadHandles[ i ], ZP_STR_T("JobThread") );
         }
 
         // set main thread job queue

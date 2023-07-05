@@ -33,7 +33,7 @@ namespace zp
 
         ~RenderSystem();
 
-        void initialize( zp_handle_t windowHandle, const GraphicsDeviceFeatures& graphicsDeviceFeatures );
+        void initialize( zp_handle_t windowHandle, const GraphicsDeviceDesc& graphicsDeviceDesc );
 
         void destroy();
 

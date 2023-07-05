@@ -22,7 +22,7 @@ namespace zp
         TextureUsage usage;
         MemoryPropertyFlags memoryPropertyFlags;
 
-        Size3Di size;
+        Size3Du size;
         zp_uint32_t mipCount;
         zp_uint32_t arrayLayers;
     };
@@ -52,7 +52,7 @@ namespace zp
         TextureFormat textureFormat;
         TextureUsage usage;
 
-        Size3Di size;
+        Size3Du size;
 
         zp_handle_t textureHandle;
         zp_handle_t textureViewHandle;

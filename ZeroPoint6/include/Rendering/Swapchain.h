@@ -5,4 +5,17 @@
 #ifndef ZP_SWAPCHAIN_H
 #define ZP_SWAPCHAIN_H
 
+namespace zp
+{
+    struct SwapchainDesc
+    {
+
+    };
+
+    struct Swapchain
+    {
+
+    };
+};
+
 #endif //ZP_SWAPCHAIN_H

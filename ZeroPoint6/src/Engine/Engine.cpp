@@ -5,6 +5,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/String.h"
 
 #include "Platform/Platform.h"
 
@@ -60,7 +61,7 @@ namespace zp
     void Engine::initialize()
     {
         zp_handle_t mainThreadHandle = GetPlatform()->GetCurrentThread();
-        GetPlatform()->SetThreadName( mainThreadHandle, "MainThread" );
+        GetPlatform()->SetThreadName( mainThreadHandle, ZP_STR_T( "MainThread" ) );
         GetPlatform()->SetThreadIdealProcessor( mainThreadHandle, 0 );
 
         const zp_uint32_t numJobThreads = 2; // GetPlatform()->GetProcessorCount() - 1;
@@ -97,13 +98,13 @@ namespace zp
 
             if( m_moduleDll )
             {
-                auto getModuleAPI = GetPlatform()->GetProcAddress<GetModuleEntryPoint>( m_moduleDll, ZP_STR( GetModuleEntryPoint ) );
-                ZP_ASSERT_MSG( getModuleAPI, "Unable to find " ZP_STR( GetModuleEntryPoint ) );
+                auto getModuleAPI = GetPlatform()->GetProcAddress<GetModuleEntryPoint>( m_moduleDll, ZP_STR_NAMEOF( GetModuleEntryPoint ) );
+                ZP_ASSERT_MSG( getModuleAPI, "Unable to find " ZP_NAMEOF( GetModuleEntryPoint ) );
 
                 if( getModuleAPI )
                 {
                     m_moduleAPI = getModuleAPI();
-                    ZP_ASSERT_MSG( m_moduleAPI, "No " ZP_STR( ModuleEntryPointAPI ) " returned" );
+                    ZP_ASSERT_MSG( m_moduleAPI, "No " ZP_NAMEOF( ModuleEntryPointAPI ) " returned" );
                 }
             }
         }
@@ -132,11 +133,16 @@ namespace zp
         };
         m_windowHandle = GetPlatform()->OpenWindow( &openWindowDesc );
 
-        GraphicsDeviceFeatures graphicsDeviceFeatures {
-            .GeometryShaderSupport = true,
-            .TessellationShaderSupport = true,
+        GraphicsDeviceDesc graphicsDeviceDesc {
+            .appName = "AppName",
+            .stagingBufferSize = 32 MB,
+            .threadCount = numJobThreads,
+            .bufferFrameCount = 4,
+            .geometryShaderSupport = true,
+            .tessellationShaderSupport = true,
         };
-        m_renderSystem->initialize( m_windowHandle, graphicsDeviceFeatures );
+
+        m_renderSystem->initialize( m_windowHandle, graphicsDeviceDesc );
 
         // Register components
 
@@ -676,7 +682,7 @@ namespace zp
         char windowTitle[128];
         zp_snprintf( windowTitle, "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, zp_current_thread_id() );
 
-        GetPlatform()->SetWindowTitle( m_windowHandle, windowTitle );
+        GetPlatform()->SetWindowTitle( m_windowHandle, { .str = (const zp_char8_t*)windowTitle, .length = zp_strlen( windowTitle ) } );
 
         ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
     }

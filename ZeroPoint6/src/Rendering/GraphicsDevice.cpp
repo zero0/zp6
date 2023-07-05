@@ -23,10 +23,10 @@
 
 namespace zp
 {
-    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, GraphicsDeviceFeatures graphicsDeviceFeatures )
+    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc )
     {
 #if ZP_RENDERING_VULKAN
-        return ZP_NEW_ARGS_( memoryLabel, VulkanGraphicsDevice, graphicsDeviceFeatures );
+        return ZP_NEW_ARGS_( memoryLabel, VulkanGraphicsDevice, graphicsDeviceDesc );
 #elif
         return nullptr;
 #endif
@@ -34,15 +34,10 @@ namespace zp
 
     void DestroyGraphicsDevice( GraphicsDevice* graphicsDevice )
     {
-        ZP_SAFE_DELETE( GraphicsDevice, graphicsDevice );
-    }
-
-    GraphicsDevice::GraphicsDevice( MemoryLabel memoryLabel )
-        : memoryLabel( memoryLabel )
-    {
-    }
-
-    GraphicsDevice::~GraphicsDevice()
-    {
+#if ZP_RENDERING_VULKAN
+        auto ptr = reinterpret_cast<VulkanGraphicsDevice*>(graphicsDevice );
+        ZP_SAFE_DELETE( VulkanGraphicsDevice, ptr );
+#else
+#endif
     }
 }

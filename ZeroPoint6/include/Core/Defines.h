@@ -18,7 +18,7 @@
 #endif
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-#define ZP_OS_WINDOWS                      1
+#define ZP_OS_WINDOWS               1
 #endif
 
 #if defined(__cplusplus)
@@ -42,10 +42,15 @@
 #endif
 #endif
 
+#if __cpp_char8_t
+#define ZP_USE_UTF8_LITERALS    1
+#else
+#define ZP_USE_UTF8_LITERALS    0
+#endif
+
 #define ZP_ALIGN16              ZP_DECLSPEC_ALIGN(16)
 
 #define ZP_USE_CONSOLE_COLORS   1
-
 
 #define ZP_USE_ASSERTIONS       1
 #define ZP_USE_PRINTF           1

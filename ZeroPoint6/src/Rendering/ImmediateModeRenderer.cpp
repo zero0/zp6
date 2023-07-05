@@ -255,12 +255,12 @@ namespace zp
         {
             GraphicsBufferUpdateDesc updateVertexBufferDesc {
                 .data = perFrameData.scratchVertexBuffer,
-                .dataSize = perFrameData.vertexBufferOffset,
+                .size = perFrameData.vertexBufferOffset,
             };
 
             GraphicsBufferUpdateDesc updateIndexBufferDesc {
                 .data = perFrameData.scratchIndexBuffer,
-                .dataSize = perFrameData.indexBufferLength * sizeof( zp_uint16_t ),
+                .size = perFrameData.indexBufferLength * sizeof( zp_uint16_t ),
             };
 
             ImmediateRenderCommand* beginCommand = static_cast<ImmediateRenderCommand*>(static_cast<void*>(perFrameData.commandBuffer));

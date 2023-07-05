@@ -12,6 +12,7 @@
 
 #include "Engine/JobSystem.h"
 
+#include "Rendering/GraphicsBuffer.h"
 #include "Rendering/RenderPass.h"
 #include "Rendering/GraphicsResource.h"
 #include "Rendering/Sampler.h"
@@ -23,88 +24,6 @@ namespace zp
     struct GraphicsDeviceEnumerator
     {
 
-    };
-
-    struct GraphicsBufferDesc
-    {
-        const char* name;
-        zp_size_t size;
-        GraphicsBufferUsageFlags usageFlags;
-        MemoryPropertyFlags memoryPropertyFlags;
-    };
-
-    struct GraphicsBuffer
-    {
-        zp_handle_t buffer;
-        zp_handle_t deviceMemory;
-
-        zp_size_t offset;
-        zp_size_t size;
-        zp_size_t alignment;
-
-        GraphicsBufferUsageFlags usageFlags;
-        zp_bool_t isVirtualBuffer;
-
-        [[nodiscard]] GraphicsBuffer splitBuffer( zp_size_t startOffset, zp_size_t splitSize ) const
-        {
-            GraphicsBuffer splitBuffer {
-                .buffer = buffer,
-                .deviceMemory = deviceMemory,
-                .offset = offset + startOffset,
-                .size = splitSize,
-                .alignment = alignment,
-                .usageFlags = usageFlags,
-                .isVirtualBuffer = true
-            };
-            return splitBuffer;
-        }
-    };
-
-    typedef GraphicsResource<GraphicsBuffer> GraphicsBufferResource;
-
-    typedef GraphicsResourceHandle<GraphicsBuffer> GraphicsBufferResourceHandle;
-
-    struct GraphicsBufferAllocation
-    {
-        zp_handle_t buffer;
-        zp_handle_t deviceMemory;
-
-        zp_size_t offset;
-        zp_size_t size;
-    };
-
-    struct GraphicsBufferAllocator
-    {
-        GraphicsBuffer graphicsBuffer;
-
-        zp_size_t allocated;
-
-        void reset()
-        {
-            allocated = 0;
-        }
-
-        GraphicsBufferAllocation allocate( zp_size_t size )
-        {
-            const zp_size_t alignedSize = ZP_ALIGN_SIZE( size, graphicsBuffer.alignment );
-            ZP_ASSERT( ( graphicsBuffer.offset + allocated + alignedSize ) < graphicsBuffer.size );
-
-            GraphicsBufferAllocation allocation {
-                .buffer = graphicsBuffer.buffer,
-                .deviceMemory = graphicsBuffer.deviceMemory,
-                .offset = graphicsBuffer.offset + allocated,
-                .size = alignedSize
-            };
-            allocated += alignedSize;
-
-            return allocation;
-        }
-    };
-
-    struct GraphicsBufferUpdateDesc
-    {
-        const void* data;
-        zp_size_t dataSize;
     };
 
     struct Viewport
@@ -264,9 +183,25 @@ namespace zp
         RenderQueue queue;
     };
 
+    //
+    //
+    //
+
+    struct GraphicsDeviceDesc
+    {
+        const char* appName;
+        zp_size_t stagingBufferSize;
+
+        zp_uint32_t threadCount;
+        zp_uint32_t bufferFrameCount;
+
+        ZP_BOOL32( geometryShaderSupport );
+        ZP_BOOL32( tessellationShaderSupport );
+    };
+
     class GraphicsDevice;
 
-    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, GraphicsDeviceFeatures graphicsDeviceFeatures );
+    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc );
 
     void DestroyGraphicsDevice( GraphicsDevice* graphicsDevice );
 
@@ -279,9 +214,9 @@ namespace zp
     ZP_NONCOPYABLE( GraphicsDevice );
 
     public:
-        explicit GraphicsDevice( MemoryLabel memoryLabel );
+        GraphicsDevice() = default;
 
-        virtual ~GraphicsDevice() = 0;
+        ~GraphicsDevice() = default;
 
         virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
@@ -335,6 +270,8 @@ namespace zp
 
         virtual CommandQueue* requestCommandQueue( RenderQueue queue ) = 0;
 
+        virtual CommandQueue* requestCommandQueue( CommandQueue* commandQueue ) = 0;
+
         virtual void releaseCommandQueue( CommandQueue* commandQueue ) = 0;
 
         virtual void beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue ) = 0;
@@ -384,9 +321,6 @@ namespace zp
         virtual void markEventLabel( const char* eventLabel, const Color& color, CommandQueue* commandQueue ) = 0;
 
 #pragma endregion
-
-    public:
-        MemoryLabel memoryLabel;
     };
 }
 
