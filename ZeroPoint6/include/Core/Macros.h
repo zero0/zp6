@@ -13,7 +13,7 @@
 #endif
 
 #define ZP_NAMEOF(x)      ZP_T(#x)
-#define ZP_STR(x)         { .str = (x), .length = zp_strlen( (x) ) }
+
 #define ZP_STR_T(x)       { .str = ZP_T(x), .length = zp_strlen( ZP_T(x) ) }
 #define ZP_STR_NAMEOF(x)  { .str = ZP_T(#x), .length = zp_strlen( ZP_T(#x) ) }
 

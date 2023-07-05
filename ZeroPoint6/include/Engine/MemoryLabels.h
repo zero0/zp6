@@ -9,22 +9,22 @@
 
 namespace zp
 {
-    enum MemoryLabels : MemoryLabel
+    namespace MemoryLabels
     {
-        Default,
-        String,
-        Graphics,
-        FileIO,
-        Buffer,
-        User,
-        Data,
-        Temp,
-        ThreadSafe,
+        const MemoryLabel Default = 0;
+        const MemoryLabel String = 1;
+        const MemoryLabel Graphics = 2;
+        const MemoryLabel FileIO = 3;
+        const MemoryLabel Buffer = 4;
+        const MemoryLabel User = 5;
+        const MemoryLabel Data = 6;
+        const MemoryLabel Temp = 7;
+        const MemoryLabel ThreadSafe = 8;
 
-        Profiling,
-        Debug,
+        const MemoryLabel Profiling = 9;
+        const MemoryLabel Debug = 10;
 
-        MemoryLabels_Count
+        const MemoryLabel MemoryLabels_Count = 11;
     };
 
     static_assert( static_cast<MemoryLabel>(MemoryLabels::MemoryLabels_Count) < kMaxMemoryLabels );

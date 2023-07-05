@@ -56,7 +56,7 @@ namespace zp
             .usageFlags = ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST,
             .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
         };
-        m_graphicsDevice->createBuffer( &vertexBufferDesc, &m_vertexGraphicsBuffer );
+        m_graphicsDevice->createBuffer( vertexBufferDesc, &m_vertexGraphicsBuffer );
 
         GraphicsBufferDesc indexBufferDesc {
             .name = "Immediate Mode Index Buffer",
@@ -64,7 +64,7 @@ namespace zp
             .usageFlags = ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST,
             .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
         };
-        m_graphicsDevice->createBuffer( &indexBufferDesc, &m_indexGraphicsBuffer );
+        m_graphicsDevice->createBuffer( indexBufferDesc, &m_indexGraphicsBuffer );
 
         for( zp_size_t i = 0; i < kMaxBufferedImmediateFrames; ++i )
         {

@@ -189,7 +189,7 @@ namespace zp
 
     struct GraphicsDeviceDesc
     {
-        const char* appName;
+        String appName;
         zp_size_t stagingBufferSize;
 
         zp_uint32_t threadCount;
@@ -244,7 +244,7 @@ namespace zp
 
         virtual void destroyPipelineLayout( PipelineLayout* pipelineLayout ) = 0;
 
-        virtual void createBuffer( const GraphicsBufferDesc* graphicsBufferDesc, GraphicsBuffer* graphicsBuffer ) = 0;
+        virtual void createBuffer( const GraphicsBufferDesc& graphicsBufferDesc, GraphicsBuffer* graphicsBuffer ) = 0;
 
         virtual void destroyBuffer( GraphicsBuffer* graphicsBuffer ) = 0;
 

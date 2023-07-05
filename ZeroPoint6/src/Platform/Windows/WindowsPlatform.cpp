@@ -218,6 +218,8 @@ namespace zp
         }
     }
 
+    const zp_char8_t Platform::PathSep = '\\';
+
     Platform* GetPlatform()
     {
         return &s_WindowsPlatform;
@@ -267,8 +269,8 @@ namespace zp
         };
         ::AdjustWindowRectEx( &r, style, false, exStyle );
 
-        int width = r.right - r.left;
-        int height = r.bottom - r.top;
+        const int width = r.right - r.left;
+        const int height = r.bottom - r.top;
 
         HWND hWnd = ::CreateWindowEx(
             exStyle,
@@ -339,8 +341,8 @@ namespace zp
         HWND hWnd = static_cast<HWND>( windowHandle );
         if( ::IsWindow( hWnd ) )
         {
-            LONG style = ::GetWindowLong( hWnd, GWL_STYLE );
-            LONG exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE );
+            const LONG style = ::GetWindowLong( hWnd, GWL_STYLE );
+            const LONG exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE );
 
             RECT r { .left = 0, .top = 0, .right = width, .bottom = height };
             ::AdjustWindowRectEx( &r, style, false, exStyle );
@@ -440,19 +442,22 @@ namespace zp
     zp_handle_t Platform::OpenTempFileHandle( const char* tempFileNamePrefix, const char* tempFileNameExtension, FileCachingMode fileCachingMode )
     {
         char tempPath[MAX_PATH];
-        ::GetTempPath( ZP_ARRAY_SIZE( tempPath ), tempPath );
+        zp_size_t len = ::GetTempPath( ZP_ARRAY_SIZE( tempPath ), tempPath );
 
-        char tempRootPath[MAX_PATH];
-        zp_snprintf( tempRootPath, "%s%c%s%c", tempPath, '\\', "ZeroPoint " ZP_VERSION, '\\' );
+        MutableFixedString<MAX_PATH> tempRootPath;
+        tempRootPath.format( "%s%c%s%c", tempPath, PathSep, "ZeroPoint", PathSep );
 
-        ::CreateDirectory( tempRootPath, nullptr );
+        //char tempRootPath[MAX_PATH];
+        //zp_snprintf( tempRootPath, "%s%c%s%c", tempPath, '\\', "ZeroPoint " ZP_VERSION, '\\' );
+
+        ::CreateDirectory( tempRootPath.c_str(), nullptr );
 
         char tempFileName[MAX_PATH];
         const zp_time_t unique = zp_time_now();
         zp_snprintf( tempFileName, "%s-%x.%s", tempFileNamePrefix ? tempFileNamePrefix : "tmp", unique, tempFileNameExtension ? tempFileNameExtension : "tmp" );
 
         char finalFileNamePath[MAX_PATH];
-        zp_snprintf( finalFileNamePath, "%s%c%s", tempRootPath, '\\', tempFileName );
+        zp_snprintf( finalFileNamePath, "%s%c%s", tempRootPath, PathSep, tempFileName );
 
         DWORD attributes = FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE;
 

@@ -311,6 +311,10 @@ constexpr zp_bool_t zp_try_guid128_to_string( const zp_guid128_t& guid, char* st
     return ok;
 }
 
+//
+//
+//
+
 namespace zp
 {
     struct String
@@ -424,13 +428,77 @@ namespace zp
     {
     public:
         FixedString()
-            : m_str( {} )
-            , m_length( 0 )
+            : m_str()
         {
         }
 
         explicit FixedString( const char* str )
-            : m_str( {} )
+            : m_str()
+        {
+            const zp_size_t length = zp_strlen( str );
+            if( str && length )
+            {
+                zp_strcpy( str, m_str, zp_min( Size, length ) );
+            }
+        }
+
+        FixedString( const char* str, zp_size_t length )
+            : m_str()
+        {
+            if( str && length )
+            {
+                zp_strcpy( str, m_str, zp_min( Size, length ) );
+            }
+        }
+
+        ~FixedString() = default;
+
+        [[nodiscard]] const zp_char8_t& operator[]( zp_size_t index ) const
+        {
+            return m_str[ index ];
+        }
+
+        [[nodiscard]] zp_size_t length() const
+        {
+            return Size;
+        }
+
+        [[nodiscard]] zp_size_t capacity() const
+        {
+            return Size;
+        }
+
+        [[nodiscard]] const char* c_str() const
+        {
+            return reinterpret_cast<const char*>( m_str );
+        }
+
+        [[nodiscard]] const zp_char8_t* str() const
+        {
+            return m_str;
+        }
+
+        [[nodiscard]]operator String() const
+        {
+            return { .str = m_str, .length = Size };
+        }
+
+    private:
+        zp_char8_t m_str[Size];
+    };
+
+    template<zp_size_t Size>
+    class MutableFixedString
+    {
+    public:
+        MutableFixedString()
+            : m_str()
+            , m_length( 0 )
+        {
+        }
+
+        explicit MutableFixedString( const char* str )
+            : m_str()
             , m_length( zp_strlen( str ) )
         {
             if( str && m_length )
@@ -439,8 +507,8 @@ namespace zp
             }
         }
 
-        FixedString( const char* str, zp_size_t length )
-            : m_str( {} )
+        MutableFixedString( const char* str, zp_size_t length )
+            : m_str()
             , m_length( length )
         {
             if( str && length )
@@ -449,9 +517,9 @@ namespace zp
             }
         }
 
-        ~FixedString() = default;
+        ~MutableFixedString() = default;
 
-        [[nodiscard]] zp_char8_t operator[]( zp_size_t index ) const
+        [[nodiscard]] const zp_char8_t& operator[]( zp_size_t index ) const
         {
             return m_str[ index ];
         }
@@ -473,7 +541,7 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return m_str;
+            return reinterpret_cast<const char*>( m_str );
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -481,10 +549,24 @@ namespace zp
             return m_str;
         }
 
-        //explicit operator String() const
-        //{
-        //    return { .str = m_str, .length = m_length };
-        //}
+        template<class ... Args>
+        void format( const char* format, Args ... args )
+        {
+            const zp_int32_t len = zp_snprintf( m_str, Size, format, args... );
+            m_length = len;
+        }
+
+        template<class ... Args>
+        void appendFormat( const char* format, Args ... args )
+        {
+            const zp_int32_t len = zp_snprintf( m_str + m_length, Size - m_length, format, args... );
+            m_length += len;
+        }
+
+        [[nodiscard]] operator String() const
+        {
+            return { .str = m_str, .length = m_length };
+        }
 //
         //explicit operator MutableString()
         //{

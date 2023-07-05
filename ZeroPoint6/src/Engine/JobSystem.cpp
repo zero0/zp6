@@ -383,15 +383,19 @@ namespace zp
             m_jobQueues[ i ] = ZP_NEW_ARGS_( memoryLabel, JobQueue, kJobQueueCount );
         }
 
+        const zp_size_t stackSize = 1 MB;
+        MutableFixedString<64> threadName;
+
         const zp_uint32_t numAvailableProcessors = GetPlatform()->GetProcessorCount() - 1;
         for( zp_size_t i = 0; i < m_threadCount; ++i )
         {
-            m_threadHandles[ i ] = GetPlatform()->CreateThread( WorkerThreadExec, m_jobQueues[ i ], 1 MB, nullptr );
+            zp_uint32_t threadId {};
+            m_threadHandles[ i ] = GetPlatform()->CreateThread( WorkerThreadExec, m_jobQueues[ i ], stackSize, &threadId );
             GetPlatform()->SetThreadIdealProcessor( m_threadHandles[ i ], ( i % numAvailableProcessors ) + 1 ); // proc 0 is used for main thread
 
-            char threadNameBuff[32];
-            zp_snprintf( threadNameBuff, "JobThread-%d", i );
-            GetPlatform()->SetThreadName( m_threadHandles[ i ], ZP_STR_T("JobThread") );
+            threadName.format( "JobThread-%d #%d", threadId, i );
+
+            GetPlatform()->SetThreadName( m_threadHandles[ i ], threadName );
         }
 
         // set main thread job queue

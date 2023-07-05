@@ -11,7 +11,7 @@
 #include "Core/Common.h"
 #include <new>
 
-#define ZP_NEW( l, t )                  new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l)
+#define ZP_NEW( l, t )                  new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(zp::MemoryLabels::l)
 #define ZP_NEW_ARGS( l, t, ... )        new (zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l),__VA_ARGS__)
 
 #define ZP_NEW_( l, t )                 new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l)

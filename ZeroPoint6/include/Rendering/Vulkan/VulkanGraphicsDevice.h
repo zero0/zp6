@@ -58,7 +58,7 @@ namespace zp
 
         void destroyPipelineLayout( PipelineLayout* pipelineLayout ) final;
 
-        void createBuffer( const GraphicsBufferDesc* graphicsBufferDesc, GraphicsBuffer* graphicsBuffer ) final;
+        void createBuffer( const GraphicsBufferDesc& graphicsBufferDesc, GraphicsBuffer* graphicsBuffer ) final;
 
         void destroyBuffer( GraphicsBuffer* graphicsBuffer ) final;
 

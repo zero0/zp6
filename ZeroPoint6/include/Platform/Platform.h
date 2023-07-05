@@ -220,6 +220,8 @@ namespace zp
 
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
 
+        static const zp_char8_t PathSep;
+
     private:
         zp_uint64_t m_activeProcessorMask;
         zp_size_t m_systemPageSize;

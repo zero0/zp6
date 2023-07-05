@@ -1004,7 +1004,7 @@ namespace zp
 
         VkApplicationInfo applicationInfo {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-            .pApplicationName = graphicsDeviceDesc.appName ? graphicsDeviceDesc.appName : "ZeroPoint Application",
+            .pApplicationName = !graphicsDeviceDesc.appName.empty() ? graphicsDeviceDesc.appName.c_str() : "ZeroPoint Application",
             .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
             .pEngineName = "ZeroPoint",
             .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
@@ -1228,9 +1228,8 @@ namespace zp
 
         // create command pools
         {
-            const zp_size_t threadCount = 16;
             m_commandPoolCount = 0;
-            m_vkCommandPools = ZP_MALLOC_T_ARRAY( memoryLabel, VkCommandPool, 3 * threadCount );
+            m_vkCommandPools = ZP_MALLOC_T_ARRAY( memoryLabel, VkCommandPool, 3 * graphicsDeviceDesc.threadCount );
 
             //    VkCommandPoolCreateInfo commandPoolCreateInfo {
             //        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -1249,17 +1248,14 @@ namespace zp
 
         // create staging buffer
         {
-            const zp_size_t stagingBufferSize = 32 MB;
-            const zp_size_t perFrameStagingBufferSize = stagingBufferSize / kBufferedFrameCount;
-
-            GraphicsBufferDesc graphicsBufferDesc {
+            GraphicsBufferDesc stagingBufferDesc {
                 .name = "Staging Buffer",
-                .size = stagingBufferSize,
+                .size = graphicsDeviceDesc.stagingBufferSize,
                 .usageFlags = ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC | ZP_GRAPHICS_BUFFER_USAGE_STORAGE,
                 .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
             };
 
-            createBuffer( &graphicsBufferDesc, &m_stagingBuffer );
+            createBuffer( stagingBufferDesc, &m_stagingBuffer );
         }
 
         // create descriptor pool
@@ -2195,12 +2191,12 @@ namespace zp
         pipelineLayout->layout = nullptr;
     }
 
-    void VulkanGraphicsDevice::createBuffer( const GraphicsBufferDesc* graphicsBufferDesc, GraphicsBuffer* graphicsBuffer )
+    void VulkanGraphicsDevice::createBuffer( const GraphicsBufferDesc& graphicsBufferDesc, GraphicsBuffer* graphicsBuffer )
     {
         VkBufferCreateInfo bufferCreateInfo {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = graphicsBufferDesc->size,
-            .usage = Convert( graphicsBufferDesc->usageFlags ),
+            .size = graphicsBufferDesc.size,
+            .usage = Convert( graphicsBufferDesc.usageFlags ),
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         };
 
@@ -2213,7 +2209,7 @@ namespace zp
         VkMemoryAllocateInfo memoryAllocateInfo {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memoryRequirements.size,
-            .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc->memoryPropertyFlags ) ),
+            .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc.memoryPropertyFlags ) ),
         };
 
         VkDeviceMemory deviceMemory;
@@ -2221,15 +2217,17 @@ namespace zp
 
         HR( vkBindBufferMemory( m_vkLocalDevice, buffer, deviceMemory, 0 ) );
 
-        graphicsBuffer->buffer = buffer;
-        graphicsBuffer->deviceMemory = deviceMemory;
-        graphicsBuffer->usageFlags = graphicsBufferDesc->usageFlags;
-        graphicsBuffer->offset = 0;
-        graphicsBuffer->size = memoryRequirements.size;
-        graphicsBuffer->alignment = memoryRequirements.alignment;
-        graphicsBuffer->isVirtualBuffer = false;
+        *graphicsBuffer = {
+            .buffer = buffer,
+            .deviceMemory = deviceMemory,
+            .offset = 0,
+            .size = memoryRequirements.size,
+            .alignment = memoryRequirements.alignment,
+            .usageFlags = graphicsBufferDesc.usageFlags,
+            .isVirtualBuffer = false,
+        };
 
-        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, graphicsBufferDesc->name, VK_OBJECT_TYPE_BUFFER, buffer );
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, graphicsBufferDesc.name, VK_OBJECT_TYPE_BUFFER, buffer );
     }
 
     void VulkanGraphicsDevice::destroyBuffer( GraphicsBuffer* graphicsBuffer )
@@ -2255,15 +2253,8 @@ namespace zp
             };
         }
 
-        graphicsBuffer->buffer = nullptr;
-        graphicsBuffer->deviceMemory = nullptr;
-
-        graphicsBuffer->offset = 0;
-        graphicsBuffer->size = 0;
-        graphicsBuffer->alignment = 0;
-
-        graphicsBuffer->usageFlags = {};
-    }
+        *graphicsBuffer = {};
+    };
 
     void VulkanGraphicsDevice::createShader( const ShaderDesc& shaderDesc, Shader* shader )
     {

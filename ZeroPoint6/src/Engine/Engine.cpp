@@ -134,7 +134,7 @@ namespace zp
         m_windowHandle = GetPlatform()->OpenWindow( &openWindowDesc );
 
         GraphicsDeviceDesc graphicsDeviceDesc {
-            .appName = "AppName",
+            .appName = ZP_STR_T("AppName"),
             .stagingBufferSize = 32 MB,
             .threadCount = numJobThreads,
             .bufferFrameCount = 4,
@@ -679,10 +679,10 @@ namespace zp
 
         const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
 
-        char windowTitle[128];
-        zp_snprintf( windowTitle, "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, zp_current_thread_id() );
+        MutableFixedString<128> windowTitle;
+        windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, zp_current_thread_id());
 
-        GetPlatform()->SetWindowTitle( m_windowHandle, { .str = (const zp_char8_t*)windowTitle, .length = zp_strlen( windowTitle ) } );
+        GetPlatform()->SetWindowTitle( m_windowHandle, windowTitle);
 
         ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
     }
