@@ -7,6 +7,7 @@
 
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/Math.h"
 #include "Core/Allocator.h"
 #include "Core/Atomic.h"
 
@@ -164,7 +165,7 @@ namespace zp
 namespace zp
 {
     template<typename T>
-    class FixedArray
+    class MemoryArray
     {
     public:
         typedef T value_type;
@@ -176,9 +177,100 @@ namespace zp
         typedef const T* const_iterator;
 
     public:
+        MemoryArray();
+
+        ~MemoryArray();
+
+        MemoryArray( pointer ptr, zp_size_t length );
+
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
+
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
+
+        [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
+
+        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE iterator begin();
+
+        [[nodiscard]] ZP_FORCEINLINE iterator end();
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const;
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
+
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray split( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray split( zp_size_t index, zp_size_t length ) const;
+
+    private:
+        pointer m_ptr;
+        zp_size_t m_length;
+    };
+}
+
+namespace zp
+{
+    template<typename T>
+    class ReadonlyMemoryArray
+    {
+    public:
+        typedef T value_type;
+        typedef T& reference;
+        typedef const T& const_reference;
+        typedef T* pointer;
+        typedef const T* const_pointer;
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+    public:
+        ReadonlyMemoryArray();
+
+        ~ReadonlyMemoryArray();
+
+        ReadonlyMemoryArray( pointer ptr, zp_size_t length );
+
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
+
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
+
+        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const;
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
+
+        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray split( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray split( zp_size_t index, zp_size_t length ) const;
+
+    private:
+        pointer m_ptr;
+        zp_size_t m_length;
+    };
+}
+
+namespace zp
+{
+    template<typename T, zp_size_t Size>
+    class FixedArray
+    {
+    public:
+        typedef T value_type;
+        typedef T& reference;
+        typedef T&& move_type;
+        typedef const T& const_reference;
+        typedef T* pointer;
+        typedef const T* const_pointer;
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+    public:
         FixedArray();
 
-        ~FixedArray();
+        FixedArray( value_type (& ptr)[Size] );
+
+        template<typename ... Args>FixedArray( Args ... m );
 
         FixedArray( pointer ptr, zp_size_t length );
 
@@ -198,13 +290,14 @@ namespace zp
 
         [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
 
-        [[nodiscard]] ZP_FORCEINLINE FixedArray split( zp_size_t index ) const;
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index ) const;
 
-        [[nodiscard]] ZP_FORCEINLINE FixedArray split( zp_size_t index, zp_size_t length ) const;
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index, zp_size_t length ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray<T> asReadonly() const;
 
     private:
-        T* m_ptr;
-        zp_size_t m_length;
+        value_type m_ptr[Size];
     };
 }
 
@@ -700,88 +793,181 @@ namespace zp
 namespace zp
 {
     template<typename T>
-    FixedArray<T>::FixedArray()
+    MemoryArray<T>::MemoryArray()
         : m_ptr( nullptr )
         , m_length( 0 )
     {
     }
 
     template<typename T>
-    FixedArray<T>::~FixedArray()
+    MemoryArray<T>::~MemoryArray()
     {
         m_ptr = nullptr;
         m_length = 0;
     }
 
     template<typename T>
-    FixedArray<T>::FixedArray( pointer ptr, zp_size_t length )
+    MemoryArray<T>::MemoryArray( pointer ptr, zp_size_t length )
         : m_ptr( ptr )
         , m_length( length )
     {
     }
 
     template<typename T>
-    zp_size_t FixedArray<T>::length() const
+    zp_size_t MemoryArray<T>::length() const
     {
         return m_length;
     }
 
     template<typename T>
-    zp_bool_t FixedArray<T>::isEmpty() const
+    zp_bool_t MemoryArray<T>::isEmpty() const
     {
         return !( m_ptr && m_length );
     }
 
     template<typename T>
-    FixedArray<T>::reference FixedArray<T>::operator[]( zp_size_t index )
+    MemoryArray<T>::reference MemoryArray<T>::operator[]( zp_size_t index )
     {
         ZP_ASSERT( m_ptr && index < m_length );
         return m_ptr[ index ];
     }
 
     template<typename T>
-    FixedArray<T>::const_reference FixedArray<T>::operator[]( zp_size_t index ) const
+    MemoryArray<T>::const_reference MemoryArray<T>::operator[]( zp_size_t index ) const
     {
         ZP_ASSERT( m_ptr && index < m_length );
         return m_ptr[ index ];
     }
 
     template<typename T>
-    FixedArray<T>::iterator FixedArray<T>::begin()
+    MemoryArray<T>::iterator MemoryArray<T>::begin()
     {
         return m_ptr;
     }
 
     template<typename T>
-    FixedArray<T>::iterator FixedArray<T>::end()
+    MemoryArray<T>::iterator MemoryArray<T>::end()
     {
         return m_ptr + m_length;
     }
 
     template<typename T>
-    FixedArray<T>::const_iterator FixedArray<T>::begin() const
+    MemoryArray<T>::const_iterator MemoryArray<T>::begin() const
     {
         return m_ptr;
     }
 
     template<typename T>
-    FixedArray<T>::const_iterator FixedArray<T>::end() const
+    MemoryArray<T>::const_iterator MemoryArray<T>::end() const
     {
         return m_ptr + m_length;
     }
 
     template<typename T>
-    FixedArray<T> FixedArray<T>::split( zp_size_t index ) const
+    MemoryArray<T> MemoryArray<T>::split( zp_size_t index ) const
     {
         ZP_ASSERT( m_ptr && index < m_length );
-        return FixedArray<T>( m_ptr + index, m_length - index );
+        return MemoryArray<T>( m_ptr + index, m_length - index );
     }
 
     template<typename T>
-    FixedArray<T> FixedArray<T>::split( zp_size_t index, zp_size_t length ) const
+    MemoryArray<T> MemoryArray<T>::split( zp_size_t index, zp_size_t length ) const
     {
         ZP_ASSERT( m_ptr && ( index + length ) < m_length );
-        return FixedArray<T>( m_ptr + index, length );
+        return MemoryArray<T>( m_ptr + index, length );
+    }
+}
+
+namespace zp
+{
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::FixedArray()
+        : m_ptr()
+    {
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::FixedArray( T (& ptr)[Size] )
+        : m_ptr( ptr )
+    {
+    }
+
+    template<typename T, zp_size_t Size> template<typename ... Args>
+    FixedArray<T, Size>::FixedArray( Args ... m )
+        : m_ptr { zp_forward<T>(m)... }
+    {
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::FixedArray( pointer ptr, zp_size_t length )
+        : m_ptr()
+    {
+        for( zp_size_t i = 0, imax = zp_min( Size, length ); i < imax; ++i )
+        {
+            m_ptr[ i ] = ptr[ i ];
+        }
+    }
+
+    template<typename T, zp_size_t Size>
+    zp_size_t FixedArray<T, Size>::length() const
+    {
+        return Size;
+    }
+
+    template<typename T, zp_size_t Size>
+    zp_bool_t FixedArray<T, Size>::isEmpty() const
+    {
+        return Size > 0;
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::reference FixedArray<T, Size>::operator[]( zp_size_t index )
+    {
+        return m_ptr[ index ];
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::const_reference FixedArray<T, Size>::operator[]( zp_size_t index ) const
+    {
+        return m_ptr[ index ];
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::iterator FixedArray<T, Size>::begin()
+    {
+        return m_ptr;
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::iterator FixedArray<T, Size>::end()
+    {
+        return m_ptr + Size;
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::const_iterator FixedArray<T, Size>::begin() const
+    {
+        return m_ptr;
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::const_iterator FixedArray<T, Size>::end() const
+    {
+        return m_ptr + Size;
+    }
+
+    template<typename T, zp_size_t Size>
+    MemoryArray<T> FixedArray<T, Size>::split( zp_size_t index ) const
+    {
+        ZP_ASSERT( m_ptr && index < Size );
+        return FixedArray<T, Size>( m_ptr + index, Size - index );
+    }
+
+    template<typename T, zp_size_t Size>
+    MemoryArray<T> FixedArray<T, Size>::split( zp_size_t index, zp_size_t length ) const
+    {
+        ZP_ASSERT( m_ptr && ( index + length ) < Size );
+        return FixedArray<T, Size>( m_ptr + index, length );
     }
 }
 

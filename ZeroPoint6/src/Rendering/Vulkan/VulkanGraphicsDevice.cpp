@@ -2022,9 +2022,9 @@ namespace zp
 
         VkPipelineViewportStateCreateInfo viewportStateCreateInfo {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            .viewportCount = static_cast<uint32_t>( ZP_ARRAY_SIZE( viewports ) ),
+            .viewportCount = static_cast<uint32_t>( graphicsPipelineStateCreateDesc->viewportCount ),
             .pViewports = viewports,
-            .scissorCount = static_cast<uint32_t>( ZP_ARRAY_SIZE( scissorRects ) ),
+            .scissorCount = static_cast<uint32_t>( graphicsPipelineStateCreateDesc->scissorRectCount ),
             .pScissors = scissorRects,
         };
 

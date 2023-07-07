@@ -77,6 +77,12 @@ constexpr T zp_upper_pow2_generic( T val )
 #define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 6>( x )
 #endif
 
+template<typename T, zp_size_t Size>
+constexpr zp_size_t zp_array_size( T(&)[Size] )
+{
+    return Size;
+}
+
 constexpr zp_bool_t zp_is_pow2( zp_uint32_t x )
 {
     return ( x & ( x - 1 ) ) == 0;
@@ -107,7 +113,7 @@ struct zp_remove_reference<T&&>
 template<typename T>
 struct zp_remove_reference<T*>
 {
-    typedef T type;
+    typedef T* type;
 };
 
 template<typename T>

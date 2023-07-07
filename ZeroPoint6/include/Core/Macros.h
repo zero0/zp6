@@ -17,7 +17,7 @@
 #define ZP_STR_T(x)       { .str = ZP_T(x), .length = zp_strlen( ZP_T(x) ) }
 #define ZP_STR_NAMEOF(x)  { .str = ZP_T(#x), .length = zp_strlen( ZP_T(#x) ) }
 
-#define ZP_ARRAY_SIZE(a)  ( sizeof( a ) / sizeof( a[ 0 ] ) )
+#define ZP_ARRAY_SIZE(a)  zp_array_size( a )
 
 #define ZP_ALIGN_SIZE(s,a)  ( ( (s) + ( (a) - 1 ) ) & -(a) )
 
