@@ -21,6 +21,7 @@
 #include "Engine/Entity.h"
 #include "Engine/Component.h"
 #include "Engine/EntityComponentManager.h"
+#include "Engine/AssetSystem.h"
 
 #include "Rendering/RenderSystem.h"
 
@@ -82,6 +83,10 @@ namespace zp
             return m_entityComponentManager;
         }
 
+        [[nodiscard]] AssetSystem* getAssetSystem() const
+        {
+            return m_assetSystem;
+        }
     private:
         enum class EngineState : zp_uint8_t
         {
@@ -112,6 +117,7 @@ namespace zp
         JobSystem* m_jobSystem;
         RenderSystem* m_renderSystem;
         EntityComponentManager* m_entityComponentManager;
+        AssetSystem* m_assetSystem;
 
 #if ZP_USE_PROFILER
         Profiler* m_profiler;

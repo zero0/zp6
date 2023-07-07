@@ -15,14 +15,30 @@ namespace zp
         }
     }
 
-    void* EntityQueryIterator::getComponentData( zp_hash64_t componentTypeHash )
+    void* EntityQueryIterator::getComponentDataByType( zp_hash64_t componentTypeHash )
     {
-        return m_current == ZP_NULL_ENTITY ? nullptr : m_entityComponentManager->getComponentData( m_current, m_entityComponentManager->getComponentType( componentTypeHash ));
+        return m_current == ZP_NULL_ENTITY ? nullptr : m_entityComponentManager->getComponentData( m_current, m_entityComponentManager->getComponentType( componentTypeHash ) );
     }
 
-    const void* EntityQueryIterator::getComponentDataReadOnly( zp_hash64_t componentTypeHash ) const
+    void EntityQueryIterator::addTagByType( zp_hash64_t tagTypeHash )
     {
-        return m_current == ZP_NULL_ENTITY ? nullptr : m_entityComponentManager->getComponentDataReadOnly( m_current, m_entityComponentManager->getComponentType( componentTypeHash ));
+        if( m_current != ZP_NULL_ENTITY )
+        {
+            m_entityComponentManager->setEntityTag( m_current, m_entityComponentManager->getTagType( tagTypeHash ) );
+        }
+    }
+
+    void EntityQueryIterator::removeTagByType( zp_hash64_t tagTypeHash )
+    {
+        if( m_current != ZP_NULL_ENTITY )
+        {
+            m_entityComponentManager->clearEntityTag( m_current, m_entityComponentManager->getTagType( tagTypeHash ) );
+        }
+    }
+
+    const void* EntityQueryIterator::getComponentDataReadOnlyByType( zp_hash64_t componentTypeHash ) const
+    {
+        return m_current == ZP_NULL_ENTITY ? nullptr : m_entityComponentManager->getComponentDataReadOnly( m_current, m_entityComponentManager->getComponentType( componentTypeHash ) );
     }
 
     zp_bool_t EntityQueryIterator::next()

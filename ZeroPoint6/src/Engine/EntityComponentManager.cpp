@@ -281,9 +281,9 @@ namespace zp
         return m_componentManager.getComponentDataSize( componentType );
     }
 
-    void EntityComponentManager::iterateEntities( const EntityQuery* entityQuery, EntityQueryIterator* iterator )
+    void EntityComponentManager::iterateEntities( const EntityQuery& entityQuery, EntityQueryIterator* iterator )
     {
-        iterator->m_query = *entityQuery;
+        iterator->m_query = entityQuery;
         iterator->m_current = ZP_NULL_ENTITY;
         iterator->m_entityComponentManager = this;
     }

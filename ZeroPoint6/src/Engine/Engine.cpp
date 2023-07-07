@@ -12,6 +12,7 @@
 #include "Engine/MemoryLabels.h"
 #include "Engine/Engine.h"
 #include "Engine/TransformComponent.h"
+#include "Engine/AssetSystem.h"
 
 #include "Rendering/Camera.h"
 #include "Rendering/RenderSystem.h"
@@ -30,6 +31,7 @@ namespace zp
         , m_jobSystem( nullptr )
         , m_renderSystem( nullptr )
         , m_entityComponentManager( nullptr )
+        , m_assetSystem( nullptr )
 #if ZP_USE_PROFILER
         , m_profiler( nullptr )
 #endif
@@ -56,6 +58,11 @@ namespace zp
     zp_int32_t Engine::getExitCode() const
     {
         return m_exitCode;
+    }
+
+    void DestroyRawAssetComponentDataCallback( void* componentData, zp_size_t componentSize )
+    {
+
     }
 
     void Engine::initialize()
@@ -85,6 +92,8 @@ namespace zp
         m_renderSystem = ZP_NEW( Default, RenderSystem );
 
         m_entityComponentManager = ZP_NEW( Default, EntityComponentManager );
+
+        m_assetSystem = ZP_NEW( Default, AssetSystem );
 
         //
         //
@@ -134,7 +143,7 @@ namespace zp
         m_windowHandle = GetPlatform()->OpenWindow( &openWindowDesc );
 
         GraphicsDeviceDesc graphicsDeviceDesc {
-            .appName = ZP_STR_T("AppName"),
+            .appName = ZP_STR_T( "AppName" ),
             .stagingBufferSize = 32 MB,
             .threadCount = numJobThreads,
             .bufferFrameCount = 4,
@@ -144,7 +153,15 @@ namespace zp
 
         m_renderSystem->initialize( m_windowHandle, graphicsDeviceDesc );
 
+        m_assetSystem->setup();
+
         // Register components
+
+        // Asset Components
+        m_entityComponentManager->registerComponent<AssetReferenceComponentData<0>>();
+        m_entityComponentManager->registerComponent<RawAssetComponentData>( DestroyRawAssetComponentDataCallback );
+        m_entityComponentManager->registerComponent<AssetReferenceCountComponentData>();
+        m_entityComponentManager->registerComponent<MeshAssetViewComponentData>();
 
         // Transform Components
         m_entityComponentManager->registerComponent<TransformComponentData>();
@@ -166,11 +183,17 @@ namespace zp
         m_entityComponentManager->registerComponent<CameraComponentData>();
 
         // Generic signatures
-        ComponentSignature mainCameraSignature {
+
+        // Main Camera Signature
+        m_entityComponentManager->registerComponentSignature( {
             .tagSignature = m_entityComponentManager->getTagSignature<MainCameraTag>(),
             .structuralSignature = m_entityComponentManager->getComponentSignature<CameraComponentData, RigidTransformComponentData>(),
-        };
-        m_entityComponentManager->registerComponentSignature( mainCameraSignature );
+        } );
+
+        // Asset Signature
+        m_entityComponentManager->registerComponentSignature( {
+            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData, AssetReferenceCountComponentData>()
+        } );
 
         if( m_moduleAPI )
         {
@@ -182,6 +205,8 @@ namespace zp
     {
         m_previousFrameEnginePipelineHandle.complete();
         m_previousFrameEnginePipelineHandle = {};
+
+        m_assetSystem->teardown();
 
         m_jobSystem->ExitJobThreads();
 
@@ -217,6 +242,7 @@ namespace zp
         ZP_SAFE_DELETE( JobSystem, m_jobSystem );
         ZP_SAFE_DELETE( RenderSystem, m_renderSystem );
         ZP_SAFE_DELETE( EntityComponentManager, m_entityComponentManager );
+        ZP_SAFE_DELETE( AssetSystem, m_assetSystem );
 
 #if ZP_USE_PROFILER
         Profiler::DestroyProfilerThread();
@@ -296,6 +322,8 @@ namespace zp
             PreparedJobHandle preparedJobHandle = jobSystem->PrepareJob( nullptr );
             PreparedJobHandle startJobHandle = preparedJobHandle;
 
+            preparedJobHandle = data->engine->getAssetSystem()->process( jobSystem, data->engine->getEntityComponentManager(), preparedJobHandle );
+
             preparedJobHandle = data->engine->getRenderSystem()->startSystem( frameIndex, jobSystem, preparedJobHandle );
 
             preparedJobHandle = data->engine->getRenderSystem()->processSystem( frameIndex, jobSystem, data->engine->getEntityComponentManager(), preparedJobHandle );
@@ -335,13 +363,11 @@ namespace zp
 
             EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
 
-            EntityQuery activeTransformEntities {
+            EntityQueryIterator iterator {};
+            entityComponentManager->iterateEntities( {
                 .notIncludedTags = entityComponentManager->getTagSignature<DisabledTag>(),
                 .requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData, ChildComponentData>(),
-            };
-
-            EntityQueryIterator iterator {};
-            entityComponentManager->iterateEntities( &activeTransformEntities, &iterator );
+            }, &iterator );
 
             while( iterator.next() )
             {
@@ -367,13 +393,11 @@ namespace zp
 
             EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
 
-            EntityQuery activeTransformEntities {
+            EntityQueryIterator iterator {};
+            entityComponentManager->iterateEntities( {
                 .notIncludedTags = entityComponentManager->getTagSignature<DisabledTag>(),
                 .requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData>(),
-            };
-
-            EntityQueryIterator iterator {};
-            entityComponentManager->iterateEntities( &activeTransformEntities, &iterator );
+            }, &iterator );
 
             while( iterator.next() )
             {
@@ -402,12 +426,10 @@ namespace zp
             entityComponentManager->replayCommandBuffers();
 
             // destroy tagged entities
-            EntityQuery destroyedEntityQuery {
-                .requiredTags = entityComponentManager->getTagSignature<DestroyedTag>(),
-            };
-
             EntityQueryIterator iterator {};
-            entityComponentManager->iterateEntities( &destroyedEntityQuery, &iterator );
+            entityComponentManager->iterateEntities( {
+                .requiredTags = entityComponentManager->getTagSignature<DestroyedTag>(),
+            }, &iterator );
 
             while( iterator.next() )
             {
@@ -680,9 +702,9 @@ namespace zp
         const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
 
         MutableFixedString<128> windowTitle;
-        windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, zp_current_thread_id());
+        windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, zp_current_thread_id() );
 
-        GetPlatform()->SetWindowTitle( m_windowHandle, windowTitle);
+        GetPlatform()->SetWindowTitle( m_windowHandle, windowTitle );
 
         ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
     }

@@ -13,13 +13,13 @@ namespace zp
 {
     struct EntityQuery
     {
-       TagSignature requiredTags;
-       TagSignature anyTags;
-       TagSignature notIncludedTags;
+        TagSignature requiredTags;
+        TagSignature anyTags;
+        TagSignature notIncludedTags;
 
-       StructuralSignature requiredStructures;
-       StructuralSignature anyStructures;
-       StructuralSignature notIncludedStructures;
+        StructuralSignature requiredStructures;
+        StructuralSignature anyStructures;
+        StructuralSignature notIncludedStructures;
     };
 
     //
@@ -37,25 +37,43 @@ namespace zp
 
         void destroyEntity();
 
-        void* getComponentData( zp_hash64_t componentTypeHash );
-
-        const void* getComponentDataReadOnly( zp_hash64_t componentTypeHash ) const;
-
-        template<class T>
-        T* getComponentData()
-        {
-            return getComponentData( zp_type_hash<T>());
-        }
-
-        template<class T>
-        const T* getComponentDataReadOnly() const
-        {
-            return getComponentDataReadOnly( zp_type_hash<T>());
-        }
-
-        Entity current() const
+        [[nodiscard]] Entity current() const
         {
             return m_current;
+        }
+
+    private:
+        void* getComponentDataByType( zp_hash64_t componentTypeHash );
+
+        [[nodiscard]] const void* getComponentDataReadOnlyByType( zp_hash64_t componentTypeHash ) const;
+
+        void addTagByType( zp_hash64_t tagTypeHash );
+
+        void removeTagByType( zp_hash64_t tagTypeHash );
+
+    public:
+        template<typename T>
+        T* getComponentData()
+        {
+            return static_cast<T*>( getComponentDataByType( zp_type_hash<T>() ) );
+        }
+
+        template<typename T>
+        const T* getComponentDataReadOnly() const
+        {
+            return static_cast<const T*>( getComponentDataReadOnlyByType( zp_type_hash<T>() ) );
+        }
+
+        template<typename T>
+        void addTag()
+        {
+            addTagByType( zp_type_hash<T>() );
+        }
+
+        template<typename T>
+        void removeTag()
+        {
+            removeTagByType( zp_type_hash<T>() );
         }
 
     private:

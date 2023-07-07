@@ -96,7 +96,7 @@ namespace zp
 
         freeBlock->usedBits |= 1 << index;
 
-        EntityMap entityMap = {
+        EntityMap entityMap {
             .block = freeBlock,
             .index = static_cast<zp_size_t>(index),
         };
@@ -120,9 +120,10 @@ namespace zp
 
             for( zp_uint32_t i = 0; i < m_componentBlockArchetype.componentCount; ++i )
             {
-                if( m_componentBlockArchetype.destroyCallbacks[ i ] )
+                DestroyComponentDataCallback callback = m_componentBlockArchetype.destroyCallbacks[ i ];
+                if( callback )
                 {
-                    m_componentBlockArchetype.destroyCallbacks[ i ]( componentData + m_componentBlockArchetype.componentOffset[ i ], m_componentBlockArchetype.componentSize[ i ] );
+                    callback( componentData + m_componentBlockArchetype.componentOffset[ i ], m_componentBlockArchetype.componentSize[ i ] );
                 }
             }
 
@@ -253,6 +254,7 @@ namespace zp
 
     ComponentType ComponentManager::registerComponent( ComponentDescriptor* componentDescriptor )
     {
+        ZP_ASSERT( m_registeredComponents < kMaxComponentTypes );
         ComponentType componentType = m_registeredComponents;
 
         m_components[ m_registeredComponents ] = {
@@ -268,6 +270,7 @@ namespace zp
 
     TagType ComponentManager::registerTag( TagDescriptor* tagDescriptor )
     {
+        ZP_ASSERT( m_registeredTags < kMaxTagTypes );
         TagType tagType = m_registeredTags;
 
         m_tags[ m_registeredTags ] = {

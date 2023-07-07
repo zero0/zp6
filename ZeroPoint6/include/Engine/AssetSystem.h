@@ -13,6 +13,8 @@
 #include "Core/Queue.h"
 
 #include "Engine/JobSystem.h"
+#include "Engine/Entity.h"
+#include "Engine/EntityComponentManager.h"
 
 namespace zp
 {
@@ -44,8 +46,34 @@ namespace zp
     class VirtualFileSystem
     {
     public:
+    };
 
+    template<AssetType AT>
+    struct AssetReferenceComponentData
+    {
+        constexpr AssetType assetType()
+        {
+            return AT;
+        }
 
+        Entity assetEntity;
+    };
+
+    struct RawAssetComponentData
+    {
+        zp_guid128_t guid;
+        zp_hash128_t hash;
+        MemoryArray<zp_uint8_t> data;
+        const MemoryLabel memoryLabel;
+    };
+
+    struct MeshAssetViewComponentData
+    {
+    };
+
+    struct AssetReferenceCountComponentData
+    {
+        zp_int32_t refCount;
     };
 
     class AssetSystem
@@ -75,7 +103,7 @@ namespace zp
 
         [[nodiscard]] zp_size_t getLoadedAssetCount() const;
 
-        [[nodiscard]] PreparedJobHandle process( JobSystem* jobSystem, const PreparedJobHandle& inputHandle );
+        [[nodiscard]] PreparedJobHandle process( JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle );
 
     private:
         struct AssetData

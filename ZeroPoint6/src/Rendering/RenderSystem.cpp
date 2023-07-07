@@ -193,7 +193,6 @@ namespace zp
 
         struct SubmitGPUJob
         {
-            zp_uint64_t frameIndex;
             GraphicsDevice* m_graphicsDevice;
 
             ZP_JOB_DEBUG_NAME( SubmitGPUJob );
@@ -208,7 +207,6 @@ namespace zp
 
         struct PresentGPUJob
         {
-            zp_uint64_t frameIndex;
             GraphicsDevice* m_graphicsDevice;
 
             ZP_JOB_DEBUG_NAME( PresentGPUJob );
@@ -739,7 +737,6 @@ namespace zp
 
         struct FinalizeBatchRenderingJob
         {
-            zp_uint64_t frameIndex;
             RenderSystem* renderSystem;
 
             ZP_JOB_DEBUG_NAME( FinalizeBatchRenderingJob );
@@ -752,19 +749,16 @@ namespace zp
                 data->renderSystem->m_batchModeRenderer->process( data->renderSystem->m_graphicsDevice );
             }
         } finalizeBatchRenderingJob {
-            .frameIndex = frameIndex,
             .renderSystem = this,
         };
         gpuHandle = jobSystem->PrepareJobData( finalizeBatchRenderingJob, gpuHandle );
 
         SubmitGPUJob submitGpuJob {
-            .frameIndex = frameIndex,
             .m_graphicsDevice = m_graphicsDevice
         };
         gpuHandle = jobSystem->PrepareJobData( submitGpuJob, gpuHandle );
 
         PresentGPUJob presentGpuJob {
-            .frameIndex = frameIndex,
             .m_graphicsDevice = m_graphicsDevice
         };
         gpuHandle = jobSystem->PrepareJobData( presentGpuJob, gpuHandle );

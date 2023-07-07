@@ -85,7 +85,7 @@ namespace zp
 
         zp_size_t getComponentDataSize( ComponentType componentType ) const;
 
-        void iterateEntities( const EntityQuery* entityQuery, EntityQueryIterator* iterator );
+        void iterateEntities( const EntityQuery& entityQuery, EntityQueryIterator* iterator );
 
         zp_bool_t next( EntityQueryIterator* iterator ) const;
 

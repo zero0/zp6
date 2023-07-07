@@ -86,8 +86,8 @@ namespace zp
         {
             ArchetypeBlock* next;
             ArchetypeBlock* prev;
-            zp_uint64_t usedBits;
             zp_uint8_t* blockPtr;
+            zp_uint64_t usedBits;
         };
 
         ArchetypeBlock m_root;

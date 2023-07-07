@@ -5,6 +5,8 @@
 #include "Engine/AssetSystem.h"
 #include "Engine/MemoryLabels.h"
 
+#include "Engine/TransformComponent.h"
+
 namespace zp
 {
     AssetSystem::AssetSystem( MemoryLabel memoryLabel )
@@ -186,12 +188,35 @@ namespace zp
         return loadedAssetCount;
     }
 
-    PreparedJobHandle AssetSystem::process( JobSystem* jobSystem, const PreparedJobHandle& inputHandle )
+    PreparedJobHandle AssetSystem::process( JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle )
     {
-        while( !m_pendingAssetLoadCommandQueue.isEmpty() && m_currentlyLoadingAssets.size() < m_maxActiveAssetLoadCommands )
+        EntityQueryIterator iterator {};
+
+        entityComponentManager->iterateEntities( {
+            .requiredTags = entityComponentManager->getTagSignature<DestroyedTag>(),
+            .notIncludedTags = entityComponentManager->getTagSignature<StaticTag>(),
+            .requiredStructures = entityComponentManager->getComponentSignature<RawAssetComponentData>(),
+        }, &iterator );
+
+        while( entityComponentManager->next( &iterator ) )
         {
-            AssetLoadCommand* assetLoadCommand = m_pendingAssetLoadCommandQueue.dequeue();
-            startAssetLoadCommand( jobSystem, assetLoadCommand );
+            iterator.destroyEntity();
+        }
+
+        //
+
+        entityComponentManager->iterateEntities( {
+            .notIncludedTags = entityComponentManager->getTagSignature<StaticTag, DestroyedTag>(),
+            .requiredStructures = entityComponentManager->getComponentSignature<AssetReferenceCountComponentData>(),
+        }, &iterator );
+
+        while( entityComponentManager->next( &iterator ) )
+        {
+            AssetReferenceCountComponentData* data = iterator.getComponentData<AssetReferenceCountComponentData>();
+            if( data->refCount == 0 )
+            {
+                iterator.addTag<DestroyedTag>();
+            }
         }
 
         return inputHandle;
