@@ -21,6 +21,8 @@
 
 #define ZP_ALIGN_SIZE(s,a)  ( ( (s) + ( (a) - 1 ) ) & -(a) )
 
+#define ZP_OFFSET_PTR(ptr, offset)      static_cast<void*>( static_cast<zp_uint8_t*>(ptr) + static_cast<zp_ptrdiff_t>(offset) )
+
 #define ZP_FG_BLACK     "30"
 #define ZP_FG_RED       "31"
 #define ZP_FG_GREEN     "32"

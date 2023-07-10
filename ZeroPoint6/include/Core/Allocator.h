@@ -287,7 +287,7 @@ namespace zp
     class SystemPageMemoryStorage
     {
     public:
-        SystemPageMemoryStorage( void** systemMemory, zp_size_t pageSize );
+        SystemPageMemoryStorage( void* systemMemory, zp_size_t pageSize );
 
         void* request_memory( zp_size_t size, zp_size_t& requestedSize );
 
@@ -295,7 +295,8 @@ namespace zp
 
     private:
         zp_size_t m_pageSize;
-        void** m_systemMemory;
+        void* m_systemMemory;
+        void* m_memory;
     };
 }
 #pragma endregion

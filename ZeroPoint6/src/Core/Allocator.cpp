@@ -34,9 +34,10 @@ namespace zp
 
 namespace zp
 {
-    SystemPageMemoryStorage::SystemPageMemoryStorage( void** systemMemory, zp_size_t pageSize )
+    SystemPageMemoryStorage::SystemPageMemoryStorage( void* systemMemory, zp_size_t pageSize )
         : m_pageSize( pageSize )
         , m_systemMemory( systemMemory )
+        , m_memory( systemMemory )
     {
     }
 
@@ -48,7 +49,7 @@ namespace zp
             requestedSize += m_pageSize;
         }
 
-        void* mem = GetPlatform()->CommitMemoryPage( m_systemMemory, requestedSize );
+        void* mem = GetPlatform()->CommitMemoryPage( &m_memory, requestedSize );
         return mem;
     }
 

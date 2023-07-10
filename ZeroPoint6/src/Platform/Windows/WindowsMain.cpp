@@ -127,9 +127,9 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
     MemoryConfig memoryConfig {
         .defaultAllocatorPageSize = 16 MB,
-        .tempAllocatorPageSize = 4 MB,
+        .tempAllocatorPageSize = 2 MB,
         .profilerPageSize = 16 MB,
-        .debugPageSize = 4 MB,
+        .debugPageSize = 1 MB,
     };
 
 #if ZP_DEBUG
@@ -138,23 +138,30 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     void* const baseAddress = nullptr;
 #endif
 
-    void* systemMemory = GetPlatform()->AllocateSystemMemory( baseAddress, 128 MB );
+    const zp_size_t totalMemorySize = 128 MB;
+    void* systemMemory = GetPlatform()->AllocateSystemMemory( baseAddress, totalMemorySize );
 
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_defaultAllocator(
-        SystemPageMemoryStorage( &systemMemory, memoryConfig.defaultAllocatorPageSize ),
+        SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, 0 ), memoryConfig.defaultAllocatorPageSize ),
         TlsfAllocatorPolicy(),
         NullMemoryLock()
     );
 
+    zp_size_t endMemorySize = totalMemorySize;
+
+    const zp_size_t tempMemorySize = 16 MB;
+    endMemorySize -= tempMemorySize;
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_tempAllocator(
-        SystemPageMemoryStorage( &systemMemory, memoryConfig.tempAllocatorPageSize ),
+        SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), memoryConfig.tempAllocatorPageSize ),
         TlsfAllocatorPolicy(),
         NullMemoryLock()
     );
 
 #if ZP_USE_PROFILER
+    const zp_size_t profilerMemorySize = 8 MB;
+    endMemorySize -= profilerMemorySize;
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_profilingAllocator(
-        SystemPageMemoryStorage( &systemMemory, memoryConfig.profilerPageSize ),
+        SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), memoryConfig.profilerPageSize ),
         TlsfAllocatorPolicy(),
         NullMemoryLock()
     );
@@ -167,8 +174,10 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 #endif
 
 #if ZP_DEBUG
+    const zp_size_t debugMemorySize = 8 MB;
+    endMemorySize -= debugMemorySize;
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_debugAllocator(
-        SystemPageMemoryStorage( &systemMemory, memoryConfig.debugPageSize ),
+        SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), memoryConfig.debugPageSize ),
         TlsfAllocatorPolicy(),
         NullMemoryLock()
     );
