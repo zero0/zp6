@@ -2,6 +2,8 @@
 //
 //
 
+#include "Platform/Platform.h"
+
 #include "Engine/AssetSystem.h"
 #include "Engine/MemoryLabels.h"
 
@@ -20,6 +22,8 @@ namespace zp
         , m_combinedAssetManifestEntries( 16, memoryLabel )
         , m_virtualFileSystem( nullptr )
         , m_maxActiveAssetLoadCommands( 4 )
+        , m_jobSystem( nullptr )
+        , m_entityComponentManager( nullptr )
         , m_assetMemoryLabels {}
         , memoryLabel( memoryLabel )
     {
@@ -66,12 +70,16 @@ namespace zp
         m_assetLoadCommandPool.destroy();
     }
 
-    void AssetSystem::setup()
+    void AssetSystem::setup( JobSystem* jobSystem, EntityComponentManager* entityComponentManager )
     {
+        m_jobSystem = jobSystem;
+        m_entityComponentManager = entityComponentManager;
     }
 
     void AssetSystem::teardown()
     {
+        m_jobSystem = nullptr;
+        m_entityComponentManager = nullptr;
     }
 
     void AssetSystem::setAssetTypeMemoryLabel( AssetTypes assetType, MemoryLabel assetMemoryLabel )
@@ -191,35 +199,70 @@ namespace zp
     PreparedJobHandle AssetSystem::process( JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle )
     {
         EntityQueryIterator iterator {};
-
         entityComponentManager->iterateEntities( {
-            .requiredTags = entityComponentManager->getTagSignature<DestroyedTag>(),
-            .notIncludedTags = entityComponentManager->getTagSignature<StaticTag>(),
-            .requiredStructures = entityComponentManager->getComponentSignature<RawAssetComponentData>(),
-        }, &iterator );
-
-        while( entityComponentManager->next( &iterator ) )
-        {
-            iterator.destroyEntity();
-        }
-
-        //
-
-        entityComponentManager->iterateEntities( {
-            .notIncludedTags = entityComponentManager->getTagSignature<StaticTag, DestroyedTag>(),
+            .notIncludedTags = entityComponentManager->getTagSignature<DestroyedTag>(),
             .requiredStructures = entityComponentManager->getComponentSignature<AssetReferenceCountComponentData>(),
         }, &iterator );
 
         while( entityComponentManager->next( &iterator ) )
         {
             AssetReferenceCountComponentData* data = iterator.getComponentData<AssetReferenceCountComponentData>();
-            if( data->refCount == 0 )
+            if( data && data->refCount == 0 )
             {
                 iterator.addTag<DestroyedTag>();
             }
         }
 
         return inputHandle;
+    }
+
+    Entity AssetSystem::loadFileDirect( const char* filePath )
+    {
+        Entity entity = m_entityComponentManager->createEntity( {
+            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData>()
+        } );
+
+        RawAssetComponentData* data = m_entityComponentManager->getComponentData<RawAssetComponentData>( entity );
+        *data = {
+            .guid = {},
+            .hash = {},
+            .data = {},
+            .memoryLabel = MemoryLabels::FileIO,
+        };
+
+        struct LoadFileJob
+        {
+            RawAssetComponentData* componentData;
+            const char* filePath;
+
+            ZP_JOB_DEBUG_NAME( LoadFileJob );
+
+            static void Execute( const JobHandle& parentJobHandle, const LoadFileJob* ptr )
+            {
+                zp_handle_t fileHandle = GetPlatform()->OpenFileHandle( ptr->filePath, ZP_OPEN_FILE_MODE_READ );
+
+                const zp_size_t fileSize = GetPlatform()->GetFileSize( fileHandle );
+
+                zp_uint8_t* mem = ZP_MALLOC_T_ARRAY( ptr->componentData->memoryLabel, zp_uint8_t, fileSize );
+
+                ptr->componentData->data = { .ptr = mem, .length = fileSize };
+
+                GetPlatform()->ReadFile( fileHandle, ptr->componentData->data.ptr, ptr->componentData->data.length );
+
+                GetPlatform()->CloseFileHandle( fileHandle );
+
+                ptr->componentData->hash = zp_fnv128_1a( ptr->componentData->data.ptr, ptr->componentData->data.length );
+            }
+        } loadFileJob {
+            .componentData = data,
+            .filePath = filePath,
+        };
+
+        PreparedJobHandle jobHandle = m_jobSystem->PrepareJobData( loadFileJob );
+
+        m_jobSystem->Schedule( jobHandle ).complete();
+
+        return entity;
     }
 
     AssetSystem::AssetLoadCommand* AssetSystem::requestAssetLoadCommand()

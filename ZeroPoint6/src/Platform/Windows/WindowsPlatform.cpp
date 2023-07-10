@@ -14,6 +14,7 @@
 #include "Core/Math.h"
 #include "Core/Common.h"
 #include "Core/Version.h"
+#include "Core/Allocator.h"
 #include "Platform/Platform.h"
 
 #define TestFlag( a, f, t, r )      a |= ((f) & (t)) ? (r) : 0
@@ -727,5 +728,36 @@ namespace zp
 
         const MessageBoxResult result = resultMap[ id ];
         return result;
+    }
+
+    zp_int32_t Platform::ExecuteProcess( const char* process, const char* arguments )
+    {
+        STARTUPINFO startupinfo {
+            .cb = sizeof( STARTUPINFO ),
+        };
+
+        DWORD returnCode = -1;
+
+        char commandLine[4 KB];
+        zp_snprintf( commandLine, "%s %s", process, arguments);
+
+        PROCESS_INFORMATION processInformation {};
+        const zp_bool_t ok = ::CreateProcess( nullptr, commandLine, nullptr, nullptr, false, 0, nullptr, nullptr, &startupinfo, &processInformation );
+        if( ok )
+        {
+            ::WaitForSingleObject( processInformation.hProcess, INFINITE );
+
+            ::GetExitCodeProcess( processInformation.hProcess, &returnCode );
+
+            ::CloseHandle( processInformation.hProcess );
+            ::CloseHandle( processInformation.hThread );
+        }
+        else
+        {
+            DWORD error = ::GetLastError();
+            ZP_INVALID_CODE_PATH_MSG( "Failed to create process" );
+        }
+
+        return static_cast<zp_int32_t>( returnCode );
     }
 }

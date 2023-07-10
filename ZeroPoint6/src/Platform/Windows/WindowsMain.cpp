@@ -113,109 +113,6 @@ static LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM
     return 0;
 }
 
-int APIENTRY OldWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow )
-{
-    HINSTANCE h = ::LoadLibrary( TEXT( "../ShadowGame/ZeroPoint_Game.dll" ) );
-
-    //if (h)
-    //{
-    //    auto ptr = (zp::GetEngineEntryPoint)::GetProcAddress(h, TEXT(ZP_STR(GetEngineEntryPoint)));
-    //    if (ptr)
-    //    {
-    //        const zp::EngineEntryPointAPI* api = ptr();
-    //    }
-    //}
-
-    WNDCLASSEX wc;
-    wc.cbSize = sizeof( WNDCLASSEX );
-    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wc.cbClsExtra = 0;
-    wc.cbWndExtra = 0;
-    wc.lpfnWndProc = WinProc;
-    wc.hInstance = hInstance;
-    wc.hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH ));
-    wc.hIcon = LoadIcon( nullptr, IDI_APPLICATION );
-    wc.hIconSm = LoadIcon( nullptr, IDI_APPLICATION );
-    wc.hCursor = LoadCursor( nullptr, IDC_ARROW );
-    wc.lpszMenuName = nullptr;
-    wc.lpszClassName = kZeroPointClassName;
-
-    ATOM reg = ::RegisterClassEx( &wc );
-    DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME;
-    DWORD exStyle = 0;
-#if ZP_DEBUG
-    exStyle |= WS_EX_ACCEPTFILES;
-#endif
-
-    RECT r = { 0, 0, 800, 600 };
-    ::AdjustWindowRectEx( &r, style, false, exStyle );
-
-    int width = r.right - r.left;
-    int height = r.bottom - r.top;
-
-    LPCSTR title = "ZeroPoint6";
-    HWND hWnd = ::CreateWindowEx(
-        exStyle,
-        kZeroPointClassName,
-        title,
-        style,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        width,
-        height,
-        nullptr,
-        nullptr,
-        hInstance,
-        nullptr
-    );
-
-    //   zp::GetPlatform()->SetWindowHandle(hWnd);
-//    ::SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(zp::GetPlatform()));
-
-    ::ShowWindow( hWnd, SW_SHOW );
-    ::UpdateWindow( hWnd );
-
-    //zp::InitializeRenderingEngine( hInstance, hWnd, width, height );
-    zp_printf( "hello world" );
-    int exitCode = 0;
-
-    MSG msg;
-    bool isRunning = true;
-    while( isRunning )
-    {
-        if( ::PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) )
-        {
-            if( msg.message == WM_QUIT )
-            {
-                exitCode = static_cast<int>(msg.wParam);
-                isRunning = false;
-            }
-
-            ::TranslateMessage( &msg );
-            ::DispatchMessage( &msg );
-        }
-
-        if( isRunning )
-        {
-            //zp::RenderFrame();
-        }
-    }
-
-    //zp::DestroyRenderingEngine();
-
-    ::DestroyWindow( hWnd );
-    ::UnregisterClass( kZeroPointClassName, hInstance );
-
-    // zp::GetPlatform()->SetWindowHandle(ZP_NULL_HANDLE);
-
-    if( h )
-    {
-        ::FreeLibrary( h );
-    }
-
-    return exitCode;
-}
-
 struct MemoryConfig
 {
     zp_size_t defaultAllocatorPageSize;
@@ -235,10 +132,6 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
         .debugPageSize = 4 MB,
     };
 
-    //MemoryAllocator<SystemMemoryStorage, SystemPageAllocatorPolicy> s_defaultAllocator(
-    //    SystemMemoryStorage( nullptr, 10 MB ),
-    //    SystemPageAllocatorPolicy()
-    //);
 #if ZP_DEBUG
     void* const baseAddress = reinterpret_cast<void*>(0x10000000);
 #else

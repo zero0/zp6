@@ -167,23 +167,19 @@ namespace zp
         template<typename T>
         ComponentType registerComponent( DestroyComponentDataCallback destroyComponentDataCallback = nullptr )
         {
-            ComponentDescriptor componentDescriptor {
+            return m_componentManager.registerComponent( {
                 .typeHash = zp_type_hash<T>(),
                 .size = sizeof( T ),
                 .destroyCallback = destroyComponentDataCallback
-            };
-
-            return m_componentManager.registerComponent( &componentDescriptor );
+            } );
         }
 
         template<typename T>
         TagType registerTag()
         {
-            TagDescriptor tagDescriptor {
+            return m_componentManager.registerTag( {
                 .typeHash = zp_type_hash<T>()
-            };
-
-            return m_componentManager.registerTag( &tagDescriptor );
+            } );
         }
 
     public:

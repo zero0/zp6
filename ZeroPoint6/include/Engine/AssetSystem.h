@@ -26,6 +26,7 @@ namespace zp
     {
         Raw,
         Data,
+        Text,
 
         AssetManifest,
         AssetPack,
@@ -43,9 +44,17 @@ namespace zp
         AssetTypes_Count,
     };
 
+    struct AssetSource
+    {
+
+    };
+
     class VirtualFileSystem
     {
     public:
+        [[nodiscard]] AssetSource getAssetSource() const;
+
+        void addAssetSource();
     };
 
     template<AssetType AT>
@@ -64,7 +73,7 @@ namespace zp
         zp_guid128_t guid;
         zp_hash128_t hash;
         MemoryArray<zp_uint8_t> data;
-        const MemoryLabel memoryLabel;
+        MemoryLabel memoryLabel;
     };
 
     struct MeshAssetViewComponentData
@@ -76,6 +85,10 @@ namespace zp
         zp_int32_t refCount;
     };
 
+    //
+    //
+    //
+
     class AssetSystem
     {
     public:
@@ -83,7 +96,7 @@ namespace zp
 
         ~AssetSystem();
 
-        void setup();
+        void setup(JobSystem* jobSystem, EntityComponentManager* entityComponentManager);
 
         void teardown();
 
@@ -103,7 +116,11 @@ namespace zp
 
         [[nodiscard]] zp_size_t getLoadedAssetCount() const;
 
+        //
+
         [[nodiscard]] PreparedJobHandle process( JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle );
+
+        Entity loadFileDirect( const char* filePath );
 
     private:
         struct AssetData
@@ -161,10 +178,15 @@ namespace zp
 
         zp_size_t m_maxActiveAssetLoadCommands;
 
+        //
+
+        JobSystem* m_jobSystem;
+        EntityComponentManager* m_entityComponentManager;
+
         MemoryLabel m_assetMemoryLabels[static_cast<zp_size_t>(AssetTypes::AssetTypes_Count )];
 
     public:
-        MemoryLabel memoryLabel;
+        const MemoryLabel memoryLabel;
     };
 }
 

@@ -23,9 +23,11 @@ namespace zp
     {
         kMaxComponentTypes = 64,
         kMaxTagTypes = 64,
+
         kMaxComponentsPerArchetype = 16,
-        kMaxEntitiesPerArchetype = 64,
+        kMaxEntitiesPerArchetypeBlock = 64,
     };
+    ZP_STATIC_ASSERT( kMaxEntitiesPerArchetypeBlock == sizeof(zp_uint64_t) * 8);
 
     typedef void (* DestroyComponentDataCallback)( void* componentData, zp_size_t componentSize );
 
@@ -61,7 +63,7 @@ namespace zp
 
         ~ComponentArchetypeManager();
 
-        const ComponentSignature& getComponentSignature() const;
+        [[nodiscard]] const ComponentSignature& getComponentSignature() const;
 
         void addEntity( Entity entity );
 
@@ -76,9 +78,9 @@ namespace zp
         void setComponentData( Entity entity, ComponentType componentType, const void* data, zp_size_t length );
 
     private:
-        zp_size_t getEntityIndex( const Entity entity ) const;
+        [[nodiscard]] zp_size_t getEntityIndex( Entity entity ) const;
 
-        zp_size_t getComponentTypeIndex( const ComponentType componentType ) const;
+        [[nodiscard]] zp_size_t getComponentTypeIndex( ComponentType componentType ) const;
 
         ComponentBlockArchetype m_componentBlockArchetype;
 
@@ -117,19 +119,19 @@ namespace zp
     public:
         explicit ComponentManager( MemoryLabel memoryLabel );
 
-        ComponentType registerComponent( ComponentDescriptor* componentDescriptor );
+        ComponentType registerComponent( const ComponentDescriptor& componentDescriptor );
 
-        TagType registerTag( TagDescriptor* tagDescriptor );
+        TagType registerTag( const TagDescriptor& tagDescriptor );
 
         void registerComponentSignature( const ComponentSignature& componentSignature );
 
-        ComponentArchetypeManager* getComponentArchetype( const ComponentSignature& componentSignature ) const;
+        [[nodiscard]] ComponentArchetypeManager* getComponentArchetype( const ComponentSignature& componentSignature ) const;
 
-        ComponentType getComponentTypeFromTypeHash( zp_hash64_t typeHash ) const;
+        [[nodiscard]] ComponentType getComponentTypeFromTypeHash( zp_hash64_t typeHash ) const;
 
-        TagType getTagTypeFromTypeHash( zp_hash64_t typeHash ) const;
+        [[nodiscard]] TagType getTagTypeFromTypeHash( zp_hash64_t typeHash ) const;
 
-        zp_size_t getComponentDataSize( ComponentType componentType ) const;
+        [[nodiscard]] zp_size_t getComponentDataSize( ComponentType componentType ) const;
 
     private:
         struct RegisteredComponent

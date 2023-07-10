@@ -153,7 +153,7 @@ namespace zp
 
         m_renderSystem->initialize( m_windowHandle, graphicsDeviceDesc );
 
-        m_assetSystem->setup();
+        m_assetSystem->setup( m_jobSystem, m_entityComponentManager );
 
         // Register components
 
@@ -191,6 +191,10 @@ namespace zp
         } );
 
         // Asset Signature
+        m_entityComponentManager->registerComponentSignature( {
+            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData>()
+        } );
+
         m_entityComponentManager->registerComponentSignature( {
             .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData, AssetReferenceCountComponentData>()
         } );

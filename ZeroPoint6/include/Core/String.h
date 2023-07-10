@@ -404,12 +404,12 @@ namespace zp
 
         //explicit operator String() const
         //{
-        //    return { .str = m_str, .length = m_length };
+        //    return { .str = m_str, .length = length };
         //}
 //
         //explicit operator MutableString()
         //{
-        //    return { .str = m_str, .length = m_length, .capacity = m_capacity };
+        //    return { .str = m_str, .length = length, .capacity = m_capacity };
         //}
 
     private:
@@ -570,7 +570,7 @@ namespace zp
 //
         //explicit operator MutableString()
         //{
-        //    return { .str = m_str, .length = m_length, .capacity = Size };
+        //    return { .str = m_str, .length = length, .capacity = Size };
         //}
 
     private:

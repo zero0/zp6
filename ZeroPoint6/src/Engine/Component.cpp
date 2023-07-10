@@ -69,7 +69,7 @@ namespace zp
         if( !found )
         {
             // allocate block memory
-            void* blockMemory = ZP_MALLOC_( memoryLabel, sizeof( ArchetypeBlock ) + kMaxEntitiesPerArchetype * m_componentBlockArchetype.totalStride );
+            void* blockMemory = ZP_MALLOC_( memoryLabel, sizeof( ArchetypeBlock ) + kMaxEntitiesPerArchetypeBlock * m_componentBlockArchetype.totalStride );
 
             freeBlock = static_cast<ArchetypeBlock*>( blockMemory );
             freeBlock->usedBits = 0;
@@ -252,29 +252,29 @@ namespace zp
     {
     }
 
-    ComponentType ComponentManager::registerComponent( ComponentDescriptor* componentDescriptor )
+    ComponentType ComponentManager::registerComponent( const ComponentDescriptor& componentDescriptor )
     {
         ZP_ASSERT( m_registeredComponents < kMaxComponentTypes );
         ComponentType componentType = m_registeredComponents;
 
         m_components[ m_registeredComponents ] = {
-            componentDescriptor->typeHash,
-            componentDescriptor->size,
+            componentDescriptor.typeHash,
+            componentDescriptor.size,
             componentType,
-            componentDescriptor->destroyCallback
+            componentDescriptor.destroyCallback
         };
         ++m_registeredComponents;
 
         return componentType;
     }
 
-    TagType ComponentManager::registerTag( TagDescriptor* tagDescriptor )
+    TagType ComponentManager::registerTag( const TagDescriptor& tagDescriptor )
     {
         ZP_ASSERT( m_registeredTags < kMaxTagTypes );
         TagType tagType = m_registeredTags;
 
         m_tags[ m_registeredTags ] = {
-            tagDescriptor->typeHash,
+            tagDescriptor.typeHash,
             tagType
         };
         ++m_registeredTags;
@@ -318,8 +318,9 @@ namespace zp
 
             if( !found )
             {
-                ComponentBlockArchetype archetype {};
-                archetype.componentSignature = componentSignature;
+                ComponentBlockArchetype archetype {
+                    .componentSignature = componentSignature,
+                };
                 archetype.componentSignature.tagSignature = 0;
 
                 for( zp_size_t index = 0; index < kMaxComponentTypes && archetype.componentCount < kMaxComponentsPerArchetype; ++index )

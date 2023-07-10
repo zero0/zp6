@@ -165,7 +165,7 @@ namespace zp
 namespace zp
 {
     template<typename T>
-    class MemoryArray
+    struct MemoryArray
     {
     public:
         typedef T value_type;
@@ -177,14 +177,6 @@ namespace zp
         typedef const T* const_iterator;
 
     public:
-        MemoryArray();
-
-        ~MemoryArray();
-
-        MemoryArray( pointer ptr, zp_size_t length );
-
-        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
-
         [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
 
         [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
@@ -201,11 +193,11 @@ namespace zp
 
         [[nodiscard]] ZP_FORCEINLINE MemoryArray split( zp_size_t index ) const;
 
-        [[nodiscard]] ZP_FORCEINLINE MemoryArray split( zp_size_t index, zp_size_t length ) const;
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray split( zp_size_t index, zp_size_t count ) const;
 
-    private:
-        pointer m_ptr;
-        zp_size_t m_length;
+    public:
+        T* ptr;
+        zp_size_t length;
     };
 }
 
@@ -270,7 +262,8 @@ namespace zp
 
         FixedArray( value_type (& ptr)[Size] );
 
-        template<typename ... Args>FixedArray( Args ... m );
+        template<typename ... Args>
+        FixedArray( Args ... m );
 
         FixedArray( pointer ptr, zp_size_t length );
 
@@ -793,88 +786,61 @@ namespace zp
 namespace zp
 {
     template<typename T>
-    MemoryArray<T>::MemoryArray()
-        : m_ptr( nullptr )
-        , m_length( 0 )
-    {
-    }
-
-    template<typename T>
-    MemoryArray<T>::~MemoryArray()
-    {
-        m_ptr = nullptr;
-        m_length = 0;
-    }
-
-    template<typename T>
-    MemoryArray<T>::MemoryArray( pointer ptr, zp_size_t length )
-        : m_ptr( ptr )
-        , m_length( length )
-    {
-    }
-
-    template<typename T>
-    zp_size_t MemoryArray<T>::length() const
-    {
-        return m_length;
-    }
-
-    template<typename T>
     zp_bool_t MemoryArray<T>::isEmpty() const
     {
-        return !( m_ptr && m_length );
+        return !( ptr && length );
     }
 
     template<typename T>
     MemoryArray<T>::reference MemoryArray<T>::operator[]( zp_size_t index )
     {
-        ZP_ASSERT( m_ptr && index < m_length );
-        return m_ptr[ index ];
+        ZP_ASSERT( ptr && index < length );
+        return ptr[ index ];
     }
 
     template<typename T>
     MemoryArray<T>::const_reference MemoryArray<T>::operator[]( zp_size_t index ) const
     {
-        ZP_ASSERT( m_ptr && index < m_length );
-        return m_ptr[ index ];
+        ZP_ASSERT( ptr && index < length );
+        return ptr[ index ];
     }
 
     template<typename T>
     MemoryArray<T>::iterator MemoryArray<T>::begin()
     {
-        return m_ptr;
+        return ptr;
     }
 
     template<typename T>
     MemoryArray<T>::iterator MemoryArray<T>::end()
     {
-        return m_ptr + m_length;
+        return ptr + length;
     }
 
     template<typename T>
     MemoryArray<T>::const_iterator MemoryArray<T>::begin() const
     {
-        return m_ptr;
+        return ptr;
     }
 
     template<typename T>
     MemoryArray<T>::const_iterator MemoryArray<T>::end() const
     {
-        return m_ptr + m_length;
+        return ptr + length;
     }
 
     template<typename T>
     MemoryArray<T> MemoryArray<T>::split( zp_size_t index ) const
     {
-        ZP_ASSERT( m_ptr && index < m_length );
-        return MemoryArray<T>( m_ptr + index, m_length - index );
+        ZP_ASSERT( ptr && index < length );
+        return { .ptr = ptr + index, .length = length - index };
     }
 
     template<typename T>
-    MemoryArray<T> MemoryArray<T>::split( zp_size_t index, zp_size_t length ) const
+    MemoryArray<T> MemoryArray<T>::split( zp_size_t index, zp_size_t count ) const
     {
-        ZP_ASSERT( m_ptr && ( index + length ) < m_length );
-        return MemoryArray<T>( m_ptr + index, length );
+        ZP_ASSERT( ptr && ( index + count ) < count );
+        return { .ptr = ptr + index, .length = count };
     }
 }
 
@@ -892,9 +858,10 @@ namespace zp
     {
     }
 
-    template<typename T, zp_size_t Size> template<typename ... Args>
+    template<typename T, zp_size_t Size>
+    template<typename ... Args>
     FixedArray<T, Size>::FixedArray( Args ... m )
-        : m_ptr { zp_forward<T>(m)... }
+        : m_ptr { zp_forward<T>( m )... }
     {
     }
 

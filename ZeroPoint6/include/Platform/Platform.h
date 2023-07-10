@@ -220,6 +220,8 @@ namespace zp
 
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
 
+        zp_int32_t ExecuteProcess( const char* process, const char* arguments );
+
         static const zp_char8_t PathSep;
 
     private:
