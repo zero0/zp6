@@ -24,8 +24,8 @@ namespace zp
     struct VertexVUC
     {
         Vector3f vertexOS;
-        Vector2f uv0;
         Color color;
+        Vector2f uv0;
     };
 
     struct ImmediateModeRendererConfig

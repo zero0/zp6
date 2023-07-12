@@ -376,8 +376,8 @@ namespace zp
                 graphicsPipelineStateDesc.vertexAttributeCount = 3;
                 graphicsPipelineStateDesc.vertexBindings[ 0 ] = { 0, sizeof( VertexVUC ), ZP_VERTEX_INPUT_RATE_VERTEX };
                 graphicsPipelineStateDesc.vertexAttributes[ 0 ] = { 0, 0, offsetof( struct VertexVUC, vertexOS ), ZP_GRAPHICS_FORMAT_R32G32B32_SFLOAT };
-                graphicsPipelineStateDesc.vertexAttributes[ 1 ] = { 1, 0, offsetof( struct VertexVUC, uv0 ), ZP_GRAPHICS_FORMAT_R32G32_SFLOAT };
-                graphicsPipelineStateDesc.vertexAttributes[ 2 ] = { 2, 0, offsetof( struct VertexVUC, color ), ZP_GRAPHICS_FORMAT_R32G32B32A32_SFLOAT };
+                graphicsPipelineStateDesc.vertexAttributes[ 1 ] = { 1, 0, offsetof( struct VertexVUC, color ), ZP_GRAPHICS_FORMAT_R32G32B32A32_SFLOAT };
+                graphicsPipelineStateDesc.vertexAttributes[ 2 ] = { 2, 0, offsetof( struct VertexVUC, uv0 ), ZP_GRAPHICS_FORMAT_R32G32_SFLOAT };
 
                 graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_colorMaterial.get().materialRenderPipeline );
             }
@@ -650,10 +650,10 @@ namespace zp
                     Vector4f v3 = Math::Mul( localToWorld, Math::Vec4f( r.bottomRight().x, r.bottomRight().y, 0.f, 1.f ) );
 
                     VertexVUC vertices[] = {
-                        { .vertexOS = Math::Vec3f( v0 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::red, color ) },
-                        { .vertexOS = Math::Vec3f( v1 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::green, color ) },
-                        { .vertexOS = Math::Vec3f( v2 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::blue, color ) },
-                        { .vertexOS = Math::Vec3f( v3 ), .uv0 = Vector2f::zero, .color = Math::Mul( Color::white, color ) },
+                        { .vertexOS = Math::Vec3f( v0 ), .color = Math::Mul( Color::red, color ) },
+                        { .vertexOS = Math::Vec3f( v1 ), .color = Math::Mul( Color::green, color ) },
+                        { .vertexOS = Math::Vec3f( v2 ), .color = Math::Mul( Color::blue, color ) },
+                        { .vertexOS = Math::Vec3f( v3 ), .color = Math::Mul( Color::white, color ) },
                     };
                     renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
                 }
@@ -690,10 +690,10 @@ namespace zp
                         Vector4f v3 = Math::Mul( localToWorld, Math::Vec4f( r.bottomRight().x, r.bottomRight().y, 0.f, 1.f ) );
 
                         VertexVUC vertices[] = {
-                            { .vertexOS = Math::Vec3f( v0 ), .uv0 = Vector2f::zero, .color = color },
-                            { .vertexOS = Math::Vec3f( v1 ), .uv0 = Vector2f::zero, .color = color },
-                            { .vertexOS = Math::Vec3f( v2 ), .uv0 = Vector2f::zero, .color = color },
-                            { .vertexOS = Math::Vec3f( v3 ), .uv0 = Vector2f::zero, .color = color },
+                            { .vertexOS = Math::Vec3f( v0 ), .color = color },
+                            { .vertexOS = Math::Vec3f( v1 ), .color = color },
+                            { .vertexOS = Math::Vec3f( v2 ), .color = color },
+                            { .vertexOS = Math::Vec3f( v3 ), .color = color },
                         };
                         renderProfilerData->immediateModeRenderer->addQuads( cmd, vertices );
 
