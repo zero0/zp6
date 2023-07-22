@@ -8,8 +8,6 @@
 
 namespace zp
 {
-
-
 }
 
 static VkResult CreateShader(

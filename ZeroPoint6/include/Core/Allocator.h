@@ -41,6 +41,8 @@
 #define ZP_ALIGNED_MALLOC_( l, s, a )   zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), (a))
 #define ZP_FREE_( l, p )                zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free((p))
 
+#define ZP_SAFE_FREE_LABEL( l, p )      do { if( p ) { zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free((p)); } } while( false )
+
 #define KB                              * zp_size_t( 1024 )
 #define MB                              * zp_size_t( 1024 * 1024 )
 

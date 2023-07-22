@@ -5,6 +5,8 @@
 #ifndef ZP_SWAPCHAIN_H
 #define ZP_SWAPCHAIN_H
 
+#include "Core/Math.h"
+
 namespace zp
 {
     struct SwapchainDesc
@@ -14,7 +16,7 @@ namespace zp
 
     struct Swapchain
     {
-
+        Size2Di screenSize;
     };
 };
 

@@ -7,6 +7,8 @@
 #include <windows.h>
 #include <processthreadsapi.h>
 #include <excpt.h>
+#include <winsock2.h>
+#pragma comment(lib, "Ws2_32.lib")
 
 #include "Core/Defines.h"
 #include "Core/Macros.h"
@@ -738,7 +740,7 @@ namespace zp
 
         DWORD returnCode = -1;
 
-        char commandLine[4 KB];
+        char commandLine[1 KB];
         zp_snprintf( commandLine, "%s %s", process, arguments);
 
         PROCESS_INFORMATION processInformation {};
@@ -755,7 +757,7 @@ namespace zp
         else
         {
             DWORD error = ::GetLastError();
-            ZP_INVALID_CODE_PATH_MSG( "Failed to create process" );
+            ZP_ASSERT_MSG( false, "Failed to create process" );
         }
 
         return static_cast<zp_int32_t>( returnCode );

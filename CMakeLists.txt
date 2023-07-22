@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 project(zp)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -9,6 +9,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(GCC 1)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CLANG 1)
+endif()
+
+if (GCC OR CLANG)
+    set(CMAKE_CXX_FLAGS "-fms-extensions")
 endif()
 
 if (USE_MODULES)

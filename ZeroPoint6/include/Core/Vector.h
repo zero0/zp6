@@ -40,6 +40,7 @@ namespace zp
         typedef T value_type;
         typedef T& reference;
         typedef const T& const_reference;
+        typedef T&& move_reference;
         typedef T* pointer;
         typedef const T* const_pointer;
         typedef T* iterator;
@@ -76,9 +77,15 @@ namespace zp
 
         void pushBack( const_reference val );
 
+        void pushBack( move_reference val );
+
         void pushBackUnsafe( const_reference val );
 
+        void pushBackUnsafe( move_reference val );
+
         void pushBackAtomic( const_reference val );
+
+        void pushBackAtomic( move_reference val );
 
         reference pushBackEmpty();
 
@@ -403,9 +410,25 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushBack( move_reference val )
+    {
+        if( m_size == m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+        m_data[ m_size++ ] = zp_move( val );
+    }
+
+    template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBackUnsafe( const_reference val )
     {
         m_data[ m_size++ ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushBackUnsafe( move_reference val )
+    {
+        m_data[ m_size++ ] = zp_move( val );
     }
 
     template<typename T, typename Allocator>
@@ -413,6 +436,13 @@ namespace zp
     {
         const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
         m_data[ index ] = val;
+    }
+
+    template<typename T, typename Allocator>
+    void Vector<T, Allocator>::pushBackAtomic( move_reference val )
+    {
+        const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
+        m_data[ index ] = zp_move( val );
     }
 
     template<typename T, typename Allocator>

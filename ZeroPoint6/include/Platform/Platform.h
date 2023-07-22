@@ -127,6 +127,32 @@ namespace zp
         ZP_MESSAGE_BOX_RESULT_TRY_AGAIN,
     };
 
+    enum AddressFamily
+    {
+        ZP_ADDRESS_FAMILY_IPv4,
+        ZP_ADDRESS_FAMILY_IPv6,
+    };
+
+    enum ConnectionProtocol
+    {
+        ZP_CONNECTION_PROTOCOL_TCP,
+        ZP_CONNECTION_PROTOCOL_UDP,
+    };
+
+    struct IPAddress
+    {
+        char addr[64];
+        zp_uint16_t port;
+    };
+
+    struct SocketDesc
+    {
+        const char* name;
+        IPAddress address;
+        AddressFamily addressFamily;
+        ConnectionProtocol connectionProtocol;
+    };
+
     class Platform
     {
     ZP_NONCOPYABLE( Platform );
@@ -221,6 +247,18 @@ namespace zp
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
 
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
+
+        zp_handle_t OpenSocket( const SocketDesc& desc );
+
+        void ListenSocket( zp_handle_t socket );
+
+        zp_handle_t AcceptSocket( zp_handle_t socket );
+
+        zp_size_t ReceiveSocket( zp_handle_t socket, void* dst, zp_size_t dstSize );
+
+        zp_size_t SendSocket( zp_handle_t socket, const void* src, zp_size_t srcSize );
+
+        void CloseSocket( zp_handle_t socket );
 
         static const zp_char8_t PathSep;
 

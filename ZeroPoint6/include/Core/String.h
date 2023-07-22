@@ -14,11 +14,21 @@
 
 zp_int32_t zp_strcmp( const char* lh, const char* rh );
 
+zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char* rh, zp_size_t rhSize );
+
 //zp_size_t zp_strlen( const char* str );
 
 //zp_size_t zp_strnlen( const char* str, zp_size_t maxSize );
 
 constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength )
+{
+    for( zp_size_t i = 0; i < dstLength; ++i )
+    {
+        dstStr[ i ] = srcStr[ i ];
+    }
+}
+
+constexpr void zp_strcpy( const zp_char8_t* srcStr, zp_char8_t* dstStr, zp_size_t dstLength )
 {
     for( zp_size_t i = 0; i < dstLength; ++i )
     {
@@ -319,8 +329,16 @@ namespace zp
 {
     struct String
     {
-        const zp_char8_t* const str;
-        const zp_size_t length;
+        const zp_char8_t* str;
+        zp_size_t length;
+
+        ZP_FORCEINLINE static String As( const char* c_str )
+        {
+            return {
+                .str = reinterpret_cast<const zp_char8_t*>(c_str),
+                .length  = zp_strlen( c_str )
+            };
+        }
 
         [[nodiscard]] zp_bool_t empty() const
         {
@@ -349,31 +367,88 @@ namespace zp
     //
     //
 
-    class BaseString
+    class AllocString
     {
     public:
-        BaseString( zp_size_t capacity, MemoryLabel memoryLabel )
+        AllocString( const zp_char8_t* str, MemoryLabel memoryLabel )
             : m_str( nullptr )
-            , m_length( 0 )
-            , m_capacity( capacity )
+            , m_length( zp_strlen( str ) )
             , memoryLabel( memoryLabel )
         {
+            if( m_length > 0 )
+            {
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length );
+                zp_strcpy( str, m_str, m_length );
+            }
         }
 
-        BaseString( const zp_char8_t* str, MemoryLabel memoryLabel )
+        AllocString( const zp_char8_t* str, zp_size_t length, MemoryLabel memoryLabel )
             : m_str( nullptr )
-            , m_length( 0 )
-            , m_capacity( 0 )
+            , m_length( length )
             , memoryLabel( memoryLabel )
         {
+            if( m_length > 0 )
+            {
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length );
+                zp_strcpy( str, m_str, m_length );
+            }
         }
 
-        BaseString( const zp_char8_t* str, zp_size_t length, MemoryLabel memoryLabel )
-            : m_str( nullptr )
-            , m_length( 0 )
-            , m_capacity( length )
-            , memoryLabel( memoryLabel )
+        ~AllocString()
         {
+            ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+        }
+
+        AllocString( const AllocString& other )
+            : m_str( nullptr )
+            , m_length( other.m_length )
+            , memoryLabel( other.memoryLabel )
+        {
+            if( m_length > 0 )
+            {
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length );
+                zp_strcpy( other.m_str, m_str, m_length );
+            }
+        }
+
+        AllocString( AllocString&& other ) noexcept
+            : m_str( other.m_str )
+            , m_length( other.m_length )
+            , memoryLabel( other.memoryLabel )
+        {
+            other.m_str = nullptr;
+            other.m_length = 0;
+        }
+
+        AllocString& operator=( const AllocString& other )
+        {
+            if( m_str != other.m_str )
+            {
+                ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+
+                m_str = other.m_str;
+                m_length = other.m_length;
+            }
+
+            return *this;
+        }
+
+        AllocString& operator=( AllocString&& other ) noexcept
+        {
+            ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+
+            m_str = other.m_str;
+            m_length = other.m_length;
+
+            other.m_str = nullptr;
+            other.m_length = 0;
+
+            return *this;
+        }
+
+        [[nodiscard]] zp_char8_t operator[]( zp_size_t index ) const
+        {
+            return m_str && index < m_length ? m_str[ index ] : '\0';
         }
 
         [[nodiscard]] zp_bool_t empty() const
@@ -386,11 +461,6 @@ namespace zp
             return m_length;
         }
 
-        [[nodiscard]] zp_size_t capacity() const
-        {
-            return m_capacity;
-        }
-
         [[nodiscard]] const char* c_str() const
         {
             return reinterpret_cast<const char*>( m_str);
@@ -398,7 +468,6 @@ namespace zp
 
         [[nodiscard]] const zp_char8_t* str() const
         {
-            const zp_char8_t* ff = ZP_T( "fafaf" );
             return m_str;
         }
 
@@ -415,7 +484,6 @@ namespace zp
     private:
         zp_char8_t* m_str;
         zp_size_t m_length;
-        zp_size_t m_capacity;
 
     public:
         const MemoryLabel memoryLabel;

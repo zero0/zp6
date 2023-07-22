@@ -40,6 +40,12 @@ zp_int32_t zp_snprintf( zp_char8_t* dest, zp_size_t destSize, const char* format
     return zp_snprintf( reinterpret_cast<char*>(dest), destSize, format, args... );
 }
 
+template<zp_size_t Size, typename ... Args>
+zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... args )
+{
+    return zp_snprintf( reinterpret_cast<char*>(dest), Size, format, args... );
+}
+
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
