@@ -8,6 +8,7 @@
 #include <processthreadsapi.h>
 #include <excpt.h>
 #include <winsock2.h>
+
 #pragma comment(lib, "Ws2_32.lib")
 
 #include "Core/Defines.h"
@@ -238,9 +239,9 @@ namespace zp
         m_numProcessors = systemInfo.dwNumberOfProcessors;
     }
 
-    zp_handle_t Platform::OpenWindow( const OpenWindowDesc* desc )
+    zp_handle_t Platform::OpenWindow( const OpenWindowDesc& desc )
     {
-        HINSTANCE hInstance = desc->instanceHandle ? static_cast<HINSTANCE>(desc->instanceHandle) : ::GetModuleHandle( nullptr );
+        HINSTANCE hInstance = desc.instanceHandle ? static_cast<HINSTANCE>(desc.instanceHandle) : ::GetModuleHandle( nullptr );
 
         const WNDCLASSEX wc {
             .cbSize = sizeof( WNDCLASSEX ),
@@ -267,8 +268,8 @@ namespace zp
         RECT r {
             .left = 0,
             .top = 0,
-            .right = desc->width,
-            .bottom = desc->height
+            .right =  desc.width,
+            .bottom = desc.height
         };
         ::AdjustWindowRectEx( &r, style, false, exStyle );
 
@@ -278,7 +279,7 @@ namespace zp
         HWND hWnd = ::CreateWindowEx(
             exStyle,
             kZeroPointClassName,
-            desc->title,
+            desc.title,
             style,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -291,9 +292,9 @@ namespace zp
         );
         ZP_ASSERT( hWnd );
 
-        ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)desc->callbacks );
+        ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)desc.callbacks );
 
-        ::ShowWindow( hWnd, SW_SHOW );
+        ::ShowWindow( hWnd, desc.showWindow ? SW_SHOW : SW_HIDE );
         ::UpdateWindow( hWnd );
 
         return hWnd;
@@ -395,10 +396,30 @@ namespace zp
         ::GetCurrentDirectory( maxPathLength, path );
     }
 
+    zp_bool_t Platform::FileExists( const char* filePath ) const
+    {
+        const DWORD attr = ::GetFileAttributes( filePath );
+        const zp_bool_t exists = ( attr != INVALID_FILE_ATTRIBUTES ) && !( attr & FILE_ATTRIBUTE_DIRECTORY );
+        return exists;
+    }
+
+    zp_bool_t Platform::FileCopy( const char* srcFilePath, const char* dstFilePath, zp_bool_t force )
+    {
+        const BOOL ok = ::CopyFile( srcFilePath, dstFilePath, !force );
+        return ok;
+    }
+
+    zp_bool_t Platform::FileMove( const char* srcFilePath, const char* dstFilePath )
+    {
+        const BOOL ok = ::MoveFile( srcFilePath, dstFilePath );
+        return ok;
+    }
+
     zp_handle_t Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode, FileCachingMode fileCachingMode )
     {
         DWORD access = 0;
         DWORD shareMode = 0;
+        DWORD createDesc = 0;
         DWORD attributes = 0;
 
         switch( openFileMode )
@@ -406,18 +427,21 @@ namespace zp
             case ZP_OPEN_FILE_MODE_READ:
                 access = FILE_GENERIC_READ;
                 shareMode = FILE_SHARE_READ;
+                createDesc = OPEN_EXISTING;
                 attributes = FILE_ATTRIBUTE_READONLY;
                 break;
 
             case ZP_OPEN_FILE_MODE_WRITE:
                 access = FILE_GENERIC_WRITE;
                 shareMode = FILE_SHARE_WRITE;
+                createDesc = CREATE_ALWAYS;
                 attributes = FILE_ATTRIBUTE_NORMAL;
                 break;
 
             case ZP_OPEN_FILE_MODE_READ_WRITE:
                 access = FILE_ALL_ACCESS;
                 shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+                createDesc = OPEN_EXISTING;
                 attributes = FILE_ATTRIBUTE_NORMAL;
                 break;
 
@@ -436,7 +460,7 @@ namespace zp
             access,
             shareMode,
             nullptr,
-            OPEN_EXISTING,
+            createDesc,
             attributes,
             nullptr );
         return fileHandle;
@@ -741,7 +765,7 @@ namespace zp
         DWORD returnCode = -1;
 
         char commandLine[1 KB];
-        zp_snprintf( commandLine, "%s %s", process, arguments);
+        zp_snprintf( commandLine, "%s %s", process, arguments );
 
         PROCESS_INFORMATION processInformation {};
         const zp_bool_t ok = ::CreateProcess( nullptr, commandLine, nullptr, nullptr, false, 0, nullptr, nullptr, &startupinfo, &processInformation );

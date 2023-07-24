@@ -59,6 +59,7 @@ namespace zp
         const char* title;
         zp_int32_t width;
         zp_int32_t height;
+        zp_bool_t showWindow;
     };
 
     enum OpenFileMode
@@ -162,7 +163,7 @@ namespace zp
 
         ~Platform() = default;
 
-        zp_handle_t OpenWindow( const OpenWindowDesc* desc );
+        zp_handle_t OpenWindow( const OpenWindowDesc& desc );
 
         zp_bool_t DispatchWindowMessages( zp_handle_t windowHandle, zp_int32_t& exitCode );
 
@@ -189,6 +190,12 @@ namespace zp
         {
             GetCurrentDir( path, Size );
         }
+
+        zp_bool_t FileExists( const char* filePath ) const;
+
+        zp_bool_t FileCopy( const char* srcFilePath, const char* dstFilePath, zp_bool_t force = false );
+
+        zp_bool_t FileMove( const char* srcFilePath, const char* dstFilePath );
 
         zp_handle_t OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode = ZP_CREATE_FILE_MODE_OPEN, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
 

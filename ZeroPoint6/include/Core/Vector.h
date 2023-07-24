@@ -5,6 +5,7 @@
 #ifndef ZP_VECTOR_H
 #define ZP_VECTOR_H
 
+#include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/Math.h"
@@ -166,6 +167,64 @@ namespace zp
         zp_size_t m_capacity;
 
         allocator_value m_allocator;
+    };
+}
+
+namespace zp
+{
+    template<typename T, typename Allocator = MemoryLabelAllocator>
+    struct AutoMemory
+    {
+        typedef T value_type;
+        typedef T& reference;
+        typedef const T& const_reference;
+        typedef T&& move_reference;
+        typedef zp_remove_pointer_t<T>* pointer;
+        typedef const zp_remove_pointer_t<T>* const_pointer;
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+        typedef Allocator allocator_value;
+        typedef const allocator_value& allocator_const_reference;
+
+        explicit AutoMemory( zp_size_t size )
+            : m_allocator( allocator_value() )
+            , m_ptr( m_allocator.allocate( size ) )
+            , m_size( size )
+        {
+        }
+
+        explicit AutoMemory( zp_size_t size, allocator_const_reference allocator )
+            : m_allocator( allocator )
+            , m_ptr( m_allocator.allocate( size ) )
+            , m_size( size )
+        {
+        }
+
+        ~AutoMemory()
+        {
+            m_allocator.free( m_ptr );
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE pointer ptr()
+        {
+            return m_ptr;
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE const_pointer ptr() const
+        {
+            return m_ptr;
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t size() const
+        {
+            return m_size;
+        }
+
+    private:
+        allocator_value m_allocator;
+        pointer m_ptr;
+        zp_size_t m_size;
     };
 }
 

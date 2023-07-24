@@ -23,6 +23,7 @@
 
 #define ZP_OFFSET_PTR(ptr, offset)      static_cast<void*>( static_cast<zp_uint8_t*>(ptr) + static_cast<zp_ptrdiff_t>(offset) )
 
+#define ZP_FG_DEFAULT   "0"
 #define ZP_FG_BLACK     "30"
 #define ZP_FG_RED       "31"
 #define ZP_FG_GREEN     "32"
@@ -41,6 +42,7 @@
 #define ZP_FG_BRIGHT_CYAN      "96"
 #define ZP_FG_BRIGHT_WHITE     "97"
 
+#define ZP_BG_DEFAULT   "0"
 #define ZP_BG_BLACK     "40"
 #define ZP_BG_RED       "41"
 #define ZP_BG_GREEN     "42"
@@ -86,5 +88,7 @@ private:                            \
     x( const x&) = delete;          \
     x( x&& ) = delete;              \
     x& operator=(x const&) = delete;
+
+#define ZP_PURE_INTERFACE   class
 
 #endif //ZP_MACROS_H

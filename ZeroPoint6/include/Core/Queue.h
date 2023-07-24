@@ -9,6 +9,7 @@
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/Allocator.h"
+#include "Core/Atomic.h"
 
 namespace zp
 {
@@ -21,6 +22,7 @@ namespace zp
         typedef T value_type;
         typedef T& reference;
         typedef const T& const_reference;
+        typedef T&& move_reference;
         typedef T* pointer;
         typedef const T* const_pointer;
 
@@ -45,6 +47,8 @@ namespace zp
         [[nodiscard]] zp_bool_t isEmpty() const;
 
         void enqueue( const_reference val );
+
+        void enqueue( move_reference val );
 
         void enqueueUnsafe( const_reference val );
 
@@ -157,6 +161,20 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
+    void Queue<T, Allocator>::enqueue( move_reference val )
+    {
+        if( size() == m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+
+        const zp_size_t index = m_tail % m_capacity;
+        ++m_tail;
+
+        m_data[ index ] = zp_move( val );
+    }
+
+    template<typename T, typename Allocator>
     void Queue<T, Allocator>::enqueueUnsafe( const_reference val )
     {
         const zp_size_t index = m_tail % m_capacity;
@@ -175,7 +193,7 @@ namespace zp
     template<typename T, typename Allocator>
     typename Queue<T, Allocator>::value_type Queue<T, Allocator>::dequeue()
     {
-        ZP_ASSERT_MSG( isEmpty(), "Trying to dequeue from an empty Queue" );
+        ZP_ASSERT_MSG( !isEmpty(), "Trying to dequeue from an empty Queue" );
 
         const zp_size_t index = m_head % m_capacity;
         ++m_head;

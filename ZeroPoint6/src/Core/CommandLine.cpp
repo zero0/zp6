@@ -15,9 +15,6 @@ namespace zp
 
     CommandLineOperation CommandLine::addOperation( const CommandLineOperationDesc& desc )
     {
-        zp_hash64_t shortHash = zp_fnv64_1a( desc.shortName, zp_strlen( desc.shortName ) );
-        zp_hash64_t longHash = zp_fnv64_1a( desc.longName, zp_strlen( desc.longName ) );
-
         zp_size_t id = m_commandLineOperations.size() + 1; // NOTE: 0 is null handle;
         m_commandLineOperations.pushBack( desc );
 
@@ -86,11 +83,10 @@ namespace zp
 
                 if( wasInToken && !inToken )
                 {
-                    m_commandLineTokens.pushBack( AllocString(
-                        reinterpret_cast<const zp_char8_t*>(cmdLine + tokenStart),
-                        i - tokenStart,
-                        memoryLabel
-                    ) );
+                    m_commandLineTokens.pushBack( {
+                        .str = reinterpret_cast<const zp_char8_t*>(cmdLine + tokenStart),
+                        .length = i - tokenStart
+                    } );
                 }
                 else if( !wasInToken && inToken )
                 {
@@ -101,11 +97,10 @@ namespace zp
             if( inToken )
             {
                 inToken = false;
-                m_commandLineTokens.pushBack( AllocString(
-                    reinterpret_cast<const zp_char8_t*>(cmdLine + tokenStart),
-                    len - tokenStart,
-                    memoryLabel
-                ) );
+                m_commandLineTokens.pushBack( {
+                    .str = reinterpret_cast<const zp_char8_t*>(cmdLine + tokenStart),
+                    .length= len - tokenStart
+                } );
             }
 
             ok = !inQuote && !inToken;
@@ -114,31 +109,54 @@ namespace zp
         return ok;
     }
 
-    zp_bool_t CommandLine::hasFlag( const CommandLineOperation& operation ) const
+    zp_bool_t CommandLine::hasFlag( const CommandLineOperation& operation, zp_bool_t includeParameters ) const
     {
-        zp_bool_t hasFlag = false;
+        zp_bool_t found = false;
 
         if( operation.id )
         {
             const zp_size_t index = operation.id - 1;
             const CommandLineOperationDesc& desc = m_commandLineOperations[ index ];
-            const zp_bool_t valid = desc.maxParameterCount == 0 && desc.minParameterCount == 0;
+            found = hasFlag( desc, includeParameters );
+        }
 
-            if( valid )
+        return found;
+    }
+
+    zp_bool_t CommandLine::hasParameter( const CommandLineOperation& operation, Vector<String>& outParameters ) const
+    {
+        zp_bool_t found = false;
+
+        if( operation.id )
+        {
+            const zp_size_t index = operation.id - 1;
+            const CommandLineOperationDesc& desc = m_commandLineOperations[ index ];
+            found = hasParameter( desc, outParameters );
+        }
+
+        return found;
+    }
+
+    zp_bool_t CommandLine::hasFlag( const CommandLineOperationDesc& desc, zp_bool_t includeParameters ) const
+    {
+        zp_bool_t hasFlag = false;
+
+        const zp_bool_t valid = includeParameters || ( desc.maxParameterCount == 0 && desc.minParameterCount == 0 );
+
+        if( valid )
+        {
+            for( const String& token : m_commandLineTokens )
             {
-                for( const AllocString& token : m_commandLineTokens )
+                zp_int32_t cmp = zp_strcmp( token.str, token.length, desc.shortName.str, desc.shortName.length );
+                if( cmp != 0 )
                 {
-                    zp_int32_t cmp = zp_strcmp( token.c_str(), desc.shortName );
-                    if( cmp != 0 )
-                    {
-                        cmp = zp_strcmp( token.c_str(), desc.longName );
-                    }
+                    cmp = zp_strcmp( token.str, token.length, desc.longName.str, desc.longName.length );
+                }
 
-                    if( cmp == 0 )
-                    {
-                        hasFlag = true;
-                        break;
-                    }
+                if( cmp == 0 )
+                {
+                    hasFlag = true;
+                    break;
                 }
             }
         }
@@ -146,70 +164,81 @@ namespace zp
         return hasFlag;
     }
 
-    zp_bool_t CommandLine::hasParameter( const CommandLineOperation& operation, Vector<AllocString>& outParameters ) const
+    zp_bool_t CommandLine::hasParameter( const CommandLineOperationDesc& desc, Vector<String>& outParameters ) const
     {
-        zp_bool_t hasParameter = false;
+        zp_bool_t found = false;
 
-        if( operation.id )
+        const zp_bool_t valid = desc.maxParameterCount >= desc.minParameterCount;
+
+        if( valid )
         {
-            const zp_size_t index = operation.id - 1;
-            const CommandLineOperationDesc& desc = m_commandLineOperations[ index ];
-            const zp_bool_t valid = desc.maxParameterCount >= desc.minParameterCount;
+            zp_size_t parameterIndex = 0;
 
-            if( valid )
+            for( zp_size_t i = 0; i < m_commandLineTokens.size(); ++i )
             {
-                zp_size_t parameterIndex = 0;
+                const String& token = m_commandLineTokens[ i ];
 
-                for( zp_size_t i = 0; i < m_commandLineTokens.size(); ++i )
+                zp_int32_t cmp = zp_strcmp( token.str, token.length, desc.shortName.str, desc.shortName.length );
+                if( cmp != 0 )
                 {
-                    const AllocString& token = m_commandLineTokens[ i ];
-
-                    zp_int32_t cmp = zp_strcmp( token.c_str(), desc.shortName );
-                    if( cmp != 0 )
-                    {
-                        cmp = zp_strcmp( token.c_str(), desc.longName );
-                    }
-
-                    if( cmp == 0 )
-                    {
-                        parameterIndex = i + 1;
-                        hasParameter = true;
-                        break;
-                    }
+                    cmp = zp_strcmp( token.str, token.length, desc.longName.str, desc.longName.length );
                 }
 
-                if( hasParameter )
+                if( cmp == 0 )
                 {
-                    outParameters.clear();
+                    parameterIndex = i + 1;
+                    found = true;
+                    break;
+                }
+            }
 
-                    zp_size_t i, idx;
-                    for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.size(); ++i, ++idx )
+            if( found )
+            {
+                outParameters.clear();
+
+                zp_size_t i, idx;
+                for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.size(); ++i, ++idx )
+                {
+                    const String& token = m_commandLineTokens[ idx ];
+                    if( token[ 0 ] == '-' )
                     {
-                        const AllocString& token = m_commandLineTokens[ idx ];
-                        if( token[ 0 ] == '-' )
-                        {
-                            break;
-                        }
-
-                        outParameters.pushBack( token );
+                        break;
                     }
 
-                    if( i < desc.minParameterCount )
-                    {
-                        hasParameter = false;
-                    }
+                    outParameters.pushBack( token );
+                }
+
+                if( i < desc.minParameterCount )
+                {
+                    found = false;
                 }
             }
         }
 
-        return hasParameter;
+        return found;
     }
 
     void CommandLine::printHelp() const
     {
-        for( const AllocString& t : m_commandLineTokens )
+        for( const String& t : m_commandLineTokens )
         {
-            zp_printfln( "= %s", t.c_str() );
+            zp_printfln( "= %.*s", t.length, t.c_str() );
+        }
+
+        for( const auto& op : m_commandLineOperations )
+        {
+            if( !op.longName.empty() && op.shortName.empty() )
+            {
+                zp_printfln( "%-20.*s%.*s", op.longName.length, op.longName.str, op.description.length, op.description.str );
+            }
+            else if( op.longName.empty() && !op.shortName.empty() )
+            {
+                zp_printfln( "%-20.*s%.*s", op.shortName.length, op.shortName.str, op.description.length, op.description.str );
+            }
+            else if( !op.longName.empty() && !op.shortName.empty() )
+            {
+                zp_printfln( "%-5.*s,%-14.*s%.*s", op.shortName.length, op.shortName.str, op.longName.length, op.longName.str, op.description.length, op.description.str );
+            }
         }
     }
 }

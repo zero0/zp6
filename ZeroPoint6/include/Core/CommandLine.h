@@ -15,9 +15,9 @@ namespace zp
 {
     struct CommandLineOperationDesc
     {
-        const char* shortName;
-        const char* longName;
-        const char* description;
+        String shortName;
+        String longName;
+        String description;
         zp_size_t minParameterCount;
         zp_size_t maxParameterCount;
     };
@@ -36,15 +36,19 @@ namespace zp
 
         zp_bool_t parse( const char* cmdLine );
 
-        zp_bool_t hasFlag( const CommandLineOperation& operation ) const;
+        zp_bool_t hasFlag( const CommandLineOperation& operation, zp_bool_t includeParameters = false ) const;
 
-        zp_bool_t hasParameter( const CommandLineOperation& operation, Vector<AllocString>& outParameters ) const;
+        zp_bool_t hasParameter( const CommandLineOperation& operation, Vector<String>& outParameters ) const;
+
+        zp_bool_t hasFlag( const CommandLineOperationDesc& desc, zp_bool_t includeParameters = false ) const;
+
+        zp_bool_t hasParameter( const CommandLineOperationDesc& desc, Vector<String>& outParameters ) const;
 
         void printHelp() const;
 
     private:
         Vector<CommandLineOperationDesc> m_commandLineOperations;
-        Vector<AllocString> m_commandLineTokens;
+        Vector<String> m_commandLineTokens;
 
     public:
         const MemoryLabel memoryLabel;

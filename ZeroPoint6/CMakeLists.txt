@@ -243,8 +243,8 @@ target_sources(${ZP_TOOLS_TARGET}
 target_include_directories(${ZP_TOOLS_TARGET}
         PRIVATE include
         PRIVATE external
-
         )
+
 set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
         VERSION ${ZP_VERSION}
         )

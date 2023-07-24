@@ -105,6 +105,12 @@ struct zp_remove_reference
 };
 
 template<typename T>
+struct zp_remove_pointer
+{
+    typedef T type;
+};
+
+template<typename T>
 struct zp_remove_reference<T&>
 {
     typedef T type;
@@ -123,7 +129,16 @@ struct zp_remove_reference<T*>
 };
 
 template<typename T>
+struct zp_remove_pointer<T*>
+{
+    typedef T type;
+};
+
+template<typename T>
 using zp_remove_reference_t = typename zp_remove_reference<T>::type;
+
+template<typename T>
+using zp_remove_pointer_t = typename zp_remove_pointer<T>::type;
 
 template<typename T>
 constexpr T&& zp_forward( zp_remove_reference_t<T>& val )

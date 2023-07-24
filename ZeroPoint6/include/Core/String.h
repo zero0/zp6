@@ -16,6 +16,8 @@ zp_int32_t zp_strcmp( const char* lh, const char* rh );
 
 zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char* rh, zp_size_t rhSize );
 
+zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* rh, zp_size_t rhSize );
+
 //zp_size_t zp_strlen( const char* str );
 
 //zp_size_t zp_strnlen( const char* str, zp_size_t maxSize );
@@ -26,6 +28,7 @@ constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength 
     {
         dstStr[ i ] = srcStr[ i ];
     }
+    dstStr[ dstLength ] = '\0';
 }
 
 constexpr void zp_strcpy( const zp_char8_t* srcStr, zp_char8_t* dstStr, zp_size_t dstLength )
@@ -34,6 +37,7 @@ constexpr void zp_strcpy( const zp_char8_t* srcStr, zp_char8_t* dstStr, zp_size_
     {
         dstStr[ i ] = srcStr[ i ];
     }
+    dstStr[ dstLength ] = '\0';
 }
 
 constexpr zp_bool_t zp_strempty( const char* str )
@@ -340,6 +344,11 @@ namespace zp
             };
         }
 
+        [[nodiscard]] zp_char8_t operator[]( zp_size_t index ) const
+        {
+            return str && index < length ? str[ index ] : '\0';
+        }
+
         [[nodiscard]] zp_bool_t empty() const
         {
             return !( str && length );
@@ -366,30 +375,31 @@ namespace zp
     //
     //
     //
+#pragma region Alloc String
 
     class AllocString
     {
     public:
-        AllocString( const zp_char8_t* str, MemoryLabel memoryLabel )
+        AllocString( MemoryLabel memoryLabel, const zp_char8_t* str )
             : m_str( nullptr )
             , m_length( zp_strlen( str ) )
             , memoryLabel( memoryLabel )
         {
             if( m_length > 0 )
             {
-                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length );
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
                 zp_strcpy( str, m_str, m_length );
             }
         }
 
-        AllocString( const zp_char8_t* str, zp_size_t length, MemoryLabel memoryLabel )
+        AllocString( MemoryLabel memoryLabel, const zp_char8_t* str, zp_size_t length )
             : m_str( nullptr )
             , m_length( length )
             , memoryLabel( memoryLabel )
         {
             if( m_length > 0 )
             {
-                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length );
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
                 zp_strcpy( str, m_str, m_length );
             }
         }
@@ -406,7 +416,7 @@ namespace zp
         {
             if( m_length > 0 )
             {
-                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length );
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
                 zp_strcpy( other.m_str, m_str, m_length );
             }
         }
@@ -471,10 +481,10 @@ namespace zp
             return m_str;
         }
 
-        //explicit operator String() const
-        //{
-        //    return { .str = m_str, .length = length };
-        //}
+        [[nodiscard]] String asString() const
+        {
+            return { .str = m_str, .length = m_length };
+        }
 //
         //explicit operator MutableString()
         //{
@@ -488,6 +498,8 @@ namespace zp
     public:
         const MemoryLabel memoryLabel;
     };
+
+#pragma endregion
 
 #pragma region Fixed String
 
@@ -670,7 +682,6 @@ namespace zp
     {
 
     };
-
 };
 
 #endif //ZP_STRING_H

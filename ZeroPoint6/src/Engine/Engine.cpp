@@ -135,23 +135,21 @@ namespace zp
             .onWindowResize = onWindowResize,
         };
 
-        OpenWindowDesc openWindowDesc {
+        m_windowHandle = GetPlatform()->OpenWindow( {
             .callbacks = &m_windowCallbacks,
             .width = 800,
             .height = 600,
-        };
-        m_windowHandle = GetPlatform()->OpenWindow( &openWindowDesc );
+            .showWindow = true
+        } );
 
-        GraphicsDeviceDesc graphicsDeviceDesc {
+        m_renderSystem->initialize( m_windowHandle, {
             .appName = ZP_STR_T( "AppName" ),
             .stagingBufferSize = 32 MB,
             .threadCount = numJobThreads,
             .bufferFrameCount = 4,
             .geometryShaderSupport = true,
             .tessellationShaderSupport = true,
-        };
-
-        m_renderSystem->initialize( m_windowHandle, graphicsDeviceDesc );
+        } );
 
         m_assetSystem->setup( m_jobSystem, m_entityComponentManager );
 
