@@ -79,17 +79,17 @@ constexpr int spec_to_int16( const char* spec )
 #define CROSS_PLATFORM_UUIDOF(interface, spec ) \
     struct interface;                           \
     __CRT_UUID_DECL( interface,                 \
-        (int)spec_to_int32(   (spec)+0),        \
-        (short)spec_to_int16( (spec)+9),        \
-        (short)spec_to_int16( (spec)+14),       \
-        (char)spec_to_int8(   (spec)+19),       \
-        (char)spec_to_int8(   (spec)+21),       \
-        (char)spec_to_int8(   (spec)+24),       \
-        (char)spec_to_int8(   (spec)+26),       \
-        (char)spec_to_int8(   (spec)+28),       \
-        (char)spec_to_int8(   (spec)+30),       \
-        (char)spec_to_int8(   (spec)+32),       \
-        (char)spec_to_int8(   (spec)+34)        \
+        (unsigned int)spec_to_int32(   (spec)+0),        \
+        (unsigned short)spec_to_int16( (spec)+9),        \
+        (unsigned short)spec_to_int16( (spec)+14),       \
+        (unsigned char)spec_to_int8(   (spec)+19),       \
+        (unsigned char)spec_to_int8(   (spec)+21),       \
+        (unsigned char)spec_to_int8(   (spec)+24),       \
+        (unsigned char)spec_to_int8(   (spec)+26),       \
+        (unsigned char)spec_to_int8(   (spec)+28),       \
+        (unsigned char)spec_to_int8(   (spec)+30),       \
+        (unsigned char)spec_to_int8(   (spec)+32),       \
+        (unsigned char)spec_to_int8(   (spec)+34)        \
         );
 
 #define DXC_API_IMPORT __attribute__ ((visibility ("default")))
@@ -244,12 +244,12 @@ namespace
         {
         }
 
-        void* Alloc( SIZE_T cb ) STDMETHODCALLTYPE override
+        void* Alloc( SIZE_T cb )  override
         {
             return ZP_MALLOC_( memoryLabel, cb );
         }
 
-        void* Realloc( void* pv, SIZE_T cb ) STDMETHODCALLTYPE override
+        void* Realloc( void* pv, SIZE_T cb ) override
         {
             return ZP_REALLOC( memoryLabel, pv, cb );
         }
@@ -349,6 +349,8 @@ namespace zp::ShaderCompiler
                 //arguments.pushBack( L"-remove-unused-globals" );
 
                 arguments.pushBack( DXC_ARG_DEBUG_NAME_FOR_BINARY );
+
+                arguments.pushBack( L"-P" );
 
                 arguments.pushBack( L"-ftime-report" );
                 arguments.pushBack( L"-ftime-trace" );

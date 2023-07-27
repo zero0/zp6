@@ -76,7 +76,10 @@ constexpr void zp_strncpy( const char* srcStr, zp_size_t srcLen, char (& dstStr)
     zp_strncpy( srcStr, srcLen, dstStr, Size );
 }
 
-constexpr zp_bool_t zp_strempty( const char* str );
+constexpr zp_bool_t zp_strempty( const char* str )
+{
+    return !( str != nullptr && str[ 0 ] != '\0' );
+}
 
 constexpr zp_bool_t zp_strempty( const zp_char8_t* str );
 
