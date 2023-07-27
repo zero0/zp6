@@ -196,7 +196,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
                 {
                     task.exec( &task );
                 }
-;
+
                 if( task.deleteTaskMemory && task.ptr )
                 {
                     task.deleteTaskMemory( task.memoryLabel, task.ptr );

@@ -40,3 +40,13 @@ zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* 
 
     return cmp;
 }
+
+constexpr zp_bool_t zp_strempty( const char* str )
+{
+    return !( str != nullptr && str[ 0 ] != '\0' );
+}
+
+constexpr zp_bool_t zp_strempty( const zp_char8_t* str )
+{
+    return !( str != nullptr && str[ 0 ] != '\0' );
+}

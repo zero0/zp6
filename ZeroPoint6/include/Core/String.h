@@ -12,11 +12,29 @@
 #include "Core/Math.h"
 #include "Core/Allocator.h"
 
+constexpr zp_size_t zp_strlen( const char* str );
+
+//
+//
+//
+
 zp_int32_t zp_strcmp( const char* lh, const char* rh );
 
 zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char* rh, zp_size_t rhSize );
 
 zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* rh, zp_size_t rhSize );
+
+template<zp_size_t RHSize>
+zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char (& rh)[RHSize] )
+{
+    return zp_strcmp( lh, lhSize, rh, zp_strlen( rh ) );
+}
+
+template<zp_size_t LHSize>
+zp_int32_t zp_strcmp( const char (& lh)[LHSize], const char* rh, zp_size_t rhSize )
+{
+    return zp_strcmp( lh, zp_strlen( lh ), rh, rhSize );
+}
 
 //zp_size_t zp_strlen( const char* str );
 
@@ -24,26 +42,43 @@ zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* 
 
 constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength )
 {
-    for( zp_size_t i = 0; i < dstLength; ++i )
+    zp_size_t i;
+    for( i = 0; srcStr[ i ] != '\0' && i < dstLength; ++i )
     {
         dstStr[ i ] = srcStr[ i ];
     }
-    dstStr[ dstLength ] = '\0';
+    dstStr[ i ] = '\0';
 }
 
 constexpr void zp_strcpy( const zp_char8_t* srcStr, zp_char8_t* dstStr, zp_size_t dstLength )
 {
-    for( zp_size_t i = 0; i < dstLength; ++i )
+    zp_size_t i;
+    for( i = 0; srcStr[ i ] != '\0' && i < dstLength; ++i )
     {
         dstStr[ i ] = srcStr[ i ];
     }
-    dstStr[ dstLength ] = '\0';
+    dstStr[ i ] = '\0';
 }
 
-constexpr zp_bool_t zp_strempty( const char* str )
+constexpr void zp_strncpy( const char* srcStr, zp_size_t srcLen, char* dstStr, zp_size_t dstLength )
 {
-    return str == nullptr || str[ 0 ] == 0;
+    zp_size_t i;
+    for( i = 0; srcStr[ i ] != '\0' && i < srcLen && i < dstLength; ++i )
+    {
+        dstStr[ i ] = srcStr[ i ];
+    }
+    dstStr[ i ] = '\0';
 }
+
+template<zp_size_t Size>
+constexpr void zp_strncpy( const char* srcStr, zp_size_t srcLen, char (& dstStr)[Size] )
+{
+    zp_strncpy( srcStr, srcLen, dstStr, Size );
+}
+
+constexpr zp_bool_t zp_strempty( const char* str );
+
+constexpr zp_bool_t zp_strempty( const zp_char8_t* str );
 
 constexpr zp_size_t zp_strlen( const char* str )
 {
@@ -62,16 +97,15 @@ constexpr zp_size_t zp_strlen( const char* str )
 
 constexpr zp_size_t zp_strlen( const char8_t* str )
 {
-    const char8_t* s = str;
-    if( s )
+    zp_size_t length = 0;
+    if( str )
     {
-        while( *s )
+        while( *str )
         {
-            ++s;
+            ++str;
         }
     }
 
-    const zp_size_t length = s - str;
     return length;
 }
 
@@ -80,15 +114,170 @@ constexpr zp_size_t zp_strnlen( const char* str, zp_size_t maxSize )
     zp_size_t length = 0;
     if( str )
     {
-        const char* s = str;
-        while( *s && length < maxSize )
+        while( *str && length < maxSize )
         {
-            ++s;
+            ++str;
             ++length;
         }
     }
 
     return length;
+}
+
+constexpr const char* zp_strchr( const char* str, char ch )
+{
+    const char* start = str;
+
+    if( start )
+    {
+        while( *start && *start != ch )
+        {
+            ++start;
+        }
+    }
+
+    return start;
+}
+
+constexpr char* zp_strchr( char* str, char ch )
+{
+    char* start = str;
+
+    if( start )
+    {
+        while( *start && *start != ch )
+        {
+            ++start;
+        }
+    }
+
+    return start;
+}
+
+constexpr zp_size_t zp_rtrim( const char* str, zp_size_t length )
+{
+    zp_size_t i;
+    for( i = length; i > 0; --i )
+    {
+        switch( str[ i - 1 ] )
+        {
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+                continue;
+            default:
+                break;
+        }
+    }
+
+    return i;
+}
+
+constexpr const char* zp_ltrim( const char* str, zp_size_t length )
+{
+    zp_size_t i;
+    for( i = 0; i < length; ++i )
+    {
+        switch( str[ i ] )
+        {
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+                continue;
+            default:
+                break;
+        }
+    }
+
+    return str + i;
+}
+
+constexpr zp_size_t zp_rtrim( const zp_char8_t* str, zp_size_t length )
+{
+    zp_size_t i;
+    for( i = length; i > 0; --i )
+    {
+        switch( str[ i - 1 ] )
+        {
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+                continue;
+            default:
+                return i;
+        }
+    }
+
+    return i;
+}
+
+constexpr const zp_char8_t* zp_ltrim( const zp_char8_t* str, zp_size_t length )
+{
+    zp_size_t i;
+    for( i = 0; i < length; ++i )
+    {
+        switch( str[ i ] )
+        {
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+                continue;
+            default:
+                return str + i;
+        }
+    }
+
+    return str + i;
+}
+
+constexpr const char* zp_strnstr( const char* str, zp_size_t strLen, const char* find, zp_size_t findLen )
+{
+    const char* start = nullptr;
+
+    if( str && find )
+    {
+        zp_size_t i = 0;
+        zp_size_t f = 0;
+
+        for( ; i < strLen && f < findLen; ++i )
+        {
+            if( str[ i ] == find[ f ] )
+            {
+                ++f;
+                if( f == findLen )
+                {
+                    ++i;
+                    break;
+                }
+            }
+            else
+            {
+                f = 0;
+            }
+        }
+
+        if( findLen > 0 && f == findLen )
+        {
+            start = str + ( i - f );
+        }
+    }
+
+    return start;
+}
+
+template<zp_size_t Size>
+constexpr const char* zp_strnstr( const char* str, zp_size_t strLen, const char (& find)[Size] )
+{
+    return zp_strnstr( str, strLen, find, zp_strlen( find ) );
+}
+
+constexpr const char* zp_strstr( const char* str, const char* find )
+{
+    return zp_strnstr( str, zp_strlen( str ), find, zp_strlen( find ) );
 }
 
 constexpr const char* zp_strrchr( const char* str, char ch )
@@ -125,12 +314,103 @@ constexpr char* zp_strrchr( char* str, char ch )
     return end;
 }
 
+constexpr zp_uint32_t zp_char_to_uint32( char c )
+{
+    zp_uint32_t v;
+    switch( c )
+    {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            v = (zp_uint32_t)( c - '0' );
+            break;
+
+        case 'a':
+        case 'b':
+        case 'c':
+        case 'd':
+        case 'e':
+        case 'f':
+            v = ( (zp_uint32_t)( c - 'a' ) + 10 );
+            break;
+
+        case 'A':
+        case 'B':
+        case 'C':
+        case 'D':
+        case 'E':
+        case 'F':
+            v = ( (zp_uint32_t)( c - 'A' ) + 10 );
+            break;
+
+        default:
+            v = 0;
+    }
+    return v;
+}
+
+constexpr zp_bool_t zp_try_parse_uint8( const char* str, zp_size_t length, zp_uint8_t* m )
+{
+    zp_uint32_t value = 0;
+    zp_uint32_t v = 0;
+    for( zp_int32_t i = 0; i < length && i < 2; ++i )
+    {
+        const char c = str[ i ];
+        switch( c )
+        {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                v = (zp_uint32_t)( c - '0' );
+                break;
+
+            case 'a':
+            case 'b':
+            case 'c':
+            case 'd':
+            case 'e':
+            case 'f':
+                v = ( (zp_uint32_t)( c - 'a' ) + 10 );
+                break;
+
+            case 'A':
+            case 'B':
+            case 'C':
+            case 'D':
+            case 'E':
+            case 'F':
+                v = ( (zp_uint32_t)( c - 'A' ) + 10 );
+                break;
+
+            default:
+                return false;
+        }
+
+        value |= ( v & 0x0F ) << ( ( 7 - i ) * 4 );
+    }
+
+    *m = value;
+    return true;
+}
 
 constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
 {
-    *m = 0;
-
-    zp_uint32_t hex;
+    zp_uint32_t value = 0;
+    zp_uint32_t v;
     for( zp_int32_t i = 0; i < 8; ++i )
     {
         const char c = str[ i ];
@@ -146,7 +426,7 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
             case '7':
             case '8':
             case '9':
-                hex = (zp_uint32_t)( c - '0' );
+                v = (zp_uint32_t)( c - '0' );
                 break;
 
             case 'a':
@@ -155,7 +435,7 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
             case 'd':
             case 'e':
             case 'f':
-                hex = ( (zp_uint32_t)( c - 'a' ) + 10 );
+                v = ( (zp_uint32_t)( c - 'a' ) + 10 );
                 break;
 
             case 'A':
@@ -164,16 +444,68 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
             case 'D':
             case 'E':
             case 'F':
-                hex = ( (zp_uint32_t)( c - 'A' ) + 10 );
+                v = ( (zp_uint32_t)( c - 'A' ) + 10 );
                 break;
 
             default:
                 return false;
         }
 
-        *m |= ( hex & 0x0F ) << ( ( 7 - i ) * 4 );
+        value |= ( v & 0x0F ) << ( ( 7 - i ) * 4 );
     }
 
+    *m = value;
+    return true;
+}
+
+constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_size_t length, zp_uint32_t* m )
+{
+    zp_uint32_t value = 0;
+    zp_uint32_t v = 0;
+    for( zp_int32_t i = 0; i < length && i < 8; ++i )
+    {
+        const char c = str[ i ];
+        switch( c )
+        {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                v = (zp_uint32_t)( c - '0' );
+                break;
+
+            case 'a':
+            case 'b':
+            case 'c':
+            case 'd':
+            case 'e':
+            case 'f':
+                v = ( (zp_uint32_t)( c - 'a' ) + 10 );
+                break;
+
+            case 'A':
+            case 'B':
+            case 'C':
+            case 'D':
+            case 'E':
+            case 'F':
+                v = ( (zp_uint32_t)( c - 'A' ) + 10 );
+                break;
+
+            default:
+                return false;
+        }
+
+        value |= ( v & 0x0F ) << ( ( 7 - i ) * 4 );
+    }
+
+    *m = value;
     return true;
 }
 
@@ -340,7 +672,15 @@ namespace zp
         {
             return {
                 .str = reinterpret_cast<const zp_char8_t*>(c_str),
-                .length  = zp_strlen( c_str )
+                .length = zp_strlen( c_str )
+            };
+        }
+
+        ZP_FORCEINLINE static String As( const char* c_str, zp_size_t length )
+        {
+            return {
+                .str = reinterpret_cast<const zp_char8_t*>(c_str),
+                .length = length
             };
         }
 
@@ -518,7 +858,7 @@ namespace zp
             const zp_size_t length = zp_strlen( str );
             if( str && length )
             {
-                zp_strcpy( str, m_str, zp_min( Size, length ) );
+                zp_strcpy( reinterpret_cast<const zp_char8_t*>(str), m_str, zp_min( Size, length ) );
             }
         }
 
@@ -527,8 +867,20 @@ namespace zp
         {
             if( str && length )
             {
-                zp_strcpy( str, m_str, zp_min( Size, length ) );
+                zp_strcpy( reinterpret_cast<const zp_char8_t*>(str), m_str, zp_min( Size, length ) );
             }
+        }
+
+        FixedString( const FixedString<Size>& other )
+            : m_str()
+        {
+            zp_memcpy( m_str, Size, other.m_str, Size );
+        }
+
+        FixedString( FixedString<Size>&& other ) noexcept
+            : m_str()
+        {
+            zp_memcpy( m_str, Size, other.m_str, Size );
         }
 
         ~FixedString() = default;
@@ -558,9 +910,36 @@ namespace zp
             return m_str;
         }
 
-        [[nodiscard]]operator String() const
+        [[nodiscard]]explicit operator String() const
         {
             return { .str = m_str, .length = Size };
+        }
+
+        FixedString<Size>& operator=( const FixedString<Size>& other ) noexcept
+        {
+            if( m_str != other.m_str )
+            {
+                zp_memcpy( m_str, Size, other.m_str, Size );
+            }
+            return *this;
+        }
+
+        FixedString<Size>& operator=( FixedString<Size>&& other ) noexcept
+        {
+            zp_memcpy( m_str, Size, other.m_str, Size );
+            return *this;
+        }
+
+        FixedString<Size>& operator=( const String& other ) noexcept
+        {
+            zp_memcpy( m_str, Size, other.str, other.length );
+            return *this;
+        }
+
+        FixedString<Size>& operator=( String&& other ) noexcept
+        {
+            zp_memcpy( m_str, Size, other.str, other.length );
+            return *this;
         }
 
     private:
@@ -681,6 +1060,90 @@ namespace zp
     class ConstantString
     {
 
+    };
+
+    class Tokenizer
+    {
+    public:
+        Tokenizer( const char* str, zp_size_t length, const char* delim )
+            : m_str( String::As( str, length ) )
+            , m_delim( String::As( delim ) )
+            , m_next( 0 )
+        {
+        }
+
+        zp_bool_t next( String& token )
+        {
+            token.str = nullptr;
+            token.length = 0;
+
+            zp_bool_t hasNext = false;
+            if( m_next < m_str.length )
+            {
+                const zp_char8_t* front = m_str.str + m_next;
+                const zp_char8_t* end = m_str.str + m_next;
+
+                zp_size_t idx = front - m_str.str;
+
+                while( *end && idx < m_str.length )
+                {
+                    zp_bool_t isDelim = false;
+                    for( zp_size_t i = 0; i < m_delim.length && !isDelim; ++i )
+                    {
+                        isDelim = m_delim.str[ i ] == *end;
+                    }
+
+                    if( isDelim )
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        ++end;
+                        ++idx;
+                    }
+                }
+
+                token.str = front;
+                token.length = end - front;
+
+                hasNext = ( end - m_str.str ) <= m_str.length;
+
+                while( *end && idx < m_str.length )
+                {
+                    zp_bool_t isDelim = false;
+                    for( zp_size_t i = 0; i < m_delim.length && !isDelim; ++i )
+                    {
+                        isDelim = m_delim.str[ i ] == *end;
+                    }
+
+                    if( isDelim )
+                    {
+                        ++end;
+                        ++idx;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                m_next = end - m_str.str;
+            }
+
+            return hasNext;
+        }
+
+        void reset()
+        {
+            m_next = 0;
+        }
+
+    private:
+        String m_str;
+        String m_delim;
+
+        zp_size_t m_next;
     };
 };
 
