@@ -78,6 +78,51 @@ zp_int32_t zp_printfln( const char* text, ... )
     return write + 1;
 }
 
+zp_int32_t zp_error_printf( const char* text, ... )
+{
+    char szBuff[kPrintBufferSize];
+    va_list arg;
+    va_start( arg, text );
+    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
+    va_end( arg );
+
+#if ZP_DEBUG
+    if( ::IsDebuggerPresent() )
+    {
+        ::OutputDebugString( szBuff );
+    }
+#endif
+
+    ::fprintf_s( stderr, szBuff );
+
+    return write;
+}
+
+zp_int32_t zp_error_printfln( const char* text, ... )
+{
+    char szBuff[kPrintBufferSize];
+
+    va_list arg;
+    va_start( arg, text );
+    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
+    va_end( arg );
+
+    szBuff[ write ] = '\n';
+    szBuff[ write + 1 ] = '\0';
+
+#if ZP_DEBUG
+    if( ::IsDebuggerPresent() )
+    {
+        ::OutputDebugString( szBuff );
+    }
+#endif
+
+    ::fprintf_s( stderr, szBuff );
+    ::fflush( stderr );
+
+    return write + 1;
+}
+
 zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... )
 {
     va_list args;

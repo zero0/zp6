@@ -18,6 +18,8 @@ namespace zp
     class JobHandle
     {
     public:
+        const static JobHandle Null;
+
         void complete();
 
         [[nodiscard]] zp_bool_t isComplete() const;
@@ -28,6 +30,7 @@ namespace zp
         Job* m_job;
 
         friend class JobData;
+
         friend class JobSystem;
     };
 
@@ -67,7 +70,66 @@ namespace zp
 
         static JobData Start( JobWorkFunc execFunc, JobHandle parentJob );
 
+        static JobData Start( JobWorkFunc execFunc, void* data, zp_size_t size );
+
+        static JobData Start( JobWorkFunc execFunc, void* data, zp_size_t size, JobHandle parentJob );
+
         static void ScheduleBatchJobs();
+
+        template<typename T>
+        static JobData Start( const T& jobData )
+        {
+            using TJob = zp_remove_reference_t<T>;
+
+            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = jobData };
+            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
+        }
+
+        template<typename T>
+        static JobData Start( const T& jobData, JobHandle parentJob )
+        {
+            using TJob = zp_remove_reference_t<T>;
+
+            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = jobData };
+            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
+        }
+
+        template<typename T>
+        static JobData Start( T&& jobData )
+        {
+            using TJob = zp_remove_reference_t<T>;
+
+            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
+            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
+        }
+
+        template<typename T>
+        static JobData Start( T&& jobData, JobHandle parentJob )
+        {
+            using TJob = zp_remove_reference_t<T>;
+
+            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
+            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
+        }
+
+    private:
+        template<typename T>
+        struct Wrapper
+        {
+            typedef void (* WrapperFunc)( const JobHandle& parentJobHandle, T* ptr );
+
+            static void Execute( Job* job, Memory memory )
+            {
+                Wrapper<T>* ptr = static_cast<Wrapper<T>*>( memory.ptr );
+                if( ptr && ptr->func )
+                {
+                    ptr->func( JobHandle( job ), &ptr->data );
+                }
+            }
+
+            WrapperFunc func;
+            T data;
+        };
     };
 }
 

@@ -12,6 +12,7 @@
 #include "Core/String.h"
 #include "Core/Map.h"
 #include "Core/CommandLine.h"
+#include "Core/Job.h"
 
 namespace zp
 {
@@ -24,9 +25,11 @@ namespace zp
 
     typedef void (* AssetProcessorExecuteFunc)( AssetCompilerTask* task );
 
-    typedef void* (* AssetProcessorCreateTaskMemoryFunc)( MemoryLabel memoryLabel, const String& inFile, const String& outFile, const CommandLine& cmdLine );
+    typedef void (* AssetProcessorExecuteJobFunc)( const JobHandle& parentJob, AssetCompilerTask* task );
 
-    typedef void (* AssetProcessorDeleteTaskMemoryFunc)( MemoryLabel memoryLabel, void* ptr );
+    typedef Memory (* AssetProcessorCreateTaskMemoryFunc)( MemoryLabel memoryLabel, const String& inFile, const String& outFile, const CommandLine& cmdLine );
+
+    typedef void (* AssetProcessorDeleteTaskMemoryFunc)( MemoryLabel memoryLabel, Memory memory );
 
     struct AssetCompilerTask
     {
@@ -34,10 +37,13 @@ namespace zp
         AllocString dstFile;
 
         AssetProcessorExecuteFunc exec;
+        AssetProcessorExecuteJobFunc jobExec;
         AssetProcessorDeleteTaskMemoryFunc deleteTaskMemory;
 
-        void* ptr;
+        Memory taskMemory;
         MemoryLabel memoryLabel;
+
+        static void Execute( const JobHandle& jobHandle, AssetCompilerTask* task );
     };
 
     struct AssetCompilerProcessor
@@ -45,6 +51,7 @@ namespace zp
         AssetProcessorCreateTaskMemoryFunc createTaskFunc;
         AssetProcessorDeleteTaskMemoryFunc deleteTaskFunc;
         AssetProcessorExecuteFunc executeFunc;
+        AssetProcessorExecuteJobFunc jobExecuteFunc;
     };
 
     class AssetCompiler

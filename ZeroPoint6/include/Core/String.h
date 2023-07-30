@@ -750,6 +750,8 @@ namespace zp
         ~AllocString()
         {
             ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+            m_str = nullptr;
+            m_length = 0;
         }
 
         AllocString( const AllocString& other )

@@ -154,6 +154,7 @@ namespace zp
         ConnectionProtocol connectionProtocol;
     };
 
+
     class Platform
     {
     ZP_NONCOPYABLE( Platform );

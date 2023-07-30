@@ -85,7 +85,7 @@ namespace zp
         typedef const Locking& lock_const_reference;
 
     public:
-        MemoryAllocator( storage_const_reference storage, policy_const_reference policy, lock_const_reference locking );
+        MemoryAllocator( storage_value storage, policy_value policy, lock_value locking );
 
         ~MemoryAllocator() = default;
 
@@ -147,10 +147,10 @@ namespace zp
 namespace zp
 {
     template<typename Storage, typename Policy, typename Locking>
-    MemoryAllocator<Storage, Policy, Locking>::MemoryAllocator( storage_const_reference storage, policy_const_reference policy, lock_const_reference locking )
-        : m_storage( storage )
-        , m_policy( policy )
-        , m_lock( locking )
+    MemoryAllocator<Storage, Policy, Locking>::MemoryAllocator( storage_value storage, policy_value policy, lock_value locking )
+        : m_storage( zp_move( storage ) )
+        , m_policy( zp_move( policy ) )
+        , m_lock( zp_move( locking ) )
     {
         if( m_storage.is_fixed() )
         {
@@ -282,6 +282,22 @@ namespace zp
         };
     };
 
+}
+#pragma endregion
+
+#pragma region CriticalSectionMemoryLock
+namespace zp
+{
+    class CriticalSectionMemoryLock
+    {
+    public:
+        void acquire();
+
+        void release();
+
+    private:
+        CriticalSection m_criticalSection;
+    };
 }
 #pragma endregion
 

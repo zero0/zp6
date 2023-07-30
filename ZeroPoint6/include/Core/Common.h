@@ -20,10 +20,18 @@ zp_int32_t zp_printf( const char* format, ... );
 
 zp_int32_t zp_printfln( const char* format, ... );
 
+zp_int32_t zp_error_printf( const char* format, ... );
+
+zp_int32_t zp_error_printfln( const char* format, ... );
+
 #else
 #define zp_printf(...)     (void)0
 
 #define zp_printfln(...)   (void)0
+
+#define zp_error_printf(...)    (void)0
+
+#define zp_error_printfln(...)  (void)0
 #endif
 
 zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... );
@@ -49,10 +57,10 @@ zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... 
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
-#define ZP_ASSERT( t )                  do { if( !(t) ) { zp_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); }} while( false )
-#define ZP_ASSERT_MSG( t, msg )         do { if( !(t) ) { zp_printfln( "Assertion failed %s:%d - %s: %s", __FILE__, __LINE__, #t, msg ); }} while( false )
-#define ZP_INVALID_CODE_PATH()          do { zp_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG( msg ) do { zp_printfln( "Invalid Code Path %s:%d - %s", __FILE__, __LINE__, msg ); } while( false )
+#define ZP_ASSERT( t )                  do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); }} while( false )
+#define ZP_ASSERT_MSG( t, msg )         do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s: %s", __FILE__, __LINE__, #t, msg ); }} while( false )
+#define ZP_INVALID_CODE_PATH()          do { zp_error_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG( msg ) do { zp_error_printfln( "Invalid Code Path %s:%d - %s", __FILE__, __LINE__, msg ); } while( false )
 #else // !ZP_USE_ASSERTIONS
 #define ZP_ASSERT(...)                  (void)0
 #define ZP_ASSERT_MSG(...)              (void)0
@@ -604,6 +612,32 @@ namespace zp
                 .size = sz
             };
         }
+    };
+}
+
+//
+//
+//
+
+namespace zp
+{
+    class CriticalSection
+    {
+    public:
+        CriticalSection();
+
+        ~CriticalSection();
+
+        CriticalSection( const CriticalSection& other );
+
+        CriticalSection( CriticalSection&& other ) noexcept;
+
+        void enter();
+
+        void leave();
+
+    private:
+        zp_uint8_t m_memory[40]; // matches Windows size but can be larger
     };
 }
 

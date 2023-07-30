@@ -392,6 +392,8 @@ namespace
 //
 //
 
+const JobHandle JobHandle::Null = JobHandle( nullptr );
+
 JobHandle::JobHandle( Job* job )
     : m_job( job )
 {
@@ -641,6 +643,55 @@ JobData JobSystem::Start( JobWorkFunc execFunc, JobHandle parentJob )
         .numDependencies = 0,
         .jobDataSize = 0
     };
+
+    return JobData( job );
+}
+
+JobData JobSystem::Start( JobWorkFunc execFunc, void* data, zp_size_t size )
+{
+    Job* job = AllocateJob();
+
+    JobHeader* header = job->header();
+    *header = {
+        .parent = nullptr,
+        .execFunc = execFunc,
+        .uncompletedJobs = 1,
+        .numDependencies = 0,
+        .jobDataSize = size
+    };
+
+    if( data && size > 0 )
+    {
+        Memory mem = job->data();
+        zp_memcpy( mem.ptr, mem.size, data, size );
+    }
+
+    return JobData( job );
+}
+
+JobData JobSystem::Start( JobWorkFunc execFunc, void* data, zp_size_t size, JobHandle parentJob )
+{
+    if( parentJob.m_job )
+    {
+        Atomic::Increment( &parentJob.m_job->header()->uncompletedJobs );
+    }
+
+    Job* job = AllocateJob();
+
+    JobHeader* header = job->header();
+    *header = {
+        .parent = parentJob.m_job,
+        .execFunc = execFunc,
+        .uncompletedJobs = 1,
+        .numDependencies = 0,
+        .jobDataSize = size
+    };
+
+    if( data && size > 0 )
+    {
+        Memory mem = job->data();
+        zp_memcpy( mem.ptr, mem.size, data, size );
+    }
 
     return JobData( job );
 }

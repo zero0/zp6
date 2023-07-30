@@ -22,206 +22,257 @@
 
 #define TestFlag( a, f, t, r )      a |= ((f) & (t)) ? (r) : 0
 
+using namespace zp;
+
+ZP_STATIC_ASSERT( sizeof( CriticalSection ) >= sizeof( CRITICAL_SECTION ) );
+
+CriticalSection::CriticalSection()
+    : m_memory()
+{
+    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
+    ::InitializeCriticalSection( ptr );
+}
+
+CriticalSection::~CriticalSection()
+{
+    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
+    ::DeleteCriticalSection( ptr );
+}
+
+CriticalSection::CriticalSection( const CriticalSection& other )
+    : m_memory()
+{
+    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
+    ::InitializeCriticalSection( ptr );
+}
+
+CriticalSection::CriticalSection( CriticalSection&& other ) noexcept
+    : m_memory()
+{
+    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
+    LPCRITICAL_SECTION otherPtr = reinterpret_cast<LPCRITICAL_SECTION>( other.m_memory );
+
+    *ptr = *otherPtr;
+
+    zp_zero_memory_array( other.m_memory );
+}
+
+void CriticalSection::enter()
+{
+    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
+    ::EnterCriticalSection( ptr );
+}
+
+void CriticalSection::leave()
+{
+    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
+    ::LeaveCriticalSection( ptr );
+}
+
+//
+//
+//
+
+namespace
+{
+    Platform s_WindowsPlatform;
+
+    const char* kZeroPointClassName = "ZeroPoint::WindowClass";
+
+    LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
+    {
+        auto windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
+
+        switch( uMessage )
+        {
+            case WM_CLOSE:
+            {
+                ::DestroyWindow( hWnd );
+            }
+                break;
+
+            case WM_DESTROY:
+            {
+                //::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR) nullptr );
+                ::PostQuitMessage( 0 );
+            }
+                break;
+
+            case WM_GETMINMAXINFO:
+            {
+                if( windowCallbacks )
+                {
+                    zp_int32_t minWidth;
+                    zp_int32_t minHeight;
+                    zp_int32_t maxWidth;
+                    zp_int32_t maxHeight;
+                    if( windowCallbacks->onWindowGetMinMaxSize )
+                    {
+                        windowCallbacks->onWindowGetMinMaxSize( hWnd, minWidth, minHeight, maxWidth, maxHeight );
+                    }
+                    else
+                    {
+                        minWidth = windowCallbacks->minWidth;
+                        minHeight = windowCallbacks->minHeight;
+                        maxWidth = windowCallbacks->maxWidth;
+                        maxHeight = windowCallbacks->maxHeight;
+                    }
+
+                    auto lpMMI = reinterpret_cast<LPMINMAXINFO>(lParam);
+                    lpMMI->ptMinTrackSize = { .x = minWidth, .y = minHeight };
+                    lpMMI->ptMaxSize = { .x = maxWidth, .y = maxHeight };
+                    lpMMI->ptMaxTrackSize = { .x = maxWidth, .y = maxHeight };
+                }
+            }
+                break;
+
+            case WM_WINDOWPOSCHANGED:
+            {
+                if( windowCallbacks && windowCallbacks->onWindowResize )
+                {
+                    auto pos = reinterpret_cast<LPWINDOWPOS >( lParam );
+                    if( ( ~pos->flags & SWP_NOSIZE ) == SWP_NOSIZE )
+                    {
+                        DWORD style = ::GetWindowLong( hWnd, GWL_STYLE );
+                        DWORD exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE );
+
+                        RECT rc;
+                        ::SetRectEmpty( &rc );
+                        ::AdjustWindowRectEx( &rc, style, false, exStyle );
+
+                        zp_int32_t width = pos->cx - ( rc.right - rc.left );
+                        zp_int32_t height = pos->cy - ( rc.bottom - rc.top );
+
+                        windowCallbacks->onWindowResize( hWnd, width, height );
+                    }
+                }
+            }
+                break;
+
+            case WM_KILLFOCUS:
+            {
+                if( windowCallbacks && windowCallbacks->onWindowFocus )
+                {
+                    windowCallbacks->onWindowFocus( hWnd, false );
+                }
+            }
+                break;
+
+            case WM_SETFOCUS:
+            {
+                if( windowCallbacks && windowCallbacks->onWindowFocus )
+                {
+                    windowCallbacks->onWindowFocus( hWnd, true );
+                }
+            }
+                break;
+
+            case WM_KEYDOWN:
+            case WM_KEYUP:
+            case WM_SYSKEYDOWN:
+            case WM_SYSKEYUP:
+            {
+                if( windowCallbacks && windowCallbacks->onWindowKeyEvent )
+                {
+                    WORD vkCode = LOWORD( wParam );                                 // virtual-key code
+
+                    WORD keyFlags = HIWORD( lParam );
+
+                    WORD scanCode = LOBYTE( keyFlags );                             // scan code
+                    BOOL isExtendedKey = ( keyFlags & KF_EXTENDED ) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
+
+                    if( isExtendedKey )
+                    {
+                        scanCode = MAKEWORD( scanCode, 0xE0 );
+                    }
+
+                    zp_bool_t wasKeyDown = ( keyFlags & KF_REPEAT ) == KF_REPEAT;        // previous key-state flag, 1 on autorepeat
+                    WORD repeatCount = LOWORD( lParam );                            // repeat count, > 0 if several keydown messages was combined into one message
+
+                    zp_bool_t isKeyReleased = ( keyFlags & KF_UP ) == KF_UP;             // transition-state flag, 1 on keyup
+                    zp_bool_t isAltKeyDown = ( keyFlags & KF_ALTDOWN ) == KF_ALTDOWN;
+                    zp_bool_t isCtrlKeyDown = GetKeyState( VK_CONTROL ) & 0x8000;
+                    zp_bool_t isShiftKeyDown = GetKeyState( VK_SHIFT ) & 0x8000;
+
+                    // if we want to distinguish these keys:
+                    switch( vkCode )
+                    {
+                        case VK_SHIFT:   // converts to VK_LSHIFT or VK_RSHIFT
+                        case VK_CONTROL: // converts to VK_LCONTROL or VK_RCONTROL
+                        case VK_MENU:    // converts to VK_LMENU or VK_RMENU
+                            vkCode = LOWORD( MapVirtualKey( scanCode, MAPVK_VSC_TO_VK_EX ) );
+                            break;
+                    }
+
+                    WindowKeyEvent event {
+                        .keyCode = vkCode,
+                        .repeatCount = repeatCount,
+                        .isCtrlDown = isCtrlKeyDown,
+                        .isShiftDown = isShiftKeyDown,
+                        .isAltDown = isAltKeyDown,
+                        .wasKeyDown = wasKeyDown,
+                        .isKeyReleased = isKeyReleased,
+                    };
+                    windowCallbacks->onWindowKeyEvent( hWnd, event );
+                }
+            }
+                break;
+
+            case WM_MOUSEMOVE:
+            case WM_LBUTTONDOWN:
+            case WM_LBUTTONUP:
+            case WM_RBUTTONDOWN:
+            case WM_RBUTTONUP:
+            case WM_MBUTTONDOWN:
+            case WM_MBUTTONUP:
+            case WM_MOUSEWHEEL:
+            {
+                if( windowCallbacks && windowCallbacks->onWindowMouseEvent )
+                {
+                    const POINTS p = MAKEPOINTS( lParam );
+                    const SHORT zDelta = GET_WHEEL_DELTA_WPARAM( wParam );
+
+                    const WORD fwKeys = GET_KEYSTATE_WPARAM( wParam );
+                    const zp_bool_t isCtrlDown = ( MK_CONTROL & fwKeys ) == MK_CONTROL;
+                    const zp_bool_t isShiftDown = ( MK_SHIFT & fwKeys ) == MK_SHIFT;
+
+                    WindowMouseEvent event {
+                        .x = p.x,
+                        .y = p.y,
+                        .zDelta = zDelta,
+                        .isCtrlDown = isCtrlDown,
+                        .isShiftDown = isShiftDown,
+                    };
+                    windowCallbacks->onWindowMouseEvent( hWnd, event );
+                }
+            }
+                break;
+
+            case WM_LBUTTONDBLCLK:
+            case WM_RBUTTONDBLCLK:
+            case WM_MBUTTONDBLCLK:
+            {
+                POINTS p = MAKEPOINTS( lParam );
+
+            }
+                break;
+
+            case WM_HELP:
+            {
+                ::PostQuitMessage( 3 );
+            }
+                break;
+
+            default:
+                return ::DefWindowProc( hWnd, uMessage, wParam, lParam );
+        }
+
+        return 0;
+    }
+}
+
 namespace zp
 {
-    namespace
-    {
-        Platform s_WindowsPlatform;
-
-        const char* kZeroPointClassName = "ZeroPoint::WindowClass";
-
-        LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
-        {
-            auto windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
-
-            switch( uMessage )
-            {
-                case WM_CLOSE:
-                {
-                    ::DestroyWindow( hWnd );
-                }
-                    break;
-
-                case WM_DESTROY:
-                {
-                    //::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR) nullptr );
-                    ::PostQuitMessage( 0 );
-                }
-                    break;
-
-                case WM_GETMINMAXINFO:
-                {
-                    if( windowCallbacks )
-                    {
-                        zp_int32_t minWidth;
-                        zp_int32_t minHeight;
-                        zp_int32_t maxWidth;
-                        zp_int32_t maxHeight;
-                        if( windowCallbacks->onWindowGetMinMaxSize )
-                        {
-                            windowCallbacks->onWindowGetMinMaxSize( hWnd, minWidth, minHeight, maxWidth, maxHeight );
-                        }
-                        else
-                        {
-                            minWidth = windowCallbacks->minWidth;
-                            minHeight = windowCallbacks->minHeight;
-                            maxWidth = windowCallbacks->maxWidth;
-                            maxHeight = windowCallbacks->maxHeight;
-                        }
-
-                        auto lpMMI = reinterpret_cast<LPMINMAXINFO>(lParam);
-                        lpMMI->ptMinTrackSize = { .x = minWidth, .y = minHeight };
-                        lpMMI->ptMaxSize = { .x = maxWidth, .y = maxHeight };
-                        lpMMI->ptMaxTrackSize = { .x = maxWidth, .y = maxHeight };
-                    }
-                }
-                    break;
-
-                case WM_WINDOWPOSCHANGED:
-                {
-                    if( windowCallbacks && windowCallbacks->onWindowResize )
-                    {
-                        auto pos = reinterpret_cast<LPWINDOWPOS >( lParam );
-                        if( ( ~pos->flags & SWP_NOSIZE ) == SWP_NOSIZE )
-                        {
-                            DWORD style = ::GetWindowLong( hWnd, GWL_STYLE );
-                            DWORD exStyle = ::GetWindowLong( hWnd, GWL_EXSTYLE );
-
-                            RECT rc;
-                            ::SetRectEmpty( &rc );
-                            ::AdjustWindowRectEx( &rc, style, false, exStyle );
-
-                            zp_int32_t width = pos->cx - ( rc.right - rc.left );
-                            zp_int32_t height = pos->cy - ( rc.bottom - rc.top );
-
-                            windowCallbacks->onWindowResize( hWnd, width, height );
-                        }
-                    }
-                }
-                    break;
-
-                case WM_KILLFOCUS:
-                {
-                    if( windowCallbacks && windowCallbacks->onWindowFocus )
-                    {
-                        windowCallbacks->onWindowFocus( hWnd, false );
-                    }
-                }
-                    break;
-
-                case WM_SETFOCUS:
-                {
-                    if( windowCallbacks && windowCallbacks->onWindowFocus )
-                    {
-                        windowCallbacks->onWindowFocus( hWnd, true );
-                    }
-                }
-                    break;
-
-                case WM_KEYDOWN:
-                case WM_KEYUP:
-                case WM_SYSKEYDOWN:
-                case WM_SYSKEYUP:
-                {
-                    if( windowCallbacks && windowCallbacks->onWindowKeyEvent )
-                    {
-                        WORD vkCode = LOWORD( wParam );                                 // virtual-key code
-
-                        WORD keyFlags = HIWORD( lParam );
-
-                        WORD scanCode = LOBYTE( keyFlags );                             // scan code
-                        BOOL isExtendedKey = ( keyFlags & KF_EXTENDED ) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
-
-                        if( isExtendedKey )
-                        {
-                            scanCode = MAKEWORD( scanCode, 0xE0 );
-                        }
-
-                        zp_bool_t wasKeyDown = ( keyFlags & KF_REPEAT ) == KF_REPEAT;        // previous key-state flag, 1 on autorepeat
-                        WORD repeatCount = LOWORD( lParam );                            // repeat count, > 0 if several keydown messages was combined into one message
-
-                        zp_bool_t isKeyReleased = ( keyFlags & KF_UP ) == KF_UP;             // transition-state flag, 1 on keyup
-                        zp_bool_t isAltKeyDown = ( keyFlags & KF_ALTDOWN ) == KF_ALTDOWN;
-                        zp_bool_t isCtrlKeyDown = GetKeyState( VK_CONTROL ) & 0x8000;
-                        zp_bool_t isShiftKeyDown = GetKeyState( VK_SHIFT ) & 0x8000;
-
-                        // if we want to distinguish these keys:
-                        switch( vkCode )
-                        {
-                            case VK_SHIFT:   // converts to VK_LSHIFT or VK_RSHIFT
-                            case VK_CONTROL: // converts to VK_LCONTROL or VK_RCONTROL
-                            case VK_MENU:    // converts to VK_LMENU or VK_RMENU
-                                vkCode = LOWORD( MapVirtualKey( scanCode, MAPVK_VSC_TO_VK_EX ) );
-                                break;
-                        }
-
-                        WindowKeyEvent event {
-                            .keyCode = vkCode,
-                            .repeatCount = repeatCount,
-                            .isCtrlDown = isCtrlKeyDown,
-                            .isShiftDown = isShiftKeyDown,
-                            .isAltDown = isAltKeyDown,
-                            .wasKeyDown = wasKeyDown,
-                            .isKeyReleased = isKeyReleased,
-                        };
-                        windowCallbacks->onWindowKeyEvent( hWnd, event );
-                    }
-                }
-                    break;
-
-                case WM_MOUSEMOVE:
-                case WM_LBUTTONDOWN:
-                case WM_LBUTTONUP:
-                case WM_RBUTTONDOWN:
-                case WM_RBUTTONUP:
-                case WM_MBUTTONDOWN:
-                case WM_MBUTTONUP:
-                case WM_MOUSEWHEEL:
-                {
-                    if( windowCallbacks && windowCallbacks->onWindowMouseEvent )
-                    {
-                        const POINTS p = MAKEPOINTS( lParam );
-                        const SHORT zDelta = GET_WHEEL_DELTA_WPARAM( wParam );
-
-                        const WORD fwKeys = GET_KEYSTATE_WPARAM( wParam );
-                        const zp_bool_t isCtrlDown = ( MK_CONTROL & fwKeys ) == MK_CONTROL;
-                        const zp_bool_t isShiftDown = ( MK_SHIFT & fwKeys ) == MK_SHIFT;
-
-                        WindowMouseEvent event {
-                            .x = p.x,
-                            .y = p.y,
-                            .zDelta = zDelta,
-                            .isCtrlDown = isCtrlDown,
-                            .isShiftDown = isShiftDown,
-                        };
-                        windowCallbacks->onWindowMouseEvent( hWnd, event );
-                    }
-                }
-                    break;
-
-                case WM_LBUTTONDBLCLK:
-                case WM_RBUTTONDBLCLK:
-                case WM_MBUTTONDBLCLK:
-                {
-                    POINTS p = MAKEPOINTS( lParam );
-
-                }
-                    break;
-
-                case WM_HELP:
-                {
-                    ::PostQuitMessage( 3 );
-                }
-                    break;
-
-                default:
-                    return ::DefWindowProc( hWnd, uMessage, wParam, lParam );
-            }
-
-            return 0;
-        }
-    }
-
     const zp_char8_t Platform::PathSep = '\\';
 
     Platform* GetPlatform()
@@ -675,6 +726,9 @@ namespace zp
 
     zp_int32_t Platform::GetThreadPriority( zp_handle_t threadHandle )
     {
+        CRITICAL_SECTION f;
+        InitializeCriticalSection( &f );
+
         const zp_int32_t priority = ::GetThreadPriority( static_cast<HANDLE>( threadHandle) );
         return priority;
     }

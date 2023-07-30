@@ -7,16 +7,15 @@
 
 #include "AssetCompiler.h"
 
-namespace zp
+namespace zp::ShaderCompiler
 {
-    namespace ShaderCompiler
-    {
-        void ShaderCompilerExecute( AssetCompilerTask* task );
+    void ShaderCompilerExecuteJob( const JobHandle& parentJob, AssetCompilerTask* task );
 
-        void* ShaderCompilerCreateTaskMemory( MemoryLabel memoryLabel, const String& inFile, const String& outFile, const CommandLine& cmdLine );
+    void ShaderCompilerExecute( AssetCompilerTask* task );
 
-        void ShaderCompilerDestroyTaskMemory( MemoryLabel memoryLabel, void* ptr );
-    }
+    Memory ShaderCompilerCreateTaskMemory( MemoryLabel memoryLabel, const String& inFile, const String& outFile, const CommandLine& cmdLine );
+
+    void ShaderCompilerDestroyTaskMemory( MemoryLabel memoryLabel, Memory memory );
 }
 
 #endif //ZP_SHADERCOMPILER_H

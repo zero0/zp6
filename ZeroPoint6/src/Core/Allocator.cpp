@@ -6,6 +6,7 @@
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/Allocator.h"
+
 #include "Platform/Platform.h"
 
 #include "tlsf/tlsf.h"
@@ -153,5 +154,18 @@ namespace zp
     {
         m_allocated -= tlsf_block_size( ptr );
         tlsf_free( m_tlsf, ptr );
+    }
+}
+
+namespace zp
+{
+    void CriticalSectionMemoryLock::acquire()
+    {
+        m_criticalSection.enter();
+    }
+
+    void CriticalSectionMemoryLock::release()
+    {
+        m_criticalSection.leave();
     }
 }

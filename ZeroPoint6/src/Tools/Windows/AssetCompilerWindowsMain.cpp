@@ -13,6 +13,21 @@
 
 #include <Windows.h>
 
+#include "Core/Job.h"
+#include "Tools/AssetCompiler.h"
+
+void zp::AssetCompilerTask::Execute( const zp::JobHandle& jobHandle, zp::AssetCompilerTask* task )
+{
+    if( task->jobExec )
+    {
+        task->jobExec( jobHandle, task );
+    }
+    else if( task->exec )
+    {
+        task->exec( task );
+    }
+}
+
 void CopyFileProcess( zp::AssetCompilerTask* task )
 {
     zp::GetPlatform()->FileCopy( task->srcFile.c_str(), task->dstFile.c_str() );
@@ -26,11 +41,18 @@ struct MemoryConfig
     zp_size_t debugPageSize;
 };
 
+void TestExec( zp::Job* job, zp::Memory memory )
+{
+    zp_printfln( "Exec Thead ID - %d", zp::GetPlatform()->GetCurrentThreadId() );
+}
+
 int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow )
 {
     int exitCode = 0;
 
     using namespace zp;
+
+    const zp_time_t startTime = zp_time_now();
 
     MemoryConfig memoryConfig {
         .defaultAllocatorPageSize = 16 MB,
@@ -48,10 +70,10 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     const zp_size_t totalMemorySize = 128 MB;
     void* systemMemory = GetPlatform()->AllocateSystemMemory( baseAddress, totalMemorySize );
 
-    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_defaultAllocator(
+    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, CriticalSectionMemoryLock> s_defaultAllocator(
         SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, 0 ), memoryConfig.defaultAllocatorPageSize ),
         TlsfAllocatorPolicy(),
-        NullMemoryLock()
+        CriticalSectionMemoryLock()
     );
 
     RegisterAllocator( 0, &s_defaultAllocator );
@@ -111,6 +133,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
                 .createTaskFunc =  ShaderCompiler::ShaderCompilerCreateTaskMemory,
                 .deleteTaskFunc =  ShaderCompiler::ShaderCompilerDestroyTaskMemory,
                 .executeFunc =     ShaderCompiler::ShaderCompilerExecute,
+                .jobExecuteFunc =  ShaderCompiler::ShaderCompilerExecuteJob,
             } );
             assetCompiler.registerFileExtension( String::As( ".computeshader" ), {} );
 
@@ -170,7 +193,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
                     const AssetCompilerProcessor* assetCompilerProcessor = assetCompiler.getCompilerProcessor( ext );
                     if( assetCompilerProcessor )
                     {
-                        void* taskMemory = nullptr;
+                        Memory taskMemory {};
                         if( assetCompilerProcessor->createTaskFunc )
                         {
                             taskMemory = assetCompilerProcessor->createTaskFunc( 0, inFile.asString(), outFile.asString(), cmdLine );
@@ -180,34 +203,56 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
                             .srcFile = inFile,
                             .dstFile = outFile,
                             .exec = assetCompilerProcessor->executeFunc,
+                            .jobExec = assetCompilerProcessor->jobExecuteFunc,
                             .deleteTaskMemory = assetCompilerProcessor->deleteTaskFunc,
-                            .ptr = taskMemory,
-                            .memoryLabel = 0
+                            .taskMemory = taskMemory,
+                            .memoryLabel = 0,
                         } );
                     }
                 }
             }
 
+            Vector<AssetCompilerTask> tasksToDelete( 16, 0 );
+
+            JobSystem::Setup( 0, 2 );
+
+            JobSystem::InitializeJobThreads();
+
+            auto parent = JobSystem::Start().schedule();
+
             // execute tasks
             while( !taskQueue.isEmpty() )
             {
                 AssetCompilerTask task = taskQueue.dequeue();
-                if( task.exec )
-                {
-                    task.exec( &task );
-                }
 
-                if( task.deleteTaskMemory && task.ptr )
+                JobSystem::Start( task, parent ).schedule();
+
+                tasksToDelete.pushBack( task );
+            }
+
+            JobSystem::ScheduleBatchJobs();
+            parent.complete();
+
+            for( const AssetCompilerTask& task : tasksToDelete )
+            {
+                if( task.deleteTaskMemory )
                 {
-                    task.deleteTaskMemory( task.memoryLabel, task.ptr );
+                    task.deleteTaskMemory( task.memoryLabel, task.taskMemory );
                 }
             }
+
+            JobSystem::ExitJobThreads();
+
+            JobSystem::Teardown();
         }
     }
     else
     {
         cmdLine.printHelp();
     }
+
+    const zp_time_t endTime = zp_time_now();
+    zp_printfln( "%s Duration: %fs", exitCode == 0 ? "Success" : "Error", zp_float32_t( endTime - startTime ) / zp_float32_t( zp_time_frequency() ) );
 
     return exitCode;
 }
