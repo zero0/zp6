@@ -193,7 +193,7 @@ namespace zp
     template<typename T, typename Allocator>
     typename Queue<T, Allocator>::value_type Queue<T, Allocator>::dequeue()
     {
-        ZP_ASSERT_MSG( !isEmpty(), "Trying to dequeue from an empty Queue" );
+        ZP_ASSERT_MSG( !isEmpty(), "Trying to popBack from an empty Queue" );
 
         const zp_size_t index = m_head % m_capacity;
         ++m_head;
@@ -210,7 +210,7 @@ namespace zp
     zp_bool_t Queue<T, Allocator>::tryDequeue( reference val )
     {
         zp_bool_t removed = false;
-        
+
         if( !isEmpty() )
         {
             const zp_size_t index = m_head % m_capacity;

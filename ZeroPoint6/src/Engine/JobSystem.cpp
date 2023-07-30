@@ -264,7 +264,7 @@ namespace zp
     void JobQueue::push( Job* job )
     {
         const zp_size_t b = m_bottom;
-        //const zp_size_t b = Atomic::IncrementSizeT( &m_bottom ) - 1;
+        //const zp_size_t b = Atomic::IncrementSizeT( &m_back ) - 1;
         m_jobs[ b & m_mask ] = job;
 
         Atomic::MemoryBarrier();
@@ -275,7 +275,7 @@ namespace zp
     Job* JobQueue::pop()
     {
         const zp_size_t b = m_bottom - 1;
-        //const zp_size_t b = Atomic::DecrementSizeT( &m_bottom );
+        //const zp_size_t b = Atomic::DecrementSizeT( &m_back );
 
         Atomic::ExchangeSizeT( &m_bottom, b );
 
