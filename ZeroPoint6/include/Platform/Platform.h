@@ -42,6 +42,8 @@ namespace zp
 
     typedef void (* OnWindowMouseEvent)( zp_handle_t windowHandle, const WindowMouseEvent& windowMouseEvent );
 
+    typedef void (* OnWindowClosed)( zp_handle_t windowHandle );
+
     struct WindowCallbacks
     {
         zp_int32_t minWidth, minHeight, maxWidth, maxHeight;
@@ -50,6 +52,7 @@ namespace zp
         OnWindowFocus onWindowFocus;
         OnWindowKeyEvent onWindowKeyEvent;
         OnWindowMouseEvent onWindowMouseEvent;
+        OnWindowClosed onWindowClosed;
     };
 
     struct OpenWindowDesc
@@ -154,36 +157,39 @@ namespace zp
         ConnectionProtocol connectionProtocol;
     };
 
-
-    class Platform
+    // Window
+    namespace Platform
     {
-    ZP_NONCOPYABLE( Platform );
-
-    public:
-        Platform();
-
-        ~Platform() = default;
-
         zp_handle_t OpenWindow( const OpenWindowDesc& desc );
 
         zp_bool_t DispatchWindowMessages( zp_handle_t windowHandle, zp_int32_t& exitCode );
+
+        zp_bool_t DispatchMessages( zp_int32_t& exitCode );
 
         void CloseWindow( zp_handle_t windowHandle );
 
         void SetWindowTitle( zp_handle_t windowHandle, const String& title );
 
         void SetWindowSize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
+    }
 
+    // Memory
+    namespace Platform
+    {
         void* AllocateSystemMemory( void* baseAddress, zp_size_t size );
 
         void FreeSystemMemory( void* ptr );
 
-        [[nodiscard]] zp_size_t GetMemoryPageSize( zp_size_t size ) const;
+        [[nodiscard]] zp_size_t GetMemoryPageSize( zp_size_t size );
 
         void* CommitMemoryPage( void** ptr, zp_size_t size );
 
         void DecommitMemoryPage( void* ptr, zp_size_t size );
+    }
 
+    // File & Path
+    namespace Platform
+    {
         void GetCurrentDir( char* path, zp_size_t maxPathLength );
 
         template<zp_size_t Size>
@@ -192,7 +198,7 @@ namespace zp
             GetCurrentDir( path, Size );
         }
 
-        zp_bool_t FileExists( const char* filePath ) const;
+        zp_bool_t FileExists( const char* filePath );
 
         zp_bool_t FileCopy( const char* srcFilePath, const char* dstFilePath, zp_bool_t force = false );
 
@@ -204,7 +210,7 @@ namespace zp
 
         void SeekFile( zp_handle_t fileHandle, zp_ptrdiff_t distanceToMoveInBytes, MoveMethod moveMethod );
 
-        zp_size_t GetFileSize( zp_handle_t fileHandle ) const;
+        zp_size_t GetFileSize( zp_handle_t fileHandle );
 
         void CloseFileHandle( zp_handle_t fileHandle );
 
@@ -212,6 +218,12 @@ namespace zp
 
         zp_size_t WriteFile( zp_handle_t fileHandle, const void* data, zp_size_t size );
 
+        extern zp_char8_t PathSep;
+    }
+
+    // Process
+    namespace Platform
+    {
         zp_handle_t LoadExternalLibrary( const char* libraryPath );
 
         void UnloadExternalLibrary( zp_handle_t libraryHandle );
@@ -223,18 +235,22 @@ namespace zp
         {
             return (T)GetProcAddress( libraryHandle, name.c_str() );
         }
+    }
 
+    // Threading
+    namespace Platform
+    {
         zp_handle_t AllocateThreadPool( zp_uint32_t minThreads, zp_uint32_t maxThreads );
 
         void FreeThreadPool( zp_handle_t threadPool );
 
         zp_handle_t CreateThread( ThreadFunc threadFunc, void* param, zp_size_t stackSize, zp_uint32_t* threadId );
 
-        [[nodiscard]] zp_handle_t GetCurrentThread() const;
+        [[nodiscard]] zp_handle_t GetCurrentThread();
 
-        [[nodiscard]] zp_uint32_t GetCurrentThreadId() const;
+        [[nodiscard]] zp_uint32_t GetCurrentThreadId();
 
-        zp_uint32_t GetThreadId( zp_handle_t threadHandle ) const;
+        zp_uint32_t GetThreadId( zp_handle_t threadHandle );
 
         void SetThreadName( zp_handle_t threadHandle, const String& threadName );
 
@@ -250,12 +266,20 @@ namespace zp
 
         void JoinThreads( zp_handle_t* threadHandles, zp_size_t threadHandleCount );
 
-        [[nodiscard]] zp_uint32_t GetProcessorCount() const;
-
-        MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
+        [[nodiscard]] zp_uint32_t GetProcessorCount();
 
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
+    }
 
+    // Util
+    namespace Platform
+    {
+        MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
+    }
+
+    // Networking
+    namespace Platform
+    {
         zp_handle_t OpenSocket( const SocketDesc& desc );
 
         void ListenSocket( zp_handle_t socket );
@@ -267,16 +291,7 @@ namespace zp
         zp_size_t SendSocket( zp_handle_t socket, const void* src, zp_size_t srcSize );
 
         void CloseSocket( zp_handle_t socket );
-
-        static const zp_char8_t PathSep;
-
-    private:
-        zp_uint64_t m_activeProcessorMask;
-        zp_size_t m_systemPageSize;
-        zp_uint32_t m_numProcessors;
     };
-
-    Platform* GetPlatform();
 }
 
 #endif //ZP_PLATFORM_H

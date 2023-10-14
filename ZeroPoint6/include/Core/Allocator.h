@@ -17,12 +17,12 @@
 #define ZP_NEW_( l, t )                 new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l)
 #define ZP_NEW_ARGS_( l, t, ... )       new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(l,__VA_ARGS__)
 
-#define ZP_DELETE( t, p )               do { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = p->memoryLabel; p->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } while( false )
+#define ZP_DELETE( t, p )               do { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = static_cast<t*>(p)->memoryLabel; static_cast<t*>(p)->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } while( false )
 #define ZP_DELETE_( l, t, p )           do { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(p); p = nullptr; } while( false )
 #define ZP_DELETE_LABEL( l, t, p )      do { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->free(p); p = nullptr; } while( false )
 
 #if ZP_USE_SAFE_DELETE
-#define ZP_SAFE_DELETE( t, p )            do { if( p ) { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = p->memoryLabel; p->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } } while( false )
+#define ZP_SAFE_DELETE( t, p )            do { if( p ) { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = static_cast<t*>(p)->memoryLabel; static_cast<t*>(p)->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } } while( false )
 #define ZP_SAFE_DELETE_( l, t, p )        do { if( p ) { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(p); p = nullptr; } } while( false )
 #define ZP_SAFE_DELETE_LABEL( l, t, p )   do { if( p ) { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(zp::MemoryLabels::l))->free(p); p = nullptr; } } while( false )
 #else // !ZP_USE_SAFE_DELETE
@@ -111,6 +111,12 @@ namespace zp
 
     struct MemoryLabelAllocator
     {
+        MemoryLabelAllocator()
+            : alignment( kDefaultMemoryAlignment )
+            , memoryLabel( 0 )
+        {
+        }
+
         MemoryLabelAllocator( MemoryLabel memoryLabel )
             : alignment( kDefaultMemoryAlignment )
             , memoryLabel( memoryLabel )
@@ -135,8 +141,8 @@ namespace zp
         }
 
     private:
-        const zp_size_t alignment;
-        const MemoryLabel memoryLabel;
+        zp_size_t alignment;
+        MemoryLabel memoryLabel;
     };
 }
 
@@ -379,4 +385,112 @@ namespace zp
 }
 #pragma endregion
 
+
+namespace zp
+{
+    struct AllocMemory
+    {
+        void* ptr;
+        zp_size_t size;
+        MemoryLabel memoryLabel;
+
+        AllocMemory()
+            : ptr( nullptr )
+            , size( 0 )
+            , memoryLabel( 0 )
+        {
+        }
+
+        AllocMemory( MemoryLabel memoryLabel, zp_size_t size )
+            : ptr( size ? ZP_MALLOC_( memoryLabel, size ) : nullptr )
+            , size( size )
+            , memoryLabel( memoryLabel )
+        {
+        }
+
+        AllocMemory( MemoryLabel memoryLabel, Memory memory )
+            : ptr( memory.size ? ZP_MALLOC_( memoryLabel, memory.size ) : nullptr )
+            , size( memory.size )
+            , memoryLabel( memoryLabel )
+        {
+            zp_memcpy( ptr, size, memory.ptr, memory.size );
+        }
+
+        AllocMemory( const AllocMemory& other )
+            : ptr( other.size ? ZP_MALLOC_( other.memoryLabel, other.size ) : nullptr )
+            , size( other.size )
+            , memoryLabel( other.memoryLabel )
+        {
+            zp_memcpy( ptr, size, other.ptr, other.size );
+        }
+
+        AllocMemory( AllocMemory&& other ) noexcept
+            : ptr( other.ptr )
+            , size( other.size )
+            , memoryLabel( other.memoryLabel )
+        {
+            other.ptr = nullptr;
+            other.size = 0;
+        }
+
+        ~AllocMemory()
+        {
+            ZP_SAFE_FREE_LABEL( memoryLabel, ptr );
+            ptr = nullptr;
+            size = 0;
+        }
+
+        AllocMemory& operator=( const AllocMemory& other )
+        {
+            ZP_SAFE_FREE_LABEL( memoryLabel, ptr );
+
+            ptr = other.ptr;
+            size = other.size;
+            memoryLabel = other.memoryLabel;
+
+            return *this;
+        }
+
+        AllocMemory& operator=( AllocMemory&& other )
+        {
+            ZP_SAFE_FREE_LABEL( memoryLabel, ptr );
+
+            ptr = other.ptr;
+            size = other.size;
+            memoryLabel = other.memoryLabel;
+
+            other.ptr = nullptr;
+            other.size = 0;
+
+            return *this;
+        }
+
+        template<typename T>
+        ZP_FORCEINLINE T* as()
+        {
+            ZP_ASSERT( sizeof( T ) <= size );
+            return static_cast<T*>( ptr );
+        }
+
+        template<typename T>
+        ZP_FORCEINLINE const T* as() const
+        {
+            ZP_ASSERT( sizeof( T ) <= size );
+            return static_cast<const T*>( ptr );
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE Memory memory() const
+        {
+            return { .ptr = ptr, .size = size };
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE Memory slice( zp_size_t offset, zp_size_t sz ) const
+        {
+            return {
+                .ptr = ZP_OFFSET_PTR( ptr, offset ),
+                .size = sz
+            };
+        }
+    };
+}
 #endif //ZP_ALLOCATOR_H

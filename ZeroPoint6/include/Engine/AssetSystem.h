@@ -11,8 +11,8 @@
 #include "Core/Allocator.h"
 #include "Core/Vector.h"
 #include "Core/Queue.h"
+#include "Core/Job.h"
 
-#include "Engine/JobSystem.h"
 #include "Engine/Entity.h"
 #include "Engine/EntityComponentManager.h"
 
@@ -57,6 +57,10 @@ namespace zp
         void addAssetSource();
     };
 
+    //
+    //
+    //
+
     template<AssetType AT>
     struct AssetReferenceComponentData
     {
@@ -72,11 +76,18 @@ namespace zp
     {
         zp_guid128_t guid;
         zp_hash128_t hash;
-        MemoryArray<zp_uint8_t> data;
-        MemoryLabel memoryLabel;
+        AllocMemory data;
     };
 
     struct MeshAssetViewComponentData
+    {
+    };
+
+    struct ShaderAssetViewComponentData
+    {
+    };
+
+    struct ComputeShaderAssetViewComponentData
     {
     };
 
@@ -96,29 +107,13 @@ namespace zp
 
         ~AssetSystem();
 
-        void setup(JobSystem* jobSystem, EntityComponentManager* entityComponentManager);
+        void setup( EntityComponentManager* entityComponentManager );
 
         void teardown();
 
-        void setAssetTypeMemoryLabel( AssetTypes assetType, MemoryLabel assetMemoryLabel );
-
-        void loadAssetManifest( const zp_hash128_t& assetManifestVersion );
-
-        [[nodiscard]] zp_bool_t isReady() const;
-
-        void loadAssetAsync( const zp_guid128_t& assetGUID, AssetLoadCompleteCallback assetLoadCompleteCallback, void* userPtr = nullptr );
-
-        void unloadAsset( const zp_guid128_t& assetGUID );
-
-        void unloadAllAssets();
-
-        void garbageCollectAssets();
-
-        [[nodiscard]] zp_size_t getLoadedAssetCount() const;
-
         //
 
-        [[nodiscard]] PreparedJobHandle process( JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle );
+        [[nodiscard]] JobHandle process( EntityComponentManager* entityComponentManager, const JobHandle& inputHandle );
 
         Entity loadFileDirect( const char* filePath );
 
@@ -158,30 +153,15 @@ namespace zp
 
         void releaseAssetLoadCommand( AssetLoadCommand* assetLoadCommand );
 
-        void startAssetLoadCommand( JobSystem* jobSystem, AssetLoadCommand* assetLoadCommand );
+        void startAssetLoadCommand( AssetLoadCommand* assetLoadCommand );
 
         void finalizeAssetLoadCommand( AssetLoadCommand* assetLoadCommand );
-
-        Map<zp_guid128_t, AssetLoadCommand*, zp_hash128_t, CastEqualityComparer<zp_guid128_t, zp_hash128_t>> m_pendingAssetLoadCommands;
-        Vector<AssetLoadCommand*> m_currentlyLoadingAssets;
-        Queue<AssetLoadCommand*> m_pendingAssetLoadCommandQueue;
-
-        Vector<AssetLoadCommand*> m_assetLoadCommandPool;
-
-        Map<zp_guid128_t, zp_size_t, zp_hash128_t, CastEqualityComparer<zp_guid128_t, zp_hash128_t>> m_loadedAssetIndexMap;
-        Vector<AssetData> m_loadedAssets;
-        Vector<zp_size_t> m_loadedAssetFreeListIndices;
-
-        Map<zp_guid128_t, AssetManifestEntry, zp_hash128_t, CastEqualityComparer<zp_guid128_t, zp_hash128_t>> m_combinedAssetManifestEntries;
-
-        VirtualFileSystem* m_virtualFileSystem;
-
-        zp_size_t m_maxActiveAssetLoadCommands;
 
         //
 
         JobSystem* m_jobSystem;
         EntityComponentManager* m_entityComponentManager;
+        VirtualFileSystem* m_virtualFileSystem;
 
         MemoryLabel m_assetMemoryLabels[static_cast<zp_size_t>(AssetTypes::AssetTypes_Count )];
 

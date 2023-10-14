@@ -16,6 +16,7 @@ set(ZP_CORE_SRC
         "src/Core/Allocator.cpp"
         "src/Core/CommandLine.cpp"
         "src/Core/Common.cpp"
+        "src/Core/Data.cpp"
         "src/Core/Job.cpp"
         "src/Core/Math.cpp"
         "src/Core/Profiler.cpp"
@@ -44,7 +45,6 @@ set(ZP_ENGINE_SRC
         "src/Engine/Entity.cpp"
         "src/Engine/EntityComponentManager.cpp"
         "src/Engine/EntityQuery.cpp"
-        "src/Engine/JobSystem.cpp"
         "src/Engine/Subsystem.cpp"
         "src/Engine/${PLATFORM_FULL_NAME}/${PLATFORM_FULL_NAME}Main.cpp"
         )
@@ -93,7 +93,6 @@ set(ZP_ENGINE_HEADERS
         "include/Engine/Entity.h"
         "include/Engine/EntityComponentManager.h"
         "include/Engine/EntityQuery.h"
-        "include/Engine/JobSystem.h"
         "include/Engine/MemoryLabels.h"
         "include/Engine/ModuleEntryPointAPI.h"
         "include/Engine/Subsystem.h"

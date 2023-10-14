@@ -30,7 +30,7 @@
 
 enum
 {
-    kPrintBufferSize = 1024 * 2
+    kPrintBufferSize = 1024 * 32
 };
 
 zp_int32_t zp_printf( const char* text, ... )
@@ -59,7 +59,7 @@ zp_int32_t zp_printfln( const char* text, ... )
 
     va_list arg;
     va_start( arg, text );
-    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
+    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize-1, text, arg );
     va_end( arg );
 
     szBuff[ write ] = '\n';

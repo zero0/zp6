@@ -6,8 +6,8 @@
 
 using namespace zp;
 
-AssetCompiler::AssetCompiler( zp::MemoryLabel memoryLabel )
-    : m_assetProcessors( 16, memoryLabel )
+AssetCompiler::AssetCompiler( MemoryLabel memoryLabel )
+    : m_assetProcessors( memoryLabel, 16, memoryLabel )
     , memoryLabel( memoryLabel )
 {
 }
@@ -18,14 +18,11 @@ AssetCompiler::~AssetCompiler()
 
 void AssetCompiler::registerFileExtension( const String& ext, const AssetCompilerProcessor& assetProcessor )
 {
-    const zp_hash64_t hash = zp_fnv64_1a( ext.str, ext.length );
-    m_assetProcessors.set( hash, assetProcessor );
+    m_assetProcessors.set( ext, assetProcessor );
 }
 
 const AssetCompilerProcessor* AssetCompiler::getCompilerProcessor( const String& ext ) const
 {
-    const zp_hash64_t hash = zp_fnv64_1a( ext.str, ext.length );
-    AssetCompilerProcessor* assetCompilerProcessor = {};
-    m_assetProcessors.get( hash, &assetCompilerProcessor );
-    return assetCompilerProcessor;
+    AssetCompilerProcessor* assetCompilerProcessor;
+    return m_assetProcessors.tryGet( ext, &assetCompilerProcessor ) ? assetCompilerProcessor : nullptr;
 }

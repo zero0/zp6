@@ -7,6 +7,7 @@
 
 #include "Core/Defines.h"
 #include "Core/Types.h"
+#include "Core/String.h"
 
 #include "Rendering/GraphicsResource.h"
 
@@ -49,7 +50,7 @@ namespace zp
         zp_handle_t shaderHandle;
 
         ShaderStage shaderStage;
-        char entryPointName[kMaxShaderEntryPointNameSize];
+        FixedString<kMaxShaderEntryPointNameSize> entryPoint;
     };
 
     typedef GraphicsResource<Shader> ShaderResource;

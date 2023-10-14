@@ -40,7 +40,7 @@ zp_int32_t zp_strcmp( const char (& lh)[LHSize], const char* rh, zp_size_t rhSiz
 
 //zp_size_t zp_strnlen( const char* str, zp_size_t maxSize );
 
-constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength )
+constexpr void zp_strcpy( char* dstStr, zp_size_t dstLength, const char* srcStr )
 {
     zp_size_t i;
     for( i = 0; srcStr[ i ] != '\0' && i < dstLength; ++i )
@@ -50,7 +50,7 @@ constexpr void zp_strcpy( const char* srcStr, char* dstStr, zp_size_t dstLength 
     dstStr[ i ] = '\0';
 }
 
-constexpr void zp_strcpy( const zp_char8_t* srcStr, zp_char8_t* dstStr, zp_size_t dstLength )
+constexpr void zp_strcpy( zp_char8_t* dstStr, zp_size_t dstLength, const zp_char8_t* srcStr )
 {
     zp_size_t i;
     for( i = 0; srcStr[ i ] != '\0' && i < dstLength; ++i )
@@ -60,7 +60,17 @@ constexpr void zp_strcpy( const zp_char8_t* srcStr, zp_char8_t* dstStr, zp_size_
     dstStr[ i ] = '\0';
 }
 
-constexpr void zp_strncpy( const char* srcStr, zp_size_t srcLen, char* dstStr, zp_size_t dstLength )
+constexpr void zp_strncpy( char* dstStr, zp_size_t dstLength, const char* srcStr, zp_size_t srcLen )
+{
+    zp_size_t i;
+    for( i = 0; srcStr[ i ] != '\0' && i < srcLen && i < dstLength; ++i )
+    {
+        dstStr[ i ] = srcStr[ i ];
+    }
+    dstStr[ i ] = '\0';
+}
+
+constexpr void zp_strncpy( zp_char8_t* dstStr, zp_size_t dstLength, const zp_char8_t* srcStr, zp_size_t srcLen )
 {
     zp_size_t i;
     for( i = 0; srcStr[ i ] != '\0' && i < srcLen && i < dstLength; ++i )
@@ -71,9 +81,21 @@ constexpr void zp_strncpy( const char* srcStr, zp_size_t srcLen, char* dstStr, z
 }
 
 template<zp_size_t Size>
-constexpr void zp_strncpy( const char* srcStr, zp_size_t srcLen, char (& dstStr)[Size] )
+constexpr void zp_strncpy( char (& dstStr)[Size], const char* srcStr, zp_size_t srcLen )
 {
-    zp_strncpy( srcStr, srcLen, dstStr, Size );
+    zp_strncpy( dstStr, Size, srcStr, srcLen );
+}
+
+template<zp_size_t Size>
+constexpr void zp_strncpy( zp_char8_t (& dstStr)[Size], const zp_char8_t* srcStr, zp_size_t srcLen )
+{
+    zp_strncpy( dstStr, Size, srcStr, srcLen );
+}
+
+template<zp_size_t Size>
+constexpr void zp_strncpy( zp_char8_t (& dstStr)[Size], const char* srcStr, zp_size_t srcLen )
+{
+    zp_strncpy( dstStr, Size, reinterpret_cast<const zp_char8_t*>(srcStr), srcLen );
 }
 
 constexpr zp_bool_t zp_strempty( const char* str )
@@ -106,6 +128,7 @@ constexpr zp_size_t zp_strlen( const char8_t* str )
         while( *str )
         {
             ++str;
+            ++length;
         }
     }
 
@@ -403,7 +426,7 @@ constexpr zp_bool_t zp_try_parse_uint8( const char* str, zp_size_t length, zp_ui
                 return false;
         }
 
-        value |= ( v & 0x0F ) << ( ( 7 - i ) * 4 );
+        value |= ( v & 0x0F ) << ( ( ( length - 1 ) - i ) * 4 );
     }
 
     *m = value;
@@ -505,7 +528,7 @@ constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_size_t length, zp_u
                 return false;
         }
 
-        value |= ( v & 0x0F ) << ( ( 7 - i ) * 4 );
+        value |= ( v & 0x0F ) << ( ( ( length - 1 ) - i ) * 4 );
     }
 
     *m = value;
@@ -584,9 +607,8 @@ constexpr zp_bool_t zp_try_hash64_to_string( const zp_hash64_t& hash, char* str 
     return ok;
 }
 
-constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_hash128_t* hash )
+constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_size_t length, zp_hash128_t* hash )
 {
-    const zp_size_t length = zp_strlen( str );
     zp_bool_t ok = length >= 32;
     if( ok )
     {
@@ -608,6 +630,12 @@ constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_hash128_t* hash )
     }
 
     return ok;
+}
+
+constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_hash128_t* hash )
+{
+    const zp_size_t length = zp_strlen( str );
+    return zp_try_parse_hash128( str, length, hash );
 }
 
 constexpr zp_bool_t zp_try_hash128_to_string( const zp_hash128_t& hash, char* str )
@@ -703,6 +731,21 @@ namespace zp
         }
     };
 
+    constexpr zp_bool_t operator==( const String& lh, const String& rh )
+    {
+        return lh.str == rh.str || zp_strcmp( lh.str, lh.length, rh.str, rh.length ) == 0;
+    }
+
+    template<typename H>
+    struct DefaultHash<String, H>
+    {
+        H operator()( const String& val ) const
+        {
+            return zp_fnv_1a<H>( val.str, val.length );
+        }
+    };
+
+
     struct MutableString
     {
         zp_char8_t* const str;
@@ -723,6 +766,13 @@ namespace zp
     class AllocString
     {
     public:
+        AllocString()
+            : m_str( nullptr )
+            , m_length( 0 )
+            , memoryLabel( 0 )
+        {
+        }
+
         AllocString( MemoryLabel memoryLabel, const zp_char8_t* str )
             : m_str( nullptr )
             , m_length( zp_strlen( str ) )
@@ -731,7 +781,7 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( str, m_str, m_length );
+                zp_strcpy( m_str, m_length, str );
             }
         }
 
@@ -743,7 +793,31 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( str, m_str, m_length );
+                zp_strcpy( m_str, m_length, str );
+            }
+        }
+
+        AllocString( MemoryLabel memoryLabel, const char* str )
+            : m_str( nullptr )
+            , m_length( zp_strlen( str ) )
+            , memoryLabel( memoryLabel )
+        {
+            if( m_length > 0 )
+            {
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
+                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>( str ) );
+            }
+        }
+
+        AllocString( MemoryLabel memoryLabel, const char* str, zp_size_t length )
+            : m_str( nullptr )
+            , m_length( length )
+            , memoryLabel( memoryLabel )
+        {
+            if( m_length > 0 )
+            {
+                m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
+                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>( str ) );
             }
         }
 
@@ -762,7 +836,7 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( other.m_str, m_str, m_length );
+                zp_strcpy( m_str, m_length, other.m_str );
             }
         }
 
@@ -830,6 +904,15 @@ namespace zp
         {
             return { .str = m_str, .length = m_length };
         }
+
+        void set( MemoryLabel memoryLabel, zp_char8_t* str, zp_size_t length )
+        {
+            ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+
+            this->memoryLabel = memoryLabel;
+            m_str = str;
+            m_length = length;
+        }
 //
         //explicit operator MutableString()
         //{
@@ -841,8 +924,25 @@ namespace zp
         zp_size_t m_length;
 
     public:
-        const MemoryLabel memoryLabel;
+        MemoryLabel memoryLabel;
+
+        friend constexpr zp_bool_t operator==( const AllocString& lh, const AllocString& rh );
     };
+
+    constexpr zp_bool_t operator==( const AllocString& lh, const AllocString& rh )
+    {
+        return lh.m_str == rh.m_str || zp_strcmp( lh.m_str, lh.m_length, rh.m_str, rh.m_length ) == 0;
+    }
+
+    template<typename H>
+    struct DefaultHash<AllocString, H>
+    {
+        H operator()( const AllocString& val ) const
+        {
+            return zp_fnv_1a<H>( val.str(), val.length() );
+        }
+    };
+
 
 #pragma endregion
 
@@ -863,7 +963,7 @@ namespace zp
             const zp_size_t length = zp_strlen( str );
             if( str && length )
             {
-                zp_strcpy( reinterpret_cast<const zp_char8_t*>(str), m_str, zp_min( Size, length ) );
+                zp_strncpy( m_str, str, length );
             }
         }
 
@@ -872,20 +972,20 @@ namespace zp
         {
             if( str && length )
             {
-                zp_strcpy( reinterpret_cast<const zp_char8_t*>(str), m_str, zp_min( Size, length ) );
+                zp_strncpy( m_str, str, length );
             }
         }
 
         FixedString( const FixedString<Size>& other )
             : m_str()
         {
-            zp_memcpy( m_str, Size, other.m_str, Size );
+            zp_strncpy( m_str, other.str(), other.length() );
         }
 
         FixedString( FixedString<Size>&& other ) noexcept
             : m_str()
         {
-            zp_memcpy( m_str, Size, other.m_str, Size );
+            zp_strncpy( m_str, other.str(), other.length() );
         }
 
         ~FixedString() = default;
@@ -895,9 +995,14 @@ namespace zp
             return m_str[ index ];
         }
 
+        [[nodiscard]] zp_bool_t empty() const
+        {
+            return m_str[ 0 ] == '\0';
+        }
+
         [[nodiscard]] zp_size_t length() const
         {
-            return Size;
+            return zp_strlen( m_str );
         }
 
         [[nodiscard]] zp_size_t capacity() const
@@ -915,35 +1020,47 @@ namespace zp
             return m_str;
         }
 
-        [[nodiscard]]explicit operator String() const
+        [[nodiscard]] explicit operator String() const
         {
-            return { .str = m_str, .length = Size };
+            return { .str = m_str, .length = length() };
         }
 
         FixedString<Size>& operator=( const FixedString<Size>& other ) noexcept
         {
             if( m_str != other.m_str )
             {
-                zp_memcpy( m_str, Size, other.m_str, Size );
+                zp_strncpy( m_str, other.m_str, other.length() );
             }
             return *this;
         }
 
         FixedString<Size>& operator=( FixedString<Size>&& other ) noexcept
         {
-            zp_memcpy( m_str, Size, other.m_str, Size );
+            zp_strncpy( m_str, other.m_str, other.length() );
             return *this;
         }
 
         FixedString<Size>& operator=( const String& other ) noexcept
         {
-            zp_memcpy( m_str, Size, other.str, other.length );
+            zp_strncpy( m_str, other.str, other.length );
             return *this;
         }
 
         FixedString<Size>& operator=( String&& other ) noexcept
         {
-            zp_memcpy( m_str, Size, other.str, other.length );
+            zp_strncpy( m_str, other.str, other.length );
+            return *this;
+        }
+
+        FixedString<Size>& operator=( const char* other ) noexcept
+        {
+            zp_strncpy( m_str, other, zp_strlen( other ) );
+            return *this;
+        }
+
+        FixedString<Size>& operator=( const zp_char8_t* other ) noexcept
+        {
+            zp_strncpy( m_str, other, zp_strlen( other ) );
             return *this;
         }
 
@@ -1011,6 +1128,46 @@ namespace zp
         [[nodiscard]] const zp_char8_t* str() const
         {
             return m_str;
+        }
+
+        void clear()
+        {
+            m_length = 0;
+            m_str[ 0 ] = '\0';
+        }
+
+
+        void append( char ch )
+        {
+            m_str[ m_length ] = ch;
+            m_length++;
+            m_str[ m_length ] = '\0';
+        }
+
+        void append( zp_char8_t ch )
+        {
+            m_str[ m_length ] = ch;
+            m_length++;
+            m_str[ m_length ] = '\0';
+        }
+
+        void append( const char* str )
+        {
+            for( ; m_length < Size && *str; ++m_length, ++str )
+            {
+                m_str[ m_length ] = *str;
+            }
+            m_str[ m_length ] = '\0';
+        }
+
+        void append( const char* str, zp_size_t length )
+        {
+            const char* end = str + length;
+            for( ; m_length < Size && *str && str != end; ++m_length, ++str )
+            {
+                m_str[ m_length ] = *str;
+            }
+            m_str[ m_length ] = '\0';
         }
 
         template<class ... Args>

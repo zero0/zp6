@@ -165,8 +165,6 @@ namespace zp
         {
             GraphicsDevice* graphicsDevice;
 
-            ZP_JOB_DEBUG_NAME( WaitOnGPUJob );
-
             static void Execute( const JobHandle& parentJobHandle, const WaitOnGPUJob* waitOnGpuJob )
             {
                 ZP_PROFILE_CPU_BLOCK();
@@ -179,8 +177,6 @@ namespace zp
         {
             zp_uint64_t frameIndex;
             GraphicsDevice* graphicsDevice;
-
-            ZP_JOB_DEBUG_NAME( BeginFrameGPUJob );
 
             static void Execute( const JobHandle& parentJobHandle, const BeginFrameGPUJob* waitOnGpuJob )
             {
@@ -195,8 +191,6 @@ namespace zp
         {
             GraphicsDevice* m_graphicsDevice;
 
-            ZP_JOB_DEBUG_NAME( SubmitGPUJob );
-
             static void Execute( const JobHandle& parentJobHandle, const SubmitGPUJob* waitOnGpuJob )
             {
                 ZP_PROFILE_CPU_BLOCK();
@@ -208,8 +202,6 @@ namespace zp
         struct PresentGPUJob
         {
             GraphicsDevice* m_graphicsDevice;
-
-            ZP_JOB_DEBUG_NAME( PresentGPUJob );
 
             static void Execute( const JobHandle& parentJobHandle, const PresentGPUJob* presentGpuJob )
             {
@@ -273,16 +265,16 @@ namespace zp
 
                 {
                     char buff[256];
-                    GetPlatform()->GetCurrentDir( buff );
+                    Platform::GetCurrentDir( buff );
                     zp_printfln( buff );
 
-                    zp_handle_t fileHandle = GetPlatform()->OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.vert.spv", ZP_OPEN_FILE_MODE_READ );
-                    zp_size_t fileSize = GetPlatform()->GetFileSize( fileHandle );
+                    zp_handle_t fileHandle = Platform::OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.vert.spv", ZP_OPEN_FILE_MODE_READ );
+                    zp_size_t fileSize = Platform::GetFileSize( fileHandle );
 
                     void* memPtr = GetAllocator( MemoryLabels::FileIO )->allocate( fileSize, kDefaultMemoryAlignment );
-                    zp_size_t read = GetPlatform()->ReadFile( fileHandle, memPtr, fileSize );
+                    zp_size_t read = Platform::ReadFile( fileHandle, memPtr, fileSize );
                     ZP_ASSERT( read == fileSize );
-                    GetPlatform()->CloseFileHandle( fileHandle );
+                    Platform::CloseFileHandle( fileHandle );
 
                     ShaderDesc shaderDesc {
                         .name = "color vertex shaderHandle",
@@ -297,13 +289,13 @@ namespace zp
                 }
 
                 {
-                    zp_handle_t fileHandle = GetPlatform()->OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.frag.spv", ZP_OPEN_FILE_MODE_READ );
-                    zp_size_t fileSize = GetPlatform()->GetFileSize( fileHandle );
+                    zp_handle_t fileHandle = Platform::OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.frag.spv", ZP_OPEN_FILE_MODE_READ );
+                    zp_size_t fileSize = Platform::GetFileSize( fileHandle );
 
                     void* memPtr = GetAllocator( MemoryLabels::FileIO )->allocate( fileSize, kDefaultMemoryAlignment );
-                    zp_size_t read = GetPlatform()->ReadFile( fileHandle, memPtr, fileSize );
+                    zp_size_t read = Platform::ReadFile( fileHandle, memPtr, fileSize );
                     ZP_ASSERT( read == fileSize );
-                    GetPlatform()->CloseFileHandle( fileHandle );
+                    Platform::CloseFileHandle( fileHandle );
 
                     ShaderDesc shaderDesc {
                         .name = "color fragment shaderHandle",
@@ -407,8 +399,6 @@ namespace zp
             GraphicsPipelineState* graphicsPipelineState;
             RenderPipelineContext renderPipelineContext;
 
-            ZP_JOB_DEBUG_NAME( PipelineJob );
-
             static void Execute( const JobHandle& parentJobHandle, const PipelineJob* data )
             {
                 RenderPipelineContext context = data->renderPipelineContext;
@@ -438,14 +428,15 @@ namespace zp
             }
         };
 
-        PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& inputHandle ) final
+        JobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const JobHandle& inputHandle ) final
         {
             PipelineJob pipelineJob {
                 .renderPass = RenderPassResourceHandle( &m_renderPass ),
                 .graphicsPipelineState = &m_graphicsPipelineState,
                 .renderPipelineContext = *renderPipelineContext,
             };
-            return renderPipelineContext->m_jobSystem->PrepareJobData( pipelineJob, inputHandle );
+            //return renderPipelineContext->m_jobSystem->PrepareJobData( pipelineJob, inputHandle );
+            return inputHandle;
         }
 
     private:
@@ -504,7 +495,7 @@ namespace zp
         m_graphicsDevice = nullptr;
     }
 
-    PreparedJobHandle RenderSystem::startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& inputHandle )
+    JobHandle RenderSystem::startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const JobHandle& inputHandle )
     {
         m_batchModeRenderer->beginFrame( frameIndex );
         m_immediateModeRenderer->beginFrame( frameIndex );
@@ -528,22 +519,20 @@ namespace zp
 #endif
     }
 
-    PreparedJobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle )
+    JobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const JobHandle& inputHandle )
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        PreparedJobHandle gpuHandle = inputHandle;
+        JobHandle gpuHandle = inputHandle;
 
         WaitOnGPUJob waitOnGpuJob {
             .graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareJobData( waitOnGpuJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( waitOnGpuJob, gpuHandle );
 
         struct UpdateRenderPipelineJob
         {
             RenderSystem* renderSystem;
-
-            ZP_JOB_DEBUG_NAME( UpdateRenderPipelineJob );
 
             static void Execute( const JobHandle& jobHandle, const UpdateRenderPipelineJob* data )
             {
@@ -568,19 +557,17 @@ namespace zp
         } updateRenderPipelineJob {
             .renderSystem = this
         };
-        gpuHandle = jobSystem->PrepareJobData( updateRenderPipelineJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( updateRenderPipelineJob, gpuHandle );
 
         BeginFrameGPUJob beginFrameGpuJob {
             .frameIndex = frameIndex,
             .graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareJobData( beginFrameGpuJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( beginFrameGpuJob, gpuHandle );
 
         struct ProcessRenderPipeline
         {
             RenderPipelineContext renderPipelineContext;
-
-            ZP_JOB_DEBUG_NAME( ProcessRenderPipeline );
 
             static void Execute( const JobHandle& parentJobHandle, const ProcessRenderPipeline* processRenderPipeline )
             {
@@ -591,9 +578,9 @@ namespace zp
 
                 if( renderSystem->m_currentRenderPipeline )
                 {
-                    PreparedJobHandle pipelineHandle = renderSystem->m_currentRenderPipeline->onProcessPipeline( &ctx, {} );
+                    //JobHandle pipelineHandle = renderSystem->m_currentRenderPipeline->onProcessPipeline( &ctx );
 
-                    ctx.m_jobSystem->Schedule( pipelineHandle ).complete();
+                    //ctx.m_jobSystem->Schedule( pipelineHandle ).complete();
                 }
                 else
                 {
@@ -611,18 +598,15 @@ namespace zp
                 .m_frameIndex = frameIndex,
                 .m_graphicsDevice = m_graphicsDevice,
                 .m_renderSystem = this,
-                .m_jobSystem = jobSystem
             }
         };
-        gpuHandle = jobSystem->PrepareJobData( processRenderPipeline, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( processRenderPipeline, gpuHandle );
 
         struct RenderProfilerData
         {
             Profiler* profiler;
             ProfilerFrameRange range;
             ImmediateModeRenderer* immediateModeRenderer;
-
-            ZP_JOB_DEBUG_NAME( RenderProfilerData );
 
             static void Execute( const JobHandle& parentJobHandle, const RenderProfilerData* renderProfilerData )
             {
@@ -733,13 +717,11 @@ namespace zp
             .range = ProfilerFrameRange::Last( frameIndex, 1 ),
             .immediateModeRenderer = m_immediateModeRenderer,
         };
-        gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );
 
         struct FinalizeBatchRenderingJob
         {
             RenderSystem* renderSystem;
-
-            ZP_JOB_DEBUG_NAME( FinalizeBatchRenderingJob );
 
             static void Execute( const JobHandle& parentJobHandle, const FinalizeBatchRenderingJob* data )
             {
@@ -751,17 +733,17 @@ namespace zp
         } finalizeBatchRenderingJob {
             .renderSystem = this,
         };
-        gpuHandle = jobSystem->PrepareJobData( finalizeBatchRenderingJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( finalizeBatchRenderingJob, gpuHandle );
 
         SubmitGPUJob submitGpuJob {
             .m_graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareJobData( submitGpuJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( submitGpuJob, gpuHandle );
 
         PresentGPUJob presentGpuJob {
             .m_graphicsDevice = m_graphicsDevice
         };
-        gpuHandle = jobSystem->PrepareJobData( presentGpuJob, gpuHandle );
+        //gpuHandle = jobSystem->PrepareJobData( presentGpuJob, gpuHandle );
 
         return gpuHandle;
     }

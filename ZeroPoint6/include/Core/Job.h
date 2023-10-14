@@ -20,6 +20,8 @@ namespace zp
     public:
         const static JobHandle Null;
 
+        JobHandle();
+
         void complete();
 
         [[nodiscard]] zp_bool_t isComplete() const;
@@ -109,6 +111,24 @@ namespace zp
             using TJob = zp_remove_reference_t<T>;
 
             Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
+            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
+        }
+
+        template<typename T>
+        static JobData Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData )
+        {
+            using TJob = zp_remove_reference_t<T>;
+
+            Wrapper <TJob> wrapper { .func = func, .data = jobData };
+            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
+        }
+
+        template<typename T>
+        static JobData Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData, JobHandle parentJob )
+        {
+            using TJob = zp_remove_reference_t<T>;
+
+            Wrapper <TJob> wrapper { .func = func, .data = jobData };
             return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
         }
 

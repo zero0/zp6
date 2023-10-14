@@ -27,6 +27,6 @@ namespace zp
         const MemoryLabel MemoryLabels_Count = 11;
     };
 
-    static_assert( static_cast<MemoryLabel>(MemoryLabels::MemoryLabels_Count) < kMaxMemoryLabels );
+    static_assert( MemoryLabels::MemoryLabels_Count < kMaxMemoryLabels );
 }
 #endif //ZP_MEMORYLABELS_H

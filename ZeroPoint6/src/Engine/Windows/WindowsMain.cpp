@@ -3,9 +3,6 @@
 
 #include <Windows.h>
 
-//import Platform;
-//import Core;
-
 #include "Core/Defines.h"
 #include "Core/Macros.h"
 #include "Core/Common.h"
@@ -13,105 +10,8 @@
 
 #include "Platform/Platform.h"
 
-#include "Rendering/RenderSystem.h"
-
 #include "Engine/MemoryLabels.h"
 #include "Engine/Engine.h"
-
-static LPCSTR kZeroPointClassName = "ZeroPoint::WindowClass";
-
-static LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
-{
-    switch( uMessage )
-    {
-        case WM_CLOSE:
-        {
-            ::PostQuitMessage( 0 );
-        }
-            break;
-
-        case WM_GETMINMAXINFO:
-        {
-            auto lpMMI = reinterpret_cast<LPMINMAXINFO>(lParam);
-
-            POINT p = { 300, 300 };
-            lpMMI->ptMinTrackSize = p;
-        }
-            break;
-
-        case WM_SIZE:
-        {
-            //zp::ResizeRenderingEngine( 0, 0 );
-        }
-            break;
-
-        case WM_KILLFOCUS:
-        {
-        }
-            break;
-
-        case WM_SETFOCUS:
-        {
-        }
-            break;
-
-        case WM_KEYDOWN:
-        {
-        }
-            break;
-
-        case WM_KEYUP:
-        {
-        }
-            break;
-
-        case WM_MOUSEMOVE:
-        {
-            POINTS p = MAKEPOINTS( lParam );
-        }
-            break;
-
-        case WM_MOUSEWHEEL:
-        {
-        }
-            break;
-
-        case WM_LBUTTONDOWN:
-        {
-        }
-            break;
-
-        case WM_LBUTTONUP:
-        {
-        }
-            break;
-
-        case WM_RBUTTONDOWN:
-        {
-        }
-            break;
-
-        case WM_RBUTTONUP:
-        {
-        }
-            break;
-
-        case WM_MBUTTONDOWN:
-        {
-        }
-            break;
-
-        case WM_MBUTTONUP:
-        {
-        }
-            break;
-
-        default:
-            return ::DefWindowProc( hWnd, uMessage, wParam, lParam );
-    }
-
-    return 0;
-}
 
 struct MemoryConfig
 {
@@ -139,7 +39,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 #endif
 
     const zp_size_t totalMemorySize = 128 MB;
-    void* systemMemory = GetPlatform()->AllocateSystemMemory( baseAddress, totalMemorySize );
+    void* systemMemory = Platform::AllocateSystemMemory( baseAddress, totalMemorySize );
 
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_defaultAllocator(
         SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, 0 ), memoryConfig.defaultAllocatorPageSize ),

@@ -657,7 +657,7 @@ namespace zp
 
                 if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
                 {
-                    MessageBoxResult result = GetPlatform()->ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
+                    MessageBoxResult result = Platform::ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
                     if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
                     {
                         exit( 1 );
@@ -985,8 +985,8 @@ namespace zp
         , m_swapChainImageViews( 4, memoryLabel )
         , m_swapChainFrameBuffers( 4, memoryLabel )
         , m_swapChainInFlightFences( 4, memoryLabel )
-        , m_descriptorSetLayoutCache( 64, memoryLabel )
-        , m_samplerCache( 16, memoryLabel )
+        , m_descriptorSetLayoutCache( memoryLabel, 64, memoryLabel )
+        , m_samplerCache( memoryLabel, 16, memoryLabel )
         , m_delayedDestroy( 64, memoryLabel )
         , m_stagingBuffer {}
         , m_queueFamilies {
@@ -1931,7 +1931,7 @@ namespace zp
                 .flags = 0,
                 .stage = stage,
                 .module = static_cast<VkShaderModule>( srcShaderStage->shaderHandle ),
-                .pName = srcShaderStage->entryPointName,
+                .pName = srcShaderStage->entryPoint.c_str(),
                 .pSpecializationInfo = nullptr,
             };
 
@@ -2269,9 +2269,7 @@ namespace zp
         shader->shaderHandle = shaderModule;
         shader->shaderStage = shaderDesc.shaderStage;
         shader->shaderHash = zp_fnv128_1a( shaderDesc.codeData, shaderDesc.codeSizeInBytes );
-
-        const zp_size_t maxLength = ZP_ARRAY_SIZE( shader->entryPointName );
-        zp_strcpy( shaderDesc.entryPointName, shader->entryPointName, zp_min( maxLength, zp_strlen( shaderDesc.entryPointName ) ) );
+        shader->entryPoint = shaderDesc.entryPointName;
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, shaderDesc.name, VK_OBJECT_TYPE_SHADER_MODULE, shaderModule );
     }
@@ -3018,7 +3016,7 @@ namespace zp
         const zp_hash128_t hash = CalculateHash( createInfo );
 
         VkDescriptorSetLayout layout;
-        if( !m_descriptorSetLayoutCache.get( hash, &layout ) )
+        if( !m_descriptorSetLayoutCache.tryGet( hash, &layout ) )
         {
             HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &createInfo, &m_vkAllocationCallbacks, &layout ) );
 

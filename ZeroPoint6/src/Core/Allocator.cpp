@@ -50,7 +50,7 @@ namespace zp
             requestedSize += m_pageSize;
         }
 
-        void* mem = GetPlatform()->CommitMemoryPage( &m_memory, requestedSize );
+        void* mem = Platform::CommitMemoryPage( &m_memory, requestedSize );
         return mem;
     }
 

@@ -394,6 +394,11 @@ namespace
 
 const JobHandle JobHandle::Null = JobHandle( nullptr );
 
+JobHandle::JobHandle()
+    : m_job( nullptr )
+{
+}
+
 JobHandle::JobHandle( Job* job )
     : m_job( job )
 {
@@ -458,11 +463,11 @@ void JobSystem::Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount )
 {
     if( threadCount == 0 )
     {
-        threadCount = GetPlatform()->GetProcessorCount() - 1;
+        threadCount = Platform::GetProcessorCount() - 1;
     }
     else
     {
-        threadCount = zp_min( threadCount, GetPlatform()->GetProcessorCount() - 1 );
+        threadCount = zp_min( threadCount, Platform::GetProcessorCount() - 1 );
     }
 
     g_stealJobQueueIndex = 0;
@@ -513,20 +518,20 @@ void JobSystem::InitializeJobThreads()
     const zp_size_t stackSize = 1 MB;
     MutableFixedString<64> threadName;
 
-    const zp_uint32_t numAvailableProcessors = GetPlatform()->GetProcessorCount() - 1;
+    const zp_uint32_t numAvailableProcessors = Platform::GetProcessorCount() - 1;
     for( zp_uint32_t i = 0; i < g_jobThreadHandles.length; ++i )
     {
         JobThreadInfo& info = g_jobThreadHandles[ i ];
         info.localJobQueue = g_allJobQueues[ i ];
         info.localBatchQueue = g_allBatchJobQueues[ i ];
 
-        info.threadHandle = GetPlatform()->CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &info.threadID );
+        info.threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &info.threadID );
 
-        GetPlatform()->SetThreadIdealProcessor( info.threadHandle, 1 + ( i % numAvailableProcessors ) ); // proc 0 is used for main thread
+        Platform::SetThreadIdealProcessor( info.threadHandle, 1 + ( i % numAvailableProcessors ) ); // proc 0 is used for main thread
 
         threadName.format( "JobThread-%d %d", info.threadID, i );
 
-        GetPlatform()->SetThreadName( info.threadHandle, threadName );
+        Platform::SetThreadName( info.threadHandle, threadName );
     }
 
     // setup main thread job info
@@ -563,12 +568,12 @@ void JobSystem::ExitJobThreads()
         threadHandles[ i ] = g_jobThreadHandles[ i ].threadHandle;
     }
 
-    GetPlatform()->JoinThreads( threadHandles, g_jobThreadHandles.length );
+    Platform::JoinThreads( threadHandles, g_jobThreadHandles.length );
 
     // close threads
     for( zp_size_t i = 0; i < g_jobThreadHandles.length; ++i )
     {
-        GetPlatform()->CloseThread( threadHandles[ i ] );
+        Platform::CloseThread( threadHandles[ i ] );
         g_jobThreadHandles[ i ] = {};
     }
 }

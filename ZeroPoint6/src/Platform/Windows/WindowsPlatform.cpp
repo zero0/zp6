@@ -75,8 +75,6 @@ void CriticalSection::leave()
 
 namespace
 {
-    Platform s_WindowsPlatform;
-
     const char* kZeroPointClassName = "ZeroPoint::WindowClass";
 
     LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
@@ -273,22 +271,7 @@ namespace
 
 namespace zp
 {
-    const zp_char8_t Platform::PathSep = '\\';
-
-    Platform* GetPlatform()
-    {
-        return &s_WindowsPlatform;
-    }
-
-    Platform::Platform()
-    {
-        SYSTEM_INFO systemInfo;
-        ::GetSystemInfo( &systemInfo );
-
-        m_activeProcessorMask = systemInfo.dwActiveProcessorMask;
-        m_systemPageSize = systemInfo.dwPageSize;
-        m_numProcessors = systemInfo.dwNumberOfProcessors;
-    }
+    zp_char8_t Platform::PathSep = '\\';
 
     zp_handle_t Platform::OpenWindow( const OpenWindowDesc& desc )
     {
@@ -353,12 +336,32 @@ namespace zp
 
     zp_bool_t Platform::DispatchWindowMessages( zp_handle_t windowHandle, zp_int32_t& exitCode )
     {
-        zp_bool_t isRunning = true;
+        zp_bool_t isClosed = false;
 
         HWND hWnd = static_cast<HWND>( windowHandle );
 
         MSG msg {};
         while( ::PeekMessage( &msg, hWnd, 0, 0, PM_REMOVE ) )
+        {
+            ::TranslateMessage( &msg );
+            ::DispatchMessage( &msg );
+
+            if( !isClosed && msg.message == WM_CLOSE )
+            {
+                exitCode = static_cast<zp_int32_t>( msg.wParam );
+                isClosed = true;
+            }
+        }
+
+        return isClosed;
+    }
+
+    zp_bool_t Platform::DispatchMessages( zp_int32_t& exitCode )
+    {
+        zp_bool_t isRunning = true;
+
+        MSG msg {};
+        while( ::PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) )
         {
             ::TranslateMessage( &msg );
             ::DispatchMessage( &msg );
@@ -419,9 +422,12 @@ namespace zp
         ::VirtualFree( ptr, 0, MEM_RELEASE );
     }
 
-    zp_size_t Platform::GetMemoryPageSize( const zp_size_t size ) const
+    zp_size_t Platform::GetMemoryPageSize( const zp_size_t size )
     {
-        const zp_size_t systemPageSize = m_systemPageSize;
+        SYSTEM_INFO systemInfo;
+        ::GetSystemInfo(&systemInfo);
+
+        const zp_size_t systemPageSize = systemInfo.dwPageSize;
 
         const zp_size_t requestedSize = size > systemPageSize ? size : systemPageSize;
         const zp_size_t allocationInPageSize = ( requestedSize & ( systemPageSize - 1 ) ) + requestedSize;
@@ -447,7 +453,7 @@ namespace zp
         ::GetCurrentDirectory( maxPathLength, path );
     }
 
-    zp_bool_t Platform::FileExists( const char* filePath ) const
+    zp_bool_t Platform::FileExists( const char* filePath )
     {
         const DWORD attr = ::GetFileAttributes( filePath );
         const zp_bool_t exists = ( attr != INVALID_FILE_ATTRIBUTES ) && !( attr & FILE_ATTRIBUTE_DIRECTORY );
@@ -570,7 +576,7 @@ namespace zp
         ::SetFilePointerEx( fileHandle, distance, nullptr, moveMethodMapping[ moveMethod ] );
     }
 
-    zp_size_t Platform::GetFileSize( zp_handle_t fileHandle ) const
+    zp_size_t Platform::GetFileSize( zp_handle_t fileHandle )
     {
         LARGE_INTEGER fileSize;
         const BOOL ok = ::GetFileSizeEx( fileHandle, &fileSize );
@@ -666,19 +672,19 @@ namespace zp
         return threadHandle;
     }
 
-    zp_handle_t Platform::GetCurrentThread() const
+    zp_handle_t Platform::GetCurrentThread()
     {
         HANDLE threadHandle = ::GetCurrentThread();
         return static_cast<zp_handle_t>( threadHandle );
     }
 
-    zp_uint32_t Platform::GetCurrentThreadId() const
+    zp_uint32_t Platform::GetCurrentThreadId()
     {
         const DWORD threadId = ::GetCurrentThreadId();
         return static_cast<zp_uint32_t>( threadId );
     }
 
-    zp_uint32_t Platform::GetThreadId( zp_handle_t threadHandle ) const
+    zp_uint32_t Platform::GetThreadId( zp_handle_t threadHandle )
     {
         const DWORD threadId = ::GetThreadId( static_cast<HANDLE>( threadHandle ) );
         return static_cast<zp_uint32_t>( threadId );
@@ -740,10 +746,13 @@ namespace zp
 
     void Platform::SetThreadIdealProcessor( zp_handle_t threadHandle, zp_uint32_t processorIndex )
     {
-        processorIndex = zp_clamp<zp_uint32_t>( processorIndex, 0, m_numProcessors );
+        SYSTEM_INFO systemInfo;
+        ::GetSystemInfo(&systemInfo);
+
+        processorIndex = zp_clamp<zp_uint32_t>( processorIndex, 0, systemInfo.dwNumberOfProcessors);
 
         const zp_uint64_t requestedMask = 1 << processorIndex;
-        if( m_activeProcessorMask & requestedMask )
+        if( systemInfo.dwActiveProcessorMask & requestedMask )
         {
             PROCESSOR_NUMBER processorNumber {
                 .Number = static_cast<BYTE>( 0xFFu & processorIndex )
@@ -763,9 +772,11 @@ namespace zp
         ::WaitForMultipleObjects( threadHandleCount, threadHandles, true, INFINITE );
     }
 
-    zp_uint32_t Platform::GetProcessorCount() const
+    zp_uint32_t Platform::GetProcessorCount()
     {
-        return m_numProcessors;
+        SYSTEM_INFO systemInfo;
+        ::GetSystemInfo(&systemInfo);
+        return systemInfo.dwNumberOfProcessors;
     }
 
     MessageBoxResult Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton )

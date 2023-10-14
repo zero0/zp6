@@ -8,8 +8,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Macros.h"
-
-#include "Engine/JobSystem.h"
+#include "Core/Job.h"
 
 namespace zp
 {
@@ -27,7 +26,7 @@ namespace zp
         {
         };
 
-        virtual PreparedJobHandle onProcessPipeline( Engine* engine, const PreparedJobHandle& inputHandle ) = 0;
+        virtual JobHandle onProcessPipeline( Engine* engine, const JobHandle& inputHandle ) = 0;
 
     private:
     };

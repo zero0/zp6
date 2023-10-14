@@ -8,6 +8,7 @@
 #include "Core/Data.h"
 #include "Core/Job.h"
 #include "Core/Vector.h"
+#include "Core/String.h"
 #include "Platform/Platform.h"
 
 #include "Tools/ShaderCompiler.h"
@@ -78,7 +79,7 @@ constexpr int spec_to_int16( const char* spec )
 }
 
 #define _Maybenull_
-#define CROSS_PLATFORM_UUIDOF(interface, spec ) \
+#define CROSS_PLATFORM_UUIDOF( interface, spec ) \
     struct interface;                           \
     __CRT_UUID_DECL( interface,                 \
         (unsigned int)spec_to_int32(   (spec)+0),        \
@@ -99,6 +100,174 @@ constexpr int spec_to_int16( const char* spec )
 #include <dxc/dxcapi.h>
 #include <d3d12shader.h>
 
+namespace zp
+{
+    enum ShaderOutputReflectionResourceType : zp_uint8_t
+    {
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_CBUFFER,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_TBUFFER,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_TEXTURE,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_SAMPLER,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWTYPED,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_STRUCTURED,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWSTRUCTURED,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_BYTEADDRESS,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWBYTEADDRESS,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_APPEND_STRUCTURED,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_COMSUMED_STRUCTURED,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWSTRUCTURED_WITH_COUNTER,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RT_ACCELERATION_STRUCTURE,
+        ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_FEEDBACK_TEXTURE,
+    };
+
+    enum ShaderOutputReflectionDimension : zp_uint8_t
+    {
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_UNKNOWN,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_BUFFER,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE1D,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE1D_ARRAY,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2D,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2D_ARRAY,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2DMS,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2DMS_ARRAY,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE3D,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURECUBE,
+        ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURECUBE_ARRAY,
+    };
+
+    enum ShaderOutputReflectionReturnType : zp_uint8_t
+    {
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_UNKNOWN,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_UNORM,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_SNORM,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_SINT,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_UINT,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_FLOAT,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_MIXED,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_DOUBLE,
+        ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_CONTINUED,
+    };
+
+    enum ShaderOutputReflectionCBufferType : zp_uint8_t
+    {
+        ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_CBUFFER,
+        ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_TBUFFER,
+        ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_INTERFACE_POINTERS,
+        ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_RESOURCE_BIND_INFO,
+    };
+
+    enum ShaderOutputReflectionComponentType : zp_uint8_t
+    {
+        ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_UNKNOWN,
+        ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_UINT32,
+        ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_INT32,
+        ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_FLOAT32,
+    };
+
+    enum ShaderOutputReflectionInputOutputName : zp_uint8_t
+    {
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_POSITION,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_CLIP_DISTANCE,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_CULL_DISTANCE,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_RENDER_TARGET_ARRAY_INDEX,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_VIEWPORT_ARRAY_INDEX,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_VERTEX_ID,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_PRIMITIVE_ID,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_INSTANCE_ID,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_IS_FRONT_FACE,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_SAMPLE_INDEX,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_BARYCENTRICS,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_SHADING_RATE,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_CULL_PRIMITIVE,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_TARGET,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_COVERAGE,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH_GREATER_EQUAL,
+        ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH_LESS_EQUAL,
+    };
+
+    enum ShaderOutputReflectionMask : zp_uint8_t
+    {
+        // @formatter:off
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_NONE = 0,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_X = 1 << 0,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_Y = 1 << 1,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_Z = 1 << 2,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_W = 1 << 3,
+
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XY =   ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_Y,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XYZ =  ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_Y | ZP_SHADER_OUTPUT_REFLECTION_MASK_Z,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XYZW = ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_Y | ZP_SHADER_OUTPUT_REFLECTION_MASK_Z | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XZ =  ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_Z,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XW =  ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XYW = ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_Y | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_XZW = ZP_SHADER_OUTPUT_REFLECTION_MASK_X | ZP_SHADER_OUTPUT_REFLECTION_MASK_Z | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_YZ =  ZP_SHADER_OUTPUT_REFLECTION_MASK_Y | ZP_SHADER_OUTPUT_REFLECTION_MASK_Z,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_YW =  ZP_SHADER_OUTPUT_REFLECTION_MASK_Y | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_YZW = ZP_SHADER_OUTPUT_REFLECTION_MASK_Y | ZP_SHADER_OUTPUT_REFLECTION_MASK_Z | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_ZW =  ZP_SHADER_OUTPUT_REFLECTION_MASK_Z | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
+
+        ZP_SHADER_OUTPUT_REFLECTION_MASK_ALL = 0xFF,
+        // @formatter:on
+    };
+
+    struct ShaderOutputReflectionHeader
+    {
+        zp_uint8_t resourceCount;
+        zp_uint8_t elementCount;
+        zp_uint8_t inputCount;
+        zp_uint8_t outputCount;
+    };
+
+    struct ShaderOutputReflectionResource
+    {
+        FixedString<32> name;
+
+        ShaderOutputReflectionResourceType type;
+        ShaderOutputReflectionDimension dimension;
+        ShaderOutputReflectionReturnType returnType;
+        zp_uint8_t bindIndex;
+
+        zp_uint8_t bindCount;
+        zp_uint8_t numSamples;
+        zp_uint8_t space;
+        zp_uint8_t flags;
+
+        zp_uint32_t size;
+    };
+
+    struct ShaderOutputReflectionElement
+    {
+        FixedString<32> name;
+        zp_uint32_t startOffset;
+        zp_uint32_t size;
+        zp_uint32_t resourceIndex;
+
+        zp_uint8_t textureIndex;
+        zp_uint8_t textureCount;
+        zp_uint8_t samplerIndex;
+        zp_uint8_t samplerCount;
+    };
+
+    struct ShaderOutputReflectionInputOutput
+    {
+        FixedString<32> name;
+        ShaderOutputReflectionInputOutputName type;
+        zp_uint8_t semanticIndex;
+        zp_uint8_t registerIndex;
+        ShaderOutputReflectionComponentType componentType;
+
+        zp_uint8_t stream;
+        ShaderOutputReflectionMask mask;
+        ShaderOutputReflectionMask readWriteMask;
+        zp_uint8_t flags;
+    };
+}
+
 #define HR( r )     do { hr = (r); ZP_ASSERT_MSG( SUCCEEDED(hr), #r ); } while( false )
 
 namespace
@@ -115,12 +284,67 @@ namespace
         {
         }
 
+        explicit Ptr( T* t )
+            : ptr( t )
+        {
+            if( ptr )
+            {
+                ptr->AddRef();
+            }
+        }
+
+        Ptr( const Ptr& other )
+            : ptr( other.ptr )
+        {
+            if( ptr )
+            {
+                ptr->AddRef();
+            }
+        }
+
+        Ptr( Ptr&& other ) noexcept
+            : ptr( other.ptr )
+        {
+            if( ptr )
+            {
+                ptr->Acquire();
+            }
+
+            if( other.ptr )
+            {
+                other.ptr->Release();
+                other.ptr = nullptr;
+            }
+        }
+
         ~Ptr()
         {
             if( ptr )
             {
                 ptr->Release();
+                ptr = nullptr;
             }
+        }
+
+        Ptr& operator=( const Ptr& other )
+        {
+            if( ptr != other.ptr )
+            {
+                if( ptr )
+                {
+                    ptr->Release();
+                    ptr = nullptr;
+                }
+
+                ptr = other.ptr;
+
+                if( ptr )
+                {
+                    ptr->AddRef();
+                }
+            }
+
+            return *this;
         }
 
         ZP_FORCEINLINE T* operator->()
@@ -151,7 +375,7 @@ namespace
 
     enum ShaderProgramSupportedType
     {
-        SHADER_PROGRAM_SUPPORTED_TYPE_NONE = 0,
+        SHADER_PROGRAM_SUPPORTED_TYPE_NONE = 0u,
         SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX = 1 << SHADER_PROGRAM_TYPE_VERTEX,
         SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT = 1 << SHADER_PROGRAM_TYPE_FRAGMENT,
         SHADER_PROGRAM_SUPPORTED_TYPE_GEOMETRY = 1 << SHADER_PROGRAM_TYPE_GEOMETRY,
@@ -161,18 +385,19 @@ namespace
         SHADER_PROGRAM_SUPPORTED_TYPE_TASK = 1 << SHADER_PROGRAM_TYPE_TASK,
         SHADER_PROGRAM_SUPPORTED_TYPE_MESH = 1 << SHADER_PROGRAM_TYPE_MESH,
         SHADER_PROGRAM_SUPPORTED_TYPE_COMPUTE = 1 << SHADER_PROGRAM_TYPE_COMPUTE,
+        SHADER_PROGRAM_SUPPORTED_TYPE_ALL = ~0u
     };
 
-    LPCWSTR kShaderTypes[] {
-        L"vs",
-        L"ps",
-        L"gs",
-        L"ts",
-        L"hs",
-        L"ds",
-        L"as",
-        L"ms",
-        L"cs",
+    const char* kShaderTypes[] {
+        "vs",
+        "ps",
+        "gs",
+        "ts",
+        "hs",
+        "ds",
+        "as",
+        "ms",
+        "cs",
     };
     ZP_STATIC_ASSERT( ShaderProgramType_Count == ZP_ARRAY_SIZE( kShaderTypes ) );
 
@@ -226,14 +451,39 @@ namespace
 
     enum
     {
-        kEntryPointSize = 128
+        kEntryPointSize = 128,
+        kMaxShaderFeaturesPerProgram = 8,
+    };
+
+    struct ShaderFeature
+    {
+        FixedArray<zp_size_t, kMaxShaderFeaturesPerProgram> shaderFeatures;
+        zp_hash64_t shaderFeatureHash;
+        zp_size_t shaderFeatureCount;
+        zp_uint32_t shaderProgramSupportedType;
     };
 
     struct ShaderTaskData
     {
-        Memory shaderSource;
+    public:
+        explicit ShaderTaskData( MemoryLabel memoryLabel )
+            : shaderSource()
+            , entryPoints()
+            , allShaderFeatures( 64, memoryLabel )
+            , shaderFeatures( 64, memoryLabel )
+            , invalidShaderFeatures( 8, memoryLabel )
+            , memoryLabel( memoryLabel )
+        {
+        }
+
+        AllocString shaderSource;
 
         FixedString<kEntryPointSize> entryPoints[ShaderProgramType_Count];
+
+        Vector<String> allShaderFeatures;
+
+        Vector<ShaderFeature> shaderFeatures;
+        Vector<ShaderFeature> invalidShaderFeatures;
 
         zp_uint32_t shaderCompilerSupportedTypes;
         ShaderModelType shaderModel;
@@ -242,6 +492,9 @@ namespace
         ShaderOutput shaderOutput;
 
         ZP_BOOL32( debug );
+
+    public:
+        const MemoryLabel memoryLabel;
     };
 
     const char* kShaderEntryName[] {
@@ -260,6 +513,11 @@ namespace
     class LocalMalloc : public IMalloc
     {
     public:
+        LocalMalloc()
+            : memoryLabel( 0 )
+        {
+        };
+
         explicit LocalMalloc( zp::MemoryLabel memoryLabel )
             : memoryLabel( memoryLabel )
         {
@@ -311,8 +569,158 @@ namespace
         }
 
     public:
-        const zp::MemoryLabel memoryLabel;
+        zp::MemoryLabel memoryLabel;
     };
+
+    wchar_t* ConvertStrToWide( wchar_t*& buffer, const char* str )
+    {
+        int len = ::MultiByteToWideChar( CP_UTF8, 0, str, -1, nullptr, 0 );
+        ::MultiByteToWideChar( CP_UTF8, 0, str, -1, buffer, len );
+        buffer[ len ] = '\0';
+
+        wchar_t* const wideStr = buffer;
+        buffer += len + 1;
+
+        return wideStr;
+    }
+
+    wchar_t* ConvertStrToWide( wchar_t*& buffer, const char* str, zp_size_t length )
+    {
+        int len = ::MultiByteToWideChar( CP_UTF8, 0, str, (int)length, nullptr, 0 );
+        ::MultiByteToWideChar( CP_UTF8, 0, str, (int)length, buffer, len );
+        buffer[ len ] = '\0';
+
+        wchar_t* const wideStr = buffer;
+        buffer += len + 1;
+
+        return wideStr;
+    }
+
+    wchar_t* ConvertStrToWide( wchar_t*& buffer, const String& str )
+    {
+        return ConvertStrToWide( buffer, str.c_str(), str.length );
+    }
+
+    //
+    //
+    //
+
+    constexpr ShaderOutputReflectionResourceType Convert( D3D_SHADER_INPUT_TYPE value )
+    {
+        constexpr ShaderOutputReflectionResourceType typeMap[] = {
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_CBUFFER,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_TBUFFER,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_TEXTURE,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_SAMPLER,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWTYPED,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_STRUCTURED,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWSTRUCTURED,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_BYTEADDRESS,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWBYTEADDRESS,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_APPEND_STRUCTURED,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_COMSUMED_STRUCTURED,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RWSTRUCTURED_WITH_COUNTER,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_RT_ACCELERATION_STRUCTURE,
+            ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_FEEDBACK_TEXTURE,
+        };
+        return typeMap[ value ];
+    }
+
+    constexpr ShaderOutputReflectionDimension Convert( D3D_SRV_DIMENSION value )
+    {
+        constexpr ShaderOutputReflectionDimension typeMap[] = {
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_UNKNOWN,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_BUFFER,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE1D,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE1D_ARRAY,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2D,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2D_ARRAY,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2DMS,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE2DMS_ARRAY,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURE3D,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURECUBE,
+            ZP_SHADER_OUTPUT_REFLECTION_DIMENSION_TEXTURECUBE_ARRAY,
+        };
+        return typeMap[ value ];
+    }
+
+    constexpr ShaderOutputReflectionReturnType Convert( D3D_RESOURCE_RETURN_TYPE value )
+    {
+        constexpr ShaderOutputReflectionReturnType typeMap[] = {
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_UNKNOWN,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_UNORM,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_SNORM,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_SINT,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_UINT,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_FLOAT,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_MIXED,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_DOUBLE,
+            ZP_SHADER_OUTPUT_REFLECTION_RETURN_TYPE_CONTINUED,
+        };
+        return typeMap[ value ];
+    }
+
+    constexpr ShaderOutputReflectionCBufferType Convert( D3D_CBUFFER_TYPE value )
+    {
+        constexpr ShaderOutputReflectionCBufferType typeMap[] = {
+            ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_CBUFFER,
+            ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_TBUFFER,
+            ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_INTERFACE_POINTERS,
+            ZP_SHADER_OUTPUT_REFLECTION_CBUFFER_TYPE_RESOURCE_BIND_INFO,
+        };
+        return typeMap[ value ];
+    }
+
+    constexpr ShaderOutputReflectionComponentType Convert( D3D_REGISTER_COMPONENT_TYPE value )
+    {
+        ShaderOutputReflectionComponentType typeMap[] = {
+            ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_UNKNOWN,
+            ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_UINT32,
+            ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_INT32,
+            ZP_SHADER_OUTPUT_REFLECTION_COMPONENT_TYPE_FLOAT32,
+        };
+        return typeMap[ value ];
+    }
+
+    constexpr ShaderOutputReflectionInputOutputName Convert( D3D_NAME value )
+    {
+        // @formatter:off
+        switch(value)
+        {
+            case D3D_NAME_UNDEFINED:                            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_POSITION:                             return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_POSITION;
+            case D3D_NAME_CLIP_DISTANCE:                        return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_CLIP_DISTANCE;
+            case D3D_NAME_CULL_DISTANCE:                        return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_CULL_DISTANCE;
+            case D3D_NAME_RENDER_TARGET_ARRAY_INDEX:            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_RENDER_TARGET_ARRAY_INDEX;
+            case D3D_NAME_VIEWPORT_ARRAY_INDEX:                 return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_VIEWPORT_ARRAY_INDEX;
+            case D3D_NAME_VERTEX_ID:                            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_VERTEX_ID;
+            case D3D_NAME_PRIMITIVE_ID:                         return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_PRIMITIVE_ID;
+            case D3D_NAME_INSTANCE_ID:                          return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_INSTANCE_ID;
+            case D3D_NAME_IS_FRONT_FACE:                        return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_IS_FRONT_FACE;
+            case D3D_NAME_SAMPLE_INDEX:                         return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_SAMPLE_INDEX;
+            case D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR:           return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_FINAL_QUAD_INSIDE_TESSFACTOR:         return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR:            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_FINAL_TRI_INSIDE_TESSFACTOR:          return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR:         return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR:        return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+            case D3D_NAME_BARYCENTRICS:                         return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_BARYCENTRICS;
+            case D3D_NAME_SHADINGRATE:                          return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_SHADING_RATE;
+            case D3D_NAME_CULLPRIMITIVE:                        return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_CULL_PRIMITIVE;
+            case D3D_NAME_TARGET:                               return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_TARGET;
+            case D3D_NAME_DEPTH:                                return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH;
+            case D3D_NAME_COVERAGE:                             return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_COVERAGE;
+            case D3D_NAME_DEPTH_GREATER_EQUAL:                  return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH_GREATER_EQUAL;
+            case D3D_NAME_DEPTH_LESS_EQUAL:                     return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH_LESS_EQUAL;
+            default:                                            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
+        }
+        // @formatter:on
+    }
+
+    constexpr ShaderOutputReflectionMask Convert( BYTE mask )
+    {
+        return ShaderOutputReflectionMask( mask );
+    }
 
     //
     //
@@ -322,6 +730,877 @@ namespace
     {
 
     }
+
+    struct CompileJob
+    {
+        AssetCompilerTask* task;
+        ShaderProgramType shaderProgram;
+        ShaderFeature shaderFeature;
+        FixedString<kEntryPointSize> entryPoint;
+
+        zp_int32_t result;
+        zp_hash128_t resultShaderHash;
+    };
+
+    struct DxcCompilerThreadData
+    {
+        IDxcUtils* utils;
+        IDxcIncludeHandler* includeHandler;
+        IDxcCompiler3* compiler;
+        LocalMalloc malloc;
+    };
+
+    thread_local DxcCompilerThreadData t_dxc {};
+
+    void CompileShaderDXC( const JobHandle& parentJob, CompileJob* compilerJobData )
+    {
+        AssetCompilerTask* task = compilerJobData->task;
+
+        HRESULT hr;
+        const zp_uint32_t currentThreadId = zp_current_thread_id();
+
+        zp_bool_t debugDisplay = true;
+
+        if( t_dxc.utils == nullptr )
+        {
+            zp_printfln( "[%8d] Create DXC", currentThreadId );
+
+            t_dxc.malloc.memoryLabel = task->memoryLabel;
+
+            HR( DxcCreateInstance2( &t_dxc.malloc, CLSID_DxcUtils, IID_PPV_ARGS( &t_dxc.utils ) ) );
+
+            HR( t_dxc.utils->CreateDefaultIncludeHandler( &t_dxc.includeHandler ) );
+
+            HR( DxcCreateInstance2( &t_dxc.malloc, CLSID_DxcCompiler, IID_PPV_ARGS( &t_dxc.compiler ) ) );
+        }
+
+        Ptr<IDxcUtils> utils( t_dxc.utils );
+        Ptr<IDxcIncludeHandler> includeHandler( t_dxc.includeHandler );
+        Ptr<IDxcCompiler3> compiler( t_dxc.compiler );
+
+        ShaderTaskData* data = task->taskMemory.as<ShaderTaskData>();
+
+        Ptr<IDxcBlobEncoding> shaderSourceBlob;
+        HR( utils->CreateBlob( data->shaderSource.c_str(), data->shaderSource.length(), DXC_CP_UTF8, &shaderSourceBlob.ptr ) );
+
+        Ptr<IDxcBlobUtf8> shaderSourceUtf8Blob;
+        HR( utils->GetBlobAsUtf8( shaderSourceBlob.ptr, &shaderSourceUtf8Blob.ptr ) );
+
+        DxcBuffer sourceCode {
+            .Ptr = shaderSourceUtf8Blob->GetBufferPointer(),
+            .Size = shaderSourceUtf8Blob->GetBufferSize(),
+            .Encoding = DXC_CP_UTF8,
+        };
+
+        //const AllocString srcFile = task->srcFile;
+        //const AllocString dstFile = task->dstFile;
+
+        const ShaderModel sm = kShaderModelTypes[ data->shaderModel ];
+
+        wchar_t strBuffer[4 KB];
+        wchar_t* strBufferPtr = strBuffer;
+
+        char targetBuffer[8];
+        zp_snprintf( targetBuffer, "%s_%d_%d", kShaderTypes[ compilerJobData->shaderProgram ], sm.major, sm.minor );
+
+        wchar_t* targetProfile = ConvertStrToWide( strBufferPtr, targetBuffer );
+
+        Vector<LPCWSTR> arguments( 24, task->memoryLabel );
+        if( data->debug )
+        {
+            arguments.pushBack( DXC_ARG_DEBUG );
+            arguments.pushBack( DXC_ARG_SKIP_OPTIMIZATIONS );
+        }
+        else
+        {
+            arguments.pushBack( DXC_ARG_OPTIMIZATION_LEVEL3 );
+            arguments.pushBack( L"-Qstrip_debug" );
+        }
+
+        arguments.pushBack( DXC_ARG_WARNINGS_ARE_ERRORS );
+
+        //arguments.pushBack( L"-remove-unused-functions" );
+        //arguments.pushBack( L"-remove-unused-globals" );
+        //arguments.pushBack( L"-keep-user-macro" );
+        //arguments.pushBack( L"-line-directive" );
+
+        arguments.pushBack( DXC_ARG_DEBUG_NAME_FOR_SOURCE );
+
+        //arguments.pushBack( L"-P" );
+
+        arguments.pushBack( L"-ftime-report" );
+        arguments.pushBack( L"-ftime-trace" );
+
+        arguments.pushBack( L"-Qstrip_debug" );
+        //arguments.pushBack( L"-Qstrip_priv" );
+        //arguments.pushBack( L"-Qstrip_reflect" );
+        //arguments.pushBack( L"-Qstrip_rootsignature" );
+
+        arguments.pushBack( L"-I" );
+        arguments.pushBack( L"Assets/ShaderLibrary/" );
+
+        switch( data->shaderOutput )
+        {
+            case SHADER_OUTPUT_DXIL:
+                break;
+
+            case SHADER_OUTPUT_SPIRV:
+                arguments.pushBack( L"-spirv" );
+                arguments.pushBack( L"-fspv-entrypoint-name=main" );
+                arguments.pushBack( L"-fspv-reflect" );
+                arguments.pushBack( L"-fvk-use-dx-position-w" );
+                break;
+        }
+
+        const wchar_t* oneStr = L"1";
+
+        Vector<DxcDefine> defines( 16, data->memoryLabel );
+
+        // add shader API define
+        switch( data->shaderAPI )
+        {
+            case SHADER_API_D3D:
+                defines.pushBack( { .Name = L"SHADER_API_D3D", .Value = oneStr } );
+                break;
+            case SHADER_API_VULKAN:
+                defines.pushBack( { .Name = L"SHADER_API_VULKAN", .Value = oneStr } );
+                break;
+        }
+
+        // add feature defines
+        for( zp_size_t i = 0; i < compilerJobData->shaderFeature.shaderFeatureCount; ++i )
+        {
+            const zp_size_t featureIndex = compilerJobData->shaderFeature.shaderFeatures[ i ];
+            if( featureIndex > 0 )
+            {
+                const String& featureDefine = data->allShaderFeatures[ featureIndex ];
+
+                defines.pushBack( {
+                    .Name = ConvertStrToWide( strBufferPtr, featureDefine ),
+                    .Value = oneStr
+                } );
+            }
+        }
+
+        // add debug define
+        if( data->debug )
+        {
+            defines.pushBack( { .Name= L"DEBUG", .Value = oneStr } );
+        }
+
+        Ptr<IDxcResult> result;
+
+        {
+            auto srcFileName = ConvertStrToWide( strBufferPtr, task->srcFile.c_str() );
+            auto entryPointName = ConvertStrToWide( strBufferPtr, compilerJobData->entryPoint.c_str() );
+
+            Ptr<IDxcCompilerArgs> args;
+            utils->BuildArguments( srcFileName, entryPointName, targetProfile, arguments.begin(), arguments.size(), defines.begin(), defines.size(), &args.ptr );
+
+            if( debugDisplay )
+            {
+                MutableFixedString<2 KB> argsBuffer;
+                auto f = args->GetArguments();
+
+                argsBuffer.appendFormat( "[%8d] Args: ", currentThreadId );
+
+                argsBuffer.append( '"' );
+                argsBuffer.appendFormat( "%ls", f[ 0 ] );
+                for( zp_size_t i = 1; i < args->GetCount(); ++i )
+                {
+                    argsBuffer.appendFormat( " %ls", f[ i ] );
+                }
+                argsBuffer.append( '"' );
+
+                zp_printfln( argsBuffer.c_str() );
+            }
+
+            zp_printfln( "[%8d] Compile DXC...", currentThreadId );
+
+            // compile
+            HR( compiler->Compile( &sourceCode, args->GetArguments(), args->GetCount(), includeHandler.ptr, IID_PPV_ARGS( &result.ptr ) ) );
+        }
+
+        compilerJobData->result = 0;
+
+        // check status
+        HRESULT status;
+        HR( result->GetStatus( &status ) );
+
+        if( SUCCEEDED( status ) )
+        {
+            zp_printfln( "[%8d] ...Success", currentThreadId );
+
+            compilerJobData->result = 1;
+
+            // errors
+            if( result->HasOutput( DXC_OUT_ERRORS ) )
+            {
+                Ptr<IDxcBlobUtf8> errorMsgs;
+                HR( result->GetOutput( DXC_OUT_ERRORS, IID_PPV_ARGS( &errorMsgs.ptr ), nullptr ) );
+
+                if( errorMsgs.ptr && errorMsgs->GetStringLength() )
+                {
+                    zp_printfln( "[ERROR] " " %s", errorMsgs->GetStringPointer() );
+                }
+            }
+
+            // time report
+            if( result->HasOutput( DXC_OUT_TIME_REPORT ) )
+            {
+                Ptr<IDxcBlobUtf8> timeReport;
+                HR( result->GetOutput( DXC_OUT_TIME_REPORT, IID_PPV_ARGS( &timeReport.ptr ), nullptr ) );
+
+                if( timeReport.ptr && timeReport->GetStringLength() )
+                {
+                    zp_printfln( "[REPORT]  " " %s", timeReport->GetStringPointer() );
+                }
+            }
+
+            // time trace
+            if( result->HasOutput( DXC_OUT_TIME_TRACE ) )
+            {
+                Ptr<IDxcBlobUtf8> timeTrace;
+                HR( result->GetOutput( DXC_OUT_TIME_TRACE, IID_PPV_ARGS( &timeTrace.ptr ), nullptr ) );
+
+                if( timeTrace.ptr && timeTrace->GetStringLength() )
+                {
+                    zp_printfln( "[TRACE]  " " %s", timeTrace->GetStringPointer() );
+                }
+            }
+
+            // text
+            if( result->HasOutput( DXC_OUT_TEXT ) )
+            {
+                Ptr<IDxcBlobUtf8> text;
+                HR( result->GetOutput( DXC_OUT_TEXT, IID_PPV_ARGS( &text.ptr ), nullptr ) );
+
+                if( text.ptr && text->GetStringLength() )
+                {
+                    zp_printfln( "[TEXT] " " %s", text->GetStringPointer() );
+                }
+            }
+
+            // remarks
+            if( result->HasOutput( DXC_OUT_REMARKS ) )
+            {
+                Ptr<IDxcBlobUtf8> remarks;
+                HR( result->GetOutput( DXC_OUT_REMARKS, IID_PPV_ARGS( &remarks.ptr ), nullptr ) );
+
+                if( remarks.ptr && remarks->GetStringLength() )
+                {
+                    zp_printfln( "[REMARKS] " " %s", remarks->GetStringPointer() );
+                }
+            }
+
+            // root signature
+            if( result->HasOutput( DXC_OUT_ROOT_SIGNATURE ) )
+            {
+                Ptr<IDxcBlobUtf8> rootSignature;
+                HR( result->GetOutput( DXC_OUT_ROOT_SIGNATURE, IID_PPV_ARGS( &rootSignature.ptr ), nullptr ) );
+
+                if( rootSignature.ptr && rootSignature->GetBufferSize() )
+                {
+                    zp_printfln( "[ROOTSIG] " " '%s'", rootSignature->GetStringPointer() );
+                }
+            }
+
+            // hlsl
+            if( result->HasOutput( DXC_OUT_HLSL ) )
+            {
+                Ptr<IDxcBlobUtf8> hlsl;
+                HR( result->GetOutput( DXC_OUT_HLSL, IID_PPV_ARGS( &hlsl.ptr ), nullptr ) );
+
+                if( hlsl.ptr && hlsl->GetStringLength() )
+                {
+                    zp_printfln( "[HSLS] " " %s", hlsl->GetStringPointer() );
+                }
+            }
+
+            // disassembly
+            if( result->HasOutput( DXC_OUT_DISASSEMBLY ) )
+            {
+                Ptr<IDxcBlobUtf8> disassembly;
+                HR( result->GetOutput( DXC_OUT_DISASSEMBLY, IID_PPV_ARGS( &disassembly.ptr ), nullptr ) );
+
+                if( disassembly.ptr && disassembly->GetStringLength() )
+                {
+                    zp_printfln( "[DISASSEMBLY] " " %s", disassembly->GetStringPointer() );
+                }
+            }
+
+            // disassembly
+            if( result->HasOutput( DXC_OUT_EXTRA_OUTPUTS ) )
+            {
+                Ptr<IDxcExtraOutputs> extraOutput;
+                HR( result->GetOutput( DXC_OUT_EXTRA_OUTPUTS, IID_PPV_ARGS( &extraOutput.ptr ), nullptr ) );
+
+                if( extraOutput.ptr && extraOutput->GetOutputCount() )
+                {
+                    zp_printfln( "[EXTRA] " " %d", extraOutput->GetOutputCount() );
+                }
+            }
+
+            //
+            //
+            //
+
+            struct ShaderOutputHeader
+            {
+                zp_uint32_t id;
+                zp_uint32_t shaderFeatureCount;
+                zp_hash64_t shaderFeatureHash;
+                zp_uint64_t pdbOffset;
+                zp_uint64_t reflectionOffset;
+                zp_uint64_t shaderDataOffset;
+                zp_hash128_t hash;
+            };
+
+            struct ShaderOutputShaderFeature
+            {
+                FixedString<32> name;
+            };
+
+            struct ShaderOutputPDBHeader
+            {
+                FixedString<64> filePath;
+                zp_uint64_t size;
+            };
+
+            ShaderOutputHeader shaderOutputHeader {
+                .id = zp_make_cc4( "ZPSH" ),
+                .shaderFeatureCount = zp_uint32_t( compilerJobData->shaderFeature.shaderFeatureCount ),
+                .shaderFeatureHash = compilerJobData->shaderFeature.shaderFeatureHash,
+                .pdbOffset = 0,
+                .reflectionOffset = 0,
+                .shaderDataOffset = 0,
+                .hash = {}
+            };
+
+            compilerJobData->resultShaderHash = {};
+
+            DataStreamWriter shaderStream( data->memoryLabel, 4 KB );
+            shaderStream.write( shaderOutputHeader );
+
+            // write features
+            for( zp_size_t i = 0; i < compilerJobData->shaderFeature.shaderFeatureCount; ++i )
+            {
+                const zp_size_t featureIndex = compilerJobData->shaderFeature.shaderFeatures[ i ];
+                if( featureIndex > 0 )
+                {
+                    const String& featureDefine = data->allShaderFeatures[ featureIndex ];
+
+                    ShaderOutputShaderFeature shaderFeature {
+                        .name = FixedString<32>( featureDefine.c_str(), featureDefine.length )
+                    };
+
+                    shaderStream.write( shaderFeature );
+                }
+            }
+
+            // pdb file and path
+            if( result->HasOutput( DXC_OUT_PDB ) )
+            {
+                Ptr<IDxcBlob> pdbData;
+                Ptr<IDxcBlobUtf16> pdbPathFromCompiler;
+                HR( result->GetOutput( DXC_OUT_PDB, IID_PPV_ARGS( &pdbData.ptr ), &pdbPathFromCompiler.ptr ) );
+
+                if( pdbData.ptr && pdbData->GetBufferSize() )
+                {
+                    char pdbFilePath[64];
+                    int pathLength = ::WideCharToMultiByte( CP_UTF8, 0, pdbPathFromCompiler->GetStringPointer(), -1, pdbFilePath, ZP_ARRAY_SIZE( pdbFilePath ), nullptr, nullptr );
+
+                    ShaderOutputPDBHeader pdbHeader {
+                        .filePath = FixedString<64>( pdbFilePath ),
+                        .size = pdbData->GetBufferSize()
+                    };
+
+                    shaderOutputHeader.pdbOffset = shaderStream.position();
+                    shaderStream.write( pdbHeader );
+                    shaderStream.write( pdbData->GetBufferPointer(), pdbData->GetBufferSize() );
+                    shaderStream.writeAlignment( 16 );
+
+
+                    //zp_handle_t pdbFileHandle = Platform::OpenFileHandle( pdbFilePath, ZP_OPEN_FILE_MODE_WRITE );
+                    //Platform::WriteFile( pdbFileHandle, pdbData->GetBufferPointer(), pdbData->GetBufferSize() );
+                    //Platform::CloseFileHandle( pdbFileHandle );
+
+                    zp_printfln( "[PDB]  " " %s", pdbFilePath );
+                }
+            }
+
+            // reflection
+            if( result->HasOutput( DXC_OUT_REFLECTION ) )
+            {
+                Ptr<IDxcBlob> reflection;
+                HR( result->GetOutput( DXC_OUT_REFLECTION, IID_PPV_ARGS( &reflection.ptr ), nullptr ) );
+
+                zp_printfln( "[REFLECTION]  " " " );
+
+                if( reflection.ptr )
+                {
+                    MutableFixedString<2 KB> info;
+
+                    // save to file also
+                    DxcBuffer reflectionData {
+                        .Ptr = reflection->GetBufferPointer(),
+                        .Size = reflection->GetBufferSize(),
+                        .Encoding = DXC_CP_ACP
+                    };
+
+                    Ptr<ID3D12ShaderReflection> shaderReflection;
+                    HR( utils->CreateReflection( &reflectionData, IID_PPV_ARGS( &shaderReflection.ptr ) ) );
+
+                    if( shaderReflection.ptr )
+                    {
+#define INFO_D( d, n ) "%s: %d ", #n, d.n
+#define INFO_S( d, n ) "%s: %s ", #n, d.n
+#define INFO_X( d, n ) "%s: %02x ", #n, d.n
+
+                        D3D12_SHADER_DESC shaderDesc;
+                        HR( shaderReflection->GetDesc( &shaderDesc ) );
+
+                        Vector<zp_hash64_t> resourceNameHashes( shaderDesc.BoundResources, data->memoryLabel );
+                        Vector<ShaderOutputReflectionResource> resources( shaderDesc.BoundResources, data->memoryLabel );
+                        Vector<ShaderOutputReflectionElement> elements( shaderDesc.BoundResources, data->memoryLabel );
+                        Vector<ShaderOutputReflectionInputOutput> inputs( shaderDesc.InputParameters, data->memoryLabel );
+                        Vector<ShaderOutputReflectionInputOutput> outputs( shaderDesc.OutputParameters, data->memoryLabel );
+
+                        zp_printfln( "Bound Resources: %d ", shaderDesc.BoundResources );
+                        for( zp_uint32_t i = 0; i < shaderDesc.BoundResources; ++i )
+                        {
+                            D3D12_SHADER_INPUT_BIND_DESC inputBindDesc;
+                            HR( shaderReflection->GetResourceBindingDesc( i, &inputBindDesc ) );
+
+                            ShaderOutputReflectionResource resource {
+                                .name = FixedString<32>( inputBindDesc.Name ),
+                                .type = Convert( inputBindDesc.Type ),
+                                .dimension = Convert( inputBindDesc.Dimension ),
+                                .returnType = Convert( inputBindDesc.ReturnType ),
+                                .bindIndex = zp_uint8_t( inputBindDesc.BindPoint ),
+                                .bindCount = zp_uint8_t( inputBindDesc.BindCount ),
+                                .numSamples = zp_uint8_t( inputBindDesc.NumSamples ),
+                                .space = zp_uint8_t( inputBindDesc.Space ),
+                                .flags = zp_uint8_t( 0 ),
+                                .size = 0
+                            };
+
+                            resources.pushBack( resource );
+                            resourceNameHashes.pushBack( zp_fnv64_1a( resource.name.str(), resource.name.length() ) );
+
+                            if( debugDisplay )
+                            {
+                                info.clear();
+                                info.append( "  " );
+                                info.appendFormat( INFO_S( inputBindDesc, Name ) );
+                                info.appendFormat( INFO_D( inputBindDesc, Type ) );
+                                info.appendFormat( INFO_D( inputBindDesc, BindPoint ) );
+                                info.appendFormat( INFO_D( inputBindDesc, BindCount ) );
+                                info.appendFormat( INFO_X( inputBindDesc, uFlags ) );
+                                info.appendFormat( INFO_D( inputBindDesc, ReturnType ) );
+                                info.appendFormat( INFO_D( inputBindDesc, Dimension ) );
+                                info.appendFormat( INFO_D( inputBindDesc, NumSamples ) );
+                                info.appendFormat( INFO_D( inputBindDesc, Space ) );
+                                info.appendFormat( INFO_D( inputBindDesc, uID ) );
+
+                                zp_printfln( info.c_str() );
+                            }
+                        }
+
+                        zp_printfln( "Constant Buffers: %d ", shaderDesc.ConstantBuffers );
+                        for( zp_uint32_t i = 0; i < shaderDesc.ConstantBuffers; ++i )
+                        {
+                            auto cb = shaderReflection->GetConstantBufferByIndex( i );
+
+                            D3D12_SHADER_BUFFER_DESC cbDesc;
+                            cb->GetDesc( &cbDesc );
+
+                            FixedString<32> cbName( cbDesc.Name );
+                            const zp_hash64_t cbNameHash = zp_fnv64_1a( cbName.str(), cbName.length() );
+
+                            const zp_size_t resourceIndex = resourceNameHashes.indexOf( cbNameHash );
+                            ZP_ASSERT( resourceIndex != ZP_NPOS );
+
+                            // adjust cbuffer resource size
+                            resources[ resourceIndex ].size = cbDesc.Size;
+
+                            if( debugDisplay )
+                            {
+                                info.clear();
+                                info.append( "  " );
+                                info.appendFormat( INFO_S( cbDesc, Name ) );
+                                info.appendFormat( INFO_D( cbDesc, Type ) );
+                                info.appendFormat( INFO_D( cbDesc, Variables ) );
+                                info.appendFormat( INFO_D( cbDesc, Size ) );
+                                info.appendFormat( INFO_X( cbDesc, uFlags ) );
+
+                                zp_printfln( info.c_str() );
+                            }
+
+                            for( zp_size_t v = 0; v < cbDesc.Variables; ++v )
+                            {
+                                auto variable = cb->GetVariableByIndex( v );
+
+                                D3D12_SHADER_VARIABLE_DESC vDesc;
+                                variable->GetDesc( &vDesc );
+
+                                ShaderOutputReflectionElement element {
+                                    .name = FixedString<32>( vDesc.Name ),
+                                    .startOffset = vDesc.StartOffset,
+                                    .size = vDesc.Size,
+                                    .resourceIndex = zp_uint32_t( resourceIndex ),
+                                    .textureIndex = zp_uint8_t( vDesc.StartTexture ),
+                                    .textureCount = zp_uint8_t( vDesc.TextureSize ),
+                                    .samplerIndex = zp_uint8_t( vDesc.StartSampler ),
+                                    .samplerCount = zp_uint8_t( vDesc.SamplerSize ),
+                                };
+
+                                elements.pushBack( element );
+
+                                if( debugDisplay )
+                                {
+                                    info.clear();
+                                    info.append( "    " );
+                                    info.appendFormat( INFO_S( vDesc, Name ) );
+                                    info.appendFormat( INFO_D( vDesc, StartOffset ) );
+                                    info.appendFormat( INFO_D( vDesc, Size ) );
+                                    info.appendFormat( INFO_X( vDesc, uFlags ) );
+                                    info.appendFormat( INFO_D( vDesc, DefaultValue ) );
+                                    info.appendFormat( INFO_D( vDesc, StartTexture ) );
+                                    info.appendFormat( INFO_D( vDesc, TextureSize ) );
+                                    info.appendFormat( INFO_D( vDesc, StartSampler ) );
+                                    info.appendFormat( INFO_D( vDesc, SamplerSize ) );
+
+                                    zp_printfln( info.c_str() );
+                                }
+                            }
+                        }
+
+                        zp_printfln( "Input Parameters: %d ", shaderDesc.InputParameters );
+                        for( zp_uint32_t i = 0; i < shaderDesc.InputParameters; ++i )
+                        {
+                            D3D12_SIGNATURE_PARAMETER_DESC parameterDesc;
+                            HR( shaderReflection->GetInputParameterDesc( i, &parameterDesc ) );
+
+                            ShaderOutputReflectionInputOutput input {
+                                .name = FixedString<32>( parameterDesc.SemanticName ),
+                                .type = Convert( parameterDesc.SystemValueType ),
+                                .semanticIndex = zp_uint8_t( parameterDesc.SemanticIndex ),
+                                .registerIndex = zp_uint8_t( parameterDesc.Register ),
+                                .componentType = Convert( parameterDesc.ComponentType ),
+                                .stream = zp_uint8_t( parameterDesc.Stream ),
+                                .mask = Convert( parameterDesc.Mask ),
+                                .readWriteMask = Convert( parameterDesc.ReadWriteMask ),
+                            };
+
+                            inputs.pushBack( input );
+
+                            if( debugDisplay )
+                            {
+                                info.clear();
+                                info.append( "  " );
+                                info.appendFormat( INFO_S( parameterDesc, SemanticName ) );
+                                info.appendFormat( INFO_D( parameterDesc, SemanticIndex ) );
+                                info.appendFormat( INFO_D( parameterDesc, Register ) );
+                                info.appendFormat( INFO_D( parameterDesc, SystemValueType ) );
+                                info.appendFormat( INFO_D( parameterDesc, ComponentType ) );
+                                info.appendFormat( INFO_X( parameterDesc, Mask ) );
+                                info.appendFormat( INFO_X( parameterDesc, ReadWriteMask ) );
+                                info.appendFormat( INFO_D( parameterDesc, Stream ) );
+                                info.appendFormat( INFO_D( parameterDesc, MinPrecision ) );
+
+                                zp_printfln( info.c_str() );
+                            }
+                        }
+
+                        zp_printfln( "Output Parameters: %d ", shaderDesc.OutputParameters );
+                        for( zp_uint32_t i = 0; i < shaderDesc.OutputParameters; ++i )
+                        {
+                            D3D12_SIGNATURE_PARAMETER_DESC parameterDesc;
+                            HR( shaderReflection->GetOutputParameterDesc( i, &parameterDesc ) );
+
+                            ShaderOutputReflectionInputOutput output {
+                                .name = FixedString<32>( parameterDesc.SemanticName ),
+                                .type = Convert( parameterDesc.SystemValueType ),
+                                .semanticIndex = zp_uint8_t( parameterDesc.SemanticIndex ),
+                                .registerIndex = zp_uint8_t( parameterDesc.Register ),
+                                .componentType = Convert( parameterDesc.ComponentType ),
+                                .stream = zp_uint8_t( parameterDesc.Stream ),
+                                .mask = Convert( parameterDesc.Mask ),
+                                .readWriteMask = Convert( parameterDesc.ReadWriteMask ),
+                            };
+
+                            outputs.pushBack( output );
+
+                            if( debugDisplay )
+                            {
+                                info.clear();
+                                info.append( "  " );
+                                info.appendFormat( INFO_S( parameterDesc, SemanticName ) );
+                                info.appendFormat( INFO_D( parameterDesc, SemanticIndex ) );
+                                info.appendFormat( INFO_D( parameterDesc, Register ) );
+                                info.appendFormat( INFO_D( parameterDesc, SystemValueType ) );
+                                info.appendFormat( INFO_D( parameterDesc, ComponentType ) );
+                                info.appendFormat( INFO_X( parameterDesc, Mask ) );
+                                info.appendFormat( INFO_X( parameterDesc, ReadWriteMask ) );
+                                info.appendFormat( INFO_D( parameterDesc, Stream ) );
+                                info.appendFormat( INFO_D( parameterDesc, MinPrecision ) );
+
+                                zp_printfln( info.c_str() );
+                            }
+                        }
+
+                        // write reflection block
+                        shaderOutputHeader.reflectionOffset = shaderStream.position();
+
+                        ShaderOutputReflectionHeader reflectionHeader {
+                            .resourceCount = zp_uint8_t( resources.size() ),
+                            .elementCount = zp_uint8_t( elements.size() ),
+                            .inputCount = zp_uint8_t( inputs.size() ),
+                            .outputCount = zp_uint8_t( outputs.size() ),
+                        };
+
+                        shaderStream.write( reflectionHeader );
+
+                        resources.foreach( [ &shaderStream ]( const ShaderOutputReflectionResource& resource ) -> void
+                        {
+                            shaderStream.write( resource );
+                        } );
+
+                        elements.foreach( [ &shaderStream ]( const ShaderOutputReflectionElement& element ) -> void
+                        {
+                            shaderStream.write( element );
+                        } );
+
+                        inputs.foreach( [ &shaderStream ]( const ShaderOutputReflectionInputOutput& input ) -> void
+                        {
+                            shaderStream.write( input );
+                        } );
+
+                        outputs.foreach( [ &shaderStream ]( const ShaderOutputReflectionInputOutput& output ) -> void
+                        {
+                            shaderStream.write( output );
+                        } );
+
+                        shaderStream.writeAlignment( 16 );
+
+                        // display stat info
+                        if( debugDisplay )
+                        {
+#undef INFO_D
+#undef INFO_S
+#undef INFO_X
+
+#define INFO_D( n ) "%30s: %d\n", #n, shaderDesc.n
+#define INFO_S( n ) "%30s: %s\n", #n, shaderDesc.n
+
+                            info.clear();
+                            info.appendFormat( INFO_D( Version ) );
+                            info.appendFormat( INFO_S( Creator ) );
+                            info.appendFormat( INFO_D( ConstantBuffers ) );
+                            info.appendFormat( INFO_D( BoundResources ) );
+                            info.appendFormat( INFO_D( InputParameters ) );
+                            info.appendFormat( INFO_D( OutputParameters ) );
+                            info.appendFormat( INFO_D( InstructionCount ) );
+                            info.appendFormat( INFO_D( TempRegisterCount ) );
+                            info.appendFormat( INFO_D( TempArrayCount ) );
+                            info.appendFormat( INFO_D( DefCount ) );
+                            info.appendFormat( INFO_D( DclCount ) );
+                            info.appendFormat( INFO_D( TextureNormalInstructions ) );
+                            info.appendFormat( INFO_D( TextureLoadInstructions ) );
+                            info.appendFormat( INFO_D( TextureCompInstructions ) );
+                            info.appendFormat( INFO_D( TextureBiasInstructions ) );
+                            info.appendFormat( INFO_D( TextureGradientInstructions ) );
+                            info.appendFormat( INFO_D( FloatInstructionCount ) );
+                            info.appendFormat( INFO_D( IntInstructionCount ) );
+                            info.appendFormat( INFO_D( UintInstructionCount ) );
+                            info.appendFormat( INFO_D( StaticFlowControlCount ) );
+                            info.appendFormat( INFO_D( DynamicFlowControlCount ) );
+                            info.appendFormat( INFO_D( MacroInstructionCount ) );
+                            info.appendFormat( INFO_D( ArrayInstructionCount ) );
+                            info.appendFormat( INFO_D( CutInstructionCount ) );
+                            info.appendFormat( INFO_D( EmitInstructionCount ) );
+                            info.appendFormat( INFO_D( GSOutputTopology ) );
+                            info.appendFormat( INFO_D( GSMaxOutputVertexCount ) );
+                            info.appendFormat( INFO_D( InputPrimitive ) );
+                            info.appendFormat( INFO_D( PatchConstantParameters ) );
+                            info.appendFormat( INFO_D( cGSInstanceCount ) );
+                            info.appendFormat( INFO_D( cControlPoints ) );
+                            info.appendFormat( INFO_D( HSOutputPrimitive ) );
+                            info.appendFormat( INFO_D( HSPartitioning ) );
+                            info.appendFormat( INFO_D( TessellatorDomain ) );
+                            info.appendFormat( INFO_D( cBarrierInstructions ) );
+                            info.appendFormat( INFO_D( cInterlockedInstructions ) );
+                            info.appendFormat( INFO_D( cTextureStoreInstructions ) );
+#undef INFO_D
+#undef INFO_S
+
+                            zp_printfln( info.c_str() );
+                        }
+                    }
+                }
+            }
+
+            // shader hash
+            if( result->HasOutput( DXC_OUT_SHADER_HASH ) )
+            {
+                Ptr<IDxcBlob> shaderHash;
+                HR( result->GetOutput( DXC_OUT_SHADER_HASH, IID_PPV_ARGS( &shaderHash.ptr ), nullptr ) );
+
+                if( shaderHash.ptr && shaderHash->GetBufferSize() )
+                {
+                    DxcShaderHash* dxcShaderHash = static_cast<DxcShaderHash*>(shaderHash->GetBufferPointer());
+
+                    MutableFixedString<64> hashStr;
+                    for( unsigned char digit : dxcShaderHash->HashDigest )
+                    {
+                        hashStr.appendFormat( "%02x", digit );
+                    }
+
+                    zp_try_parse_hash128( hashStr.c_str(), hashStr.length(), &compilerJobData->resultShaderHash );
+
+                    if( debugDisplay )
+                    {
+                        zp_printfln( "[HASH] " " KeyHash: %s", hashStr.c_str() );
+                    }
+                }
+            }
+
+            // shader byte code
+            if( result->HasOutput( DXC_OUT_OBJECT ) )
+            {
+                Ptr<IDxcBlob> shaderObj;
+                HR( result->GetOutput( DXC_OUT_OBJECT, IID_PPV_ARGS( &shaderObj.ptr ), nullptr ) );
+
+                struct ShaderOutputDataHeader
+                {
+                    zp_hash128_t hash;
+                    zp_uint64_t size;
+                    zp_uint64_t compressedSize;
+                };
+
+                ShaderOutputDataHeader dataHeader {
+                    .hash = compilerJobData->resultShaderHash,
+                    .size = shaderObj->GetBufferSize(),
+                    .compressedSize = 0,
+                };
+
+                zp_bool_t compressShaderBinary = true;
+
+                shaderOutputHeader.shaderDataOffset = shaderStream.position();
+
+                if( compressShaderBinary )
+                {
+                    AllocMemory compressedShaderBinary( data->memoryLabel, dataHeader.size );
+
+                    const zp_size_t compressedSize =  zp_lzf_compress(shaderObj->GetBufferPointer(), 0, shaderObj->GetBufferSize(), compressedShaderBinary.ptr, compressedShaderBinary.size );
+                    dataHeader.compressedSize = compressedSize;
+
+                    shaderStream.write( dataHeader );
+                    shaderStream.write( compressedShaderBinary.ptr, compressedSize );
+                }
+                else
+                {
+                    shaderStream.write( dataHeader );
+                    shaderStream.write( shaderObj->GetBufferPointer(), shaderObj->GetBufferSize() );
+                }
+
+                shaderStream.writeAlignment( 16 );
+
+                //zp_handle_t dstFileHandle = Platform::OpenFileHandle( task->dstFilePath.c_str(), ZP_OPEN_FILE_MODE_WRITE );
+                //Platform::WriteFile( dstFileHandle, shaderObj->GetBufferPointer(), shaderObj->GetBufferSize() );
+                //Platform::CloseFileHandle( dstFileHandle );
+                if( debugDisplay )
+                {
+                    zp_printfln( "[OBJECT] " " '%s'", task->dstFile.c_str() );
+                }
+            }
+
+            const Memory shaderStreamMemory = shaderStream.memory();
+
+            // hash file
+            shaderOutputHeader.hash = zp_fnv128_1a( shaderStreamMemory.ptr, shaderStreamMemory.size );
+
+            // rewrite header with values
+            shaderStream.writeAt( shaderOutputHeader, 0, DataStreamSeekOrigin::Beginning );
+
+            // write to file
+            char hashStr[32 + 1];
+            zp_try_hash128_to_string( compilerJobData->resultShaderHash, hashStr );
+
+            char featureHashStr[16 + 1];
+            zp_try_hash64_to_string( compilerJobData->shaderFeature.shaderFeatureHash, featureHashStr );
+
+            MutableFixedString<256> dstFilePath;
+            dstFilePath.append( task->dstFile.c_str() );
+            dstFilePath.append( '.' );
+            dstFilePath.append( hashStr );
+            dstFilePath.append( '.' );
+            dstFilePath.append( featureHashStr );
+            dstFilePath.append( '.' );
+            dstFilePath.append( kShaderTypes[ compilerJobData->shaderProgram ] );
+
+            zp_handle_t dstFileHandle = Platform::OpenFileHandle( dstFilePath.c_str(), ZP_OPEN_FILE_MODE_WRITE );
+            Platform::WriteFile( dstFileHandle, shaderStreamMemory.ptr, shaderStreamMemory.size );
+            Platform::CloseFileHandle( dstFileHandle );
+        }
+        else
+        {
+            zp_printfln( "[%8d] ...Failed", currentThreadId );
+
+            compilerJobData->result = -1;
+
+            // errors
+            if( result->HasOutput( DXC_OUT_ERRORS ) )
+            {
+                Ptr<IDxcBlobUtf8> errorMsgs;
+                HR( result->GetOutput( DXC_OUT_ERRORS, IID_PPV_ARGS( &errorMsgs.ptr ), nullptr ) );
+
+                const zp_size_t l = errorMsgs->GetStringLength();
+                if( l )
+                {
+                    auto c = errorMsgs->GetStringPointer();
+                    zp_printfln( "[ERROR] " " %s", c );
+                }
+            }
+
+            // text
+            if( result->HasOutput( DXC_OUT_TEXT ) )
+            {
+                Ptr<IDxcBlobUtf8> text;
+                HR( result->GetOutput( DXC_OUT_TEXT, IID_PPV_ARGS( &text.ptr ), nullptr ) );
+
+                if( text.ptr && text->GetStringLength() )
+                {
+                    zp_printfln( "[TEXT]  " " %s", text->GetStringPointer() );
+                }
+            }
+
+            // hlsl
+            if( result->HasOutput( DXC_OUT_HLSL ) )
+            {
+                Ptr<IDxcBlobUtf8> hlsl;
+                HR( result->GetOutput( DXC_OUT_HLSL, IID_PPV_ARGS( &hlsl.ptr ), nullptr ) );
+
+                if( hlsl.ptr && hlsl->GetStringLength() )
+                {
+                    zp_printfln( "[HLSL]  " " %s", hlsl->GetStringPointer() );
+                }
+            }
+
+            // remarks
+            if( result->HasOutput( DXC_OUT_REMARKS ) )
+            {
+                Ptr<IDxcBlobUtf8> remarks;
+                HR( result->GetOutput( DXC_OUT_REMARKS, IID_PPV_ARGS( &remarks.ptr ), nullptr ) );
+
+                if( remarks.ptr && remarks->GetStringLength() )
+                {
+                    zp_printfln( "[REMARKS]  " " %s", remarks->GetStringPointer() );
+                }
+            }
+        }
+    }
 }
 
 //
@@ -330,20 +1609,80 @@ namespace
 
 namespace zp::ShaderCompiler
 {
-    struct CompileJob
-    {
-
-    };
-
     void ShaderCompilerExecuteJob( const JobHandle& parentJob, AssetCompilerTask* task )
     {
-        ShaderCompilerExecute( task );
+        ShaderTaskData* data = task->taskMemory.as<ShaderTaskData>();
+
+        const zp_bool_t useJobSystem = false;
+
+        zp_uint64_t processedShaderFeatureCount = 0;
+
+        for( zp_uint32_t shaderProgram = 0; shaderProgram < ShaderProgramType_Count; ++shaderProgram )
+        {
+            const zp_uint32_t shaderProgramType = 1 << shaderProgram;
+            if( ( data->shaderCompilerSupportedTypes & shaderProgramType ) == shaderProgramType )
+            {
+                for( zp_size_t s = 0; s < data->shaderFeatures.size(); ++s )
+                {
+                    const ShaderFeature& shaderFeature = data->shaderFeatures[ s ];
+
+                    // check shader feature is supported for the program type
+                    zp_bool_t shaderFeatureSupported = ( shaderFeature.shaderProgramSupportedType & shaderProgramType ) == shaderProgramType;
+
+                    // check for invalid shader features
+                    if( shaderFeatureSupported )
+                    {
+                        for( auto invalidShaderFeature : data->invalidShaderFeatures )
+                        {
+                            if( invalidShaderFeature.shaderFeatureHash == shaderFeature.shaderFeatureHash )
+                            {
+                                shaderFeatureSupported = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    // compile each valid shader feature
+                    if( shaderFeatureSupported )
+                    {
+                        for( zp_size_t i = 0; i < shaderFeature.shaderFeatureCount; ++i )
+                        {
+                            ShaderFeature activeShaderFeature {
+                                .shaderFeatureCount = 1,
+                                .shaderProgramSupportedType = shaderFeature.shaderProgramSupportedType,
+                            };
+                            activeShaderFeature.shaderFeatures[ 0 ] = shaderFeature.shaderFeatures[ i ];
+
+                            activeShaderFeature.shaderFeatureHash = zp_fnv64_1a( activeShaderFeature.shaderFeatures );
+
+                            CompileJob job {
+                                .task = task,
+                                .shaderProgram = (ShaderProgramType)shaderProgram,
+                                .shaderFeature = activeShaderFeature,
+                                .entryPoint = data->entryPoints[ shaderProgram ],
+                            };
+
+                            if( useJobSystem )
+                            {
+                                JobSystem::Start( CompileShaderDXC, job, parentJob ).schedule();
+                            }
+                            else
+                            {
+                                CompileShaderDXC( parentJob, &job );
+                            }
+                        }
+                    }
+                }
+
+                JobSystem::ScheduleBatchJobs();
+            }
+        }
     }
 
+#if 0
     void ShaderCompilerExecute( AssetCompilerTask* task )
     {
-        ShaderTaskData* data = reinterpret_cast<ShaderTaskData*>(task->taskMemory.ptr);
-
+        // Old code for reference
         DxcBuffer sourceCode {
             .Ptr = data->shaderSource.ptr,
             .Size = data->shaderSource.size,
@@ -355,7 +1694,7 @@ namespace zp::ShaderCompiler
         AllocString srcFile = task->srcFile;
         AllocString dstFile = task->dstFile;
 
-        LocalMalloc malloc( 0 );
+        LocalMalloc malloc( task->memoryLabel );
 
         for( zp_uint32_t shaderType = 0; shaderType < ShaderProgramType_Count; ++shaderType )
         {
@@ -363,11 +1702,18 @@ namespace zp::ShaderCompiler
             {
                 ShaderModel sm = kShaderModelTypes[ data->shaderModel ];
 
-                auto start = zp_strrchr( srcFile.c_str(), '\\' ) + 1;
-                auto end = zp_strrchr( srcFile.c_str(), '.' );
-
                 char entryPoint[kEntryPointSize];
-                zp_snprintf( entryPoint, "%.*s%s", end - start, start, kShaderEntryName[ shaderType ] );
+                if( data->entryPoints[ shaderType ].empty() )
+                {
+                    auto start = zp_strrchr( srcFile.c_str(), '\\' ) + 1;
+                    auto end = zp_strrchr( srcFile.c_str(), '.' );
+
+                    zp_snprintf( entryPoint, "%.*s%s", end - start, start, kShaderEntryName[ shaderType ] );
+                }
+                else
+                {
+                    zp_strcpy( entryPoint, ZP_ARRAY_SIZE( entryPoint ), data->entryPoints[ shaderType ].c_str() );
+                }
 
                 WCHAR targetProfiler[] {
                     kShaderTypes[ shaderType ][ 0 ],
@@ -462,7 +1808,7 @@ namespace zp::ShaderCompiler
                 {
                     argsBuffer.appendFormat( "%ls ", f[ i ] );
                 }
-                argsBuffer.appendFormat( "\n" );
+                argsBuffer.append( '\n' );
 
                 zp_printfln( "Args: %s", argsBuffer.c_str() );
 
@@ -525,9 +1871,9 @@ namespace zp::ShaderCompiler
                             char pdbFilePath[512];
                             ::WideCharToMultiByte( CP_UTF8, 0, pdbPathFromCompiler->GetStringPointer(), -1, pdbFilePath, ZP_ARRAY_SIZE( pdbFilePath ), nullptr, nullptr );
 
-                            zp_handle_t pdbFileHandle = GetPlatform()->OpenFileHandle( pdbFilePath, ZP_OPEN_FILE_MODE_WRITE );
-                            GetPlatform()->WriteFile( pdbFileHandle, pdbData->GetBufferPointer(), pdbData->GetBufferSize() );
-                            GetPlatform()->CloseFileHandle( pdbFileHandle );
+                            zp_handle_t pdbFileHandle = Platform::OpenFileHandle( pdbFilePath, ZP_OPEN_FILE_MODE_WRITE );
+                            Platform::WriteFile( pdbFileHandle, pdbData->GetBufferPointer(), pdbData->GetBufferSize() );
+                            Platform::CloseFileHandle( pdbFileHandle );
 
                             zp_printfln( "[PDB]  " " %s", pdbFilePath );
                         }
@@ -728,9 +2074,9 @@ namespace zp::ShaderCompiler
                         Ptr <IDxcBlob> shaderObj;
                         HR( result->GetOutput( DXC_OUT_OBJECT, IID_PPV_ARGS( &shaderObj.ptr ), nullptr ) );
 
-                        zp_handle_t dstFileHandle = GetPlatform()->OpenFileHandle( dstFile.c_str(), ZP_OPEN_FILE_MODE_WRITE );
-                        GetPlatform()->WriteFile( dstFileHandle, shaderObj->GetBufferPointer(), shaderObj->GetBufferSize() );
-                        GetPlatform()->CloseFileHandle( dstFileHandle );
+                        zp_handle_t dstFileHandle = Platform::OpenFileHandle( dstFile.c_str(), ZP_OPEN_FILE_MODE_WRITE );
+                        Platform::WriteFile( dstFileHandle, shaderObj->GetBufferPointer(), shaderObj->GetBufferSize() );
+                        Platform::CloseFileHandle( dstFileHandle );
 
                         zp_printfln( "[OBJECT] " " %s", dstFile.c_str() );
                     }
@@ -791,7 +2137,6 @@ namespace zp::ShaderCompiler
         //
         //
         //
-#if 0
         DataBuilder dataBuilder( 0 );
 
         dataBuilder.beginRecodring();
@@ -811,33 +2156,63 @@ namespace zp::ShaderCompiler
         {
 
         }
-#endif
     }
+#endif
 
     Memory ShaderCompilerCreateTaskMemory( MemoryLabel memoryLabel, const String& inFile, const String& outFile, const CommandLine& cmdLine )
     {
         ShaderTaskData* data = nullptr;
 
-        if( GetPlatform()->FileExists( inFile.c_str() ) )
+        if( Platform::FileExists( inFile.c_str() ) )
         {
-            data = ZP_MALLOC_T( memoryLabel, ShaderTaskData );
+            data = ZP_NEW_( memoryLabel, ShaderTaskData );
 
+            // default values
             data->debug = false;
+            data->shaderModel = SHADER_MODEL_TYPE_6_0;
+            data->shaderCompilerSupportedTypes = 0;
 
-            zp_handle_t inFileHandle = GetPlatform()->OpenFileHandle( inFile.c_str(), ZP_OPEN_FILE_MODE_READ );
-            const zp_size_t inFileSize = GetPlatform()->GetFileSize( inFileHandle );
+            data->shaderAPI = SHADER_API_D3D;
+            data->shaderOutput = SHADER_OUTPUT_DXIL;
+
+            data->shaderSource = {};
+
+            // add "empty" feature
+            data->allShaderFeatures.pushBack( String::As( "_" ) );
+
+            String ext = String::As( zp_strrchr( inFile.c_str(), '.' ) );
+            zp_uint32_t requiredShaderPrograms = 0;
+
+            if( zp_strcmp( ext.c_str(), ext.length, ".shader" ) == 0 )
+            {
+                requiredShaderPrograms = SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX | SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
+            }
+            else if( zp_strcmp( ext.c_str(), ext.length, ".compute" ) == 0 )
+            {
+                requiredShaderPrograms = SHADER_PROGRAM_SUPPORTED_TYPE_COMPUTE;
+            }
+            else
+            {
+                ZP_INVALID_CODE_PATH_MSG( "Unsupported shader file type used" );
+            }
+
+            zp_handle_t inFileHandle = Platform::OpenFileHandle( inFile.c_str(), ZP_OPEN_FILE_MODE_READ );
+            const zp_size_t inFileSize = Platform::GetFileSize( inFileHandle );
             void* inFileData = ZP_MALLOC_( memoryLabel, inFileSize );
 
-            zp_size_t inFileReadSize = GetPlatform()->ReadFile( inFileHandle, inFileData, inFileSize );
+            zp_size_t inFileReadSize = Platform::ReadFile( inFileHandle, inFileData, inFileSize );
             ZP_ASSERT( inFileSize == inFileReadSize );
+            Platform::CloseFileHandle( inFileHandle );
+
+            data->shaderSource.set( memoryLabel, (zp_char8_t*)inFileData, inFileSize ); //= { .str = (zp_char8_t*)inFileData, .length = inFileSize };
 
             // TODO: move to helper functions
-            Tokenizer lineTokenizer( static_cast<const char*>( inFileData ), inFileSize, "\r\n" );
+            Tokenizer lineTokenizer( data->shaderSource.c_str(), data->shaderSource.length(), "\r\n" );
 
             String line {};
             while( lineTokenizer.next( line ) )
             {
-                if( zp_strnstr( line.c_str(), line.length, "#pragma " ) )
+                if( zp_strnstr( line.c_str(), line.length, "#pragma " ) == line.c_str() )
                 {
                     Tokenizer pragmaTokenizer( line.c_str(), line.length, " " );
 
@@ -846,21 +2221,42 @@ namespace zp::ShaderCompiler
                     {
                         if( zp_strcmp( "vertex", pragma.c_str(), pragma.length ) == 0 )
                         {
+                            data->shaderCompilerSupportedTypes |= SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX;
+                            data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ] = String::As( "" );
+
                             String pragmaOp {};
                             if( pragmaTokenizer.next( pragmaOp ) )
                             {
                                 data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ] = pragmaOp;
-                                zp_printfln( "Vertex Entry - %.*s", pragmaOp.length, pragmaOp.str );
                             }
+
+                            zp_printfln( "Vertex Entry - %.*s", data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ].length(), data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ].c_str() );
                         }
                         else if( zp_strcmp( "fragment", pragma.c_str(), pragma.length ) == 0 )
                         {
+                            data->shaderCompilerSupportedTypes |= SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
+                            data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ] = String::As( "" );
+
                             String pragmaOp {};
                             if( pragmaTokenizer.next( pragmaOp ) )
                             {
                                 data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ] = pragmaOp;
-                                zp_printfln( "Fragment Entry - %.*s", pragmaOp.length, pragmaOp.str );
                             }
+
+                            zp_printfln( "Fragment Entry - %.*s", data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ].length(), data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ].c_str() );
+                        }
+                        else if( zp_strcmp( "kernel", pragma.c_str(), pragma.length ) == 0 )
+                        {
+                            data->shaderCompilerSupportedTypes |= SHADER_PROGRAM_SUPPORTED_TYPE_COMPUTE;
+                            data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ] = String::As( "" );
+
+                            String pragmaOp {};
+                            if( pragmaTokenizer.next( pragmaOp ) )
+                            {
+                                data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ] = pragmaOp;
+                            }
+
+                            zp_printfln( "Compute Entry - %.*s", data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ].length(), data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ].c_str() );
                         }
                         else if( zp_strcmp( "enable_debug", pragma.c_str(), pragma.length ) == 0 )
                         {
@@ -872,7 +2268,28 @@ namespace zp::ShaderCompiler
                             String pragmaOp {};
                             if( pragmaTokenizer.next( pragmaOp ) )
                             {
-                                zp_printfln( "Target - %.*s", pragmaOp.length, pragmaOp.str );
+                                // format "#.#"
+                                if( pragmaOp.length == 3 && pragmaOp.str[ 1 ] == '.' )
+                                {
+                                    ShaderModel model {};
+
+                                    zp_bool_t ok = false;
+                                    ok |= zp_try_parse_uint8( pragmaOp.c_str() + 0, 1, &model.major );
+                                    ok |= zp_try_parse_uint8( pragmaOp.c_str() + 2, 1, &model.minor );
+                                    if( ok )
+                                    {
+                                        zp_size_t index;
+                                        if( zp_try_find_index( kShaderModelTypes, model, []( const ShaderModel& x, const ShaderModel& y )
+                                        {
+                                            return x.major == y.major && x.minor == y.minor;
+                                        }, index ) )
+                                        {
+                                            data->shaderModel = static_cast<ShaderModelType>( index );
+
+                                            zp_printfln( "Target - Major: %d Minor %d  Model Index %d", model.major, model.minor, data->shaderModel );
+                                        }
+                                    }
+                                }
                             }
                         }
                             // TODO: have dxc precompile hlsl and then parse pragmas from that to support pragmas in included files, then compile variants from the preprocessed
@@ -896,23 +2313,84 @@ namespace zp::ShaderCompiler
 
                             if( programSupportedType != 0 )
                             {
-                                MutableFixedString<4> pp;
+                                MutableFixedString<ShaderProgramType_Count> pp;
                                 if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX )
                                 {
-                                    pp.appendFormat( "V" );
+                                    pp.append( "V" );
                                 }
+
                                 if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT )
                                 {
-                                    pp.appendFormat( "F" );
+                                    pp.append( "F" );
                                 }
 
-                                zp_printfln( "Shader Features %s:", pp.c_str() );
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_GEOMETRY )
+                                {
+                                    pp.append( "G" );
+                                }
 
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_TESSELATION )
+                                {
+                                    pp.append( "T" );
+                                }
+
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_HULL )
+                                {
+                                    pp.append( "H" );
+                                }
+
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_DOMAIN )
+                                {
+                                    pp.append( "D" );
+                                }
+
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_COMPUTE )
+                                {
+                                    pp.append( "C" );
+                                }
+
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_MESH )
+                                {
+                                    pp.append( "M" );
+                                }
+
+                                if( programSupportedType & SHADER_PROGRAM_SUPPORTED_TYPE_TASK )
+                                {
+                                    pp.append( "A" );
+                                }
+
+                                zp_printfln( "Shader Programs %s:", pp.c_str() );
+
+                                ShaderFeature shaderFeature { .shaderProgramSupportedType = programSupportedType };
+
+                                // parse each feature
                                 String pragmaOp {};
                                 while( pragmaTokenizer.next( pragmaOp ) )
                                 {
+                                    ZP_ASSERT( shaderFeature.shaderFeatureCount < shaderFeature.shaderFeatures.length() );
                                     zp_printfln( "  - %.*s", pragmaOp.length, pragmaOp.str );
+
+                                    // build feature list, add new one if it doesn't exist
+                                    zp_size_t index;
+                                    if( !zp_try_find_index( data->allShaderFeatures.begin(), data->allShaderFeatures.end(), pragmaOp, []( const String& x, const String& y )
+                                    {
+                                        return zp_strcmp( x.str, x.length, y.str, y.length ) == 0;
+                                    }, index ) )
+                                    {
+                                        index = data->allShaderFeatures.size();
+                                        data->allShaderFeatures.pushBack( pragmaOp );
+                                    }
+
+                                    shaderFeature.shaderFeatures[ shaderFeature.shaderFeatureCount++ ] = index;
                                 }
+
+                                // sort feature set in descending order
+                                zp_qsort3( shaderFeature.shaderFeatures.begin(), shaderFeature.shaderFeatures.end(), zp_cmp_dsc<zp_size_t> );
+
+                                // generate hash from sorted list
+                                shaderFeature.shaderFeatureHash = zp_fnv64_1a( shaderFeature.shaderFeatures );
+
+                                data->shaderFeatures.pushBack( shaderFeature );
                             }
                             break;
                         }
@@ -920,39 +2398,49 @@ namespace zp::ShaderCompiler
                         {
                             zp_printfln( "Invalid Shader Features:" );
 
+                            ShaderFeature shaderFeature { .shaderProgramSupportedType = SHADER_PROGRAM_SUPPORTED_TYPE_ALL };
+
+                            // parse each feature
                             String pragmaOp {};
                             while( pragmaTokenizer.next( pragmaOp ) )
                             {
+                                ZP_ASSERT( shaderFeature.shaderFeatureCount < shaderFeature.shaderFeatures.length() );
                                 zp_printfln( "  - %.*s", pragmaOp.length, pragmaOp.str );
+
+                                // build feature list, add new one if it doesn't exist
+                                zp_size_t index;
+                                if( !zp_try_find_index( data->allShaderFeatures.begin(), data->allShaderFeatures.end(), pragmaOp, []( const String& x, const String& y )
+                                {
+                                    return zp_strcmp( x.str, x.length, y.str, y.length ) == 0;
+                                }, index ) )
+                                {
+                                    index = data->allShaderFeatures.size();
+                                    data->allShaderFeatures.pushBack( pragmaOp );
+                                }
+
+                                shaderFeature.shaderFeatures[ shaderFeature.shaderFeatureCount++ ] = index;
                             }
+
+                            // sort feature set
+                            zp_qsort3( shaderFeature.shaderFeatures.begin(), shaderFeature.shaderFeatures.end(), zp_cmp_dsc<zp_size_t> );
+
+                            // generate hash from sorted list
+                            shaderFeature.shaderFeatureHash = zp_fnv64_1a( shaderFeature.shaderFeatures );
+
+                            data->invalidShaderFeatures.pushBack( shaderFeature );
                         }
                     }
                 }
             }
 
-            data->shaderSource = { .ptr = inFileData, .size =inFileSize };
-
-            data->shaderCompilerSupportedTypes = SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX | SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
-            data->shaderModel = SHADER_MODEL_TYPE_6_0;
-
-            data->shaderAPI = SHADER_API_D3D;
-            data->shaderOutput = SHADER_OUTPUT_SPIRV;
-
-            GetPlatform()->CloseFileHandle( inFileHandle );
+            ZP_ASSERT( ( data->shaderCompilerSupportedTypes & requiredShaderPrograms ) == requiredShaderPrograms );
         }
 
-        return { .ptr = data, .size = data == nullptr ? 0 : sizeof( ShaderTaskData ) };
+        return { .ptr = data, .size = data ? sizeof( ShaderTaskData ) : 0 };
     }
 
     void ShaderCompilerDestroyTaskMemory( MemoryLabel memoryLabel, Memory memory )
     {
-        if( memory.ptr )
-        {
-            ShaderTaskData* data = reinterpret_cast<ShaderTaskData*>(memory.ptr);
-
-            ZP_SAFE_FREE_LABEL( memoryLabel, data->shaderSource.ptr );
-
-            ZP_FREE_( memoryLabel, memory.ptr );
-        }
+        ZP_SAFE_DELETE( ShaderTaskData, memory.ptr );
     }
 }

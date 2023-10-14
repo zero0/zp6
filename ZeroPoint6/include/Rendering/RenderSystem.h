@@ -12,7 +12,6 @@
 #include "Core/Allocator.h"
 #include "Core/Math.h"
 
-#include "Engine/JobSystem.h"
 #include "Engine/EntityComponentManager.h"
 
 #include "Rendering/GraphicsDevice.h"
@@ -37,9 +36,9 @@ namespace zp
 
         void destroy();
 
-        PreparedJobHandle startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const PreparedJobHandle& inputHandle );
+        JobHandle startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const JobHandle& inputHandle );
 
-        PreparedJobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const PreparedJobHandle& inputHandle );
+        JobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const JobHandle& inputHandle );
 
         GraphicsDevice* getGraphicsDevice()
         {

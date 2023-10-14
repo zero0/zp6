@@ -30,7 +30,7 @@ void zp::AssetCompilerTask::Execute( const zp::JobHandle& jobHandle, zp::AssetCo
 
 void CopyFileProcess( zp::AssetCompilerTask* task )
 {
-    zp::GetPlatform()->FileCopy( task->srcFile.c_str(), task->dstFile.c_str() );
+    zp::Platform::FileCopy( task->srcFile.c_str(), task->dstFile.c_str() );
 }
 
 struct MemoryConfig
@@ -43,7 +43,7 @@ struct MemoryConfig
 
 void TestExec( zp::Job* job, zp::Memory memory )
 {
-    zp_printfln( "Exec Thead ID - %d", zp::GetPlatform()->GetCurrentThreadId() );
+    zp_printfln( "Exec Thead ID - %d", zp::Platform::GetCurrentThreadId() );
 }
 
 int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow )
@@ -68,7 +68,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 #endif
 
     const zp_size_t totalMemorySize = 128 MB;
-    void* systemMemory = GetPlatform()->AllocateSystemMemory( baseAddress, totalMemorySize );
+    void* systemMemory = Platform::AllocateSystemMemory( baseAddress, totalMemorySize );
 
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, CriticalSectionMemoryLock> s_defaultAllocator(
         SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, 0 ), memoryConfig.defaultAllocatorPageSize ),
@@ -132,10 +132,10 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
             assetCompiler.registerFileExtension( String::As( ".shader" ), {
                 .createTaskFunc =  ShaderCompiler::ShaderCompilerCreateTaskMemory,
                 .deleteTaskFunc =  ShaderCompiler::ShaderCompilerDestroyTaskMemory,
-                .executeFunc =     ShaderCompiler::ShaderCompilerExecute,
+                .executeFunc =     nullptr, //ShaderCompiler::ShaderCompilerExecute,
                 .jobExecuteFunc =  ShaderCompiler::ShaderCompilerExecuteJob,
             } );
-            assetCompiler.registerFileExtension( String::As( ".computeshader" ), {} );
+            assetCompiler.registerFileExtension( String::As( ".compute" ), {} );
 
             assetCompiler.registerFileExtension( String::As( ".tiff" ), {} );
             assetCompiler.registerFileExtension( String::As( ".png" ), {} );
@@ -219,13 +219,22 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
             JobSystem::InitializeJobThreads();
 
             auto parent = JobSystem::Start().schedule();
+            const bool useJobSystem = false;
 
             // execute tasks
             while( !taskQueue.isEmpty() )
             {
                 AssetCompilerTask task = taskQueue.dequeue();
 
-                JobSystem::Start( task, parent ).schedule();
+                if( useJobSystem )
+                {
+                    JobSystem::Start( task, parent ).schedule();
+                }
+                else
+                {
+                    AssetCompilerTask::Execute( JobHandle::Null, &task );
+                }
+
 
                 tasksToDelete.pushBack( task );
             }

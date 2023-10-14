@@ -36,6 +36,8 @@ namespace zp
     public:
         typedef zp_bool_t (* EqualityComparerFunc)( const T& lh, const T& rh );
 
+        typedef zp_bool_t (* ComparerFunc)( const T& value );
+
         static const zp_size_t npos = -1;
 
         typedef T value_type;
@@ -94,6 +96,8 @@ namespace zp
 
         reference pushBackEmptyAtomic();
 
+        zp_size_t pushBackEmptyRange( zp_size_t count, zp_bool_t initialize = true );
+
         zp_size_t pushBackEmptyRangeAtomic( zp_size_t count, zp_bool_t initialize = true );
 
         void pushFront( const_reference val );
@@ -129,11 +133,25 @@ namespace zp
         zp_size_t lastIndexOf( const_reference val, EqualityComparerFunc comparer = nullptr ) const;
 
         template<typename Cmp>
+        zp_size_t findIndexOf( Cmp cmp ) const;
+
+        zp_size_t findLastIndexOf( ComparerFunc cmp ) const;
+
+        template<typename Cmp>
         void sort( Cmp cmp )
         {
             if( m_size > 1 )
             {
                 zp_qsort3( begin(), end() - 1, cmp );
+            }
+        }
+
+        template<typename Func>
+        void foreach( Func func ) const
+        {
+            for( const_iterator b = begin(), e = end(); b != e; ++b )
+            {
+                func( *b );
             }
         }
 
@@ -532,6 +550,28 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::pushBackEmptyRange( zp_size_t count, zp_bool_t initialize )
+    {
+        const zp_size_t index = m_size;
+        m_size += count;
+
+        if( m_size >= m_capacity )
+        {
+            ensureCapacity( m_capacity * 2 );
+        }
+
+        //if( initialize )
+        //{
+        //    for( zp_size_t i = index, imax = index + count; i < imax; ++i )
+        //    {
+        //        new( m_data + i ) T();
+        //    }
+        //}
+
+        return index;
+    }
+
+    template<typename T, typename Allocator>
     zp_size_t Vector<T, Allocator>::pushBackEmptyRangeAtomic( zp_size_t count, zp_bool_t initialize )
     {
         const zp_size_t index = Atomic::AddSizeT( &m_size, count ) - count;
@@ -772,6 +812,52 @@ namespace zp
             {
                 --e;
                 if( cmp( *e, val ) )
+                {
+                    index = e - m_data;
+                    break;
+                }
+            }
+        }
+
+        return index;
+    }
+
+    template<typename T, typename Allocator>
+    template<typename Cmp>
+    zp_size_t Vector<T, Allocator>::findIndexOf( Cmp cmp ) const
+    {
+        zp_size_t index = npos;
+
+        if( m_size > 0 )
+        {
+            const_iterator b = m_data;
+            const_iterator e = m_data + m_size;
+            for( ; b != e; ++b )
+            {
+                if( cmp( *b ) )
+                {
+                    index = b - m_data;
+                    break;
+                }
+            }
+        }
+
+        return index;
+    }
+
+    template<typename T, typename Allocator>
+    zp_size_t Vector<T, Allocator>::findLastIndexOf( ComparerFunc cmp ) const
+    {
+        zp_size_t index = npos;
+
+        if( m_size > 0 )
+        {
+            const_iterator b = m_data;
+            const_iterator e = m_data + m_size;
+            for( ; b != e; )
+            {
+                --e;
+                if( cmp( *e ) )
                 {
                     index = e - m_data;
                     break;

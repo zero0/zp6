@@ -20,7 +20,7 @@ goto :init
     set "UseProd="
     set "Clean="
     set "VkVersion=100"
-    set "GlobalDefines=--define-macro SHADER_VULKAN=1 --spirv-val"
+    set "GlobalDefines="
     set "HumanReadable="
     set "OutputExtension=spv"
 
@@ -105,4 +105,3 @@ goto :init
 
 :end
     ENDLOCAL
-

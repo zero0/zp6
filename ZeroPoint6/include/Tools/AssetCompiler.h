@@ -46,6 +46,15 @@ namespace zp
         static void Execute( const JobHandle& jobHandle, AssetCompilerTask* task );
     };
 
+    struct AssetCompilerTaskResult
+    {
+        zp_guid128_t assetGUID;
+        zp_hash128_t assetHash;
+        zp_hash64_t assetVariant;
+        zp_uint32_t assetType;
+        zp_uint32_t returnCode;
+    };
+
     struct AssetCompilerProcessor
     {
         AssetProcessorCreateTaskMemoryFunc createTaskFunc;
@@ -66,7 +75,7 @@ namespace zp
         [[nodiscard]] const AssetCompilerProcessor* getCompilerProcessor( const String& ext ) const;
 
     private:
-        Map<zp_hash64_t, AssetCompilerProcessor> m_assetProcessors;
+        Map<String, AssetCompilerProcessor> m_assetProcessors;
 
     public:
         const MemoryLabel memoryLabel;

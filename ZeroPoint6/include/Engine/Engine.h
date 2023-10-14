@@ -8,6 +8,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Allocator.h"
+#include "Core/Job.h"
 
 #if ZP_USE_PROFILER
 
@@ -15,7 +16,6 @@
 
 #endif
 
-#include "Engine/JobSystem.h"
 #include "Engine/ModuleEntryPointAPI.h"
 #include "Engine/EnginePipeline.h"
 #include "Engine/Entity.h"
@@ -68,11 +68,6 @@ namespace zp
             return m_moduleAPI;
         }
 
-        [[nodiscard]] JobSystem* getJobSystem() const
-        {
-            return m_jobSystem;
-        }
-
         [[nodiscard]] RenderSystem* getRenderSystem() const
         {
             return m_renderSystem;
@@ -114,7 +109,6 @@ namespace zp
 
         JobHandle m_previousFrameEnginePipelineHandle;
 
-        JobSystem* m_jobSystem;
         RenderSystem* m_renderSystem;
         EntityComponentManager* m_entityComponentManager;
         AssetSystem* m_assetSystem;

@@ -8,8 +8,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Macros.h"
-
-#include "Engine/JobSystem.h"
+#include "Core/Job.h"
 
 namespace zp
 {
@@ -34,7 +33,6 @@ namespace zp
         zp_uint64_t m_frameIndex;
         GraphicsDevice* m_graphicsDevice;
         RenderSystem* m_renderSystem;
-        JobSystem* m_jobSystem;
     };
 
     ZP_DECLSPEC_NOVTABLE class RenderPipeline
@@ -44,7 +42,7 @@ namespace zp
 
         virtual void onDeactivate( RenderSystem* renderSystem ) = 0;
 
-        virtual PreparedJobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const PreparedJobHandle& parentJobHandle ) = 0;
+        virtual JobHandle onProcessPipeline( RenderPipelineContext* renderPipelineContext, const JobHandle& parentJobHandle ) = 0;
     };
 };
 

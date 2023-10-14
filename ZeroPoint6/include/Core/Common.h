@@ -9,10 +9,13 @@
 
 #include "Core/Defines.h"
 #include "Core/Types.h"
+#include "Core/Macros.h"
 
 #if ZP_MSC
 #include <intrin.h>
 #endif
+
+constexpr zp_size_t ZP_NPOS = -1;
 
 #if ZP_USE_PRINTF
 
@@ -58,11 +61,13 @@ zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... 
 
 #if ZP_USE_ASSERTIONS
 #define ZP_ASSERT( t )                  do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); }} while( false )
+#define ZP_ASSERT_RETURN( t )           do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); return; }} while( false )
 #define ZP_ASSERT_MSG( t, msg )         do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s: %s", __FILE__, __LINE__, #t, msg ); }} while( false )
 #define ZP_INVALID_CODE_PATH()          do { zp_error_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
 #define ZP_INVALID_CODE_PATH_MSG( msg ) do { zp_error_printfln( "Invalid Code Path %s:%d - %s", __FILE__, __LINE__, msg ); } while( false )
 #else // !ZP_USE_ASSERTIONS
 #define ZP_ASSERT(...)                  (void)0
+#define ZP_ASSERT_RETURN(...)           (void)0
 #define ZP_ASSERT_MSG(...)              (void)0
 #define ZP_INVALID_CODE_PATH()          (void)0
 #define ZP_INVALID_CODE_PATH_MSG(...)   (void)0
@@ -287,6 +292,28 @@ constexpr zp_hash64_t zp_fnv64_1a( const void* ptr, const zp_size_t size, zp_has
     return h;
 }
 
+template<typename T>
+constexpr zp_hash64_t zp_fnv64_1a( const T& value, zp_hash64_t h = 0xcbf29ce484222325 )
+{
+    return zp_fnv64_1a( static_cast<const void*>(&value), sizeof( T ), h );
+}
+
+template<typename T>
+constexpr zp_hash64_t zp_fnv64_1a( const T* value, zp_size_t length, zp_hash64_t h = 0xcbf29ce484222325 )
+{
+    return zp_fnv64_1a( static_cast<const void*>(value), sizeof( T ) * length, h );
+}
+
+template<typename T, zp_size_t Size>
+constexpr zp_hash64_t zp_fnv64_1a( const T (& value)[Size], zp_hash64_t h = 0xcbf29ce484222325 )
+{
+    return zp_fnv64_1a( static_cast<const void*>(&value), sizeof( T ) * Size, h );
+}
+
+//
+//
+//
+
 constexpr zp_hash128_t zp_fnv128_1a( const void* ptr, const zp_size_t size, zp_hash128_t h = { .m32 = 0x6c62272e07bb0142, .m10 = 0x62b821756295c58d } )
 {
     if( ptr )
@@ -426,6 +453,89 @@ constexpr zp_int32_t zp_cmp( const T& lh, const T& rh )
     return lh < rh ? -1 : rh < lh ? 1 : 0;
 }
 
+template<typename T>
+constexpr zp_int32_t zp_cmp_asc( const T& lh, const T& rh )
+{
+    return lh < rh ? -1 : rh < lh ? 1 : 0;
+}
+
+template<typename T>
+constexpr zp_int32_t zp_cmp_dsc( const T& lh, const T& rh )
+{
+    return lh < rh ? 1 : rh < lh ? -1 : 0;
+}
+
+
+template<typename T, typename Eq>
+constexpr T* zp_find( T* begin, T* end, const T& value, Eq eq )
+{
+    T* found = nullptr;
+
+    for( ; begin != end; ++begin )
+    {
+        if( eq( *begin, value ) )
+        {
+            found = begin;
+            break;
+        }
+    }
+
+    return found;
+}
+
+template<typename T, typename Eq>
+constexpr zp_size_t zp_find_index( T* begin, T* end, const T& value, Eq eq )
+{
+    T* found = zp_find( begin, end, value, eq );
+    return found == nullptr ? -1 : found - begin;
+}
+
+template<typename T, typename Eq>
+constexpr zp_bool_t zp_try_find_index( T* begin, T* end, const T& value, Eq eq, zp_size_t& index )
+{
+    T* found = zp_find( begin, end, value, eq );
+    if( found != nullptr )
+    {
+        index = found - begin;
+    }
+    return found != nullptr;
+}
+
+template<typename T, zp_size_t Size, typename Eq>
+constexpr zp_size_t zp_find_index( const T (& arr)[Size], const T& value, Eq eq )
+{
+    zp_size_t index = -1;
+
+    for( zp_size_t i = 0; i < Size; ++i )
+    {
+        if( eq( arr[ i ], value ) )
+        {
+            index = i;
+            break;
+        }
+    }
+
+    return index;
+}
+
+template<typename T, zp_size_t Size, typename Eq>
+constexpr zp_bool_t zp_try_find_index( const T (& arr)[Size], const T& value, Eq eq, zp_size_t& index )
+{
+    zp_bool_t found = false;
+
+    for( zp_size_t i = 0; i < Size; ++i )
+    {
+        if( eq( arr[ i ], value ) )
+        {
+            index = i;
+            found = true;
+            break;
+        }
+    }
+
+    return found;
+}
+
 //
 //
 //
@@ -513,6 +623,28 @@ namespace zp
     //
     //
 
+    template<typename T, typename H>
+    struct DefaultHash
+    {
+        typedef const T& const_reference;
+
+        H operator()( const_reference val ) const
+        {
+            return zp_fnv_1a<H>( &val, sizeof( T ) );
+        }
+    };
+
+    template<typename T>
+    struct DefaultEquality
+    {
+        typedef const T& const_reference;
+
+        zp_bool_t operator()( const_reference lh, const_reference rh ) const
+        {
+            return lh == rh;
+        }
+    };
+
     template<typename T, typename H = zp_hash64_t>
     struct EqualityComparer
     {
@@ -596,19 +728,21 @@ namespace zp
         template<typename T>
         ZP_FORCEINLINE T* as()
         {
+            ZP_ASSERT( sizeof( T ) <= size );
             return static_cast<T*>( ptr );
         }
 
         template<typename T>
         ZP_FORCEINLINE const T* as() const
         {
+            ZP_ASSERT( sizeof( T ) <= size );
             return static_cast<const T*>( ptr );
         }
 
         [[nodiscard]] ZP_FORCEINLINE Memory slice( zp_ptrdiff_t offset, zp_size_t sz ) const
         {
             return {
-                .ptr = static_cast<zp_uint8_t*>( ptr ) + offset,
+                .ptr = ZP_OFFSET_PTR( ptr, offset ),
                 .size = sz
             };
         }
