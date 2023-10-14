@@ -146,7 +146,9 @@ namespace zp
 
     void* TlsfAllocatorPolicy::reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
     {
+        m_allocated -= tlsf_block_size( ptr );
         void* mem = tlsf_realloc( m_tlsf, ptr, size );
+        m_allocated += tlsf_block_size( mem );
         return mem;
     }
 
