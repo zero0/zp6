@@ -25,18 +25,6 @@ namespace zp
         T* m_subsystem;
     };
 
-    class SubsystemEngine
-    {
-    public:
-        template<typename T>
-        void registerSubsystem();
-
-        template<typename T>
-        zp_bool_t tryGetSubsystem( SubsystemHandle<T>& handle ) const;
-
-    public:
-        const MemoryLabel memoryLabel;
-    };
 }
 
 #endif //ZP_SUBSYSTEM_H

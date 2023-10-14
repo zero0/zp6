@@ -272,27 +272,35 @@ namespace
 namespace zp
 {
     zp_char8_t Platform::PathSep = '\\';
+    namespace
+    {
+        ATOM g_windowClassReg = 0;
+    }
 
     zp_handle_t Platform::OpenWindow( const OpenWindowDesc& desc )
     {
-        HINSTANCE hInstance = desc.instanceHandle ? static_cast<HINSTANCE>(desc.instanceHandle) : ::GetModuleHandle( nullptr );
+        HINSTANCE hInstance = desc.instanceHandle ? static_cast<HINSTANCE>( desc.instanceHandle ) : ::GetModuleHandle( nullptr );
 
-        const WNDCLASSEX wc {
-            .cbSize = sizeof( WNDCLASSEX ),
-            .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-            .lpfnWndProc = WinProc,
-            .cbClsExtra = 0,
-            .cbWndExtra = 0,
-            .hInstance = hInstance,
-            .hIcon = LoadIcon( hInstance, IDI_APPLICATION ),
-            .hCursor = LoadCursor( hInstance, IDC_ARROW ),
-            .hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH )),
-            .lpszMenuName = nullptr,
-            .lpszClassName = kZeroPointClassName,
-            .hIconSm = LoadIcon( hInstance, IDI_APPLICATION ),
-        };
+        if( g_windowClassReg == 0 )
+        {
+            const WNDCLASSEX wc {
+                .cbSize = sizeof( WNDCLASSEX ),
+                .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
+                .lpfnWndProc = WinProc,
+                .cbClsExtra = 0,
+                .cbWndExtra = 0,
+                .hInstance = hInstance,
+                .hIcon = LoadIcon( hInstance, IDI_APPLICATION ),
+                .hCursor = LoadCursor( hInstance, IDC_ARROW ),
+                .hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH )),
+                .lpszMenuName = nullptr,
+                .lpszClassName = kZeroPointClassName,
+                .hIconSm = LoadIcon( hInstance, IDI_APPLICATION ),
+            };
 
-        const ATOM reg = ::RegisterClassEx( &wc );
+            g_windowClassReg = ::RegisterClassEx( &wc );
+        }
+
         const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME;
         DWORD exStyle = 0;
 #if ZP_DEBUG
@@ -425,7 +433,7 @@ namespace zp
     zp_size_t Platform::GetMemoryPageSize( const zp_size_t size )
     {
         SYSTEM_INFO systemInfo;
-        ::GetSystemInfo(&systemInfo);
+        ::GetSystemInfo( &systemInfo );
 
         const zp_size_t systemPageSize = systemInfo.dwPageSize;
 
@@ -747,9 +755,9 @@ namespace zp
     void Platform::SetThreadIdealProcessor( zp_handle_t threadHandle, zp_uint32_t processorIndex )
     {
         SYSTEM_INFO systemInfo;
-        ::GetSystemInfo(&systemInfo);
+        ::GetSystemInfo( &systemInfo );
 
-        processorIndex = zp_clamp<zp_uint32_t>( processorIndex, 0, systemInfo.dwNumberOfProcessors);
+        processorIndex = zp_clamp<zp_uint32_t>( processorIndex, 0, systemInfo.dwNumberOfProcessors );
 
         const zp_uint64_t requestedMask = 1 << processorIndex;
         if( systemInfo.dwActiveProcessorMask & requestedMask )
@@ -775,7 +783,7 @@ namespace zp
     zp_uint32_t Platform::GetProcessorCount()
     {
         SYSTEM_INFO systemInfo;
-        ::GetSystemInfo(&systemInfo);
+        ::GetSystemInfo( &systemInfo );
         return systemInfo.dwNumberOfProcessors;
     }
 

@@ -17,18 +17,18 @@ namespace zp
 {
     namespace
     {
-        IMemoryAllocator* s_memoryAllocators[static_cast<MemoryLabel>(kMaxMemoryLabels)];
+        IMemoryAllocator* s_memoryAllocators[kMaxMemoryLabels];
     }
 
     void RegisterAllocator( const MemoryLabel memoryLabel, IMemoryAllocator* memoryAllocator )
     {
-        ZP_ASSERT( memoryLabel < static_cast<MemoryLabel>(kMaxMemoryLabels) );
+        ZP_ASSERT( memoryLabel < kMaxMemoryLabels );
         s_memoryAllocators[ memoryLabel ] = memoryAllocator;
     }
 
     IMemoryAllocator* GetAllocator( const MemoryLabel memoryLabel )
     {
-        ZP_ASSERT( memoryLabel < static_cast<MemoryLabel>(kMaxMemoryLabels) );
+        ZP_ASSERT( memoryLabel < kMaxMemoryLabels );
         return s_memoryAllocators[ memoryLabel ];
     }
 }

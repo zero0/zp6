@@ -447,9 +447,14 @@ JobHandle JobData::schedule( JobHandle dependency )
 
     if( job )
     {
-        job->addDependency( dependency.m_job );
-
-        GetLocalBatchJobQueue()->pushBack( job );
+        if( dependency.m_job && !dependency.isComplete() )
+        {
+            dependency.m_job->addDependency( job );
+        }
+        else
+        {
+            GetLocalBatchJobQueue()->pushBack( job );
+        }
     }
 
     return JobHandle( job );

@@ -17,6 +17,7 @@ struct MemoryConfig
 {
     zp_size_t defaultAllocatorPageSize;
     zp_size_t tempAllocatorPageSize;
+    zp_size_t threadSafeAllocatorPageSize;
     zp_size_t profilerPageSize;
     zp_size_t debugPageSize;
 };
@@ -28,6 +29,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     MemoryConfig memoryConfig {
         .defaultAllocatorPageSize = 16 MB,
         .tempAllocatorPageSize = 2 MB,
+        .threadSafeAllocatorPageSize = 2 MB,
         .profilerPageSize = 16 MB,
         .debugPageSize = 1 MB,
     };
@@ -38,7 +40,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     void* const baseAddress = nullptr;
 #endif
 
-    const zp_size_t totalMemorySize = 128 MB;
+    const zp_size_t totalMemorySize = 256 MB;
     void* systemMemory = Platform::AllocateSystemMemory( baseAddress, totalMemorySize );
 
     MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_defaultAllocator(
@@ -55,6 +57,14 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
         SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), memoryConfig.tempAllocatorPageSize ),
         TlsfAllocatorPolicy(),
         NullMemoryLock()
+    );
+
+    const zp_size_t threadSafeMemorySize = 8 MB;
+    endMemorySize -= threadSafeMemorySize;
+    MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, CriticalSectionMemoryLock> s_threadSafeAllocator(
+        SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), memoryConfig.threadSafeAllocatorPageSize ),
+        TlsfAllocatorPolicy(),
+        CriticalSectionMemoryLock()
     );
 
 #if ZP_USE_PROFILER
@@ -97,12 +107,14 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     RegisterAllocator( MemoryLabels::User, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Data, &s_defaultAllocator );
     RegisterAllocator( MemoryLabels::Temp, &s_tempAllocator );
-    RegisterAllocator( MemoryLabels::ThreadSafe, &s_defaultAllocator );
+    RegisterAllocator( MemoryLabels::ThreadSafe, &s_threadSafeAllocator );
     RegisterAllocator( MemoryLabels::Profiling, &s_profilingAllocator );
     RegisterAllocator( MemoryLabels::Debug, &s_debugAllocator );
 
     auto engine = ZP_NEW( Default, Engine );
     {
+        engine->processCommandLine( String::As( lpCmdLine ) );
+
         engine->initialize();
 
         engine->startEngine();
@@ -110,8 +122,6 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
         do
         {
             engine->process();
-
-            //zp_yield_current_thread();
         } while( engine->isRunning() );
 
         engine->stopEngine();

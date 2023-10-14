@@ -40,6 +40,8 @@ namespace zp
 
         [[nodiscard]] zp_int32_t getExitCode() const;
 
+        void processCommandLine( const String& cmdLine );
+
         void initialize();
 
         void destroy();
@@ -82,15 +84,24 @@ namespace zp
         {
             return m_assetSystem;
         }
+
     private:
-        enum class EngineState : zp_uint8_t
+        enum class EngineState : zp_uint32_t
         {
-            Idle,
+            Uninitialized,
             Initializing,
+            Initialized,
             Running,
-            Restart,
+            Destroying,
+            Destroyed,
             Exit,
         };
+
+        void onStateEntered( EngineState engineState );
+
+        void onStateProcess( EngineState engineState );
+
+        void onStateExited( EngineState engineState );
 
         static void onWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height )
         {
@@ -121,7 +132,10 @@ namespace zp
         zp_time_t m_frameTime;
         zp_time_t m_timeFrequencyS;
 
+        zp_int32_t m_restartCounter;
+        zp_int32_t m_pauseCounter;
         zp_int32_t m_exitCode;
+
         EngineState m_nextEngineState;
         EngineState m_currentEngineState;
 

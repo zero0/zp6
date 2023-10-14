@@ -38,8 +38,8 @@ namespace zp
         , m_frameTime( 0 )
         , m_timeFrequencyS( zp_time_frequency() )
         , m_exitCode( 0 )
-        , m_nextEngineState( EngineState::Idle )
-        , m_currentEngineState( EngineState::Idle )
+        , m_nextEngineState( EngineState::Uninitialized )
+        , m_currentEngineState( EngineState::Uninitialized )
         , memoryLabel( memoryLabel )
     {
     }
@@ -60,6 +60,11 @@ namespace zp
     }
 
     void DestroyRawAssetComponentDataCallback( void* componentData, zp_size_t componentSize )
+    {
+
+    }
+
+    void Engine::processCommandLine( const String& cmdLine )
     {
 
     }
@@ -86,6 +91,9 @@ namespace zp
         Profiler::InitializeProfilerThread();
 #endif
 
+        JobSystem::Setup( MemoryLabels::Default, numJobThreads );
+        JobSystem::InitializeJobThreads();
+
         m_windowCallbacks = {
             .minWidth = 320,
             .minHeight = 240,
@@ -101,7 +109,7 @@ namespace zp
             .showWindow = true
         } );
 
-return;
+        return;
         const char* moduleDLLPath = "";
         if( !zp_strempty( moduleDLLPath ) )
         {
@@ -247,6 +255,9 @@ return;
 
         ZP_SAFE_DELETE( Profiler, m_profiler );
 #endif
+
+        JobSystem::ExitJobThreads();
+        JobSystem::Teardown();
     }
 
     void Engine::startEngine()
@@ -261,8 +272,6 @@ return;
 
     void Engine::stopEngine()
     {
-        m_nextEngineState = EngineState::Idle;
-
         if( m_moduleAPI )
         {
             m_moduleAPI->onEngineStopped( this );
@@ -271,13 +280,113 @@ return;
 
     void Engine::restart()
     {
-        m_nextEngineState = EngineState::Restart;
+        m_restartCounter++;
+        m_nextEngineState = EngineState::Destroying;
     }
 
     void Engine::exit( zp_int32_t exitCode )
     {
+        m_restartCounter = 0;
         m_exitCode = exitCode;
-        m_nextEngineState = EngineState::Exit;
+        m_nextEngineState = EngineState::Destroying;
+    }
+
+    void Engine::onStateEntered( EngineState engineState )
+    {
+        switch( engineState )
+        {
+            case EngineState::Uninitialized:
+                zp_printfln("Enter Uninitialized");
+                break;
+            case EngineState::Initializing:
+            {
+                zp_printfln("Enter Initializing");
+            }
+                break;
+            case EngineState::Initialized:
+            {
+                zp_printfln("Enter Initialized");
+            }
+                break;
+            case EngineState::Running:
+            {
+                zp_printfln("Enter Running");
+            }
+                break;
+            case EngineState::Destroying:
+                zp_printfln("Enter Destroying");
+                break;
+            case EngineState::Destroyed:
+                zp_printfln("Enter Destroyed");
+                break;
+            case EngineState::Exit:
+                zp_printfln("Enter Exit");
+                break;
+        }
+    }
+
+    void Engine::onStateProcess( EngineState engineState )
+    {
+        switch( engineState )
+        {
+            case EngineState::Uninitialized:
+                break;
+            case EngineState::Initializing:
+                m_nextEngineState = EngineState::Initialized;
+                break;
+            case EngineState::Initialized:
+                m_nextEngineState = EngineState::Running;
+                break;
+            case EngineState::Running:
+                zp_yield_current_thread();
+                break;
+            case EngineState::Destroying:
+                m_nextEngineState = EngineState::Destroyed;
+                break;
+            case EngineState::Destroyed:
+            {
+                if( m_restartCounter > 0 )
+                {
+                    m_restartCounter = 0;
+                    m_nextEngineState = EngineState::Initializing;
+                }
+                else
+                {
+                    m_nextEngineState = EngineState::Exit;
+                }
+            }
+                break;
+            case EngineState::Exit:
+                break;
+        }
+    }
+
+    void Engine::onStateExited( EngineState engineState )
+    {
+        switch( engineState )
+        {
+            case EngineState::Uninitialized:
+                zp_printfln("Exit Uninitialized");
+                break;
+            case EngineState::Initializing:
+                zp_printfln("Exit Initializing");
+                break;
+            case EngineState::Initialized:
+                zp_printfln("Exit Initialized");
+                break;
+            case EngineState::Running:
+                zp_printfln("Exit Running");
+                break;
+            case EngineState::Destroying:
+                zp_printfln("Exit Destroying");
+                break;
+            case EngineState::Destroyed:
+                zp_printfln("Exit Destroyed");
+                break;
+            case EngineState::Exit:
+                zp_printfln("Exit Exit");
+                break;
+        }
     }
 
     struct InitializeEngineJob;
@@ -478,48 +587,85 @@ return;
     {
         processWindowEvents();
 
-        if( m_nextEngineState != m_currentEngineState )
+        const zp_bool_t stateChanged = m_nextEngineState != m_currentEngineState;
+        if( stateChanged )
         {
+            onStateExited( m_currentEngineState );
+
             m_currentEngineState = m_nextEngineState;
+
+            onStateEntered( m_currentEngineState );
         }
 
-        switch( m_currentEngineState )
-        {
-            case EngineState::Idle:
-                break;
-
-            case EngineState::Initializing:
-            {
-                //ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
-
-                m_nextEngineState = EngineState::Running;
-            }
-                break;
-
-            case EngineState::Running:
-            {
-                zp_yield_current_thread();
-            }
-                break;
-
-            case EngineState::Exit:
-                zp_printfln( "Exit" );
-                break;
-
-            case EngineState::Restart:
-            {
-                stopEngine();
-
-                destroy();
-
-                initialize();
-
-                startEngine();
-            }
-                break;
-        }
+        onStateProcess( m_currentEngineState );
 
 #if 0
+        if( stateChanged )
+        {
+            switch( m_currentEngineState )
+            {
+                case EngineState::Uninitialized:
+                {
+                    m_nextEngineState = EngineState::Initializing;
+                }
+                    break;
+
+                case EngineState::Initializing:
+                {
+                    m_nextEngineState = EngineState::Initialized;
+                }
+                    break;
+
+                case EngineState::Initialized:
+                {
+                    m_nextEngineState = EngineState::Running;
+                }
+                    break;
+
+                case EngineState::Running:
+                {
+                    zp_yield_current_thread();
+                }
+                    break;
+
+                case EngineState::Paused:
+                {
+                    zp_yield_current_thread();
+                }
+                    break;
+
+                case EngineState::Restart:
+                {
+                    stopEngine();
+
+                    destroy();
+
+                    initialize();
+
+                    startEngine();
+                }
+                    break;
+
+                case EngineState::Destroying:
+                {
+                    m_nextEngineState = EngineState::Destroyed;
+                }
+                    break;
+
+                case EngineState::Destroyed:
+                {
+                    m_nextEngineState = EngineState::Uninitialized;
+                }
+                    break;
+
+                case EngineState::Exit:
+                {
+                    zp_printfln( "Exit" );
+                }
+                    break;
+            }
+        }
+
         switch( m_currentEngineState )
         {
             case Running:
