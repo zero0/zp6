@@ -70,16 +70,16 @@ namespace zp
         thread_local ProfilerThreadData t_profilerData;
     }
 
-    Profiler::Profiler( MemoryLabel memoryLabel, const ProfilerCreateDesc* profilerCreateDesc )
+    Profiler::Profiler( MemoryLabel memoryLabel, const ProfilerCreateDesc& profilerCreateDesc )
         : m_currentFrame( 0 )
-        , m_maxProfilerThreads( profilerCreateDesc->maxThreadCount )
+        , m_maxProfilerThreads( profilerCreateDesc.maxThreadCount )
         , m_currentCPUProfilerEvent( 0 )
         , m_currentMemoryProfilerEvent( 0 )
         , m_currentGPUProfilerEvent( 0 )
-        , m_maxCPUProfilerEvents( profilerCreateDesc->maxCPUEventsPerThread )
-        , m_maxMemoryProfilerEvents( profilerCreateDesc->maxMemoryEventsPerThread )
-        , m_maxGPUProfilerEvents( profilerCreateDesc->maxGPUEventsPerThread )
-        , m_framesToCapture( profilerCreateDesc->maxFramesToCapture )
+        , m_maxCPUProfilerEvents( profilerCreateDesc.maxCPUEventsPerThread )
+        , m_maxMemoryProfilerEvents( profilerCreateDesc.maxMemoryEventsPerThread )
+        , m_maxGPUProfilerEvents( profilerCreateDesc.maxGPUEventsPerThread )
+        , m_framesToCapture( profilerCreateDesc.maxFramesToCapture )
         , m_profilerFrameStride( 0 )
         , m_cpuProfilerData( nullptr )
         , m_memoryProfilerData( nullptr )
@@ -87,7 +87,7 @@ namespace zp
         , m_profilerFrameBuffers( nullptr )
         , m_profilerThreadData( nullptr )
         , m_profilerDataThreadCount( 0 )
-        , m_profilerDataThreadCapacity( profilerCreateDesc->maxThreadCount )
+        , m_profilerDataThreadCapacity( profilerCreateDesc.maxThreadCount )
         , memoryLabel( memoryLabel )
     {
         g_profiler = this;

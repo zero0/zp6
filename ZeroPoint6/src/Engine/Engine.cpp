@@ -78,15 +78,13 @@ namespace zp
         const zp_uint32_t numJobThreads = 2; // Platform::GetProcessorCount() - 1;
 
 #if ZP_USE_PROFILER
-        ProfilerCreateDesc profilerCreateDesc {
+        m_profiler = ZP_NEW_ARGS( Profiling, Profiler, {
             .maxThreadCount = numJobThreads + 1,
             .maxCPUEventsPerThread = 128,
             .maxMemoryEventsPerThread = 128,
             .maxGPUEventsPerThread = 4,
             .maxFramesToCapture = 120,
-        };
-
-        m_profiler = ZP_NEW_ARGS( Profiling, Profiler, &profilerCreateDesc );
+        } );
 
         Profiler::InitializeProfilerThread();
 #endif

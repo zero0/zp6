@@ -265,7 +265,7 @@ namespace zp
         };
 
     public:
-        Profiler( MemoryLabel memoryLabel, const ProfilerCreateDesc* profilerCreateDesc );
+        Profiler( MemoryLabel memoryLabel, const ProfilerCreateDesc& profilerCreateDesc );
 
         ~Profiler();
 
