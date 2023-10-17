@@ -1311,7 +1311,7 @@ namespace zp
         {
             vkDestroyCommandPool( m_vkLocalDevice, m_vkCommandPools[ i ], &m_vkAllocationCallbacks );
         }
-        ZP_FREE_( memoryLabel, m_vkCommandPools );
+        ZP_FREE( memoryLabel, m_vkCommandPools );
 
         //vkDestroyCommandPool( m_vkLocalDevice, m_vkGraphicsCommandPool, nullptr );
         //vkDestroyCommandPool( m_vkLocalDevice, m_vkTransferCommandPool, nullptr );
@@ -1633,7 +1633,7 @@ namespace zp
                     }
                 }
 
-                ZP_FREE_( memoryLabel, perFrameData.commandQueues );
+                ZP_FREE( memoryLabel, perFrameData.commandQueues );
             }
 
             perFrameData.vkSwapChainAcquireSemaphore = VK_NULL_HANDLE;
@@ -1683,6 +1683,7 @@ namespace zp
 
         VkResult result;
 
+        const zp_uint64_t prevFrame = m_currentFrameIndex;
         m_currentFrameIndex = frameIndex;
 
         processDelayedDestroy();
@@ -1719,10 +1720,8 @@ namespace zp
         }
 
 #if ZP_USE_PROFILER
-        if( frameIndex > 0 )
         {
-            const zp_uint64_t prevFrame = ( frameIndex - 1 ) & ( kBufferedFrameCount - 1 );
-            PerFrameData& prevFrameData = m_perFrameData[ prevFrame ];
+            PerFrameData& prevFrameData = getFrameData( prevFrame );
 
             if( prevFrameData.commandQueueCount > 0 )
             {
@@ -2475,7 +2474,7 @@ namespace zp
                     newCommandQueues[ i ] = zp_move( frameData.commandQueues[ i ] );
                 }
 
-                ZP_FREE_( memoryLabel, frameData.commandQueues );
+                ZP_FREE( memoryLabel, frameData.commandQueues );
                 frameData.commandQueues = nullptr;
             }
 

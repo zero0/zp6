@@ -465,7 +465,7 @@ namespace zp
         m_graphicsDevice->createSwapChain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
 
         BatchModeRendererConfig batchModeRendererConfig {};
-        m_batchModeRenderer = ZP_NEW_ARGS_( memoryLabel, BatchModeRenderer, &batchModeRendererConfig );
+        m_batchModeRenderer = ZP_NEW_ARGS( memoryLabel, BatchModeRenderer, &batchModeRendererConfig );
 
         ImmediateModeRendererConfig immediateModeRendererConfig {
             64,
@@ -474,7 +474,7 @@ namespace zp
             m_graphicsDevice,
             m_batchModeRenderer
         };
-        m_immediateModeRenderer = ZP_NEW_ARGS_( memoryLabel, ImmediateModeRenderer, &immediateModeRendererConfig );
+        m_immediateModeRenderer = ZP_NEW_ARGS( memoryLabel, ImmediateModeRenderer, &immediateModeRendererConfig );
 
         m_nextRenderPipeline = &s_renderPipeline;
     }

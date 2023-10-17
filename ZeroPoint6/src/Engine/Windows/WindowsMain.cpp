@@ -111,7 +111,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     RegisterAllocator( MemoryLabels::Profiling, &s_profilingAllocator );
     RegisterAllocator( MemoryLabels::Debug, &s_debugAllocator );
 
-    auto engine = ZP_NEW( Default, Engine );
+    auto engine = ZP_NEW( MemoryLabels::Default, Engine );
     {
         engine->processCommandLine( String::As( lpCmdLine ) );
 
@@ -131,7 +131,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
     const zp_int32_t exitCode = engine->getExitCode();
 
-    ZP_FREE( Default, engine );
+    ZP_FREE( MemoryLabels::Default, engine );
 
     return exitCode;
 }

@@ -38,7 +38,7 @@ DataStreamWriter::~DataStreamWriter()
 {
     if( m_blockSize > 0 )
     {
-        ZP_SAFE_FREE_LABEL( memoryLabel, m_buffer );
+        ZP_SAFE_FREE( memoryLabel, m_buffer );
     }
 }
 
@@ -212,7 +212,7 @@ void DataStreamWriter::ensureCapacity( zp_size_t capacity )
     if( m_buffer )
     {
         zp_memcpy( newBuffer, newCapacity, m_buffer, m_position );
-        ZP_FREE_( memoryLabel, m_buffer );
+        ZP_FREE( memoryLabel, m_buffer );
     }
 
     m_buffer = newBuffer;

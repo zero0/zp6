@@ -55,6 +55,7 @@
 #define ZP_USE_ASSERTIONS       1
 #define ZP_USE_PRINTF           1
 #define ZP_USE_SAFE_DELETE      1
+#define ZP_USE_SAFE_FREE        1
 
 #define ZP_USE_PROFILER         1
 

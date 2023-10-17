@@ -78,7 +78,7 @@ namespace zp
         const zp_uint32_t numJobThreads = 2; // Platform::GetProcessorCount() - 1;
 
 #if ZP_USE_PROFILER
-        m_profiler = ZP_NEW_ARGS( Profiling, Profiler, {
+        m_profiler = ZP_NEW_ARGS( MemoryLabels::Profiling, Profiler, {
             .maxThreadCount = numJobThreads + 1,
             .maxCPUEventsPerThread = 128,
             .maxMemoryEventsPerThread = 128,
@@ -131,11 +131,11 @@ namespace zp
         //
         //
 
-        m_renderSystem = ZP_NEW( Default, RenderSystem );
+        m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
 
-        m_entityComponentManager = ZP_NEW( Default, EntityComponentManager );
+        m_entityComponentManager = ZP_NEW( MemoryLabels::Default, EntityComponentManager );
 
-        m_assetSystem = ZP_NEW( Default, AssetSystem );
+        m_assetSystem = ZP_NEW( MemoryLabels::Default, AssetSystem );
 
         //
         //

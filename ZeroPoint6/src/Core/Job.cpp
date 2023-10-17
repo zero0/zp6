@@ -511,11 +511,11 @@ void JobSystem::Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount )
 
 void JobSystem::Teardown()
 {
-    ZP_FREE_( g_memoryLabel, g_jobThreadHandles.ptr );
+    ZP_FREE( g_memoryLabel, g_jobThreadHandles.ptr );
 
-    ZP_FREE_( g_memoryLabel, g_allBatchJobQueues.ptr );
-    ZP_FREE_( g_memoryLabel, g_allJobQueues.ptr );
-    ZP_FREE_( g_memoryLabel, g_allQueues.ptr );
+    ZP_FREE( g_memoryLabel, g_allBatchJobQueues.ptr );
+    ZP_FREE( g_memoryLabel, g_allJobQueues.ptr );
+    ZP_FREE( g_memoryLabel, g_allQueues.ptr );
 }
 
 void JobSystem::InitializeJobThreads()

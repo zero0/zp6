@@ -34,7 +34,7 @@ namespace zp
             while( block != m_head )
             {
                 ArchetypeBlock* next = block->next;
-                ZP_FREE_( memoryLabel, block );
+                ZP_FREE( memoryLabel, block );
 
                 block = next;
             }
@@ -69,7 +69,7 @@ namespace zp
         if( !found )
         {
             // allocate block memory
-            void* blockMemory = ZP_MALLOC_( memoryLabel, sizeof( ArchetypeBlock ) + kMaxEntitiesPerArchetypeBlock * m_componentBlockArchetype.totalStride );
+            void* blockMemory = ZP_MALLOC( memoryLabel, sizeof( ArchetypeBlock ) + kMaxEntitiesPerArchetypeBlock * m_componentBlockArchetype.totalStride );
 
             freeBlock = static_cast<ArchetypeBlock*>( blockMemory );
             freeBlock->usedBits = 0;
@@ -341,7 +341,7 @@ namespace zp
                 }
 
                 ComponentArchetypeManager* archetypeManager;
-                archetypeManager = ZP_NEW_ARGS_( memoryLabel, ComponentArchetypeManager, archetype );
+                archetypeManager = ZP_NEW_ARGS( memoryLabel, ComponentArchetypeManager, archetype );
 
                 m_componentArchetypes.pushBack( archetypeManager );
             }
@@ -402,5 +402,3 @@ namespace zp
     }
 
 }
-
-

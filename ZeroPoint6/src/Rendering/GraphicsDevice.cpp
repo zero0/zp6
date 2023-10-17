@@ -26,7 +26,7 @@ namespace zp
     GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc )
     {
 #if ZP_RENDERING_VULKAN
-        return ZP_NEW_ARGS_( memoryLabel, VulkanGraphicsDevice, graphicsDeviceDesc );
+        return ZP_NEW_ARGS( memoryLabel, VulkanGraphicsDevice, graphicsDeviceDesc );
 #elif
         return nullptr;
 #endif

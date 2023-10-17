@@ -116,20 +116,20 @@ namespace zp
         m_profilerFrameStride = ( sizeof( ProfilerFrameHeader ) + cpuProfileEventSize + memoryProfileEventSize + gpuProfileEventSize );
         const zp_size_t profilerFrameBufferAllocationSize = m_profilerFrameStride * m_framesToCapture;
 
-        m_profilerFrameBuffers = ZP_MALLOC_( memoryLabel, profilerFrameBufferAllocationSize );
+        m_profilerFrameBuffers = ZP_MALLOC( memoryLabel, profilerFrameBufferAllocationSize );
 
         zp_zero_memory( m_profilerFrameBuffers, profilerFrameBufferAllocationSize );
     }
 
     Profiler::~Profiler()
     {
-        ZP_FREE_( memoryLabel, m_cpuProfilerData );
-        ZP_FREE_( memoryLabel, m_memoryProfilerData );
-        ZP_FREE_( memoryLabel, m_gpuProfilerData );
+        ZP_FREE( memoryLabel, m_cpuProfilerData );
+        ZP_FREE( memoryLabel, m_memoryProfilerData );
+        ZP_FREE( memoryLabel, m_gpuProfilerData );
 
-        ZP_FREE_( memoryLabel, m_profilerThreadData );
+        ZP_FREE( memoryLabel, m_profilerThreadData );
 
-        ZP_FREE_( memoryLabel, m_profilerFrameBuffers );
+        ZP_FREE( memoryLabel, m_profilerFrameBuffers );
 
         g_profiler = nullptr;
     }

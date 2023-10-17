@@ -86,9 +86,9 @@ namespace zp
 
     ImmediateModeRenderer::~ImmediateModeRenderer()
     {
-        ZP_FREE_( memoryLabel, m_perFrameData[ 0 ].commandBuffer );
-        ZP_FREE_( memoryLabel, m_perFrameData[ 0 ].scratchVertexBuffer );
-        ZP_FREE_( memoryLabel, m_perFrameData[ 0 ].scratchIndexBuffer );
+        ZP_FREE( memoryLabel, m_perFrameData[ 0 ].commandBuffer );
+        ZP_FREE( memoryLabel, m_perFrameData[ 0 ].scratchVertexBuffer );
+        ZP_FREE( memoryLabel, m_perFrameData[ 0 ].scratchIndexBuffer );
 
         for( PerFrameData& perFrameData : m_perFrameData )
         {

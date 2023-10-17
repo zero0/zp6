@@ -823,8 +823,7 @@ namespace zp
 
         ~AllocString()
         {
-            ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
-            m_str = nullptr;
+            ZP_SAFE_FREE( memoryLabel, m_str );
             m_length = 0;
         }
 
@@ -853,7 +852,7 @@ namespace zp
         {
             if( m_str != other.m_str )
             {
-                ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+                ZP_SAFE_FREE( memoryLabel, m_str );
 
                 m_str = other.m_str;
                 m_length = other.m_length;
@@ -864,7 +863,7 @@ namespace zp
 
         AllocString& operator=( AllocString&& other ) noexcept
         {
-            ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+            ZP_SAFE_FREE( memoryLabel, m_str );
 
             m_str = other.m_str;
             m_length = other.m_length;
@@ -907,7 +906,7 @@ namespace zp
 
         void set( MemoryLabel memoryLabel, zp_char8_t* str, zp_size_t length )
         {
-            ZP_SAFE_FREE_LABEL( memoryLabel, m_str );
+            ZP_SAFE_FREE( memoryLabel, m_str );
 
             this->memoryLabel = memoryLabel;
             m_str = str;
