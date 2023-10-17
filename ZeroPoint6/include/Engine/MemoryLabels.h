@@ -11,22 +11,23 @@ namespace zp
 {
     namespace MemoryLabels
     {
-        const MemoryLabel Default = 0;
-        const MemoryLabel String = 1;
-        const MemoryLabel Graphics = 2;
-        const MemoryLabel FileIO = 3;
-        const MemoryLabel Buffer = 4;
-        const MemoryLabel User = 5;
-        const MemoryLabel Data = 6;
-        const MemoryLabel Temp = 7;
-        const MemoryLabel ThreadSafe = 8;
+        constexpr MemoryLabel Default = 0;
+        constexpr MemoryLabel String = 1;
+        constexpr MemoryLabel Graphics = 2;
+        constexpr MemoryLabel FileIO = 3;
+        constexpr MemoryLabel Buffer = 4;
+        constexpr MemoryLabel User = 5;
+        constexpr MemoryLabel Data = 6;
+        constexpr MemoryLabel Temp = 7;
+        constexpr MemoryLabel ThreadSafe = 8;
 
-        const MemoryLabel Profiling = 9;
-        const MemoryLabel Debug = 10;
+        constexpr MemoryLabel Profiling = 9;
+        constexpr MemoryLabel Debug = 10;
 
-        const MemoryLabel MemoryLabels_Count = 11;
+        constexpr MemoryLabel MemoryLabels_Count = 11;
     };
 
-    static_assert( MemoryLabels::MemoryLabels_Count < kMaxMemoryLabels );
+    ZP_STATIC_ASSERT( static_cast<MemoryLabel>( MemoryLabels::MemoryLabels_Count ) < kMaxMemoryLabels );
 }
+
 #endif //ZP_MEMORYLABELS_H
