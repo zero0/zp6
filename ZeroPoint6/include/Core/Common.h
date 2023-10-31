@@ -60,17 +60,23 @@ zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... 
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
-#define ZP_ASSERT( t )                  do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); }} while( false )
-#define ZP_ASSERT_RETURN( t )           do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s", __FILE__, __LINE__, #t ); return; }} while( false )
-#define ZP_ASSERT_MSG( t, msg )         do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - %s: %s", __FILE__, __LINE__, #t, msg ); }} while( false )
-#define ZP_INVALID_CODE_PATH()          do { zp_error_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG( msg ) do { zp_error_printfln( "Invalid Code Path %s:%d - %s", __FILE__, __LINE__, msg ); } while( false )
+#define ZP_ASSERT( t )                                      do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t, __FILE__, __LINE__ ); return; }} while( false )
+#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t, __FILE__, __LINE__ ); return v; }} while( false )
+#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t ": " msg, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
+#define ZP_INVALID_CODE_PATH()                              do { zp_error_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_error_printfln( "Invalid Code Path %s:%d - " msg, __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_error_printfln( "Invalid Code Path %s:%d - " msg, __FILE__, __LINE__, args ); } while( false )
 #else // !ZP_USE_ASSERTIONS
-#define ZP_ASSERT(...)                  (void)0
-#define ZP_ASSERT_RETURN(...)           (void)0
-#define ZP_ASSERT_MSG(...)              (void)0
-#define ZP_INVALID_CODE_PATH()          (void)0
-#define ZP_INVALID_CODE_PATH_MSG(...)   (void)0
+#define ZP_ASSERT(...)                      (void)0
+#define ZP_ASSERT_RETURN(...)               (void)0
+#define ZP_ASSERT_RETURN_VALUE(...)         (void)0
+#define ZP_ASSERT_MSG(...)                  (void)0
+#define ZP_ASSERT_MSG_ARGS(...)             (void)0
+#define ZP_INVALID_CODE_PATH()              (void)0
+#define ZP_INVALID_CODE_PATH_MSG(...)       (void)0
+#define ZP_INVALID_CODE_PATH_MSG_ARGS(...)  (void)0
 #endif // ZP_USE_ASSERTIONS
 
 template<typename T, int CountLog2>

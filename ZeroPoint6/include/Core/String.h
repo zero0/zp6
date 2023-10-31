@@ -14,15 +14,59 @@
 
 constexpr zp_size_t zp_strlen( const char* str );
 
+constexpr zp_size_t zp_strlen( const zp_char8_t* str );
+
 //
 //
 //
 
-zp_int32_t zp_strcmp( const char* lh, const char* rh );
+constexpr zp_int32_t zp_strcmp( const char* lh, const char* rh )
+{
+    const zp_size_t lhLength = zp_strlen( lh );
+    const zp_size_t rhLength = zp_strlen( rh );
 
-zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char* rh, zp_size_t rhSize );
+    zp_int32_t cmp = zp_cmp( lhLength, rhLength );
+    if( cmp == 0 )
+    {
+        const zp_size_t len = lhLength < rhLength ? lhLength : rhLength;
+        for( zp_size_t i = 0; i < len && cmp == 0; ++i )
+        {
+            cmp = zp_cmp( lh[ i ], rh[ i ] );
+        }
+    }
 
-zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* rh, zp_size_t rhSize );
+    return cmp;
+}
+
+constexpr zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char* rh, zp_size_t rhSize )
+{
+    zp_int32_t cmp = zp_cmp( lhSize, rhSize );
+
+    if( cmp == 0 )
+    {
+        for( zp_size_t i = 0; i < lhSize && cmp == 0; ++i )
+        {
+            cmp = zp_cmp( lh[ i ], rh[ i ] );
+        }
+    }
+
+    return cmp;
+}
+
+constexpr zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* rh, zp_size_t rhSize )
+{
+    zp_int32_t cmp = zp_cmp( lhSize, rhSize );
+
+    if( cmp == 0 )
+    {
+        for( zp_size_t i = 0; i < lhSize && cmp == 0; ++i )
+        {
+            cmp = zp_cmp( lh[ i ], rh[ i ] );
+        }
+    }
+
+    return cmp;
+}
 
 template<zp_size_t RHSize>
 zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char (& rh)[RHSize] )
@@ -1067,6 +1111,15 @@ namespace zp
         zp_char8_t m_str[Size];
     };
 
+    // Predefined FixedString lengths
+    typedef FixedString<16> FixedString16;
+    typedef FixedString<32> FixedString32;
+    typedef FixedString<64> FixedString64;
+    typedef FixedString<128> FixedString128;
+    typedef FixedString<256> FixedString256;
+    typedef FixedString<512> FixedString512;
+    typedef FixedString<1024> FixedString1024;
+
     template<zp_size_t Size>
     class MutableFixedString
     {
@@ -1169,6 +1222,11 @@ namespace zp
             m_str[ m_length ] = '\0';
         }
 
+        void append( const String& str )
+        {
+            append( str.c_str(), str.length );
+        }
+
         template<class ... Args>
         void format( const char* format, Args ... args )
         {
@@ -1198,6 +1256,15 @@ namespace zp
         zp_size_t m_length;
     };
 
+    // Predefined MutableFixedString lengths
+    typedef MutableFixedString<16> MutableFixedString16;
+    typedef MutableFixedString<32> MutableFixedString32;
+    typedef MutableFixedString<64> MutableFixedString64;
+    typedef MutableFixedString<128> MutableFixedString128;
+    typedef MutableFixedString<256> MutableFixedString256;
+    typedef MutableFixedString<512> MutableFixedString512;
+    typedef MutableFixedString<1024> MutableFixedString1024;
+
 #pragma endregion
 
 #pragma region Pooled String
@@ -1226,6 +1293,13 @@ namespace zp
     class Tokenizer
     {
     public:
+        Tokenizer( const String& str, const char* delim)
+            : m_str( str )
+            , m_delim( String::As( delim ) )
+            , m_next( 0 )
+        {
+        }
+
         Tokenizer( const char* str, zp_size_t length, const char* delim )
             : m_str( String::As( str, length ) )
             , m_delim( String::As( delim ) )
@@ -1307,5 +1381,26 @@ namespace zp
         zp_size_t m_next;
     };
 };
+
+//
+//
+//
+
+template<zp_size_t RHSize>
+constexpr zp_int32_t zp_strcmp( const zp::String& str, const char (& rh)[RHSize] )
+{
+    return zp_strcmp( str.c_str(), str.length, rh, zp_strlen( rh ) );
+}
+
+constexpr zp_int32_t zp_strcmp( const zp::String& lh, const zp::String& rh )
+{
+    return zp_strcmp( lh.str, lh.length, rh.str, rh.length );
+}
+
+template<zp_size_t Size>
+constexpr const char* zp_strnstr( const zp::String& str, const char (& find)[Size] )
+{
+    return zp_strnstr( str.c_str(), str.length, find, zp_strlen( find ) );
+}
 
 #endif //ZP_STRING_H

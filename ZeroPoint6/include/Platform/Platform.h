@@ -190,13 +190,32 @@ namespace zp
     // File & Path
     namespace Platform
     {
-        void GetCurrentDir( char* path, zp_size_t maxPathLength );
+        zp_size_t GetCurrentDir( char* path, zp_size_t maxPathLength );
+
+        String GetCurrentDirStr( char* path, zp_size_t maxPathLength );
 
         template<zp_size_t Size>
-        void GetCurrentDir( char (& path)[Size] )
+        zp_size_t GetCurrentDir( char (& path)[Size] )
         {
-            GetCurrentDir( path, Size );
+            return GetCurrentDir( path, Size );
         }
+
+        template<zp_size_t Size>
+        String GetCurrentDirStr( char (& path)[Size] )
+        {
+            return GetCurrentDirStr( path, Size );
+        }
+
+        enum class CreateDirResult
+        {
+            Success,
+            ErrorDirectoryAlreadyExists = -1,
+            ErrorPathNotFound = -2,
+        };
+
+        zp_bool_t CreateDirectory( const char* path );
+
+        zp_bool_t DirectoryExists( const char* path );
 
         zp_bool_t FileExists( const char* filePath );
 

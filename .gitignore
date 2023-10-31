@@ -460,3 +460,4 @@ FodyWeavers.xsd
 cmake-build-*
 out/
 .idea/
+Library/

@@ -7,11 +7,19 @@
 
 using namespace zp;
 
+namespace
+{
+    enum
+    {
+        kDefaultDataStreamWriterBlockSize = 4 KB
+    };
+}
+
 DataStreamWriter::DataStreamWriter( MemoryLabel memoryLabel )
     : m_buffer( nullptr )
     , m_position( 0 )
     , m_capacity( 0 )
-    , m_blockSize( 4 KB )
+    , m_blockSize( kDefaultDataStreamWriterBlockSize )
     , memoryLabel( memoryLabel )
 {
 }
@@ -20,7 +28,7 @@ DataStreamWriter::DataStreamWriter( MemoryLabel memoryLabel, zp_size_t blockSize
     : m_buffer( nullptr )
     , m_position( 0 )
     , m_capacity( 0 )
-    , m_blockSize( blockSize )
+    , m_blockSize( blockSize ? blockSize : kDefaultDataStreamWriterBlockSize )
     , memoryLabel( memoryLabel )
 {
 }
@@ -36,10 +44,7 @@ DataStreamWriter::DataStreamWriter( MemoryLabel memoryLabel, zp_uint8_t* ptr, zp
 
 DataStreamWriter::~DataStreamWriter()
 {
-    if( m_blockSize > 0 )
-    {
-        ZP_SAFE_FREE( memoryLabel, m_buffer );
-    }
+    ZP_SAFE_FREE( memoryLabel, m_buffer );
 }
 
 zp_size_t DataStreamWriter::position() const
@@ -759,7 +764,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
     outCompiledData.reset();
 
     outCompiledData.write<ArchiveHeader>( {
-        .id = zp_make_cc4( "zARC" ),
+        .id = zp_make_cc4( "ZARH" ),
         .dataVersion = 0,
         .version = 0,
         .flags = 0
@@ -771,7 +776,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
         zp_size_t offset;
         zp_size_t size;
     };
-    Map<zp_hash64_t, BlockOffsetSize> blockIdToOffset( sortedBlockCount, memoryLabel );
+    Map<zp_hash64_t, BlockOffsetSize> blockIdToOffset( memoryLabel, sortedBlockCount );
 
     for( zp_size_t i = 0; i < sortedBlockCount; ++i )
     {
@@ -798,9 +803,6 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
 
             // write header
             outCompiledData.write( block.header.ptr, block.header.size );
-
-            // align after header
-            outCompiledData.writeAlignment( kBlockAlignment );
 
             // write data
             outCompiledData.write( block.data.ptr, block.data.size );
@@ -854,9 +856,9 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
 
     // write footer
     outCompiledData.write<ArchiveFooter>( {
-        .id = zp_make_cc4( "zARC" ),
+        .id = zp_make_cc4( "ZARF" ),
         .flags = 0,
-        .blockCount = blockCount,
+        .blockCount = sortedBlockCount,
         .hash = archiveHash
     } );
 

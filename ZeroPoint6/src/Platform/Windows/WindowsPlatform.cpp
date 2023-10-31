@@ -456,9 +456,42 @@ namespace zp
         ::VirtualFree( ptr, size, MEM_DECOMMIT );
     }
 
-    void Platform::GetCurrentDir( char* path, zp_size_t maxPathLength )
+    zp_size_t Platform::GetCurrentDir( char* path, zp_size_t maxPathLength )
     {
+        zp_size_t length = ::GetCurrentDirectory( 0, nullptr );
+        ZP_ASSERT( length < maxPathLength );
+
         ::GetCurrentDirectory( maxPathLength, path );
+        return length;
+    }
+
+    String Platform::GetCurrentDirStr( char* path, zp_size_t maxPathLength )
+    {
+        return String::As( path, GetCurrentDir( path, maxPathLength ) );
+    }
+
+    zp_bool_t Platform::CreateDirectory( const char* path )
+    {
+        BOOL ok = ::CreateDirectory( path, nullptr );
+
+        if( !ok )
+        {
+            switch(::GetLastError())
+            {
+                case ERROR_ALREADY_EXISTS:
+                    ok = true;
+                    break;
+            }
+        }
+
+        return ok;
+    }
+
+    zp_bool_t Platform::DirectoryExists( const char* path )
+    {
+        const DWORD attr = ::GetFileAttributes( path );
+        const zp_bool_t exists = ( attr != INVALID_FILE_ATTRIBUTES ) && ( attr & FILE_ATTRIBUTE_DIRECTORY );
+        return exists;
     }
 
     zp_bool_t Platform::FileExists( const char* filePath )

@@ -452,6 +452,7 @@ namespace
     enum
     {
         kEntryPointSize = 128,
+        kMaxShaderOutputPathLength = 512,
         kMaxShaderFeaturesPerProgram = 8,
     };
 
@@ -478,7 +479,7 @@ namespace
 
         AllocString shaderSource;
 
-        FixedString<kEntryPointSize> entryPoints[ShaderProgramType_Count];
+        FixedString64 entryPoints[ShaderProgramType_Count];
 
         Vector<String> allShaderFeatures;
 
@@ -525,7 +526,7 @@ namespace
 
         void* Alloc( SIZE_T cb ) override
         {
-            return ZP_MALLOC_( memoryLabel, cb );
+            return ZP_MALLOC( memoryLabel, cb );
         }
 
         void* Realloc( void* pv, SIZE_T cb ) override
@@ -535,7 +536,7 @@ namespace
 
         void Free( void* pv ) override
         {
-            ZP_FREE_( memoryLabel, pv );
+            ZP_FREE( memoryLabel, pv );
         }
 
         SIZE_T GetSize( void* pv ) override
@@ -736,10 +737,12 @@ namespace
         AssetCompilerTask* task;
         ShaderProgramType shaderProgram;
         ShaderFeature shaderFeature;
-        FixedString<kEntryPointSize> entryPoint;
+        FixedString64 entryPoint;
 
         zp_int32_t result;
         zp_hash128_t resultShaderHash;
+        zp_hash64_t resultShaderFeatureHash;
+        MutableFixedString512 resultShaderFilePath;
     };
 
     struct DxcCompilerThreadData
@@ -1451,7 +1454,7 @@ namespace
                 {
                     DxcShaderHash* dxcShaderHash = static_cast<DxcShaderHash*>(shaderHash->GetBufferPointer());
 
-                    MutableFixedString<64> hashStr;
+                    MutableFixedString64 hashStr;
                     for( unsigned char digit : dxcShaderHash->HashDigest )
                     {
                         hashStr.appendFormat( "%02x", digit );
@@ -1479,13 +1482,16 @@ namespace
                     zp_uint64_t compressedSize;
                 };
 
+                const zp_size_t shaderObjSize = shaderObj->GetBufferSize();
+                const void* shaderObjPtr = shaderObj->GetBufferPointer();
+
                 ShaderOutputDataHeader dataHeader {
                     .hash = compilerJobData->resultShaderHash,
-                    .size = shaderObj->GetBufferSize(),
+                    .size = shaderObjSize,
                     .compressedSize = 0,
                 };
 
-                zp_bool_t compressShaderBinary = true;
+                zp_bool_t compressShaderBinary = false;
 
                 shaderOutputHeader.shaderDataOffset = shaderStream.position();
 
@@ -1493,7 +1499,7 @@ namespace
                 {
                     AllocMemory compressedShaderBinary( data->memoryLabel, dataHeader.size );
 
-                    const zp_size_t compressedSize =  zp_lzf_compress(shaderObj->GetBufferPointer(), 0, shaderObj->GetBufferSize(), compressedShaderBinary.ptr, compressedShaderBinary.size );
+                    const zp_size_t compressedSize = zp_lzf_compress( shaderObjPtr, 0, shaderObjSize, compressedShaderBinary.ptr, compressedShaderBinary.size );
                     dataHeader.compressedSize = compressedSize;
 
                     shaderStream.write( dataHeader );
@@ -1502,7 +1508,7 @@ namespace
                 else
                 {
                     shaderStream.write( dataHeader );
-                    shaderStream.write( shaderObj->GetBufferPointer(), shaderObj->GetBufferSize() );
+                    shaderStream.write( shaderObjPtr, shaderObjSize );
                 }
 
                 shaderStream.writeAlignment( 16 );
@@ -1531,14 +1537,43 @@ namespace
             char featureHashStr[16 + 1];
             zp_try_hash64_to_string( compilerJobData->shaderFeature.shaderFeatureHash, featureHashStr );
 
-            MutableFixedString<256> dstFilePath;
-            dstFilePath.append( task->dstFile.c_str() );
-            dstFilePath.append( '.' );
+            char currentDir[512];
+            String currentDirPath = Platform::GetCurrentDirStr( currentDir );
+
+            zp_bool_t r;
+
+            MutableFixedString512 dstFilePath;
+            dstFilePath.append( currentDirPath );
+            dstFilePath.append( Platform::PathSep );
+            dstFilePath.append( "Library" );
+            dstFilePath.append( Platform::PathSep );
+
+            r = Platform::CreateDirectory( dstFilePath.c_str() );
+            ZP_ASSERT_MSG_ARGS( r, "dir: %s", dstFilePath.c_str() );
+
+            dstFilePath.append( "ShaderCache" );
+            dstFilePath.append( Platform::PathSep );
+
+            r = Platform::CreateDirectory( dstFilePath.c_str() );
+            ZP_ASSERT_MSG_ARGS( r, "dir: %s", dstFilePath.c_str() );
+
+            const char* srcFileName = zp_strrchr( task->srcFile.c_str(), Platform::PathSep ) + 1;
+
+            dstFilePath.append( srcFileName );
+            dstFilePath.append( Platform::PathSep );
+
+            r = Platform::CreateDirectory( dstFilePath.c_str() );
+            ZP_ASSERT_MSG_ARGS( r, "dir: %s", dstFilePath.c_str() );
+
             dstFilePath.append( hashStr );
             dstFilePath.append( '.' );
             dstFilePath.append( featureHashStr );
             dstFilePath.append( '.' );
             dstFilePath.append( kShaderTypes[ compilerJobData->shaderProgram ] );
+
+            // store out resulting path
+            compilerJobData->resultShaderFilePath = dstFilePath;
+            compilerJobData->resultShaderFeatureHash = compilerJobData->shaderFeature.shaderFeatureHash;
 
             zp_handle_t dstFileHandle = Platform::OpenFileHandle( dstFilePath.c_str(), ZP_OPEN_FILE_MODE_WRITE );
             Platform::WriteFile( dstFileHandle, shaderStreamMemory.ptr, shaderStreamMemory.size );
@@ -1617,6 +1652,11 @@ namespace zp::ShaderCompiler
 
         zp_uint64_t processedShaderFeatureCount = 0;
 
+        Vector<CompileJob> compileJobs( 64, task->memoryLabel );
+
+        // TODO: invert loop so each shader feature can be grouped into tuple of shader programs,
+        //  that way shader feature set "A" = ["vs 1", "ps 1"], "B" = ["vs 1", "ps 2"] etc
+        //  then the tuple can be written out to the archive only keeping the unique programs
         for( zp_uint32_t shaderProgram = 0; shaderProgram < ShaderProgramType_Count; ++shaderProgram )
         {
             const zp_uint32_t shaderProgramType = 1 << shaderProgram;
@@ -1659,23 +1699,69 @@ namespace zp::ShaderCompiler
                                 .task = task,
                                 .shaderProgram = (ShaderProgramType)shaderProgram,
                                 .shaderFeature = activeShaderFeature,
-                                .entryPoint = data->entryPoints[ shaderProgram ],
+                                .entryPoint = data->entryPoints[ shaderProgram ]
                             };
 
-                            if( useJobSystem )
-                            {
-                                JobSystem::Start( CompileShaderDXC, job, parentJob ).schedule();
-                            }
-                            else
-                            {
-                                CompileShaderDXC( parentJob, &job );
-                            }
+                            compileJobs.pushBack( job );
                         }
                     }
                 }
-
-                JobSystem::ScheduleBatchJobs();
             }
+        }
+
+        JobHandle parentCompileJob = JobSystem::Start().schedule();
+
+        // compile each job
+        for( CompileJob& job : compileJobs )
+        {
+            if( useJobSystem )
+            {
+                JobSystem::Start( CompileShaderDXC, job, parentCompileJob ).schedule();
+            }
+            else
+            {
+                CompileShaderDXC( parentCompileJob, &job );
+            }
+        }
+
+        JobSystem::ScheduleBatchJobs();
+        parentCompileJob.complete();
+
+        char featureHashStr[16 + 1];
+
+        // combine output shaders into single file
+        ArchiveBuilder shaderArchiveBuilder( task->memoryLabel );
+        // TODO: maybe load the existing archive? could be cool to merge the old and new, but could cause issues
+
+        for( const CompileJob& job : compileJobs )
+        {
+            //zp_try_hash64_to_string( job.resultShaderFeatureHash, featureHashStr );
+            //shaderArchiveBuilder.addBlock(  );
+
+            // TODO: write out shader feature tuple ["vs 1", "ps 1"], ["vs 1", "ps 2"], etc.
+            //  using the shader feature as the key
+            // TODO: write of shader programs ["vs 1", "vs 2", ..., "ps 1", "ps 2",...]
+            //  using the program name as the key
+        }
+
+        // compile archive
+        DataStreamWriter shaderDataStream( task->memoryLabel );
+        auto r = shaderArchiveBuilder.compile( 0, shaderDataStream );
+
+        // write out compiled file on success
+        if( r == ArchiveBuilderResult::Success )
+        {
+            zp_printfln( "Compile Success: %s", task->dstFile.c_str() );
+
+            const Memory shaderDataMemory = shaderDataStream.memory();
+
+            zp_handle_t dstFileHandle = Platform::OpenFileHandle( task->dstFile.c_str(), ZP_OPEN_FILE_MODE_WRITE );
+            Platform::WriteFile( dstFileHandle, shaderDataMemory.ptr, shaderDataMemory.size );
+            Platform::CloseFileHandle( dstFileHandle );
+        }
+        else
+        {
+            zp_printfln( "Failed to compile shader data %s", task->dstFile.c_str() );
         }
     }
 
@@ -2165,7 +2251,7 @@ namespace zp::ShaderCompiler
 
         if( Platform::FileExists( inFile.c_str() ) )
         {
-            data = ZP_NEW_( memoryLabel, ShaderTaskData );
+            data = ZP_NEW( memoryLabel, ShaderTaskData );
 
             // default values
             data->debug = false;
@@ -2183,11 +2269,11 @@ namespace zp::ShaderCompiler
             String ext = String::As( zp_strrchr( inFile.c_str(), '.' ) );
             zp_uint32_t requiredShaderPrograms = 0;
 
-            if( zp_strcmp( ext.c_str(), ext.length, ".shader" ) == 0 )
+            if( zp_strcmp( ext, ".shader" ) == 0 )
             {
                 requiredShaderPrograms = SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX | SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
             }
-            else if( zp_strcmp( ext.c_str(), ext.length, ".compute" ) == 0 )
+            else if( zp_strcmp( ext, ".compute" ) == 0 )
             {
                 requiredShaderPrograms = SHADER_PROGRAM_SUPPORTED_TYPE_COMPUTE;
             }
@@ -2198,7 +2284,7 @@ namespace zp::ShaderCompiler
 
             zp_handle_t inFileHandle = Platform::OpenFileHandle( inFile.c_str(), ZP_OPEN_FILE_MODE_READ );
             const zp_size_t inFileSize = Platform::GetFileSize( inFileHandle );
-            void* inFileData = ZP_MALLOC_( memoryLabel, inFileSize );
+            void* inFileData = ZP_MALLOC( memoryLabel, inFileSize );
 
             zp_size_t inFileReadSize = Platform::ReadFile( inFileHandle, inFileData, inFileSize );
             ZP_ASSERT( inFileSize == inFileReadSize );
@@ -2207,19 +2293,19 @@ namespace zp::ShaderCompiler
             data->shaderSource.set( memoryLabel, (zp_char8_t*)inFileData, inFileSize ); //= { .str = (zp_char8_t*)inFileData, .length = inFileSize };
 
             // TODO: move to helper functions
-            Tokenizer lineTokenizer( data->shaderSource.c_str(), data->shaderSource.length(), "\r\n" );
+            Tokenizer lineTokenizer( data->shaderSource.asString(), "\r\n" );
 
             String line {};
             while( lineTokenizer.next( line ) )
             {
-                if( zp_strnstr( line.c_str(), line.length, "#pragma " ) == line.c_str() )
+                if( zp_strnstr( line, "#pragma " ) == line.c_str() )
                 {
-                    Tokenizer pragmaTokenizer( line.c_str(), line.length, " " );
+                    Tokenizer pragmaTokenizer( line, " " );
 
                     String pragma {};
                     while( pragmaTokenizer.next( pragma ) )
                     {
-                        if( zp_strcmp( "vertex", pragma.c_str(), pragma.length ) == 0 )
+                        if( zp_strcmp( pragma, "vertex" ) == 0 )
                         {
                             data->shaderCompilerSupportedTypes |= SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX;
                             data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ] = String::As( "" );
@@ -2232,7 +2318,7 @@ namespace zp::ShaderCompiler
 
                             zp_printfln( "Vertex Entry - %.*s", data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ].length(), data->entryPoints[ SHADER_PROGRAM_TYPE_VERTEX ].c_str() );
                         }
-                        else if( zp_strcmp( "fragment", pragma.c_str(), pragma.length ) == 0 )
+                        else if( zp_strcmp( pragma, "fragment" ) == 0 )
                         {
                             data->shaderCompilerSupportedTypes |= SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
                             data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ] = String::As( "" );
@@ -2245,7 +2331,7 @@ namespace zp::ShaderCompiler
 
                             zp_printfln( "Fragment Entry - %.*s", data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ].length(), data->entryPoints[ SHADER_PROGRAM_TYPE_FRAGMENT ].c_str() );
                         }
-                        else if( zp_strcmp( "kernel", pragma.c_str(), pragma.length ) == 0 )
+                        else if( zp_strcmp( pragma, "kernel" ) == 0 )
                         {
                             data->shaderCompilerSupportedTypes |= SHADER_PROGRAM_SUPPORTED_TYPE_COMPUTE;
                             data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ] = String::As( "" );
@@ -2258,12 +2344,12 @@ namespace zp::ShaderCompiler
 
                             zp_printfln( "Compute Entry - %.*s", data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ].length(), data->entryPoints[ SHADER_PROGRAM_TYPE_COMPUTE ].c_str() );
                         }
-                        else if( zp_strcmp( "enable_debug", pragma.c_str(), pragma.length ) == 0 )
+                        else if( zp_strcmp( pragma, "enable_debug" ) == 0 )
                         {
                             data->debug = true;
                             zp_printfln( "Use Debug - true" );
                         }
-                        else if( zp_strcmp( "target", pragma.c_str(), pragma.length ) == 0 )
+                        else if( zp_strcmp( pragma, "target" ) == 0 )
                         {
                             String pragmaOp {};
                             if( pragmaTokenizer.next( pragmaOp ) )
@@ -2293,19 +2379,19 @@ namespace zp::ShaderCompiler
                             }
                         }
                             // TODO: have dxc precompile hlsl and then parse pragmas from that to support pragmas in included files, then compile variants from the preprocessed
-                        else if( zp_strnstr( pragma.c_str(), pragma.length, "shader_feature" ) != nullptr )
+                        else if( zp_strnstr( pragma, "shader_feature" ) != nullptr )
                         {
                             zp_uint32_t programSupportedType = SHADER_PROGRAM_SUPPORTED_TYPE_NONE;
 
-                            if( zp_strcmp( "shader_feature_vertex", pragma.c_str(), pragma.length ) == 0 )
+                            if( zp_strcmp( pragma, "shader_feature_vertex" ) == 0 )
                             {
                                 programSupportedType |= SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX;
                             }
-                            else if( zp_strcmp( "shader_feature_fragment", pragma.c_str(), pragma.length ) == 0 )
+                            else if( zp_strcmp( pragma, "shader_feature_fragment" ) == 0 )
                             {
                                 programSupportedType |= SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
                             }
-                            else if( zp_strcmp( "shader_feature", pragma.c_str(), pragma.length ) == 0 )
+                            else if( zp_strcmp( pragma, "shader_feature" ) == 0 )
                             {
                                 programSupportedType |= SHADER_PROGRAM_SUPPORTED_TYPE_VERTEX;
                                 programSupportedType |= SHADER_PROGRAM_SUPPORTED_TYPE_FRAGMENT;
@@ -2394,7 +2480,7 @@ namespace zp::ShaderCompiler
                             }
                             break;
                         }
-                        else if( zp_strnstr( pragma.c_str(), pragma.length, "invalid_shader_feature" ) != nullptr )
+                        else if( zp_strnstr( pragma, "invalid_shader_feature" ) != nullptr )
                         {
                             zp_printfln( "Invalid Shader Features:" );
 
