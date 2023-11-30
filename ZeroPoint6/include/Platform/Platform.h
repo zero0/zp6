@@ -44,6 +44,8 @@ namespace zp
 
     typedef void (* OnWindowClosed)( zp_handle_t windowHandle );
 
+    typedef void (* OnWindowHelp)( zp_handle_t windowHandle );
+
     struct WindowCallbacks
     {
         zp_int32_t minWidth, minHeight, maxWidth, maxHeight;
@@ -52,6 +54,7 @@ namespace zp
         OnWindowFocus onWindowFocus;
         OnWindowKeyEvent onWindowKeyEvent;
         OnWindowMouseEvent onWindowMouseEvent;
+        OnWindowHelp onWindowHelpEvent;
         OnWindowClosed onWindowClosed;
     };
 

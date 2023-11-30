@@ -8,8 +8,10 @@
 #include <processthreadsapi.h>
 #include <excpt.h>
 #include <winsock2.h>
+#include <dwmapi.h>
 
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "dwmapi.dll")
 
 #include "Core/Defines.h"
 #include "Core/Macros.h"
@@ -85,6 +87,11 @@ namespace
         {
             case WM_CLOSE:
             {
+                if( windowCallbacks && windowCallbacks->onWindowClosed )
+                {
+                    windowCallbacks->onWindowClosed( hWnd );
+                }
+
                 ::DestroyWindow( hWnd );
             }
                 break;
@@ -257,7 +264,19 @@ namespace
 
             case WM_HELP:
             {
-                ::PostQuitMessage( 3 );
+                if( windowCallbacks && windowCallbacks->onWindowHelpEvent )
+                {
+                    windowCallbacks->onWindowHelpEvent( hWnd );
+                }
+            }
+                break;
+
+            case WM_COMMAND:
+            {
+                switch( LOWORD( wParam ) )
+                {
+
+                }
             }
                 break;
 
@@ -266,6 +285,28 @@ namespace
         }
 
         return 0;
+    }
+
+    void PrintLastErrorMsg( const char* msg )
+    {
+        const DWORD errorMessageID = ::GetLastError();
+        if( errorMessageID )
+        {
+            LPSTR messageBuffer = nullptr;
+
+            ::FormatMessage(
+                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                nullptr,
+                errorMessageID,
+                MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+                reinterpret_cast<LPSTR>(&messageBuffer),
+                0,
+                nullptr );
+
+            zp_error_printfln( "%s: [%d] %s", msg, errorMessageID, messageBuffer );
+
+            ::LocalFree( messageBuffer );
+        }
     }
 }
 
@@ -302,7 +343,7 @@ namespace zp
         }
 
         const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME;
-        DWORD exStyle = 0;
+        DWORD exStyle = WS_EX_APPWINDOW;
 #if ZP_DEBUG
         exStyle |= WS_EX_ACCEPTFILES;
 #endif
@@ -335,6 +376,13 @@ namespace zp
         ZP_ASSERT( hWnd );
 
         ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)desc.callbacks );
+
+        // set dark mode by default
+        const BOOL useDarkMode = true;
+        if( FAILED( ::DwmSetWindowAttribute( hWnd, 20, &useDarkMode, sizeof( BOOL ) ) ) )
+        {
+            ::DwmSetWindowAttribute( hWnd, 19, &useDarkMode, sizeof( BOOL ) );
+        }
 
         ::ShowWindow( hWnd, desc.showWindow ? SW_SHOW : SW_HIDE );
         ::UpdateWindow( hWnd );
@@ -476,7 +524,7 @@ namespace zp
 
         if( !ok )
         {
-            switch(::GetLastError())
+            switch( ::GetLastError() )
             {
                 case ERROR_ALREADY_EXISTS:
                     ok = true;
@@ -886,8 +934,7 @@ namespace zp
         }
         else
         {
-            DWORD error = ::GetLastError();
-            ZP_ASSERT_MSG( false, "Failed to create process" );
+            PrintLastErrorMsg( "Failed to create process" );
         }
 
         return static_cast<zp_int32_t>( returnCode );

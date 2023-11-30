@@ -1657,33 +1657,34 @@ namespace zp::ShaderCompiler
         // TODO: invert loop so each shader feature can be grouped into tuple of shader programs,
         //  that way shader feature set "A" = ["vs 1", "ps 1"], "B" = ["vs 1", "ps 2"] etc
         //  then the tuple can be written out to the archive only keeping the unique programs
-        for( zp_uint32_t shaderProgram = 0; shaderProgram < ShaderProgramType_Count; ++shaderProgram )
+        for( zp_size_t s = 0; s < data->shaderFeatures.size(); ++s )
         {
-            const zp_uint32_t shaderProgramType = 1 << shaderProgram;
-            if( ( data->shaderCompilerSupportedTypes & shaderProgramType ) == shaderProgramType )
+            const ShaderFeature& shaderFeature = data->shaderFeatures[ s ];
+
+            for( zp_uint32_t shaderProgram = 0; shaderProgram < ShaderProgramType_Count; ++shaderProgram )
             {
-                for( zp_size_t s = 0; s < data->shaderFeatures.size(); ++s )
+                const zp_uint32_t shaderProgramType = 1 << shaderProgram;
+
+                // check shader feature is supported for the program type
+                zp_bool_t shaderFeatureSupported = ( shaderFeature.shaderProgramSupportedType & shaderProgramType ) == shaderProgramType;
+
+                // check for invalid shader features
+                if( shaderFeatureSupported )
                 {
-                    const ShaderFeature& shaderFeature = data->shaderFeatures[ s ];
-
-                    // check shader feature is supported for the program type
-                    zp_bool_t shaderFeatureSupported = ( shaderFeature.shaderProgramSupportedType & shaderProgramType ) == shaderProgramType;
-
-                    // check for invalid shader features
-                    if( shaderFeatureSupported )
+                    for( const ShaderFeature& invalidShaderFeature : data->invalidShaderFeatures )
                     {
-                        for( auto invalidShaderFeature : data->invalidShaderFeatures )
+                        if( invalidShaderFeature.shaderFeatureHash == shaderFeature.shaderFeatureHash )
                         {
-                            if( invalidShaderFeature.shaderFeatureHash == shaderFeature.shaderFeatureHash )
-                            {
-                                shaderFeatureSupported = false;
-                                break;
-                            }
+                            shaderFeatureSupported = false;
+                            break;
                         }
                     }
+                }
 
-                    // compile each valid shader feature
-                    if( shaderFeatureSupported )
+                // compile each valid shader feature
+                if( shaderFeatureSupported )
+                {
+                    if( ( data->shaderCompilerSupportedTypes & shaderProgramType ) == shaderProgramType )
                     {
                         for( zp_size_t i = 0; i < shaderFeature.shaderFeatureCount; ++i )
                         {

@@ -131,7 +131,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
     const zp_int32_t exitCode = engine->getExitCode();
 
-    ZP_FREE( MemoryLabels::Default, engine );
+    ZP_SAFE_DELETE( Engine, engine );
 
     return exitCode;
 }

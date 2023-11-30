@@ -182,6 +182,7 @@ target_link_options(${ZP_TARGET}
 target_link_libraries(${ZP_TARGET}
         PRIVATE ${Vulkan_LIBRARIES}
         PRIVATE "rpcrt4.lib"
+        PRIVATE "dwmapi.dll"
         )
 #endif ()
 

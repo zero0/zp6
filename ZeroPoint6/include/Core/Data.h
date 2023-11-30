@@ -480,6 +480,9 @@ namespace zp
         ArchiveBuilderResult loadArchive( Memory archiveMemory );
 
         // add or replace an existing block
+        zp_hash64_t addBlock( String name, Memory data );
+
+        // add or replace an existing block
         zp_hash64_t addBlock( String name, Memory header, Memory data );
 
         // keeps block, but removes data

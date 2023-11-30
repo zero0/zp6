@@ -1,25 +1,26 @@
 #ifndef ZP_MACROS_H
 #define ZP_MACROS_H
 
-#define ZP_UNUSED(v)      (void)v
+#define ZP_UNUSED(v)                    (void)v
 
-#define ZP_CONCAT_(a, b)  a ## b
-#define ZP_CONCAT(a, b)   ZP_CONCAT_( a, b )
+#define ZP_CONCAT_(a, b)                a ## b
+#define ZP_CONCAT(a, b)                 ZP_CONCAT_( a, b )
 
 #if ZP_USE_UTF8_LITERALS
-#define ZP_T(x)    ZP_CONCAT(u8, x)
+#define ZP_T(x)                         ZP_CONCAT( u8, x )
 #else
-#define ZP_T(x)    x
+#define ZP_T(x)                         x
 #endif
 
-#define ZP_NAMEOF(x)      ZP_T(#x)
+#define ZP_NAMEOF(x)                    #x
+#define ZP_NAMEOF_T(x)                  ZP_T( #x )
 
-#define ZP_STR_T(x)       { .str = ZP_T(x), .length = zp_strlen( ZP_T(x) ) }
-#define ZP_STR_NAMEOF(x)  { .str = ZP_T(#x), .length = zp_strlen( ZP_T(#x) ) }
+#define ZP_STR_T(x)                     { .str = ZP_T(x),  .length = zp_strlen( ZP_T(x) ) }
+#define ZP_STR_NAMEOF(x)                { .str = ZP_T(#x), .length = zp_strlen( ZP_T(#x) ) }
 
-#define ZP_ARRAY_SIZE(a)  zp_array_size( a )
+#define ZP_ARRAY_SIZE(a)                zp_array_size( a )
 
-#define ZP_ALIGN_SIZE(s,a)  ( ( (s) + ( (a) - 1 ) ) & -(a) )
+#define ZP_ALIGN_SIZE(s,a)              ( ( (s) + ( (a) - 1 ) ) & -(a) )
 
 #define ZP_OFFSET_PTR(ptr, offset)      static_cast<void*>( static_cast<zp_uint8_t*>(ptr) + static_cast<zp_ptrdiff_t>(offset) )
 

@@ -663,6 +663,36 @@ ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
     return ArchiveBuilderResult::Success;
 }
 
+zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
+{
+    zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
+    zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
+    {
+        return v.id == id;
+    } );
+
+    if( index == -1 )
+    {
+        m_blocks.pushBack( {
+            .id = id,
+            .flags = 0,
+            .header = {},
+            .data = data,
+        } );
+    }
+    else
+    {
+        m_blocks[ index ] = {
+            .id = id,
+            .flags = 0,
+            .header = {},
+            .data = data,
+        };
+    }
+
+    return id;
+}
+
 zp_hash64_t ArchiveBuilder::addBlock( String name, Memory header, Memory data )
 {
     zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
@@ -797,12 +827,15 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
         {
             offset = outCompiledData.write<ArchiveBlockHeader>( {
                 .type = block.type,
-                .headerSize = zp_uint32_t( block.header.size ),
+                .headerSize = block.header.ptr && block.header.size ? zp_uint32_t( block.header.size ) : 0,
                 .dataSize = block.data.size
             } );
 
-            // write header
-            outCompiledData.write( block.header.ptr, block.header.size );
+            // write header if provided
+            if( block.header.ptr && block.header.size )
+            {
+                outCompiledData.write( block.header.ptr, block.header.size );
+            }
 
             // write data
             outCompiledData.write( block.data.ptr, block.data.size );

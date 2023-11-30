@@ -43,6 +43,22 @@ namespace zp
         ShaderStage shaderStage;
     };
 
+    struct ShaderProgramData
+    {
+        zp_hash128_t shaderProgramHash;
+        Memory shaderProgramData;
+    };
+
+    struct ShaderProgram
+    {
+        zp_handle_t shaderProgramHandle;
+    };
+
+    struct ShaderProgramSet
+    {
+
+    };
+
     struct Shader
     {
         zp_hash128_t shaderHash;
