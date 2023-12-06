@@ -32,13 +32,14 @@ namespace zp
     ZP_NONCOPYABLE( Engine )
 
     public:
+        static Engine* GetInstance();
+
+    public:
         explicit Engine( MemoryLabel memoryLabel );
 
         ~Engine();
 
         [[nodiscard]] zp_bool_t isRunning() const;
-
-        [[nodiscard]] zp_bool_t isRestarting() const;
 
         [[nodiscard]] zp_int32_t getExitCode() const;
 
@@ -46,11 +47,13 @@ namespace zp
 
         void initialize();
 
-        void destroy();
-
         void startEngine();
 
         void stopEngine();
+
+        void destroy();
+
+        void reload();
 
         void restart();
 
@@ -91,11 +94,10 @@ namespace zp
         enum class EngineState : zp_uint32_t
         {
             Uninitialized,
-            Initializing,
-            Initialized,
+            Initialize,
             Running,
-            Destroying,
-            Destroyed,
+            Destroy,
+            Reloading,
             Restarting,
             Exit,
         };
@@ -108,7 +110,9 @@ namespace zp
 
         static void onWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height ){}
 
-        static void onWindowHelpEvent( zp_handle_t windowHandle ){}
+        static void onWindowHelpEvent( zp_handle_t windowHandle ){
+            Engine::GetInstance()->restart();
+        }
 
         zp_handle_t m_windowHandle;
         zp_handle_t m_consoleHandle;
@@ -135,7 +139,8 @@ namespace zp
         zp_time_t m_frameTime;
         zp_time_t m_timeFrequencyS;
 
-        zp_int32_t m_restartCounter;
+        ZP_BOOL32( m_shouldReload );
+        ZP_BOOL32( m_shouldRestart );
         zp_int32_t m_pauseCounter;
         zp_int32_t m_exitCode;
 

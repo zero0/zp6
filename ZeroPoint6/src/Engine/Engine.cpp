@@ -20,6 +20,16 @@
 
 namespace zp
 {
+    namespace
+    {
+        Engine* s_engine = {};
+    }
+
+    Engine* Engine::GetInstance()
+    {
+        return s_engine;
+    }
+
     Engine::Engine( MemoryLabel memoryLabel )
         : m_windowHandle( nullptr )
         , m_consoleHandle( nullptr )
@@ -43,21 +53,19 @@ namespace zp
         , m_currentEngineState( EngineState::Uninitialized )
         , memoryLabel( memoryLabel )
     {
+        ZP_ASSERT( s_engine == nullptr );
+        s_engine = this;
     }
 
     Engine::~Engine()
     {
-
+        ZP_ASSERT( s_engine == this );
+        s_engine = nullptr;
     }
 
     zp_bool_t Engine::isRunning() const
     {
         return m_currentEngineState != EngineState::Exit;
-    }
-
-    zp_bool_t Engine::isRestarting() const
-    {
-        return m_currentEngineState == EngineState::Restarting;
     }
 
     zp_int32_t Engine::getExitCode() const
@@ -225,6 +233,22 @@ namespace zp
         }
     }
 
+    void Engine::startEngine()
+    {
+        if( m_moduleAPI )
+        {
+            m_moduleAPI->onEngineStarted( this );
+        }
+    }
+
+    void Engine::stopEngine()
+    {
+        if( m_moduleAPI )
+        {
+            m_moduleAPI->onEngineStopped( this );
+        }
+    }
+
     void Engine::destroy()
     {
         m_previousFrameEnginePipelineHandle.complete();
@@ -281,35 +305,24 @@ namespace zp
         JobSystem::Teardown();
     }
 
-    void Engine::startEngine()
+    void Engine::reload()
     {
-        m_nextEngineState = EngineState::Initializing;
-
-        if( m_moduleAPI )
-        {
-            m_moduleAPI->onEngineStarted( this );
-        }
-    }
-
-    void Engine::stopEngine()
-    {
-        if( m_moduleAPI )
-        {
-            m_moduleAPI->onEngineStopped( this );
-        }
+        m_shouldReload = true;
+        m_nextEngineState = EngineState::Destroy;
     }
 
     void Engine::restart()
     {
-        m_restartCounter++;
-        m_nextEngineState = EngineState::Destroying;
+        m_shouldRestart = true;
+        m_nextEngineState = EngineState::Destroy;
     }
 
     void Engine::exit( zp_int32_t exitCode )
     {
-        m_restartCounter = 0;
+        m_shouldReload = false;
+        m_shouldRestart = false;
         m_exitCode = exitCode;
-        m_nextEngineState = EngineState::Destroying;
+        m_nextEngineState = EngineState::Destroy;
     }
 
     void Engine::onStateEntered( EngineState engineState )
@@ -319,31 +332,40 @@ namespace zp
             case EngineState::Uninitialized:
                 zp_printfln( "Enter Uninitialized" );
                 break;
-            case EngineState::Initializing:
+            case EngineState::Initialize:
             {
-                zp_printfln( "Enter Initializing" );
+                initialize();
             }
-                break;
-            case EngineState::Initialized:
-            {
-                zp_printfln( "Enter Initialized" );
-            }
+                zp_printfln( "Enter Initialize" );
                 break;
             case EngineState::Running:
             {
-                zp_printfln( "Enter Running" );
+                startEngine();
             }
+                zp_printfln( "Enter Running" );
                 break;
-            case EngineState::Destroying:
-                zp_printfln( "Enter Destroying" );
+            case EngineState::Destroy:
+            {
+
+            }
+                zp_printfln( "Enter Destroy" );
                 break;
-            case EngineState::Destroyed:
-                zp_printfln( "Enter Destroyed" );
+            case EngineState::Reloading:
+            {
+
+            }
+                zp_printfln( "Enter Reloading" );
                 break;
             case EngineState::Restarting:
-                zp_printfln( "Restarting" );
+            {
+                destroy();
+            }
+                zp_printfln( "Enter Restarting" );
                 break;
             case EngineState::Exit:
+            {
+                destroy();
+            }
                 zp_printfln( "Enter Exit" );
                 break;
         }
@@ -354,30 +376,44 @@ namespace zp
         switch( engineState )
         {
             case EngineState::Uninitialized:
+            {
+                m_nextEngineState = EngineState::Initialize;
+            }
                 break;
-            case EngineState::Initializing:
-                m_nextEngineState = EngineState::Initialized;
-                break;
-            case EngineState::Initialized:
+            case EngineState::Initialize:
+            {
                 m_nextEngineState = EngineState::Running;
+            }
                 break;
             case EngineState::Running:
-                zp_yield_current_thread();
-                break;
-            case EngineState::Destroying:
-                m_nextEngineState = EngineState::Destroyed;
-                break;
-            case EngineState::Destroyed:
             {
-                if( m_restartCounter > 0 )
+                zp_yield_current_thread();
+            }
+                break;
+            case EngineState::Destroy:
+            {
+                if( m_shouldReload )
                 {
-                    m_restartCounter = 0;
+                    m_nextEngineState = EngineState::Reloading;
+                }
+                else if( m_shouldRestart )
+                {
                     m_nextEngineState = EngineState::Restarting;
                 }
                 else
                 {
                     m_nextEngineState = EngineState::Exit;
                 }
+            }
+                break;
+            case EngineState::Reloading:
+            {
+                m_nextEngineState = EngineState::Running;
+            }
+                break;
+            case EngineState::Restarting:
+            {
+                m_nextEngineState = EngineState::Initialize;
             }
                 break;
             case EngineState::Exit:
@@ -392,20 +428,23 @@ namespace zp
             case EngineState::Uninitialized:
                 zp_printfln( "Exit Uninitialized" );
                 break;
-            case EngineState::Initializing:
-                zp_printfln( "Exit Initializing" );
-                break;
-            case EngineState::Initialized:
-                zp_printfln( "Exit Initialized" );
+            case EngineState::Initialize:
+                zp_printfln( "Exit Initialize" );
                 break;
             case EngineState::Running:
+            {
+                stopEngine();
+            }
                 zp_printfln( "Exit Running" );
                 break;
-            case EngineState::Destroying:
-                zp_printfln( "Exit Destroying" );
+            case EngineState::Destroy:
+                zp_printfln( "Exit Destroy" );
                 break;
-            case EngineState::Destroyed:
-                zp_printfln( "Exit Destroyed" );
+            case EngineState::Reloading:
+                zp_printfln( "Exit Reloading" );
+                break;
+            case EngineState::Restarting:
+                zp_printfln( "Exit Restarting" );
                 break;
             case EngineState::Exit:
                 zp_printfln( "Exit Exit" );

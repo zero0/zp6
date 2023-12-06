@@ -123,20 +123,8 @@ namespace zp
 
         do
         {
-            engine->initialize();
-
-            engine->startEngine();
-
-            do
-            {
-                engine->process();
-            } while( engine->isRunning() );
-
-            engine->stopEngine();
-
-            engine->destroy();
-        }
-        while( engine->isRestarting() );
+            engine->process();
+        } while( engine->isRunning() );
 
         const zp_int32_t exitCode = engine->getExitCode();
 
