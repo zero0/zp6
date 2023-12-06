@@ -64,6 +64,8 @@ namespace zp
 
         static void ExitJobThreads();
 
+        static void ProcessJobs();
+
         static JobData Start();
 
         static JobData Start( JobHandle parentJob );

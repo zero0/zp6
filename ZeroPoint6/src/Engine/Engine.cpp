@@ -103,9 +103,10 @@ namespace zp
         Profiler::InitializeProfilerThread();
 #endif
 
+        // initialize job system
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
-        JobSystem::InitializeJobThreads();
 
+        // create window/console
         const zp_bool_t createWindow = true;
         if( createWindow )
         {
@@ -132,6 +133,9 @@ namespace zp
             m_consoleHandle = Platform::OpenConsole();
         }
 
+        // create systems
+        m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
+
         return;
         const char* moduleDLLPath = "";
         if( !zp_strempty( moduleDLLPath ) )
@@ -156,7 +160,6 @@ namespace zp
         //
         //
 
-        m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
 
         m_entityComponentManager = ZP_NEW( MemoryLabels::Default, EntityComponentManager );
 
@@ -233,16 +236,68 @@ namespace zp
         }
     }
 
+    namespace
+    {
+        struct EngineJobData
+        {
+            Engine* engine;
+        };
+
+        void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e );
+
+        void AdvanceFrameJob( const JobHandle& parentHandle, EngineJobData* e )
+        {
+            if( e->engine->isRunning() )
+            {
+                e->engine->advanceFrame();
+
+                ZP_PROFILE_ADVANCE_FRAME( e->engine->getFrameCount() );
+
+                JobSystem::Start( StartFrameJob, *e ).schedule();
+                JobSystem::ScheduleBatchJobs();
+            }
+        }
+
+        void EndFrameJob( const JobHandle& parentHandle, EngineJobData* e )
+        {
+            zp_printfln( "[%10d] EndFrameJob", zp_current_thread_id() );
+
+            JobSystem::Start( AdvanceFrameJob, *e ).schedule();
+            JobSystem::ScheduleBatchJobs();
+        }
+
+        void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e )
+        {
+            zp_printfln( "[%10d] StartFrameJob", zp_current_thread_id() );
+
+            JobSystem::Start( EndFrameJob, *e ).schedule();
+            JobSystem::ScheduleBatchJobs();
+        }
+
+        void InitialEngineJob( const JobHandle& parentHandle, EngineJobData* e )
+        {
+            JobSystem::Start( StartFrameJob, *e ).schedule();
+            JobSystem::ScheduleBatchJobs();
+        }
+    }
+
     void Engine::startEngine()
     {
+        JobSystem::InitializeJobThreads();
+
         if( m_moduleAPI )
         {
             m_moduleAPI->onEngineStarted( this );
         }
+
+        JobSystem::Start( InitialEngineJob, { .engine = this } ).schedule();
+        JobSystem::ScheduleBatchJobs();
     }
 
     void Engine::stopEngine()
     {
+        JobSystem::ExitJobThreads();
+
         if( m_moduleAPI )
         {
             m_moduleAPI->onEngineStopped( this );
@@ -387,6 +442,8 @@ namespace zp
                 break;
             case EngineState::Running:
             {
+                JobSystem::ProcessJobs();
+
                 zp_yield_current_thread();
             }
                 break;

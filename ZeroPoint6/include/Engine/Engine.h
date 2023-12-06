@@ -111,7 +111,7 @@ namespace zp
         static void onWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height ){}
 
         static void onWindowHelpEvent( zp_handle_t windowHandle ){
-            Engine::GetInstance()->restart();
+            Engine::GetInstance()->reload();
         }
 
         zp_handle_t m_windowHandle;
