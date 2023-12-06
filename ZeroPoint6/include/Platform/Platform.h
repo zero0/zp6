@@ -176,6 +176,15 @@ namespace zp
         void SetWindowSize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
     }
 
+    namespace Platform
+    {
+        zp_handle_t OpenConsole();
+
+        zp_bool_t CloseConsole( zp_handle_t );
+
+        zp_bool_t SetConsoleTitle( zp_handle_t, const String& title );
+    }
+
     // Memory
     namespace Platform
     {

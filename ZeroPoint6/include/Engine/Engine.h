@@ -38,6 +38,8 @@ namespace zp
 
         [[nodiscard]] zp_bool_t isRunning() const;
 
+        [[nodiscard]] zp_bool_t isRestarting() const;
+
         [[nodiscard]] zp_int32_t getExitCode() const;
 
         void processCommandLine( const String& cmdLine );
@@ -94,6 +96,7 @@ namespace zp
             Running,
             Destroying,
             Destroyed,
+            Restarting,
             Exit,
         };
 
@@ -103,12 +106,12 @@ namespace zp
 
         void onStateExited( EngineState engineState );
 
-        static void onWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height )
-        {
-            zp_printfln( "new w %d h %d", width, height );
-        }
+        static void onWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height ){}
+
+        static void onWindowHelpEvent( zp_handle_t windowHandle ){}
 
         zp_handle_t m_windowHandle;
+        zp_handle_t m_consoleHandle;
 
         zp_handle_t m_moduleDll;
         ModuleEntryPointAPI* m_moduleAPI;

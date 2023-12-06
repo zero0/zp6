@@ -376,14 +376,14 @@ namespace zp
         ZP_ASSERT( hWnd );
 
         ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)desc.callbacks );
-
+/*
         // set dark mode by default
         const BOOL useDarkMode = true;
         if( FAILED( ::DwmSetWindowAttribute( hWnd, 20, &useDarkMode, sizeof( BOOL ) ) ) )
         {
             ::DwmSetWindowAttribute( hWnd, 19, &useDarkMode, sizeof( BOOL ) );
         }
-
+*/
         ::ShowWindow( hWnd, desc.showWindow ? SW_SHOW : SW_HIDE );
         ::UpdateWindow( hWnd );
 
@@ -463,6 +463,24 @@ namespace zp
 
             ::SetWindowPos( hWnd, nullptr, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER );
         }
+    }
+
+    zp_handle_t Platform::OpenConsole()
+    {
+        const WINBOOL ok = ::AllocConsole();
+        return ok ? zp_handle_t( 1 ) : nullptr;
+    }
+
+    zp_bool_t Platform::CloseConsole( zp_handle_t )
+    {
+        const WINBOOL ok = ::FreeConsole();
+        return ok;
+    }
+
+    zp_bool_t Platform::SetConsoleTitle( zp_handle_t, const String& title )
+    {
+        const WINBOOL ok = ::SetConsoleTitle( title.c_str() );
+        return ok;
     }
 
     void* Platform::AllocateSystemMemory( void* baseAddress, const zp_size_t size )

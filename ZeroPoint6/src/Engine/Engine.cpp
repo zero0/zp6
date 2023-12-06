@@ -22,6 +22,7 @@ namespace zp
 {
     Engine::Engine( MemoryLabel memoryLabel )
         : m_windowHandle( nullptr )
+        , m_consoleHandle( nullptr )
         , m_moduleDll( nullptr )
         , m_moduleAPI( nullptr )
         , m_windowCallbacks {}
@@ -52,6 +53,11 @@ namespace zp
     zp_bool_t Engine::isRunning() const
     {
         return m_currentEngineState != EngineState::Exit;
+    }
+
+    zp_bool_t Engine::isRestarting() const
+    {
+        return m_currentEngineState == EngineState::Restarting;
     }
 
     zp_int32_t Engine::getExitCode() const
@@ -92,20 +98,31 @@ namespace zp
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
         JobSystem::InitializeJobThreads();
 
-        m_windowCallbacks = {
-            .minWidth = 320,
-            .minHeight = 240,
-            .maxWidth = 65535,
-            .maxHeight = 65535,
-            .onWindowResize = onWindowResize,
-        };
+        const zp_bool_t createWindow = true;
+        if( createWindow )
+        {
+            m_windowCallbacks = {
+                .minWidth = 320,
+                .minHeight = 240,
+                .maxWidth = 65535,
+                .maxHeight = 65535,
+                .onWindowResize = onWindowResize,
+                .onWindowHelpEvent = onWindowHelpEvent
+            };
 
-        m_windowHandle = Platform::OpenWindow( {
-            .callbacks = &m_windowCallbacks,
-            .width = 800,
-            .height = 600,
-            .showWindow = true
-        } );
+            m_windowHandle = Platform::OpenWindow( {
+                .callbacks = &m_windowCallbacks,
+                .width = 800,
+                .height = 600,
+                .showWindow = true
+            } );
+        }
+
+        const zp_bool_t createConsole = true;
+        if( createConsole )
+        {
+            m_consoleHandle = Platform::OpenConsole();
+        }
 
         return;
         const char* moduleDLLPath = "";
@@ -244,6 +261,12 @@ namespace zp
             m_windowHandle = nullptr;
         }
 
+        if( m_consoleHandle )
+        {
+            Platform::CloseConsole( m_consoleHandle );
+            m_consoleHandle = nullptr;
+        }
+
         ZP_SAFE_DELETE( RenderSystem, m_renderSystem );
         ZP_SAFE_DELETE( EntityComponentManager, m_entityComponentManager );
         ZP_SAFE_DELETE( AssetSystem, m_assetSystem );
@@ -294,31 +317,34 @@ namespace zp
         switch( engineState )
         {
             case EngineState::Uninitialized:
-                zp_printfln("Enter Uninitialized");
+                zp_printfln( "Enter Uninitialized" );
                 break;
             case EngineState::Initializing:
             {
-                zp_printfln("Enter Initializing");
+                zp_printfln( "Enter Initializing" );
             }
                 break;
             case EngineState::Initialized:
             {
-                zp_printfln("Enter Initialized");
+                zp_printfln( "Enter Initialized" );
             }
                 break;
             case EngineState::Running:
             {
-                zp_printfln("Enter Running");
+                zp_printfln( "Enter Running" );
             }
                 break;
             case EngineState::Destroying:
-                zp_printfln("Enter Destroying");
+                zp_printfln( "Enter Destroying" );
                 break;
             case EngineState::Destroyed:
-                zp_printfln("Enter Destroyed");
+                zp_printfln( "Enter Destroyed" );
+                break;
+            case EngineState::Restarting:
+                zp_printfln( "Restarting" );
                 break;
             case EngineState::Exit:
-                zp_printfln("Enter Exit");
+                zp_printfln( "Enter Exit" );
                 break;
         }
     }
@@ -346,7 +372,7 @@ namespace zp
                 if( m_restartCounter > 0 )
                 {
                     m_restartCounter = 0;
-                    m_nextEngineState = EngineState::Initializing;
+                    m_nextEngineState = EngineState::Restarting;
                 }
                 else
                 {
@@ -364,25 +390,25 @@ namespace zp
         switch( engineState )
         {
             case EngineState::Uninitialized:
-                zp_printfln("Exit Uninitialized");
+                zp_printfln( "Exit Uninitialized" );
                 break;
             case EngineState::Initializing:
-                zp_printfln("Exit Initializing");
+                zp_printfln( "Exit Initializing" );
                 break;
             case EngineState::Initialized:
-                zp_printfln("Exit Initialized");
+                zp_printfln( "Exit Initialized" );
                 break;
             case EngineState::Running:
-                zp_printfln("Exit Running");
+                zp_printfln( "Exit Running" );
                 break;
             case EngineState::Destroying:
-                zp_printfln("Exit Destroying");
+                zp_printfln( "Exit Destroying" );
                 break;
             case EngineState::Destroyed:
-                zp_printfln("Exit Destroyed");
+                zp_printfln( "Exit Destroyed" );
                 break;
             case EngineState::Exit:
-                zp_printfln("Exit Exit");
+                zp_printfln( "Exit Exit" );
                 break;
         }
     }
