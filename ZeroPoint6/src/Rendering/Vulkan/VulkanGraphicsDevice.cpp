@@ -30,7 +30,7 @@
 #endif
 
 #if ZP_DEBUG
-#define HR( r )   do { const VkResult ZP_CONCAT(_result_,__LINE__) = (r); if( ZP_CONCAT(_result_,__LINE__) != VK_SUCCESS ) { zp_printfln("HR Failed: " #r ); zp_debug_break(); } } while( false )
+#define HR( r )   do { const VkResult ZP_CONCAT(_result_,__LINE__) = (r); if( ZP_CONCAT(_result_,__LINE__) != VK_SUCCESS ) { zp_printfln("HR Failed: " #r ); Platform::DebugBreak(); } } while( false )
 #else
 #define HR( r )   r
 #endif
@@ -664,7 +664,7 @@ namespace zp
                     }
                     else if( result == ZP_MESSAGE_BOX_RESULT_RETRY )
                     {
-                        zp_debug_break();
+                        Platform::DebugBreak();
                     }
                 }
             }
@@ -2538,7 +2538,7 @@ namespace zp
                 "Present",
             };
 
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_BUFFER, commandBuffer, "%s Command Buffer #%d (%d)", kQueueNames[ queue ], commandQueueIndex, zp_current_thread_id() );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_BUFFER, commandBuffer, "%s Command Buffer #%d (%d)", kQueueNames[ queue ], commandQueueIndex, Platform::GetCurrentThreadId() );
 #endif
         }
 
@@ -2995,9 +2995,9 @@ namespace zp
             m_vkCommandPools[ index + 1 ] = t_vkTransferCommandPool;
             m_vkCommandPools[ index + 2 ] = t_vkComputeCommandPool;
 
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, t_vkGraphicsCommandPool, "Graphics Command Buffer Pool (%d)", zp_current_thread_id() );
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, t_vkTransferCommandPool, "Transfer Command Buffer Pool (%d)", zp_current_thread_id() );
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, t_vkComputeCommandPool, "Compute Command Buffer Pool (%d)", zp_current_thread_id() );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, t_vkGraphicsCommandPool, "Graphics Command Buffer Pool (%d)", Platform::GetCurrentThreadId() );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, t_vkTransferCommandPool, "Transfer Command Buffer Pool (%d)", Platform::GetCurrentThreadId() );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, t_vkComputeCommandPool, "Compute Command Buffer Pool (%d)", Platform::GetCurrentThreadId() );
         }
 
         const VkCommandPool commandPoolMap[] {
@@ -3019,7 +3019,7 @@ namespace zp
         {
             HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &createInfo, &m_vkAllocationCallbacks, &layout ) );
 
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, layout, "Descriptor Set Layout #%d (%d)", m_descriptorSetLayoutCache.size(), zp_current_thread_id() );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, layout, "Descriptor Set Layout #%d (%d)", m_descriptorSetLayoutCache.size(), Platform::GetCurrentThreadId() );
 
             m_descriptorSetLayoutCache.set( hash, layout );
         }

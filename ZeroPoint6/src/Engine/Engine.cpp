@@ -47,7 +47,7 @@ namespace zp
 #endif
         , m_frameCount( 0 )
         , m_frameTime( 0 )
-        , m_timeFrequencyS( zp_time_frequency() )
+        , m_timeFrequencyS( Platform::TimeFrequency() )
         , m_exitCode( 0 )
         , m_nextEngineState( EngineState::Uninitialized )
         , m_currentEngineState( EngineState::Uninitialized )
@@ -260,7 +260,7 @@ namespace zp
 
         void EndFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            zp_printfln( "[%10d] EndFrameJob", zp_current_thread_id() );
+            zp_printfln( "[%10d] EndFrameJob", Platform::GetCurrentThreadId() );
 
             JobSystem::Start( AdvanceFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -268,7 +268,7 @@ namespace zp
 
         void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            zp_printfln( "[%10d] StartFrameJob", zp_current_thread_id() );
+            zp_printfln( "[%10d] StartFrameJob", Platform::GetCurrentThreadId() );
 
             JobSystem::Start( EndFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -356,7 +356,6 @@ namespace zp
         ZP_SAFE_DELETE( Profiler, m_profiler );
 #endif
 
-        JobSystem::ExitJobThreads();
         JobSystem::Teardown();
     }
 
@@ -444,7 +443,7 @@ namespace zp
             {
                 JobSystem::ProcessJobs();
 
-                zp_yield_current_thread();
+                Platform::YieldCurrentThread();
             }
                 break;
             case EngineState::Destroy:
@@ -898,14 +897,14 @@ namespace zp
     {
         ++m_frameCount;
 
-        const zp_time_t now = zp_time_now();
+        const zp_time_t now = Platform::TimeNow();
         const zp_time_t totalCPUTime = now - m_frameTime;
         m_frameTime = now;
 
         const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
 
         MutableFixedString<128> windowTitle;
-        windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, zp_current_thread_id() );
+        windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, Platform::GetCurrentThreadId() );
 
         Platform::SetWindowTitle( m_windowHandle, windowTitle );
 

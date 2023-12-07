@@ -305,7 +305,7 @@ namespace
 
         if( job == nullptr )
         {
-            zp_yield_current_thread();
+            Platform::YieldCurrentThread();
         }
 
         return job;
@@ -384,7 +384,7 @@ namespace
                 ExecuteJob( job );
             }
 
-            zp_yield_current_thread();
+            Platform::YieldCurrentThread();
         }
 
         t_threadInfo.allocatedJobCount = 0;

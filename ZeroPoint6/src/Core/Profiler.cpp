@@ -3,14 +3,15 @@
 //
 
 #include "Core/Defines.h"
-#include "Core/Math.h"
 
 #if ZP_USE_PROFILER
 
+#include "Core/Math.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/Atomic.h"
 #include "Core/Profiler.h"
+#include "Platform/Platform.h"
 
 namespace zp
 {
@@ -157,9 +158,9 @@ namespace zp
         event->functionName = cpuDesc.functionName;
         event->eventName = cpuDesc.eventName;
         event->frameIndex = t_profilerData.currentFrame;
-        event->startCycle = zp_time_cycle();
+        event->startCycle = Platform::TimeCycles();
         event->endCycle = event->startCycle;
-        event->startTime = zp_time_now();
+        event->startTime = Platform::TimeNow();
         event->endTime = event->startTime;
         event->parentEvent = t_profilerData.eventStackCount > 0 ? t_profilerData.eventStack[ t_profilerData.eventStackCount - 1 ] : 0;
         event->userData = cpuDesc.userData;
@@ -176,9 +177,9 @@ namespace zp
         event->functionName = functionName;
         event->eventName = eventName;
         event->frameIndex = t_profilerData.currentFrame;
-        event->startCycle = zp_time_cycle();
+        event->startCycle = Platform::TimeCycles();
         event->endCycle = event->startCycle;
-        event->startTime = zp_time_now();
+        event->startTime = Platform::TimeNow();
         event->endTime = event->startTime;
         event->parentEvent = t_profilerData.eventStackCount > 0 ? t_profilerData.eventStack[ t_profilerData.eventStackCount - 1 ] : -1;
         event->userData = userData;
@@ -195,8 +196,8 @@ namespace zp
     {
         CPUProfilerEvent* event = t_profilerData.cpuProfilerData + eventIndex;
 
-        event->endTime = zp_time_now();
-        event->endCycle = zp_time_cycle();
+        event->endTime = Platform::TimeNow();
+        event->endCycle = Platform::TimeCycles();
 
         ZP_ASSERT(t_profilerData.eventStackCount > 0 );
         //if( t_profilerData.eventStackCount > 0 )
@@ -211,8 +212,8 @@ namespace zp
 
         MemoryProfilerEvent* event = t_profilerData.memoryProfilerData + eventIndex;
         event->frameIndex = t_profilerData.currentFrame;
-        event->cycle = zp_time_cycle();
-        event->time = zp_time_now();
+        event->cycle = Platform::TimeCycles();
+        event->time = Platform::TimeNow();
         event->memoryAllocated = memoryDesc.allocated;
         event->memoryFreed = memoryDesc.freed;
         event->memoryTotal = memoryDesc.total;
@@ -228,7 +229,7 @@ namespace zp
         GPUProfilerEvent* event = t_profilerData.gpuProfilerData + eventIndex;
         event->frameIndex = t_profilerData.currentFrame;
         event->gpuDuration = gpuDesc.duration;
-        event->time = zp_time_now();
+        event->time = Platform::TimeNow();
         event->numDrawCalls = gpuDesc.numDrawCalls;
         event->numTriangles = gpuDesc.numTriangles;
         event->numCommands = gpuDesc.numCommands;
@@ -330,7 +331,7 @@ namespace zp
         profilerThreadData->gpuProfilerEventCount = m_maxGPUProfilerEvents;
 
         profilerThreadData->threadIndex = profilerThreadIndex;
-        profilerThreadData->threadID = zp_current_thread_id();
+        profilerThreadData->threadID = Platform::GetCurrentThreadId();
 
         m_profilerThreadData[ profilerThreadIndex ] = profilerThreadData;
     }

@@ -281,6 +281,10 @@ namespace zp
 
         [[nodiscard]] zp_uint32_t GetCurrentThreadId();
 
+        void YieldCurrentThread();
+
+        void SleepCurrentThread( zp_uint64_t milliseconds );
+
         zp_uint32_t GetThreadId( zp_handle_t threadHandle );
 
         void SetThreadName( zp_handle_t threadHandle, const String& threadName );
@@ -302,10 +306,22 @@ namespace zp
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
     }
 
+    // Time
+    namespace Platform
+    {
+        [[nodiscard]] zp_time_t TimeNow();
+
+        [[nodiscard]] zp_time_t TimeFrequency();
+
+        [[nodiscard]] zp_uint64_t TimeCycles();
+    }
+
     // Util
     namespace Platform
     {
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
+
+        void DebugBreak();
     }
 
     // Networking

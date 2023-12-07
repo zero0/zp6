@@ -644,7 +644,7 @@ namespace zp
         ::CreateDirectory( tempRootPath.c_str(), nullptr );
 
         char tempFileName[MAX_PATH];
-        const zp_time_t unique = zp_time_now();
+        const zp_time_t unique = Platform::TimeNow();
         zp_snprintf( tempFileName, "%s-%x.%s", tempFileNamePrefix ? tempFileNamePrefix : "tmp", unique, tempFileNameExtension ? tempFileNameExtension : "tmp" );
 
         char finalFileNamePath[MAX_PATH];
@@ -791,6 +791,16 @@ namespace zp
         return static_cast<zp_uint32_t>( threadId );
     }
 
+    void Platform::YieldCurrentThread()
+    {
+        ::YieldProcessor();
+    }
+
+    void Platform::SleepCurrentThread( zp_uint64_t milliseconds )
+    {
+        ::Sleep( milliseconds );
+    }
+
     zp_uint32_t Platform::GetThreadId( zp_handle_t threadHandle )
     {
         const DWORD threadId = ::GetThreadId( static_cast<HANDLE>( threadHandle ) );
@@ -886,6 +896,26 @@ namespace zp
         return systemInfo.dwNumberOfProcessors;
     }
 
+    zp_time_t Platform::TimeNow()
+    {
+        LARGE_INTEGER val;
+        ::QueryPerformanceCounter( &val );
+        return val.QuadPart;
+    }
+
+    zp_time_t Platform::TimeFrequency()
+    {
+        LARGE_INTEGER val;
+        ::QueryPerformanceFrequency( &val );
+        return val.QuadPart;
+    }
+
+    zp_uint64_t Platform::TimeCycles()
+    {
+        const zp_uint64_t cycles = ::__rdtsc();
+        return cycles;
+    }
+
     MessageBoxResult Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton )
     {
         constexpr UINT buttonMap[] {
@@ -926,6 +956,13 @@ namespace zp
 
         const MessageBoxResult result = resultMap[ id ];
         return result;
+    }
+
+    void Platform::DebugBreak()
+    {
+#if ZP_DEBUG
+        ::DebugBreak();
+#endif
     }
 
     zp_int32_t Platform::ExecuteProcess( const char* process, const char* arguments )

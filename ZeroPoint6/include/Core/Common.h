@@ -263,20 +263,6 @@ constexpr zp_int32_t zp_bitscan_reverse( zp_uint64_t val )
 #endif
 }
 
-zp_time_t zp_time_now();
-
-zp_time_t zp_time_frequency();
-
-zp_uint64_t zp_time_cycle();
-
-zp_uint32_t zp_current_thread_id();
-
-void zp_yield_current_thread();
-
-void zp_sleep_current_thread( zp_uint64_t timeMilliseconds );
-
-void zp_debug_break();
-
 //
 //
 //
