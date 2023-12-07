@@ -767,4 +767,84 @@ namespace zp
     };
 }
 
+//
+//
+//
+
+namespace zp
+{
+    struct SizeInfo
+    {
+        zp_float32_t size;
+        zp_char8_t k;
+        zp_char8_t b;
+    };
+
+    constexpr SizeInfo GetSizeInfoFromBytes( zp_size_t bytes, zp_bool_t asBits = false )
+    {
+        SizeInfo info {};
+
+        if( asBits )
+        {
+            info.b = 'b';
+            if( bytes > 1 tb )
+            {
+                info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 tb ) );
+                info.k = 't';
+            }
+            else if( bytes > 1 gb )
+            {
+                info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 gb );
+                info.k = 'g';
+            }
+            else if( bytes > 1 mb )
+            {
+                info.size = (zp_float32_t)bytes / ( 1 mb );
+                info.k = 'm';
+            }
+            else if( bytes > 1 kb )
+            {
+                info.size = (zp_float32_t)bytes / ( 1 kb );
+                info.k = 'k';
+            }
+            else
+            {
+                info.size = (zp_float32_t)bytes;
+                info.k = ' ';
+            }
+        }
+        else
+        {
+            info.b = 'B';
+            if( bytes > 1 TB )
+            {
+                info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 TB ) );
+                info.k = 'T';
+            }
+            else if( bytes > 1 GB )
+            {
+                info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 GB );
+                info.k = 'G';
+            }
+            else if( bytes > 1 MB )
+            {
+                info.size = (zp_float32_t)bytes / ( 1 MB );
+                info.k = 'M';
+            }
+            else if( bytes > 1 KB )
+            {
+                info.size = (zp_float32_t)bytes / ( 1 KB );
+                info.k = 'K';
+            }
+            else
+            {
+                info.size = (zp_float32_t)bytes;
+                info.k = ' ';
+            }
+        }
+
+        return info;
+    }
+}
+
 #endif //ZP_COMMON_H

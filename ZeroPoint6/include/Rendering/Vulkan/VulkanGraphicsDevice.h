@@ -32,6 +32,8 @@ namespace zp
 
         ~VulkanGraphicsDevice();
 
+        [[nodiscard]] AllocString name() const final;
+
         void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
 
         void destroySwapChain() final;

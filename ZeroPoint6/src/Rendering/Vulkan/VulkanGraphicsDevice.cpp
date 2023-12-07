@@ -10,6 +10,7 @@
 #include "Core/Math.h"
 #include "Core/Atomic.h"
 #include "Core/Profiler.h"
+#include "Core/String.h"
 
 #include "Platform/Platform.h"
 
@@ -19,12 +20,12 @@
 #include "Rendering/Vulkan/VulkanGraphicsDevice.h"
 
 #include <vulkan/vulkan.h>
-#include <windows.h>
 
 #if ZP_OS_WINDOWS
-#define VK_USE_PLATFORM_WIN32_KHR
 #define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
+#define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan_win32.h>
 
 #endif
@@ -710,6 +711,66 @@ namespace zp
 
 #pragma endregion
 
+        void PrintPhysicalDeviceInfo( VkPhysicalDevice physicalDevice )
+        {
+            VkPhysicalDeviceProperties properties {};
+            vkGetPhysicalDeviceProperties( physicalDevice, &properties );
+
+            MutableFixedString512 info;
+            info.append( properties.deviceName );
+            info.append( ' ' );
+
+            SizeInfo sizeInfo = GetSizeInfoFromBytes( properties.limits.maxMemoryAllocationCount MB );
+            info.appendFormat( "%1.1f %c%c", sizeInfo.size, sizeInfo.k, sizeInfo.b );
+
+            switch( properties.deviceType )
+            {
+                case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+                    info.append( "(Other)" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                    info.append( "(Integrated GPU)" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                    info.append( "(Discrete)" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                    info.append( "(Virtual GPU)" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                    info.append( "(CPU)" );
+                    break;
+                default:
+                    break;
+            }
+            info.append( ' ' );
+
+            if( properties.vendorID == 4318 ) // NVidia
+            {
+                info.appendFormat( "%d.%d.%d.%d",
+                    ( properties.driverVersion >> 22 ) & 0x03FFU,
+                    ( properties.driverVersion >> 14 ) & 0xFFU,
+                    ( properties.driverVersion >> 6 ) & 0xFFU,
+                    ( properties.driverVersion ) & 0x3FU );
+            }
+            else
+            {
+                info.appendFormat( "%x", properties.driverVersion );
+            }
+            info.append( ' ' );
+
+            info.append( "Vulkan" );
+            info.append( ' ' );
+
+            info.appendFormat( "%d.%d.%d.%d",
+                VK_API_VERSION_VARIANT( properties.apiVersion ),
+                VK_API_VERSION_MAJOR( properties.apiVersion ),
+                VK_API_VERSION_MINOR( properties.apiVersion ),
+                VK_API_VERSION_PATCH( properties.apiVersion ) );
+
+            zp_printfln( info.c_str() );
+        }
+
         zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
             zp_bool_t isSuitable = true;
@@ -719,8 +780,9 @@ namespace zp
             vkGetPhysicalDeviceProperties( physicalDevice, &physicalDeviceProperties );
             vkGetPhysicalDeviceFeatures( physicalDevice, &physicalDeviceFeatures );
 
+#if ZP_DEBUG
             zp_printfln( "Testing %s", physicalDeviceProperties.deviceName );
-
+#endif
             // require discrete gpu
             isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
@@ -767,8 +829,9 @@ namespace zp
                         break;
                     }
                 }
-
+#if ZP_DEBUG
                 zp_printfln( "[%c] %s", found ? 'X' : ' ', availableExtension.extensionName );
+#endif
             }
 
             // check that required extensions are available
@@ -790,6 +853,7 @@ namespace zp
             return isSuitable;
         }
 
+#pragma region Swapchain
         VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& surfaceFormats, int format, ColorSpace colorSpace )
         {
             VkSurfaceFormatKHR chosenFormat = surfaceFormats[ 0 ];
@@ -809,7 +873,7 @@ namespace zp
             return chosenFormat;
         }
 
-        VkPresentModeKHR ChooseSwapChainPresentMode( const Vector<VkPresentModeKHR>& presentModes, zp_bool_t vsync )
+        constexpr VkPresentModeKHR ChooseSwapChainPresentMode( const Vector<VkPresentModeKHR>& presentModes, zp_bool_t vsync )
         {
             VkPresentModeKHR chosenPresentMode = VK_PRESENT_MODE_FIFO_KHR;
 
@@ -833,7 +897,7 @@ namespace zp
             return chosenPresentMode;
         }
 
-        VkExtent2D ChooseSwapChainExtent( const VkSurfaceCapabilitiesKHR& surfaceCapabilities, uint32_t requestedWith, uint32_t requestedHeight )
+        constexpr VkExtent2D ChooseSwapChainExtent( const VkSurfaceCapabilitiesKHR& surfaceCapabilities, uint32_t requestedWith, uint32_t requestedHeight )
         {
             VkExtent2D chosenExtents;
 
@@ -858,8 +922,8 @@ namespace zp
             }
 
             return chosenExtents;
-
         }
+#pragma endregion
 
         constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
         {
@@ -875,6 +939,8 @@ namespace zp
             ZP_INVALID_CODE_PATH();
             return 0;
         }
+
+#pragma region Custom Allocator Callbacks
 
         void* AllocationCallback( void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope )
         {
@@ -893,6 +959,8 @@ namespace zp
             IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
             allocator->free( pMemory );
         }
+
+#pragma endregion
 
         void DestroyDelayedDestroyHandle( VkInstance vkInstance, VkDevice vkLocalDevice, const DelayedDestroy& delayedDestroy )
         {
@@ -1094,6 +1162,8 @@ namespace zp
 
             ZP_ASSERT( m_vkPhysicalDevice );
             vkGetPhysicalDeviceMemoryProperties( m_vkPhysicalDevice, &m_vkPhysicalDeviceMemoryProperties );
+
+            PrintPhysicalDeviceInfo( m_vkPhysicalDevice );
         }
 
         // create local device and queue families
@@ -1292,9 +1362,9 @@ namespace zp
 
         destroySwapChain();
 
-        destroyAllDelayedDestroy();
-
         destroyBuffer( &m_stagingBuffer );
+
+        destroyAllDelayedDestroy();
 
         auto b = m_descriptorSetLayoutCache.begin();
         auto e = m_descriptorSetLayoutCache.end();
@@ -1338,6 +1408,11 @@ namespace zp
 
         vkDestroyInstance( m_vkInstance, &m_vkAllocationCallbacks );
         m_vkInstance = {};
+    }
+
+    AllocString VulkanGraphicsDevice::name() const
+    {
+        return {};
     }
 
     void VulkanGraphicsDevice::createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace )

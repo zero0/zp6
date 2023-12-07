@@ -92,4 +92,16 @@ private:                            \
 
 #define ZP_PURE_INTERFACE   class
 
+// Bytes
+#define KB              * zp_size_t( 1024 )
+#define MB              * zp_size_t( 1024 * 1024 )
+#define GB              * zp_size_t( 1024 * 1024 * 1024 )
+#define TB              * zp_size_t( zp_size_t(1024) * 1024 * 1024 * 1024 )
+
+// Bits
+#define kb              * zp_size_t( 1000 )
+#define mb              * zp_size_t( 1000 * 1000 )
+#define gb              * zp_size_t( 1000 * 1000 * 1000 )
+#define tb              * zp_size_t( zp_size_t(1000) * 1000 * 1000 * 1000 )
+
 #endif //ZP_MACROS_H

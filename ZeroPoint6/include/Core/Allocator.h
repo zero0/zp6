@@ -45,10 +45,6 @@
 #define ZP_SAFE_FREE( l, p )            ZP_FREE( l, p )
 #endif // ZP_USE_SAFE_FREE
 
-
-#define KB                              * zp_size_t( 1024 )
-#define MB                              * zp_size_t( 1024 * 1024 )
-
 namespace zp
 {
     typedef zp_uint8_t MemoryLabel;

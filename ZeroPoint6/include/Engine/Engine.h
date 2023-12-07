@@ -127,6 +127,7 @@ namespace zp
 
         JobHandle m_previousFrameEnginePipelineHandle;
 
+        GraphicsDevice* m_graphicsDevice;
         RenderSystem* m_renderSystem;
         EntityComponentManager* m_entityComponentManager;
         AssetSystem* m_assetSystem;

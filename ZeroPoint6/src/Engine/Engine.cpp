@@ -39,6 +39,7 @@ namespace zp
         , m_currentEnginePipeline( nullptr )
         , m_nextEnginePipeline( nullptr )
         , m_previousFrameEnginePipelineHandle {}
+        , m_graphicsDevice( nullptr )
         , m_renderSystem( nullptr )
         , m_entityComponentManager( nullptr )
         , m_assetSystem( nullptr )
@@ -86,7 +87,7 @@ namespace zp
     void Engine::initialize()
     {
         zp_handle_t mainThreadHandle = Platform::GetCurrentThread();
-        Platform::SetThreadName( mainThreadHandle, ZP_STR_T( "MainThread" ) );
+        Platform::SetThreadName( mainThreadHandle, String::As( "MainThread" ) );
         Platform::SetThreadIdealProcessor( mainThreadHandle, 0 );
 
         const zp_uint32_t numJobThreads = 2; // Platform::GetProcessorCount() - 1;
@@ -105,6 +106,8 @@ namespace zp
 
         // initialize job system
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
+
+        const zp_bool_t headless = false;
 
         // create window/console
         const zp_bool_t createWindow = true;
@@ -133,8 +136,20 @@ namespace zp
             m_consoleHandle = Platform::OpenConsole();
         }
 
+
+        // graphics device
+        if( !headless )
+        {
+            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, {
+                .appName = String::As( "AppName" ),
+                .stagingBufferSize = 32 MB,
+                .threadCount = numJobThreads,
+                .bufferFrameCount = 4,
+            } );
+        }
         // create systems
-        m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
+        //m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
+
 
         return;
         const char* moduleDLLPath = "";
@@ -345,6 +360,9 @@ namespace zp
             Platform::CloseConsole( m_consoleHandle );
             m_consoleHandle = nullptr;
         }
+
+        DestroyGraphicsDevice( m_graphicsDevice );
+        m_graphicsDevice = nullptr;
 
         ZP_SAFE_DELETE( RenderSystem, m_renderSystem );
         ZP_SAFE_DELETE( EntityComponentManager, m_entityComponentManager );

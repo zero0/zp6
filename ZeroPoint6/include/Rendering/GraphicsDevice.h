@@ -193,8 +193,8 @@ namespace zp
         zp_uint32_t threadCount;
         zp_uint32_t bufferFrameCount;
 
-        ZP_BOOL32( geometryShaderSupport );
-        ZP_BOOL32( tessellationShaderSupport );
+        ZP_BOOL32( geometryShaderSupport ) = true;
+        ZP_BOOL32( tessellationShaderSupport ) = true;
     };
 
     class GraphicsDevice;
@@ -215,6 +215,8 @@ namespace zp
         GraphicsDevice() = default;
 
         ~GraphicsDevice() = default;
+
+        virtual AllocString name() const = 0;
 
         virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
