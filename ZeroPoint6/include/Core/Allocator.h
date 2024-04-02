@@ -11,6 +11,8 @@
 #include "Core/Common.h"
 #include <new>
 
+#define ZP_USE_MEMORY_PROFILER  ZP_USE_PROFILER
+
 #define ZP_NEW( l, t )                 new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l))
 #define ZP_NEW_ARGS( l, t, ... )       new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l),__VA_ARGS__)
 
@@ -231,13 +233,13 @@ namespace zp
 {
     struct NullMemoryStorage
     {
-        void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
+        [[nodiscard]] void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
         {
             requestedSize = size;
             return nullptr;
         }
 
-        zp_bool_t is_fixed() const
+        [[nodiscard]] zp_bool_t is_fixed() const
         {
             return true;
         }
@@ -249,22 +251,22 @@ namespace zp
         {
         }
 
-        zp_size_t allocated() const
+        [[nodiscard]] zp_size_t allocated() const
         {
             return 0;
         }
 
-        zp_size_t total() const
+        [[nodiscard]] zp_size_t total() const
         {
             return 0;
         }
 
-        void* allocate( zp_size_t size, zp_size_t alignment )
+        [[nodiscard]] void* allocate( zp_size_t size, zp_size_t alignment )
         {
             return nullptr;
         }
 
-        void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
+        [[nodiscard]] void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
         {
             return nullptr;
         }
@@ -314,7 +316,7 @@ namespace zp
 
         void* request_memory( zp_size_t size, zp_size_t& requestedSize );
 
-        zp_bool_t is_fixed() const;
+        [[nodiscard]] zp_bool_t is_fixed() const;
 
     private:
         zp_size_t m_pageSize;
@@ -331,7 +333,7 @@ namespace zp
     {
         void* request_memory( zp_size_t size, zp_size_t& requestedSize );
 
-        zp_bool_t is_fixed() const;
+        [[nodiscard]] zp_bool_t is_fixed() const;
     };
 
     class MallocAllocatorPolicy
@@ -339,9 +341,9 @@ namespace zp
     public:
         void add_memory( void* mem, zp_size_t size );
 
-        zp_size_t allocated() const;
+        [[nodiscard]] zp_size_t allocated() const;
 
-        zp_size_t total() const;
+        [[nodiscard]] zp_size_t total() const;
 
         void* allocate( zp_size_t size, zp_size_t alignment );
 
@@ -350,8 +352,8 @@ namespace zp
         void free( void* ptr );
 
     protected:
-        zp_size_t m_allocated;
-        zp_size_t m_size;
+        zp_size_t m_allocated {};
+        zp_size_t m_size {};
     };
 }
 #pragma endregion
@@ -364,9 +366,9 @@ namespace zp
     public:
         void add_memory( void* mem, zp_size_t size );
 
-        zp_size_t allocated() const;
+        [[nodiscard]] zp_size_t allocated() const;
 
-        zp_size_t total() const;
+        [[nodiscard]] zp_size_t total() const;
 
         void* allocate( zp_size_t size, zp_size_t alignment );
 
@@ -382,6 +384,27 @@ namespace zp
 }
 #pragma endregion
 
+namespace zp
+{
+    template<zp_size_t Size>
+    class FixedMemoryStorage
+    {
+    public:
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
+        {
+            requestedSize = Size;
+            return m_memory;
+        }
+
+        [[nodiscard]] zp_bool_t is_fixed() const
+        {
+            return true;
+        }
+
+    private:
+        zp_uint8_t m_memory[ Size ];
+    };
+}
 
 namespace zp
 {

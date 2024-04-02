@@ -457,7 +457,7 @@ FodyWeavers.xsd
 ## Custom
 ##
 
-cmake-build-*
+cmake-build-*/
 out/
 .idea/
 Library/

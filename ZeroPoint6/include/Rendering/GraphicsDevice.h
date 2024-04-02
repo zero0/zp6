@@ -191,7 +191,7 @@ namespace zp
         zp_size_t stagingBufferSize;
 
         zp_uint32_t threadCount;
-        zp_uint32_t bufferFrameCount;
+        zp_uint32_t bufferedFrameCount;
 
         ZP_BOOL32( geometryShaderSupport ) = true;
         ZP_BOOL32( tessellationShaderSupport ) = true;
@@ -221,6 +221,10 @@ namespace zp
         virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
         virtual void destroySwapChain() = 0;
+
+        virtual void createPerFrameData() = 0;
+
+        virtual void destroyPerFrameData() = 0;
 
         virtual void beginFrame( zp_uint64_t frameIndex ) = 0;
 

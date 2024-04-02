@@ -20,36 +20,11 @@ namespace zp
 
     struct GraphicsBufferAllocation
     {
-        zp_handle_t const buffer;
-        zp_handle_t const deviceMemory;
-
-        const zp_size_t offset;
-        const zp_size_t size;
-    };
-
-    struct VirtualGraphicsBuffer
-    {
         zp_handle_t buffer;
         zp_handle_t deviceMemory;
 
-        zp_size_t offset;
-        zp_size_t size;
-        zp_size_t alignment;
-
-        GraphicsBufferUsageFlags usageFlags;
-
-        [[nodiscard]] VirtualGraphicsBuffer splitBuffer( zp_size_t startOffset, zp_size_t splitSize ) const
-        {
-            VirtualGraphicsBuffer splitBuffer {
-                .buffer = buffer,
-                .deviceMemory = deviceMemory,
-                .offset = offset + startOffset,
-                .size = splitSize,
-                .alignment = alignment,
-                .usageFlags = usageFlags,
-            };
-            return splitBuffer;
-        }
+        const zp_size_t offset;
+        const zp_size_t size;
     };
 
     struct GraphicsBuffer

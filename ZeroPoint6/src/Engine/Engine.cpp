@@ -49,6 +49,9 @@ namespace zp
         , m_frameCount( 0 )
         , m_frameTime( 0 )
         , m_timeFrequencyS( Platform::TimeFrequency() )
+        , m_shouldReload( false )
+        , m_shouldRestart( false )
+        , m_pauseCounter( 0 )
         , m_exitCode( 0 )
         , m_nextEngineState( EngineState::Uninitialized )
         , m_currentEngineState( EngineState::Uninitialized )
@@ -108,8 +111,15 @@ namespace zp
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
 
         const zp_bool_t headless = false;
+        const Rect2Di windowSize {
+            .offset = {},
+            .size = {
+                .width = 800,
+                .height = 600
+            }
+        };
 
-        // create window/console
+        // create window
         const zp_bool_t createWindow = true;
         if( createWindow )
         {
@@ -124,18 +134,18 @@ namespace zp
 
             m_windowHandle = Platform::OpenWindow( {
                 .callbacks = &m_windowCallbacks,
-                .width = 800,
-                .height = 600,
-                .showWindow = true
+                .width = windowSize.size.width,
+                .height = windowSize.size.height,
+                .showWindow = false
             } );
         }
 
+        // create console
         const zp_bool_t createConsole = true;
         if( createConsole )
         {
             m_consoleHandle = Platform::OpenConsole();
         }
-
 
         // graphics device
         if( !headless )
@@ -144,12 +154,16 @@ namespace zp
                 .appName = String::As( "AppName" ),
                 .stagingBufferSize = 32 MB,
                 .threadCount = numJobThreads,
-                .bufferFrameCount = 4,
+                .bufferedFrameCount = 4,
             } );
+
+            m_graphicsDevice->createSwapChain( m_windowHandle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
         // create systems
         //m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
 
+        // show window when graphics device is created
+        Platform::ShowWindow(m_windowHandle, true );
 
         return;
         const char* moduleDLLPath = "";
@@ -194,7 +208,7 @@ namespace zp
             .appName = ZP_STR_T( "AppName" ),
             .stagingBufferSize = 32 MB,
             .threadCount = numJobThreads,
-            .bufferFrameCount = 4,
+            .bufferedFrameCount = 4,
             .geometryShaderSupport = true,
             .tessellationShaderSupport = true,
         } );

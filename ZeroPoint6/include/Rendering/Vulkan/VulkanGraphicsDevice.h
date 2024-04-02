@@ -38,6 +38,10 @@ namespace zp
 
         void destroySwapChain() final;
 
+        void createPerFrameData() final;
+
+        void destroyPerFrameData() final;
+
         void beginFrame( zp_uint64_t frameIndex ) final;
 
         void submit() final;
@@ -193,7 +197,7 @@ namespace zp
         VkQueue m_vkRenderQueues[RenderQueue_Count];
 
         VkSwapchainKHR m_vkSwapChain;
-        VkRenderPass m_vkSwapChainRenderPass;
+        VkRenderPass m_vkSwapChainDefaultRenderPass;
 
         VkPipelineCache m_vkPipelineCache;
         VkDescriptorPool m_vkDescriptorPool;

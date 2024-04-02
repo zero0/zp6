@@ -25,6 +25,7 @@ set(ZP_CORE_SRC
 
 set(ZP_PLATFORM_SRC
         "src/Platform/${PLATFORM_FULL_NAME}/${PLATFORM_FULL_NAME}Platform.cpp"
+        "src/Platform/${PLATFORM_FULL_NAME}/${PLATFORM_FULL_NAME}Main.cpp"
         )
 
 set(ZP_RENDERING_SRC
@@ -46,7 +47,6 @@ set(ZP_ENGINE_SRC
         "src/Engine/EntityComponentManager.cpp"
         "src/Engine/EntityQuery.cpp"
         "src/Engine/Subsystem.cpp"
-        "src/Engine/${PLATFORM_FULL_NAME}/${PLATFORM_FULL_NAME}Main.cpp"
         )
 
 set(ZP_SRC

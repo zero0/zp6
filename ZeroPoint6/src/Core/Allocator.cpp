@@ -78,6 +78,14 @@ namespace zp
     //
     //
 
+    namespace
+    {
+        struct MallocHeader
+        {
+            zp_size_t allocatedSize;
+        };
+    }
+
     void MallocAllocatorPolicy::add_memory( void* mem, zp_size_t size )
     {
         m_size += size;
@@ -95,18 +103,74 @@ namespace zp
 
     void* MallocAllocatorPolicy::allocate( zp_size_t size, zp_size_t alignment )
     {
-        void* mem = _aligned_malloc( size, alignment );
+#if ZP_USE_MEMORY_PROFILER
+        const zp_size_t allocatedSize = size + sizeof( MallocHeader );
+#else
+        const zp_size_t allocatedSize = size;
+#endif
+
+        void* mem = _aligned_malloc( allocatedSize, alignment );
+        ZP_ASSERT( mem );
+
+#if ZP_USE_MEMORY_PROFILER
+        if( mem )
+        {
+            m_allocated += allocatedSize;
+
+            MallocHeader* header = reinterpret_cast<MallocHeader*>( mem );
+            header->allocatedSize = allocatedSize;
+
+            mem = header + 1;
+        }
+#endif
+
         return mem;
     }
 
     void* MallocAllocatorPolicy::reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
     {
-        void* mem = _aligned_realloc( ptr, size, alignment );
+        void* mem;
+
+#if ZP_USE_MEMORY_PROFILER
+        if( ptr )
+        {
+            MallocHeader* header = reinterpret_cast<MallocHeader*>( ptr ) - 1;
+            m_allocated -= header->allocatedSize;
+
+            ptr = header;
+        }
+
+        const zp_size_t allocatedSize = size + sizeof( MallocHeader );
+        mem = _aligned_realloc( ptr, allocatedSize, alignment );
+
+        if( mem )
+        {
+            m_allocated += allocatedSize;
+
+            MallocHeader* header = reinterpret_cast<MallocHeader*>( mem );
+            header->allocatedSize = allocatedSize;
+
+            mem = header + 1;
+        }
+#else
+            mem = _aligned_realloc( ptr, size, alignment );
+#endif
+        ZP_ASSERT( mem );
         return mem;
     }
 
     void MallocAllocatorPolicy::free( void* ptr )
     {
+#if ZP_USE_MEMORY_PROFILER
+        if( ptr )
+        {
+            MallocHeader* header = reinterpret_cast<MallocHeader*>( ptr ) - 1;
+            m_allocated -= header->allocatedSize;
+
+            ptr = header;
+        }
+#endif
+
         _aligned_free( ptr );
     }
 }

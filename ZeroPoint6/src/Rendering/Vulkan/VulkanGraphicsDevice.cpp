@@ -23,15 +23,17 @@
 
 #if ZP_OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
+
 #include <windows.h>
 
 #define VK_USE_PLATFORM_WIN32_KHR
+
 #include <vulkan/vulkan_win32.h>
 
 #endif
 
 #if ZP_DEBUG
-#define HR( r )   do { const VkResult ZP_CONCAT(_result_,__LINE__) = (r); if( ZP_CONCAT(_result_,__LINE__) != VK_SUCCESS ) { zp_printfln("HR Failed: " #r ); Platform::DebugBreak(); } } while( false )
+#define HR( r )   do { const VkResult ZP_CONCAT(_vkResult_,__LINE__) = (r); if( ZP_CONCAT(_vkResult_,__LINE__) != VK_SUCCESS ) { zp_error_printfln("HR Failed: " #r ); Platform::DebugBreak(); } } while( false )
 #else
 #define HR( r )   r
 #endif
@@ -722,6 +724,7 @@ namespace zp
 
             SizeInfo sizeInfo = GetSizeInfoFromBytes( properties.limits.maxMemoryAllocationCount MB );
             info.appendFormat( "%1.1f %c%c", sizeInfo.size, sizeInfo.k, sizeInfo.b );
+            info.append( ' ' );
 
             switch( properties.deviceType )
             {
@@ -741,6 +744,7 @@ namespace zp
                     info.append( "(CPU)" );
                     break;
                 default:
+                    ZP_INVALID_CODE_PATH_MSG( "Unknown DeviceType");
                     break;
             }
             info.append( ' ' );
@@ -854,11 +858,12 @@ namespace zp
         }
 
 #pragma region Swapchain
+
         VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& surfaceFormats, int format, ColorSpace colorSpace )
         {
             VkSurfaceFormatKHR chosenFormat = surfaceFormats[ 0 ];
 
-            VkColorSpaceKHR searchColorSpace = Convert( colorSpace );
+            const VkColorSpaceKHR searchColorSpace = Convert( colorSpace );
 
             for( const VkSurfaceFormatKHR& surfaceFormat : surfaceFormats )
             {
@@ -923,13 +928,14 @@ namespace zp
 
             return chosenExtents;
         }
+
 #pragma endregion
 
         constexpr uint32_t FindMemoryTypeIndex( const VkPhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties, const zp_uint32_t typeFilter, const VkMemoryPropertyFlags memoryPropertyFlags )
         {
             for( uint32_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++ )
             {
-                VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties.memoryTypes[ i ].propertyFlags;
+                const VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties.memoryTypes[ i ].propertyFlags;
                 if( ( typeFilter & ( 1 << i ) ) && ( flags & memoryPropertyFlags ) == memoryPropertyFlags )
                 {
                     return i;
@@ -962,55 +968,57 @@ namespace zp
 
 #pragma endregion
 
-        void DestroyDelayedDestroyHandle( VkInstance vkInstance, VkDevice vkLocalDevice, const DelayedDestroy& delayedDestroy )
+        void DestroyDelayedDestroyHandle( const DelayedDestroy& delayedDestroy )
         {
-            auto allocator = static_cast<const VkAllocationCallbacks*>( delayedDestroy.allocator);
+            auto vkAllocatorCallbacks = static_cast<const VkAllocationCallbacks*>( delayedDestroy.allocator );
+            auto vkLocalDevice = static_cast<VkDevice>( delayedDestroy.localDevice );
+            auto vkInstance = static_cast<VkInstance>( delayedDestroy.instance );
             switch( delayedDestroy.type )
             {
                 case DelayedDestroyType::Buffer:
-                    vkDestroyBuffer( vkLocalDevice, static_cast<VkBuffer>(delayedDestroy.handle), allocator );
+                    vkDestroyBuffer( vkLocalDevice, static_cast<VkBuffer>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::BufferView:
-                    vkDestroyBufferView( vkLocalDevice, static_cast<VkBufferView>(delayedDestroy.handle), allocator );
+                    vkDestroyBufferView( vkLocalDevice, static_cast<VkBufferView>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Image:
-                    vkDestroyImage( vkLocalDevice, static_cast<VkImage>(delayedDestroy.handle), allocator );
+                    vkDestroyImage( vkLocalDevice, static_cast<VkImage>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::ImageView:
-                    vkDestroyImageView( vkLocalDevice, static_cast<VkImageView>(delayedDestroy.handle), allocator );
+                    vkDestroyImageView( vkLocalDevice, static_cast<VkImageView>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::FrameBuffer:
-                    vkDestroyFramebuffer( vkLocalDevice, static_cast<VkFramebuffer>(delayedDestroy.handle), allocator );
+                    vkDestroyFramebuffer( vkLocalDevice, static_cast<VkFramebuffer>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Swapchain:
-                    vkDestroySwapchainKHR( vkLocalDevice, static_cast<VkSwapchainKHR>(delayedDestroy.handle), allocator );
+                    vkDestroySwapchainKHR( vkLocalDevice, static_cast<VkSwapchainKHR>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Surface:
-                    vkDestroySurfaceKHR( vkInstance, static_cast<VkSurfaceKHR>(delayedDestroy.handle), allocator );
+                    vkDestroySurfaceKHR( vkInstance, static_cast<VkSurfaceKHR>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Shader:
-                    vkDestroyShaderModule( vkLocalDevice, static_cast<VkShaderModule>(delayedDestroy.handle), allocator );
+                    vkDestroyShaderModule( vkLocalDevice, static_cast<VkShaderModule>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::RenderPass:
-                    vkDestroyRenderPass( vkLocalDevice, static_cast<VkRenderPass>(delayedDestroy.handle), allocator );
+                    vkDestroyRenderPass( vkLocalDevice, static_cast<VkRenderPass>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Sampler:
-                    vkDestroySampler( vkLocalDevice, static_cast<VkSampler>(delayedDestroy.handle), allocator );
+                    vkDestroySampler( vkLocalDevice, static_cast<VkSampler>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Fence:
-                    vkDestroyFence( vkLocalDevice, static_cast<VkFence>(delayedDestroy.handle), allocator );
+                    vkDestroyFence( vkLocalDevice, static_cast<VkFence>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Semaphore:
-                    vkDestroySemaphore( vkLocalDevice, static_cast<VkSemaphore>(delayedDestroy.handle), allocator );
+                    vkDestroySemaphore( vkLocalDevice, static_cast<VkSemaphore>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Pipeline:
-                    vkDestroyPipeline( vkLocalDevice, static_cast<VkPipeline>(delayedDestroy.handle), allocator );
+                    vkDestroyPipeline( vkLocalDevice, static_cast<VkPipeline>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::PipelineLayout:
-                    vkDestroyPipelineLayout( vkLocalDevice, static_cast<VkPipelineLayout>(delayedDestroy.handle), allocator );
+                    vkDestroyPipelineLayout( vkLocalDevice, static_cast<VkPipelineLayout>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 case DelayedDestroyType::Memory:
-                    vkFreeMemory( vkLocalDevice, static_cast<VkDeviceMemory>(delayedDestroy.handle), allocator );
+                    vkFreeMemory( vkLocalDevice, static_cast<VkDeviceMemory>(delayedDestroy.handle), vkAllocatorCallbacks );
                     break;
                 default:
                     ZP_INVALID_CODE_PATH_MSG( "DelayedDestroyType not defined" );
@@ -1038,7 +1046,7 @@ namespace zp
         }
         , m_vkRenderQueues {}
         , m_vkSwapChain( VK_NULL_HANDLE )
-        , m_vkSwapChainRenderPass( VK_NULL_HANDLE )
+        , m_vkSwapChainDefaultRenderPass( VK_NULL_HANDLE )
         , m_vkPipelineCache( VK_NULL_HANDLE )
         , m_vkDescriptorPool( VK_NULL_HANDLE )
         , m_vkCommandPools( nullptr )
@@ -1354,6 +1362,8 @@ namespace zp
 
             HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
         }
+
+        createPerFrameData();
     }
 
     VulkanGraphicsDevice::~VulkanGraphicsDevice()
@@ -1361,6 +1371,8 @@ namespace zp
         HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
 
         destroySwapChain();
+
+        destroyPerFrameData();
 
         destroyBuffer( &m_stagingBuffer );
 
@@ -1523,53 +1535,73 @@ namespace zp
         m_swapChainImageViews.resize_unsafe( swapChainImageCount );
 
         {
-            if( m_vkSwapChainRenderPass )
+            if( m_vkSwapChainDefaultRenderPass )
             {
-                vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainRenderPass, &m_vkAllocationCallbacks );
+                const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+                m_delayedDestroy[ index ] = {
+                    .frameIndex = m_currentFrameIndex,
+                    .handle = m_vkSwapChainDefaultRenderPass,
+                    .allocator = &m_vkAllocationCallbacks,
+                    .localDevice = m_vkLocalDevice,
+                    .instance = m_vkInstance,
+                    .order = index,
+                    .type = DelayedDestroyType::RenderPass,
+                };
+
+                m_vkSwapChainDefaultRenderPass = VK_NULL_HANDLE;
             }
 
-            VkAttachmentDescription colorAttachment {
-                .format = m_vkSwapChainFormat,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
-                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VkAttachmentDescription colorAttachments[] {
+                {
+                    .format = m_vkSwapChainFormat,
+                    .samples = VK_SAMPLE_COUNT_1_BIT,
+                    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                    .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                }
             };
 
-            VkAttachmentReference colorAttachmentRef {
-                .attachment = 0,
-                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VkAttachmentReference colorAttachmentRefs[] {
+                {
+                    .attachment = 0,
+                    .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                }
             };
 
-            VkSubpassDescription subPassDesc {
-                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                .colorAttachmentCount = 1,
-                .pColorAttachments = &colorAttachmentRef,
+            VkSubpassDescription subPassDescriptions[] {
+                {
+                    .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    .colorAttachmentCount = ZP_ARRAY_SIZE( colorAttachmentRefs ),
+                    .pColorAttachments = colorAttachmentRefs,
+                }
             };
 
-            VkSubpassDependency subPassDependency {
-                .srcSubpass = VK_SUBPASS_EXTERNAL,
-                .dstSubpass = 0,
-                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .srcAccessMask = 0,
-                .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            VkSubpassDependency subPassDependencies[] {
+                {
+                    .srcSubpass = VK_SUBPASS_EXTERNAL,
+                    .dstSubpass = 0,
+                    .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    .srcAccessMask = 0,
+                    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                }
             };
 
             VkRenderPassCreateInfo renderPassInfo {
                 .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-                .attachmentCount = 1,
-                .pAttachments = &colorAttachment,
-                .subpassCount = 1,
-                .pSubpasses = &subPassDesc,
-                .dependencyCount = 1,
-                .pDependencies = &subPassDependency,
+                .attachmentCount = ZP_ARRAY_SIZE( colorAttachments ),
+                .pAttachments = colorAttachments,
+                .subpassCount = ZP_ARRAY_SIZE( subPassDescriptions ),
+                .pSubpasses = subPassDescriptions,
+                .dependencyCount = ZP_ARRAY_SIZE( subPassDependencies ),
+                .pDependencies = subPassDependencies,
             };
 
-            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_vkSwapChainRenderPass ) );
+            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_vkSwapChainDefaultRenderPass ) );
         }
 
         m_swapChainFrameBuffers.reserve( swapChainImageCount );
@@ -1598,10 +1630,20 @@ namespace zp
 
             if( m_swapChainImageViews[ i ] != VK_NULL_HANDLE )
             {
-                // TODO: destroy in a few frames
-                vkDestroyImageView( m_vkLocalDevice, m_swapChainImageViews[ i ], &m_vkAllocationCallbacks );
+                const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+                m_delayedDestroy[ index ] = {
+                    .frameIndex = m_currentFrameIndex,
+                    .handle = m_swapChainImageViews[ i ],
+                    .allocator = &m_vkAllocationCallbacks,
+                    .localDevice = m_vkLocalDevice,
+                    .instance = m_vkInstance,
+                    .order = index,
+                    .type = DelayedDestroyType::ImageView,
+                };
+
                 m_swapChainImageViews[ i ] = VK_NULL_HANDLE;
-            }
+            };
 
             HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapChainImageViews[ i ] ) );
 
@@ -1609,7 +1651,7 @@ namespace zp
 
             VkFramebufferCreateInfo framebufferCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .renderPass = m_vkSwapChainRenderPass,
+                .renderPass = m_vkSwapChainDefaultRenderPass,
                 .attachmentCount = ZP_ARRAY_SIZE( attachments ),
                 .pAttachments = attachments,
                 .width = m_vkSwapChainExtent.width,
@@ -1619,15 +1661,55 @@ namespace zp
 
             if( m_swapChainFrameBuffers[ i ] != VK_NULL_HANDLE )
             {
-                // TODO: destroy in a few frames
-                vkDestroyFramebuffer( m_vkLocalDevice, m_swapChainFrameBuffers[ i ], &m_vkAllocationCallbacks );
+                const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+                m_delayedDestroy[ index ] = {
+                    .frameIndex = m_currentFrameIndex,
+                    .handle = m_swapChainFrameBuffers[ i ],
+                    .allocator = &m_vkAllocationCallbacks,
+                    .localDevice = m_vkLocalDevice,
+                    .instance = m_vkInstance,
+                    .order = index,
+                    .type = DelayedDestroyType::FrameBuffer,
+                };
+
                 m_swapChainFrameBuffers[ i ] = VK_NULL_HANDLE;
             }
 
             HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapChainFrameBuffers[ i ] ) );
         }
+    }
 
-        // swap chain sync
+    void VulkanGraphicsDevice::destroySwapChain()
+    {
+        for( VkFramebuffer swapChainFramebuffer : m_swapChainFrameBuffers )
+        {
+            vkDestroyFramebuffer( m_vkLocalDevice, swapChainFramebuffer, &m_vkAllocationCallbacks );
+        }
+        m_swapChainFrameBuffers.clear();
+
+        vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainDefaultRenderPass, &m_vkAllocationCallbacks );
+        m_vkSwapChainDefaultRenderPass = {};
+
+        for( VkImageView swapChainImageView : m_swapChainImageViews )
+        {
+            vkDestroyImageView( m_vkLocalDevice, swapChainImageView, &m_vkAllocationCallbacks );
+        }
+        m_swapChainImageViews.clear();
+        m_swapChainImages.clear();
+
+        for( VkFence& inFlightFence : m_swapChainInFlightFences )
+        {
+            vkDestroyFence( m_vkLocalDevice, inFlightFence, &m_vkAllocationCallbacks );
+        }
+        m_swapChainInFlightFences.clear();
+
+        vkDestroySwapchainKHR( m_vkLocalDevice, m_vkSwapChain, &m_vkAllocationCallbacks );
+        m_vkSwapChain = {};
+    }
+
+    void VulkanGraphicsDevice::createPerFrameData()
+    {
         VkSemaphoreCreateInfo semaphoreCreateInfo {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
@@ -1683,7 +1765,7 @@ namespace zp
         }
     }
 
-    void VulkanGraphicsDevice::destroySwapChain()
+    void VulkanGraphicsDevice::destroyPerFrameData()
     {
         for( PerFrameData& perFrameData : m_perFrameData )
         {
@@ -1725,31 +1807,6 @@ namespace zp
             perFrameData.commandQueueCapacity = 0;
             perFrameData.commandQueues = nullptr;
         }
-
-        for( VkFramebuffer swapChainFramebuffer : m_swapChainFrameBuffers )
-        {
-            vkDestroyFramebuffer( m_vkLocalDevice, swapChainFramebuffer, &m_vkAllocationCallbacks );
-        }
-        m_swapChainFrameBuffers.clear();
-
-        vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainRenderPass, &m_vkAllocationCallbacks );
-        m_vkSwapChainRenderPass = {};
-
-        for( VkImageView swapChainImageView : m_swapChainImageViews )
-        {
-            vkDestroyImageView( m_vkLocalDevice, swapChainImageView, &m_vkAllocationCallbacks );
-        }
-        m_swapChainImageViews.clear();
-        m_swapChainImages.clear();
-
-        for( VkFence& inFlightFence : m_swapChainInFlightFences )
-        {
-            vkDestroyFence( m_vkLocalDevice, inFlightFence, &m_vkAllocationCallbacks );
-        }
-        m_swapChainInFlightFences.clear();
-
-        vkDestroySwapchainKHR( m_vkLocalDevice, m_vkSwapChain, &m_vkAllocationCallbacks );
-        m_vkSwapChain = {};
     }
 
     void VulkanGraphicsDevice::beginFrame( zp_uint64_t frameIndex )
@@ -1976,6 +2033,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = renderPass->internalRenderPass,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index,
             .type = DelayedDestroyType::RenderPass,
         };
@@ -2222,6 +2281,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = graphicsPipelineState->pipelineState,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index,
             .type = DelayedDestroyType::Pipeline,
         };
@@ -2258,6 +2319,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = pipelineLayout->layout,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index,
             .type = DelayedDestroyType::PipelineLayout
         };
@@ -2269,9 +2332,12 @@ namespace zp
     {
         VkBufferCreateInfo bufferCreateInfo {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .flags = 0,
             .size = graphicsBufferDesc.size,
             .usage = Convert( graphicsBufferDesc.usageFlags ),
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 0,
+            .pQueueFamilyIndices = nullptr,
         };
 
         VkBuffer buffer;
@@ -2314,6 +2380,8 @@ namespace zp
                 .frameIndex = m_currentFrameIndex,
                 .handle = graphicsBuffer->buffer,
                 .allocator = &m_vkAllocationCallbacks,
+                .localDevice = m_vkLocalDevice,
+                .instance = m_vkInstance,
                 .order = index + 0,
                 .type = DelayedDestroyType::Buffer
             };
@@ -2322,6 +2390,8 @@ namespace zp
                 .frameIndex = m_currentFrameIndex,
                 .handle = graphicsBuffer->deviceMemory,
                 .allocator = &m_vkAllocationCallbacks,
+                .localDevice = m_vkLocalDevice,
+                .instance = m_vkInstance,
                 .order = index + 1,
                 .type = DelayedDestroyType::Memory
             };
@@ -2356,6 +2426,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = shader->shaderHandle,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index,
             .type = DelayedDestroyType::Shader
         };
@@ -2448,6 +2520,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = texture->textureViewHandle,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index + 0,
             .type = DelayedDestroyType::ImageView,
         };
@@ -2455,6 +2529,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = texture->textureMemoryHandle,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index + 1,
             .type = DelayedDestroyType::Memory,
         };
@@ -2462,6 +2538,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = texture->textureHandle,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index + 2,
             .type = DelayedDestroyType::Image,
         };
@@ -2507,6 +2585,8 @@ namespace zp
             .frameIndex = m_currentFrameIndex,
             .handle = sampler->samplerHandle,
             .allocator = &m_vkAllocationCallbacks,
+            .localDevice = m_vkLocalDevice,
+            .instance = m_vkInstance,
             .order = index,
             .type = DelayedDestroyType::Sampler,
         };
@@ -2514,8 +2594,7 @@ namespace zp
         *sampler = {};
     };
 
-    void
-    VulkanGraphicsDevice::mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory )
+    void VulkanGraphicsDevice::mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory )
     {
         VkDeviceMemory deviceMemory = static_cast<VkDeviceMemory>( graphicsBuffer.deviceMemory );
         HR( vkMapMemory( m_vkLocalDevice, deviceMemory, offset + graphicsBuffer.offset, size, 0, memory ) );
@@ -2664,7 +2743,7 @@ namespace zp
         PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
         VkRenderPassBeginInfo renderPassBeginInfo {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_vkSwapChainRenderPass,
+            .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_vkSwapChainDefaultRenderPass,
             .framebuffer = m_swapChainFrameBuffers[ frameData.swapChainImageIndex ],
             .renderArea { .offset = { 0, 0 }, .extent = m_vkSwapChainExtent },
             .clearValueCount = ZP_ARRAY_SIZE( clearValues ),
@@ -3140,7 +3219,7 @@ namespace zp
                 // destroy each delayed destroy handle
                 for( const DelayedDestroy& delayedDestroy : handlesToDestroy )
                 {
-                    DestroyDelayedDestroyHandle( m_vkInstance, m_vkLocalDevice, delayedDestroy );
+                    DestroyDelayedDestroyHandle( delayedDestroy );
                 }
             }
         }
@@ -3151,7 +3230,7 @@ namespace zp
         // destroy each delayed destroy handle
         for( const DelayedDestroy& delayedDestroy : m_delayedDestroy )
         {
-            DestroyDelayedDestroyHandle( m_vkInstance, m_vkLocalDevice, delayedDestroy );
+            DestroyDelayedDestroyHandle( delayedDestroy );
         }
 
         m_delayedDestroy.clear();

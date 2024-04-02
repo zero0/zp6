@@ -478,6 +478,8 @@ namespace zp
         zp_uint64_t frameIndex;
         zp_handle_t handle;
         zp_handle_t allocator;
+        zp_handle_t localDevice;
+        zp_handle_t instance;
         zp_size_t order;
         DelayedDestroyType type;
     };

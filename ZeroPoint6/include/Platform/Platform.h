@@ -169,6 +169,8 @@ namespace zp
 
         zp_bool_t DispatchMessages( zp_int32_t& exitCode );
 
+        void ShowWindow( zp_handle_t windowHandle, zp_bool_t show );
+
         void CloseWindow( zp_handle_t windowHandle );
 
         void SetWindowTitle( zp_handle_t windowHandle, const String& title );
@@ -176,6 +178,7 @@ namespace zp
         void SetWindowSize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
     }
 
+    // Console
     namespace Platform
     {
         zp_handle_t OpenConsole();

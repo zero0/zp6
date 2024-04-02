@@ -42,7 +42,7 @@ namespace zp
 
         void replay( EntityComponentManager* entityComponentManager );
 
-        zp_size_t size() const
+        [[nodiscard]] zp_size_t size() const
         {
             return m_length;
         }

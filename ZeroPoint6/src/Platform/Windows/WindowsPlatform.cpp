@@ -432,6 +432,16 @@ namespace zp
         return isRunning;
     }
 
+    void Platform::ShowWindow( zp_handle_t windowHandle, zp_bool_t show )
+    {
+        HWND hWnd = static_cast<HWND>( windowHandle );
+        if( ::IsWindow( hWnd ) )
+        {
+            ::ShowWindow( hWnd, show ? SW_SHOW : SW_HIDE );
+            ::UpdateWindow( hWnd );
+        }
+    }
+
     void Platform::CloseWindow( zp_handle_t windowHandle )
     {
         HWND hWnd = static_cast<HWND>( windowHandle );
