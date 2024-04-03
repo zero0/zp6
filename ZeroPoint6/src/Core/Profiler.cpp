@@ -168,22 +168,22 @@ namespace zp
         event->threadId = t_profilerData.threadID;
     }
 
-    zp_size_t Profiler::StartCPU( const char* filename, const char* functionName, zp_int32_t lineNumber, const char* eventName, zp_ptr_t userData )
+    zp_size_t Profiler::StartCPU( const CPUDesc& cpuDesc )
     {
         const zp_size_t eventIndex = t_profilerData.currentCPUProfilerEvent++ % t_profilerData.cpuProfilerEventCount;
 
         CPUProfilerEvent* event = t_profilerData.cpuProfilerData + eventIndex;
-        event->filename = filename;
-        event->functionName = functionName;
-        event->eventName = eventName;
+        event->filename = cpuDesc.filename;
+        event->functionName = cpuDesc.functionName;
+        event->eventName = cpuDesc.eventName;
         event->frameIndex = t_profilerData.currentFrame;
         event->startCycle = Platform::TimeCycles();
         event->endCycle = event->startCycle;
         event->startTime = Platform::TimeNow();
         event->endTime = event->startTime;
         event->parentEvent = t_profilerData.eventStackCount > 0 ? t_profilerData.eventStack[ t_profilerData.eventStackCount - 1 ] : -1;
-        event->userData = userData;
-        event->lineNumber = lineNumber;
+        event->userData = cpuDesc.userData;
+        event->lineNumber = cpuDesc.lineNumber;
         event->threadId = t_profilerData.threadID;
 
         ZP_ASSERT( t_profilerData.eventStackCount != kMaxEventStackCount );
