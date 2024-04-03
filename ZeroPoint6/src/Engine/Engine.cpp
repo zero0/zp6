@@ -107,6 +107,8 @@ namespace zp
         Profiler::InitializeProfilerThread();
 #endif
 
+        ZP_PROFILE_CPU_BLOCK_E(Initialize Engine);
+
         // initialize job system
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
 
@@ -123,6 +125,8 @@ namespace zp
         const zp_bool_t createWindow = true;
         if( createWindow )
         {
+            ZP_PROFILE_CPU_BLOCK_E(Create Window);
+
             m_windowCallbacks = {
                 .minWidth = 320,
                 .minHeight = 240,
@@ -144,12 +148,16 @@ namespace zp
         const zp_bool_t createConsole = true;
         if( createConsole )
         {
+            ZP_PROFILE_CPU_BLOCK_E(Create Console);
+
             m_consoleHandle = Platform::OpenConsole();
         }
 
         // graphics device
         if( !headless )
         {
+            ZP_PROFILE_CPU_BLOCK_E(Create Graphics Device);
+
             m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, {
                 .appName = String::As( "AppName" ),
                 .stagingBufferSize = 32 MB,
