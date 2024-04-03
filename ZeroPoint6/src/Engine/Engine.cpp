@@ -160,12 +160,13 @@ namespace zp
 
             m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, {
                 .appName = String::As( "AppName" ),
+                .windowHandle = m_windowHandle,
                 .stagingBufferSize = 32 MB,
                 .threadCount = numJobThreads,
                 .bufferedFrameCount = 4,
             } );
 
-            m_graphicsDevice->createSwapChain( m_windowHandle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
+            m_graphicsDevice->createSwapchain( m_windowHandle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
         // create systems
         //m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
@@ -297,7 +298,9 @@ namespace zp
 
         void EndFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            zp_printfln( "[%10d] EndFrameJob", Platform::GetCurrentThreadId() );
+            e->engine->getGraphicsDevice()->submit();
+
+            e->engine->getGraphicsDevice()->present();
 
             JobSystem::Start( AdvanceFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -305,7 +308,7 @@ namespace zp
 
         void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            zp_printfln( "[%10d] StartFrameJob", Platform::GetCurrentThreadId() );
+            e->engine->getGraphicsDevice()->beginFrame( e->engine->getFrameCount() );
 
             JobSystem::Start( EndFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();

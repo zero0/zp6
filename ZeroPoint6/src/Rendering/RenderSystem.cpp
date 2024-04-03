@@ -462,7 +462,7 @@ namespace zp
 
         m_graphicsDevice = CreateGraphicsDevice( memoryLabel, graphicsDeviceDesc );
 
-        m_graphicsDevice->createSwapChain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
+        m_graphicsDevice->createSwapchain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
 
         BatchModeRendererConfig batchModeRendererConfig {};
         m_batchModeRenderer = ZP_NEW_ARGS( memoryLabel, BatchModeRenderer, &batchModeRendererConfig );

@@ -188,6 +188,7 @@ namespace zp
     struct GraphicsDeviceDesc
     {
         String appName;
+        zp_handle_t windowHandle;
         zp_size_t stagingBufferSize;
 
         zp_uint32_t threadCount;
@@ -216,9 +217,9 @@ namespace zp
 
         ~GraphicsDevice() = default;
 
-        virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
+        virtual void createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
-        virtual void destroySwapChain() = 0;
+        virtual void destroySwapchain() = 0;
 
         virtual void createPerFrameData() = 0;
 

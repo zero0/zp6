@@ -32,9 +32,9 @@ namespace zp
 
         ~VulkanGraphicsDevice();
 
-        void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
+        void createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
 
-        void destroySwapChain() final;
+        void destroySwapchain() final;
 
         void createPerFrameData() final;
 
@@ -149,6 +149,8 @@ namespace zp
 
         void destroyAllDelayedDestroy();
 
+        void rebuildSwapchain();
+
         struct QueueFamilies
         {
             zp_uint32_t graphicsFamily;
@@ -161,7 +163,7 @@ namespace zp
         {
             VkSemaphore vkSwapChainAcquireSemaphore;
             VkSemaphore vkRenderFinishedSemaphore;
-            VkFence vkInFlightFences;
+            VkFence vkInFlightFence;
             VkFence vkSwapChainImageAcquiredFence;
             zp_uint32_t swapChainImageIndex;
 
@@ -193,7 +195,6 @@ namespace zp
             FixedArray<VkImage, kBufferedFrameCount> swapChainImages;
             FixedArray<VkImageView, kBufferedFrameCount> swapChainImageViews;
             FixedArray<VkFramebuffer, kBufferedFrameCount> swapChainFrameBuffers;
-            FixedArray<VkFence, kBufferedFrameCount> swapChainInFlightFences;
         };
 
         PerFrameData& getCurrentFrameData();
@@ -208,7 +209,7 @@ namespace zp
         VkSurfaceKHR m_vkSurface;
         VkPhysicalDevice m_vkPhysicalDevice;
         VkDevice m_vkLocalDevice;
-        VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties;
+        VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties{};
 
         VkAllocationCallbacks m_vkAllocationCallbacks;
 

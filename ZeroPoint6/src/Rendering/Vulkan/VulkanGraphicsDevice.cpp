@@ -656,7 +656,18 @@ namespace zp
 
             if( messageSeverity & messageMask )
             {
-                zp_printfln( pCallbackData->pMessage );
+                if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT )
+                {
+                    zp_printfln( "[INFO] %s", pCallbackData->pMessage );
+                }
+                else if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT )
+                {
+                    zp_printfln( "[WARN] %s", pCallbackData->pMessage );
+                }
+                else if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
+                {
+                    zp_error_printfln( pCallbackData->pMessage );
+                }
 
                 if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
                 {
@@ -697,7 +708,7 @@ namespace zp
 
         void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, VkObjectType objectType, void* objectHandle, const char* format, ... )
         {
-            char name[128];
+            char name[512];
 
             va_list args;
             va_start( args, format );
@@ -1166,6 +1177,25 @@ namespace zp
             PrintPhysicalDeviceInfo( m_vkPhysicalDevice );
         }
 
+        // create surface
+        {
+#if ZP_OS_WINDOWS
+            auto hWnd = static_cast<HWND>( graphicsDeviceDesc.windowHandle );
+            auto hInstance = reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
+
+            // create surface
+            VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+                .hinstance = hInstance,
+                .hwnd = hWnd,
+            };
+
+            HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface ) );
+#else
+#error "Platform not defined to create VkSurface"
+#endif
+        }
+
         // create local device and queue families
         {
             uint32_t queueFamilyCount = 0;
@@ -1187,8 +1217,8 @@ namespace zp
                 {
                     m_queueFamilies.graphicsFamily = i;
 
-                    VkBool32 presentSupport = VK_TRUE;// VK_FALSE;
-                    //HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ));
+                    VkBool32 presentSupport = VK_FALSE;
+                    HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
 
                     if( m_queueFamilies.presentFamily == VK_QUEUE_FAMILY_IGNORED && presentSupport )
                     {
@@ -1294,6 +1324,8 @@ namespace zp
             };
 
             HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_PIPELINE_CACHE, m_vkPipelineCache, "Pipeline Cache" );
         }
 
         // create command pools
@@ -1353,6 +1385,8 @@ namespace zp
             };
 
             HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_vkDescriptorPool, "Descriptor Pool" );
         }
 
         createPerFrameData();
@@ -1362,7 +1396,7 @@ namespace zp
     {
         HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
 
-        destroySwapChain();
+        destroySwapchain();
 
         destroyPerFrameData();
 
@@ -1414,27 +1448,9 @@ namespace zp
         m_vkInstance = {};
     }
 
-    void VulkanGraphicsDevice::createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace )
+    void VulkanGraphicsDevice::createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace )
     {
         m_swapchainData.windowHandle = windowHandle;
-
-#if ZP_OS_WINDOWS
-        auto hWnd = static_cast<HWND>( windowHandle );
-        auto hInstance = reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
-
-        // create surface
-        VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
-            .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-            .hinstance = hInstance,
-            .hwnd = hWnd,
-        };
-
-        HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface ) );
-
-        VkBool32 surfaceSupported;
-        HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, m_queueFamilies.presentFamily, m_vkSurface, &surfaceSupported ) );
-        ZP_ASSERT( surfaceSupported );
-#endif
 
         VkSurfaceCapabilitiesKHR swapChainSupportDetails;
         HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_vkPhysicalDevice, m_vkSurface, &swapChainSupportDetails ) );
@@ -1500,6 +1516,8 @@ namespace zp
         }
 
         HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapChain ) );
+
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_SWAPCHAIN_KHR, m_swapchainData.vkSwapChain, "Swapchain" );
 
         if( swapChainCreateInfo.oldSwapchain != VK_NULL_HANDLE )
         {
@@ -1584,6 +1602,8 @@ namespace zp
             };
 
             HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapChainDefaultRenderPass ) );
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_RENDER_PASS, m_swapchainData.vkSwapChainDefaultRenderPass, "Swapchain Default Render Pass" );
         }
 
         for( zp_size_t i = 0; i < m_swapchainData.swapChainImageCount; ++i )
@@ -1627,6 +1647,8 @@ namespace zp
 
             HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapChainImageViews[ i ] ) );
 
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_IMAGE_VIEW, m_swapchainData.swapChainImageViews[ i ], "Swapchain Image View %d", i );
+
             VkImageView attachments[] { m_swapchainData.swapChainImageViews[ i ] };
 
             VkFramebufferCreateInfo framebufferCreateInfo {
@@ -1657,27 +1679,26 @@ namespace zp
             }
 
             HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapChainFrameBuffers[ i ] ) );
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_FRAMEBUFFER, m_swapchainData.swapChainFrameBuffers[ i ], "Swapchain Framebuffer %d", i );
         }
     }
 
-    void VulkanGraphicsDevice::destroySwapChain()
+    void VulkanGraphicsDevice::destroySwapchain()
     {
-        for( VkFramebuffer swapChainFramebuffer : m_swapchainData.swapChainFrameBuffers )
+        for( zp_size_t i = 0; i < m_swapchainData.swapChainImageCount; ++i )
         {
+            VkFramebuffer swapChainFramebuffer = m_swapchainData.swapChainFrameBuffers[ i ];
             vkDestroyFramebuffer( m_vkLocalDevice, swapChainFramebuffer, &m_vkAllocationCallbacks );
         }
 
         vkDestroyRenderPass( m_vkLocalDevice, m_swapchainData.vkSwapChainDefaultRenderPass, &m_vkAllocationCallbacks );
         m_swapchainData.vkSwapChainDefaultRenderPass = {};
 
-        for( VkImageView swapChainImageView : m_swapchainData.swapChainImageViews )
+        for( zp_size_t i = 0; i < m_swapchainData.swapChainImageCount; ++i )
         {
+            VkImageView swapChainImageView = m_swapchainData.swapChainImageViews[ i ];
             vkDestroyImageView( m_vkLocalDevice, swapChainImageView, &m_vkAllocationCallbacks );
-        }
-
-        for( VkFence& inFlightFence : m_swapchainData.swapChainInFlightFences )
-        {
-            vkDestroyFence( m_vkLocalDevice, inFlightFence, &m_vkAllocationCallbacks );
         }
 
         vkDestroySwapchainKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, &m_vkAllocationCallbacks );
@@ -1720,11 +1741,12 @@ namespace zp
         zp_size_t perFrameStagingBufferOffset = 0;
         const zp_size_t perFrameStagingBufferSize = m_stagingBuffer.size / kBufferedFrameCount;
 
-        for( PerFrameData& perFrameData : m_perFrameData )
+        for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
         {
+            PerFrameData& perFrameData = m_perFrameData[ i ];
             HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainAcquireSemaphore ) );
             HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkRenderFinishedSemaphore ) );
-            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkInFlightFences ) );
+            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkInFlightFence ) );
             HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainImageAcquiredFence ) );
 #if ZP_USE_PROFILER
             HR( vkCreateQueryPool( m_vkLocalDevice, &pipelineStatsQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkPipelineStatisticsQueryPool ) );
@@ -1738,6 +1760,11 @@ namespace zp
             perFrameData.commandQueues = nullptr;
 
             perFrameStagingBufferOffset += perFrameStagingBufferSize;
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_SEMAPHORE, perFrameData.vkSwapChainAcquireSemaphore, "Swapchain Acquire Semaphore %d", i );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_SEMAPHORE, perFrameData.vkRenderFinishedSemaphore, "Render Finished Semaphore %d", i );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_FENCE, perFrameData.vkInFlightFence, "In Flight Fence %d", i );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_FENCE, perFrameData.vkSwapChainImageAcquiredFence, "Swapchain Image Acquire Fence %d", i );
         }
     }
 
@@ -1747,7 +1774,7 @@ namespace zp
         {
             vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkSwapChainAcquireSemaphore, &m_vkAllocationCallbacks );
             vkDestroySemaphore( m_vkLocalDevice, perFrameData.vkRenderFinishedSemaphore, &m_vkAllocationCallbacks );
-            vkDestroyFence( m_vkLocalDevice, perFrameData.vkInFlightFences, &m_vkAllocationCallbacks );
+            vkDestroyFence( m_vkLocalDevice, perFrameData.vkInFlightFence, &m_vkAllocationCallbacks );
             vkDestroyFence( m_vkLocalDevice, perFrameData.vkSwapChainImageAcquiredFence, &m_vkAllocationCallbacks );
 
 #if ZP_USE_PROFILER
@@ -1771,7 +1798,7 @@ namespace zp
 
             perFrameData.vkSwapChainAcquireSemaphore = VK_NULL_HANDLE;
             perFrameData.vkRenderFinishedSemaphore = VK_NULL_HANDLE;
-            perFrameData.vkInFlightFences = {};
+            perFrameData.vkInFlightFence = {};
             perFrameData.vkSwapChainImageAcquiredFence = VK_NULL_HANDLE;
             perFrameData.swapChainImageIndex = 0;
 #if ZP_USE_PROFILER
@@ -1785,51 +1812,39 @@ namespace zp
         }
     }
 
-    void VulkanGraphicsDevice::beginFrame( zp_uint64_t frameIndex )
+    void VulkanGraphicsDevice::beginFrame( zp_uint64_t )
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        VkResult result;
+        PerFrameData& currentFrameData = getCurrentFrameData();
 
-        const zp_uint64_t prevFrame = m_currentFrameIndex;
-        m_currentFrameIndex = frameIndex;
+        HR( vkWaitForFences( m_vkLocalDevice, 1, &currentFrameData.vkInFlightFence, VK_TRUE, UINT64_MAX ) );
 
         processDelayedDestroy();
 
-        PerFrameData& frameData = getCurrentFrameData();
+        VkResult result;
 
-        uint32_t imageIndex;
-        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, UINT64_MAX, frameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &imageIndex );
+        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, UINT64_MAX, currentFrameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &currentFrameData.swapChainImageIndex );
 
         if( result != VK_SUCCESS )
         {
             if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR )
             {
-                // TODO: rebuild swap chain
-                destroySwapChain();
-
-                //beginFrame( frameIndex );
+                rebuildSwapchain();
                 return;
             }
 
             ZP_INVALID_CODE_PATH();
         }
 
-        frameData.swapChainImageIndex = imageIndex;
+        HR( vkResetFences( m_vkLocalDevice, 1, &currentFrameData.vkInFlightFence ) );
 
-        if( m_swapchainData.swapChainInFlightFences[ imageIndex ] != VK_NULL_HANDLE )
+        for( zp_size_t i = 0; i < currentFrameData.commandQueueCount; ++i )
         {
-            HR( vkWaitForFences( m_vkLocalDevice, 1, &m_swapchainData.swapChainInFlightFences[ imageIndex ], VK_TRUE, UINT64_MAX ) );
+            HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ i ].commandBuffer ), 0 ) );
         }
 
-        m_swapchainData.swapChainInFlightFences[ imageIndex ] = frameData.vkInFlightFences;
-
-        for( zp_size_t i = 0; i < frameData.commandQueueCount; ++i )
-        {
-            HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>( frameData.commandQueues[ i ].commandBuffer ), 0 ) );
-        }
-
-#if ZP_USE_PROFILER
+#if ZP_USE_PROFILER && false
         {
             PerFrameData& prevFrameData = getFrameData( prevFrame );
 
@@ -1854,56 +1869,63 @@ namespace zp
         }
 #endif
 
-        frameData.perFrameStagingBuffer.allocated = 0;
-        frameData.commandQueueCount = 0;
+        currentFrameData.perFrameStagingBuffer.allocated = 0;
+        currentFrameData.commandQueueCount = 0;
     }
 
     void VulkanGraphicsDevice::submit()
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        PerFrameData& frameData = getCurrentFrameData();
+        PerFrameData& currentFrameData = getCurrentFrameData();
 
-        const zp_size_t commandQueueCount = frameData.commandQueueCount;
-        if( commandQueueCount > 0 )
+        // if there are no command queues, add the default swapchain render pass
+        if( currentFrameData.commandQueueCount == 0 )
         {
-            const zp_size_t preCommandQueueIndex = commandQueueCount - 1;
-            VkCommandBuffer buffer = static_cast<VkCommandBuffer>( frameData.commandQueues[ preCommandQueueIndex ].commandBuffer );
+            auto cmd = requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
+
+            beginRenderPass( nullptr, cmd );
+
+            endRenderPass( cmd );
+        }
+
+        // release any open command queues
+        if( currentFrameData.commandQueueCount > 0 )
+        {
+            const zp_size_t preCommandQueueIndex = currentFrameData.commandQueueCount - 1;
+            releaseCommandQueue( currentFrameData.commandQueues + preCommandQueueIndex );
 
 #if ZP_USE_PROFILER
-            //vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
-            //vkCmdEndQuery( buffer, frameData.vkPipelineStatisticsQueryPool, 0 );
-            //vkCmdResetQueryPool( static_cast<VkCommandBuffer>( frameData.commandQueues[ preCommandQueueIndex ].commandBuffer ), frameData.vkTimestampQueryPool, commandQueueCount * 2 + 2, 16 - (commandQueueCount * 2 + 2));
+            //vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, currentFrameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
+            //vkCmdEndQuery( buffer, currentFrameData.vkPipelineStatisticsQueryPool, 0 );
+            //vkCmdResetQueryPool( static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ preCommandQueueIndex ].commandBuffer ), currentFrameData.vkTimestampQueryPool, commandQueueCount * 2 + 2, 16 - (commandQueueCount * 2 + 2));
 #endif
             //HR( vkEndCommandBuffer( buffer ) );
         }
 
-        VkPipelineStageFlags waitStages[] { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
-        VkSemaphore waitSemaphores[] { frameData.vkSwapChainAcquireSemaphore };
+        VkPipelineStageFlags waitStages[] { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        VkSemaphore waitSemaphores[] { currentFrameData.vkSwapChainAcquireSemaphore };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( waitStages ) == ZP_ARRAY_SIZE( waitSemaphores ) );
 
-        VkSemaphore signalSemaphores[] { frameData.vkRenderFinishedSemaphore };
-
-        HR( vkResetFences( m_vkLocalDevice, 1, &frameData.vkInFlightFences ) );
-
-        VkCommandBuffer graphicsQueueCommandBuffers[commandQueueCount];
-        for( zp_size_t i = 0; i < commandQueueCount; ++i )
+        VkCommandBuffer graphicsQueueCommandBuffers[ currentFrameData.commandQueueCount ];
+        for( zp_size_t i = 0; i < currentFrameData.commandQueueCount; ++i )
         {
-            graphicsQueueCommandBuffers[ i ] = static_cast<VkCommandBuffer>( frameData.commandQueues[ i ].commandBuffer );
+            graphicsQueueCommandBuffers[ i ] = static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ i ].commandBuffer );
         }
 
+        VkSemaphore signalSemaphores[] { currentFrameData.vkRenderFinishedSemaphore };
         VkSubmitInfo submitInfo {
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores ),
             .pWaitSemaphores = waitSemaphores,
             .pWaitDstStageMask = waitStages,
-            .commandBufferCount = static_cast<uint32_t>( commandQueueCount ),
+            .commandBufferCount = static_cast<uint32_t>( currentFrameData.commandQueueCount ),
             .pCommandBuffers = graphicsQueueCommandBuffers,
             .signalSemaphoreCount = ZP_ARRAY_SIZE( signalSemaphores ),
             .pSignalSemaphores = signalSemaphores,
         };
 
-        HR( vkQueueSubmit( m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], 1, &submitInfo, frameData.vkInFlightFences ) );
+        HR( vkQueueSubmit( m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], 1, &submitInfo, currentFrameData.vkInFlightFence ) );
     }
 
     void VulkanGraphicsDevice::present()
@@ -1933,13 +1955,15 @@ namespace zp
         {
             if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR )
             {
-                // TODO: rebuild swap chain
+                rebuildSwapchain();
             }
             else
             {
                 ZP_INVALID_CODE_PATH();
             }
         }
+
+        ++m_currentFrameIndex;
     }
 
     void VulkanGraphicsDevice::waitForGPU()
@@ -2651,6 +2675,7 @@ namespace zp
         {
             VkCommandPool commandPool = getCommandPool( commandQueue );
             commandQueue->commandBufferPool = commandPool;
+
             VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                 .commandPool = commandPool,
@@ -3215,6 +3240,19 @@ namespace zp
         }
 
         m_delayedDestroy.clear();
+    }
+
+    void VulkanGraphicsDevice::rebuildSwapchain()
+    {
+        // cache swapchain values
+        zp_handle_t windowHandle = m_swapchainData.windowHandle;
+        VkExtent2D extent = m_swapchainData.vkSwapChainExtent;
+        int displayFormat = m_swapchainData.vkSwapChainFormat;
+        ColorSpace colorSpace = ZP_COLOR_SPACE_REC_709_LINEAR;
+        VkSwapchainKHR oldSwapchain = m_swapchainData.vkSwapChain;
+
+        // recreate new swapchain using old values
+        createSwapchain( windowHandle, extent.width, extent.height, displayFormat, colorSpace );
     }
 
     VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getCurrentFrameData()
