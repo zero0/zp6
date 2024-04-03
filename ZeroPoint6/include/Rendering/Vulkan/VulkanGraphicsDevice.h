@@ -32,8 +32,6 @@ namespace zp
 
         ~VulkanGraphicsDevice();
 
-        [[nodiscard]] AllocString name() const final;
-
         void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
 
         void destroySwapChain() final;
@@ -180,11 +178,31 @@ namespace zp
             CommandQueue* commandQueues;
         };
 
+        struct SwapchainData
+        {
+            zp_handle_t windowHandle;
+
+            VkSwapchainKHR vkSwapChain;
+            VkRenderPass vkSwapChainDefaultRenderPass;
+            VkFormat vkSwapChainFormat;
+
+            VkColorSpaceKHR vkSwapChainColorSpace;
+            VkExtent2D vkSwapChainExtent;
+
+            zp_uint32_t swapChainImageCount;
+            FixedArray<VkImage, 4> swapChainImages;
+            FixedArray<VkImageView, 4> swapChainImageViews;
+            FixedArray<VkFramebuffer, 4> swapChainFrameBuffers;
+            FixedArray<VkFence, 4> swapChainInFlightFences;
+        };
+
         PerFrameData& getCurrentFrameData();
 
         PerFrameData& getFrameData( zp_uint64_t frameIndex );
 
         PerFrameData m_perFrameData[kBufferedFrameCount];
+
+        SwapchainData m_swapchainData;
 
         VkInstance m_vkInstance;
         VkSurfaceKHR m_vkSurface;
@@ -196,27 +214,15 @@ namespace zp
 
         VkQueue m_vkRenderQueues[RenderQueue_Count];
 
-        VkSwapchainKHR m_vkSwapChain;
-        VkRenderPass m_vkSwapChainDefaultRenderPass;
-
         VkPipelineCache m_vkPipelineCache;
         VkDescriptorPool m_vkDescriptorPool;
 
         VkCommandPool* m_vkCommandPools;
         zp_size_t m_commandPoolCount;
 
-        VkFormat m_vkSwapChainFormat;
-        VkColorSpaceKHR m_vkSwapChainColorSpace;
-        VkExtent2D m_vkSwapChainExtent;
-
 #if ZP_DEBUG
         VkDebugUtilsMessengerEXT m_vkDebugMessenger;
 #endif
-
-        Vector<VkImage> m_swapChainImages;
-        Vector<VkImageView> m_swapChainImageViews;
-        Vector<VkFramebuffer> m_swapChainFrameBuffers;
-        Vector<VkFence> m_swapChainInFlightFences;
 
         Map<zp_hash128_t, VkDescriptorSetLayout, zp_hash128_t> m_descriptorSetLayoutCache;
         Map<zp_hash128_t, VkSampler, zp_hash128_t> m_samplerCache;

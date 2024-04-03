@@ -775,7 +775,7 @@ namespace zp
         HANDLE threadHandle = ::CreateThread(
             nullptr,
             stackSize,
-            threadFunc,
+            (LPTHREAD_START_ROUTINE)threadFunc,
             param,
             THREAD_SET_INFORMATION,
             &id );

@@ -216,8 +216,6 @@ namespace zp
 
         ~GraphicsDevice() = default;
 
-        virtual AllocString name() const = 0;
-
         virtual void createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
         virtual void destroySwapChain() = 0;

@@ -359,6 +359,10 @@ namespace zp
 
         [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
 
+        [[nodiscard]] ZP_FORCEINLINE pointer data();
+
+        [[nodiscard]] ZP_FORCEINLINE const_pointer data() const;
+
         [[nodiscard]] ZP_FORCEINLINE iterator begin();
 
         [[nodiscard]] ZP_FORCEINLINE iterator end();
@@ -1072,6 +1076,18 @@ namespace zp
     FixedArray<T, Size>::const_reference FixedArray<T, Size>::operator[]( zp_size_t index ) const
     {
         return m_ptr[ index ];
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::pointer FixedArray<T, Size>::data()
+    {
+        return m_ptr;
+    }
+
+    template<typename T, zp_size_t Size>
+    FixedArray<T, Size>::const_pointer FixedArray<T, Size>::data() const
+    {
+        return m_ptr;
     }
 
     template<typename T, zp_size_t Size>

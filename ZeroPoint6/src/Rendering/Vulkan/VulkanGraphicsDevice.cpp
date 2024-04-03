@@ -744,7 +744,7 @@ namespace zp
                     info.append( "(CPU)" );
                     break;
                 default:
-                    ZP_INVALID_CODE_PATH_MSG( "Unknown DeviceType");
+                    ZP_INVALID_CODE_PATH_MSG( "Unknown DeviceType" );
                     break;
             }
             info.append( ' ' );
@@ -1034,6 +1034,7 @@ namespace zp
     VulkanGraphicsDevice::VulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc )
         : GraphicsDevice()
         , m_perFrameData {}
+        , m_swapchainData {}
         , m_vkInstance( VK_NULL_HANDLE )
         , m_vkSurface( VK_NULL_HANDLE )
         , m_vkPhysicalDevice( VK_NULL_HANDLE )
@@ -1045,22 +1046,13 @@ namespace zp
             .pfnFree = FreeCallback,
         }
         , m_vkRenderQueues {}
-        , m_vkSwapChain( VK_NULL_HANDLE )
-        , m_vkSwapChainDefaultRenderPass( VK_NULL_HANDLE )
         , m_vkPipelineCache( VK_NULL_HANDLE )
         , m_vkDescriptorPool( VK_NULL_HANDLE )
         , m_vkCommandPools( nullptr )
         , m_commandPoolCount( 0 )
-        , m_vkSwapChainFormat( VK_FORMAT_UNDEFINED )
-        , m_vkSwapChainColorSpace( VK_COLORSPACE_SRGB_NONLINEAR_KHR )
-        , m_vkSwapChainExtent { 0, 0 }
 #if ZP_DEBUG
         , m_vkDebugMessenger( VK_NULL_HANDLE )
 #endif
-        , m_swapChainImages( 4, memoryLabel )
-        , m_swapChainImageViews( 4, memoryLabel )
-        , m_swapChainFrameBuffers( 4, memoryLabel )
-        , m_swapChainInFlightFences( 4, memoryLabel )
         , m_descriptorSetLayoutCache( memoryLabel, 64, memoryLabel )
         , m_samplerCache( memoryLabel, 16, memoryLabel )
         , m_delayedDestroy( 64, memoryLabel )
@@ -1422,13 +1414,10 @@ namespace zp
         m_vkInstance = {};
     }
 
-    AllocString VulkanGraphicsDevice::name() const
-    {
-        return {};
-    }
-
     void VulkanGraphicsDevice::createSwapChain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace )
     {
+        m_swapchainData.windowHandle = windowHandle;
+
 #if ZP_OS_WINDOWS
         auto hWnd = static_cast<HWND>( windowHandle );
         auto hInstance = reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
@@ -1492,7 +1481,7 @@ namespace zp
             .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             .presentMode = presentMode,
             .clipped = VK_TRUE,
-            .oldSwapchain = m_vkSwapChain
+            .oldSwapchain = m_swapchainData.vkSwapChain
         };
 
         const uint32_t queueFamilyIndices[] = { m_queueFamilies.graphicsFamily, m_queueFamilies.presentFamily };
@@ -1510,38 +1499,31 @@ namespace zp
             swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
         }
 
-        HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, &m_vkAllocationCallbacks, &m_vkSwapChain ) );
+        HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapChain ) );
 
         if( swapChainCreateInfo.oldSwapchain != VK_NULL_HANDLE )
         {
             vkDestroySwapchainKHR( m_vkLocalDevice, swapChainCreateInfo.oldSwapchain, &m_vkAllocationCallbacks );
         }
 
-        m_vkSwapChainFormat = surfaceFormat.format;
-        m_vkSwapChainColorSpace = Convert( colorSpace );
-        m_vkSwapChainExtent = extent;
+        m_swapchainData.vkSwapChainFormat = surfaceFormat.format;
+        m_swapchainData.vkSwapChainColorSpace = Convert( colorSpace );
+        m_swapchainData.vkSwapChainExtent = extent;
 
-        uint32_t swapChainImageCount = 0;
-        HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_vkSwapChain, &swapChainImageCount, VK_NULL_HANDLE ) );
+        m_swapchainData.swapChainImageCount = 0;
+        HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, &m_swapchainData.swapChainImageCount, VK_NULL_HANDLE ) );
 
-        m_swapChainInFlightFences.reserve( swapChainImageCount );
-        m_swapChainInFlightFences.resize_unsafe( swapChainImageCount );
-
-        m_swapChainImages.reserve( swapChainImageCount );
-        m_swapChainImages.resize_unsafe( swapChainImageCount );
-        HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_vkSwapChain, &swapChainImageCount, m_swapChainImages.data() ) );
-
-        m_swapChainImageViews.reserve( swapChainImageCount );
-        m_swapChainImageViews.resize_unsafe( swapChainImageCount );
+        m_swapchainData.swapChainImageCount = zp_min( m_swapchainData.swapChainImageCount, static_cast<zp_uint32_t>( m_swapchainData.swapChainImages.length() ) );
+        HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, &m_swapchainData.swapChainImageCount, m_swapchainData.swapChainImages.data() ) );
 
         {
-            if( m_vkSwapChainDefaultRenderPass )
+            if( m_swapchainData.vkSwapChainDefaultRenderPass )
             {
                 const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                 m_delayedDestroy[ index ] = {
                     .frameIndex = m_currentFrameIndex,
-                    .handle = m_vkSwapChainDefaultRenderPass,
+                    .handle = m_swapchainData.vkSwapChainDefaultRenderPass,
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
                     .instance = m_vkInstance,
@@ -1549,12 +1531,12 @@ namespace zp
                     .type = DelayedDestroyType::RenderPass,
                 };
 
-                m_vkSwapChainDefaultRenderPass = VK_NULL_HANDLE;
+                m_swapchainData.vkSwapChainDefaultRenderPass = VK_NULL_HANDLE;
             }
 
             VkAttachmentDescription colorAttachments[] {
                 {
-                    .format = m_vkSwapChainFormat,
+                    .format = m_swapchainData.vkSwapChainFormat,
                     .samples = VK_SAMPLE_COUNT_1_BIT,
                     .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                     .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -1601,18 +1583,16 @@ namespace zp
                 .pDependencies = subPassDependencies,
             };
 
-            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_vkSwapChainDefaultRenderPass ) );
+            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapChainDefaultRenderPass ) );
         }
 
-        m_swapChainFrameBuffers.reserve( swapChainImageCount );
-        m_swapChainFrameBuffers.resize_unsafe( swapChainImageCount );
-        for( zp_size_t i = 0; i < swapChainImageCount; ++i )
+        for( zp_size_t i = 0; i < m_swapchainData.swapChainImageCount; ++i )
         {
             VkImageViewCreateInfo imageViewCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .image = m_swapChainImages[ i ],
+                .image = m_swapchainData.swapChainImages[ i ],
                 .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = m_vkSwapChainFormat,
+                .format = m_swapchainData.vkSwapChainFormat,
                 .components {
                     .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                     .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -1628,13 +1608,13 @@ namespace zp
                 }
             };
 
-            if( m_swapChainImageViews[ i ] != VK_NULL_HANDLE )
+            if( m_swapchainData.swapChainImageViews[ i ] != VK_NULL_HANDLE )
             {
                 const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                 m_delayedDestroy[ index ] = {
                     .frameIndex = m_currentFrameIndex,
-                    .handle = m_swapChainImageViews[ i ],
+                    .handle = m_swapchainData.swapChainImageViews[ i ],
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
                     .instance = m_vkInstance,
@@ -1642,30 +1622,30 @@ namespace zp
                     .type = DelayedDestroyType::ImageView,
                 };
 
-                m_swapChainImageViews[ i ] = VK_NULL_HANDLE;
+                m_swapchainData.swapChainImageViews[ i ] = VK_NULL_HANDLE;
             };
 
-            HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapChainImageViews[ i ] ) );
+            HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapChainImageViews[ i ] ) );
 
-            VkImageView attachments[] { m_swapChainImageViews[ i ] };
+            VkImageView attachments[] { m_swapchainData.swapChainImageViews[ i ] };
 
             VkFramebufferCreateInfo framebufferCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .renderPass = m_vkSwapChainDefaultRenderPass,
+                .renderPass = m_swapchainData.vkSwapChainDefaultRenderPass,
                 .attachmentCount = ZP_ARRAY_SIZE( attachments ),
                 .pAttachments = attachments,
-                .width = m_vkSwapChainExtent.width,
-                .height = m_vkSwapChainExtent.height,
+                .width = m_swapchainData.vkSwapChainExtent.width,
+                .height = m_swapchainData.vkSwapChainExtent.height,
                 .layers = 1,
             };
 
-            if( m_swapChainFrameBuffers[ i ] != VK_NULL_HANDLE )
+            if( m_swapchainData.swapChainFrameBuffers[ i ] != VK_NULL_HANDLE )
             {
                 const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                 m_delayedDestroy[ index ] = {
                     .frameIndex = m_currentFrameIndex,
-                    .handle = m_swapChainFrameBuffers[ i ],
+                    .handle = m_swapchainData.swapChainFrameBuffers[ i ],
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
                     .instance = m_vkInstance,
@@ -1673,39 +1653,35 @@ namespace zp
                     .type = DelayedDestroyType::FrameBuffer,
                 };
 
-                m_swapChainFrameBuffers[ i ] = VK_NULL_HANDLE;
+                m_swapchainData.swapChainFrameBuffers[ i ] = VK_NULL_HANDLE;
             }
 
-            HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapChainFrameBuffers[ i ] ) );
+            HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapChainFrameBuffers[ i ] ) );
         }
     }
 
     void VulkanGraphicsDevice::destroySwapChain()
     {
-        for( VkFramebuffer swapChainFramebuffer : m_swapChainFrameBuffers )
+        for( VkFramebuffer swapChainFramebuffer : m_swapchainData.swapChainFrameBuffers )
         {
             vkDestroyFramebuffer( m_vkLocalDevice, swapChainFramebuffer, &m_vkAllocationCallbacks );
         }
-        m_swapChainFrameBuffers.clear();
 
-        vkDestroyRenderPass( m_vkLocalDevice, m_vkSwapChainDefaultRenderPass, &m_vkAllocationCallbacks );
-        m_vkSwapChainDefaultRenderPass = {};
+        vkDestroyRenderPass( m_vkLocalDevice, m_swapchainData.vkSwapChainDefaultRenderPass, &m_vkAllocationCallbacks );
+        m_swapchainData.vkSwapChainDefaultRenderPass = {};
 
-        for( VkImageView swapChainImageView : m_swapChainImageViews )
+        for( VkImageView swapChainImageView : m_swapchainData.swapChainImageViews )
         {
             vkDestroyImageView( m_vkLocalDevice, swapChainImageView, &m_vkAllocationCallbacks );
         }
-        m_swapChainImageViews.clear();
-        m_swapChainImages.clear();
 
-        for( VkFence& inFlightFence : m_swapChainInFlightFences )
+        for( VkFence& inFlightFence : m_swapchainData.swapChainInFlightFences )
         {
             vkDestroyFence( m_vkLocalDevice, inFlightFence, &m_vkAllocationCallbacks );
         }
-        m_swapChainInFlightFences.clear();
 
-        vkDestroySwapchainKHR( m_vkLocalDevice, m_vkSwapChain, &m_vkAllocationCallbacks );
-        m_vkSwapChain = {};
+        vkDestroySwapchainKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, &m_vkAllocationCallbacks );
+        m_swapchainData.vkSwapChain = VK_NULL_HANDLE;
     }
 
     void VulkanGraphicsDevice::createPerFrameData()
@@ -1823,13 +1799,15 @@ namespace zp
         PerFrameData& frameData = getCurrentFrameData();
 
         uint32_t imageIndex;
-        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_vkSwapChain, UINT64_MAX, frameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &imageIndex );
+        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapChain, UINT64_MAX, frameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &imageIndex );
 
         if( result != VK_SUCCESS )
         {
             if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR )
             {
                 // TODO: rebuild swap chain
+                destroySwapChain();
+
                 //beginFrame( frameIndex );
                 return;
             }
@@ -1839,12 +1817,12 @@ namespace zp
 
         frameData.swapChainImageIndex = imageIndex;
 
-        if( m_swapChainInFlightFences[ imageIndex ] != VK_NULL_HANDLE )
+        if( m_swapchainData.swapChainInFlightFences[ imageIndex ] != VK_NULL_HANDLE )
         {
-            HR( vkWaitForFences( m_vkLocalDevice, 1, &m_swapChainInFlightFences[ imageIndex ], VK_TRUE, UINT64_MAX ) );
+            HR( vkWaitForFences( m_vkLocalDevice, 1, &m_swapchainData.swapChainInFlightFences[ imageIndex ], VK_TRUE, UINT64_MAX ) );
         }
 
-        m_swapChainInFlightFences[ imageIndex ] = frameData.vkInFlightFences;
+        m_swapchainData.swapChainInFlightFences[ imageIndex ] = frameData.vkInFlightFences;
 
         for( zp_size_t i = 0; i < frameData.commandQueueCount; ++i )
         {
@@ -1936,16 +1914,16 @@ namespace zp
 
         VkSemaphore waitSemaphores[] { frameData.vkRenderFinishedSemaphore };
 
-        VkSwapchainKHR swapChains[] { m_vkSwapChain };
+        VkSwapchainKHR swapchains[] { m_swapchainData.vkSwapChain };
         uint32_t imageIndices[] { frameData.swapChainImageIndex };
-        ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( swapChains ) == ZP_ARRAY_SIZE( imageIndices ) );
+        ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( swapchains ) == ZP_ARRAY_SIZE( imageIndices ) );
 
         VkPresentInfoKHR presentInfo {
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores ),
             .pWaitSemaphores = waitSemaphores,
-            .swapchainCount = ZP_ARRAY_SIZE( swapChains ),
-            .pSwapchains = swapChains,
+            .swapchainCount = ZP_ARRAY_SIZE( swapchains ),
+            .pSwapchains = swapchains,
             .pImageIndices = imageIndices,
         };
 
@@ -1976,7 +1954,7 @@ namespace zp
         VkAttachmentDescription attachmentDescriptions[] {
             {
                 .flags = 0,
-                .format = m_vkSwapChainFormat,
+                .format = m_swapchainData.vkSwapChainFormat,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
                 .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -2444,7 +2422,7 @@ namespace zp
             .extent {
                 .width =  textureCreateDesc->size.width,
                 .height = textureCreateDesc->size.height,
-                .depth =  IsTextureArray( textureCreateDesc->textureDimension ) ? zp_max( textureCreateDesc->size.depth, 1lu ) : 1,
+                .depth =  IsTextureArray( textureCreateDesc->textureDimension ) ? zp_max( textureCreateDesc->size.depth, 1u ) : 1,
             },
             .mipLevels = textureCreateDesc->mipCount,
             .arrayLayers = textureCreateDesc->arrayLayers,
@@ -2743,9 +2721,12 @@ namespace zp
         PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
         VkRenderPassBeginInfo renderPassBeginInfo {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_vkSwapChainDefaultRenderPass,
-            .framebuffer = m_swapChainFrameBuffers[ frameData.swapChainImageIndex ],
-            .renderArea { .offset = { 0, 0 }, .extent = m_vkSwapChainExtent },
+            .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_swapchainData.vkSwapChainDefaultRenderPass,
+            .framebuffer = m_swapchainData.swapChainFrameBuffers[ frameData.swapChainImageIndex ],
+            .renderArea {
+                .offset { 0, 0 },
+                .extent { m_swapchainData.vkSwapChainExtent },
+            },
             .clearValueCount = ZP_ARRAY_SIZE( clearValues ),
             .pClearValues = clearValues,
         };

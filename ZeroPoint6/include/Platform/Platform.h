@@ -8,7 +8,7 @@
 
 namespace zp
 {
-    typedef unsigned long (* __stdcall ThreadFunc)( void* );
+    typedef zp_uint32_t (* __stdcall ThreadFunc)( void* );
 
     typedef zp_int64_t (* ProcAddressFunc)();
 

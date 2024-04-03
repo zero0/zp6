@@ -13,7 +13,7 @@ typedef unsigned char zp_uint8_t;
 typedef signed short zp_int16_t;
 typedef unsigned short zp_uint16_t;
 
-#define USE_LONG_AS_INT 1
+#define USE_LONG_AS_INT 0
 #if USE_LONG_AS_INT
 typedef signed long zp_int32_t;
 typedef unsigned long zp_uint32_t;
