@@ -22,7 +22,7 @@ namespace zp
             kMaxEventStackCount = 32
         };
 
-        Profiler* g_profiler;
+        Profiler* g_profiler = nullptr;
 
         zp_int32_t compareCPU( const CPUProfilerEvent& lh, const CPUProfilerEvent& rh )
         {
@@ -91,6 +91,7 @@ namespace zp
         , m_profilerDataThreadCapacity( profilerCreateDesc.maxThreadCount )
         , memoryLabel( memoryLabel )
     {
+        ZP_ASSERT( g_profiler == nullptr );
         g_profiler = this;
 
         // thread scratch buffers
@@ -124,6 +125,8 @@ namespace zp
 
     Profiler::~Profiler()
     {
+        ZP_ASSERT( g_profiler == this );
+
         ZP_FREE( memoryLabel, m_cpuProfilerData );
         ZP_FREE( memoryLabel, m_memoryProfilerData );
         ZP_FREE( memoryLabel, m_gpuProfilerData );

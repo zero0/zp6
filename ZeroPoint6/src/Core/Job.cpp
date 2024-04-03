@@ -6,6 +6,7 @@
 #include "Core/Vector.h"
 #include "Core/Atomic.h"
 #include "Core/Allocator.h"
+#include "Core/Profiler.h"
 #include "Platform/Platform.h"
 
 using namespace zp;
@@ -365,6 +366,10 @@ namespace
 
     zp_uint32_t WorkerThreadFunc( void* threadData )
     {
+#if ZP_USE_PROFILER
+        Profiler::InitializeProfilerThread();
+#endif
+
         const zp_size_t index = static_cast<zp_size_t>( reinterpret_cast<zp_ptr_t>( threadData ) );
 
         g_allJobThreadInfos[ index ] = &t_threadInfo;

@@ -75,6 +75,11 @@ namespace zp
             return m_moduleAPI;
         }
 
+        [[nodiscard]] GraphicsDevice* getGraphicsDevice() const
+        {
+            return m_graphicsDevice;
+        }
+
         [[nodiscard]] RenderSystem* getRenderSystem() const
         {
             return m_renderSystem;

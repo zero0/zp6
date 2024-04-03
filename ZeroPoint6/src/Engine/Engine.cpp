@@ -114,8 +114,8 @@ namespace zp
 
         const zp_bool_t headless = false;
         const Rect2Di windowSize {
-            .offset = {},
-            .size = {
+            .offset {},
+            .size {
                 .width = 800,
                 .height = 600
             }
@@ -715,17 +715,6 @@ namespace zp
 
         static void Execute( const JobHandle& parentJobHandle, const InitializeEngineJob* data )
         {
-        }
-    };
-
-    struct ProcessWindowEventsJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const ProcessWindowEventsJob* data )
-        {
-            data->engine->processWindowEvents();
         }
     };
 

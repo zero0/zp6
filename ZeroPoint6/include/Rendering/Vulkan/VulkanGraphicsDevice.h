@@ -190,10 +190,10 @@ namespace zp
             VkExtent2D vkSwapChainExtent;
 
             zp_uint32_t swapChainImageCount;
-            FixedArray<VkImage, 4> swapChainImages;
-            FixedArray<VkImageView, 4> swapChainImageViews;
-            FixedArray<VkFramebuffer, 4> swapChainFrameBuffers;
-            FixedArray<VkFence, 4> swapChainInFlightFences;
+            FixedArray<VkImage, kBufferedFrameCount> swapChainImages;
+            FixedArray<VkImageView, kBufferedFrameCount> swapChainImageViews;
+            FixedArray<VkFramebuffer, kBufferedFrameCount> swapChainFrameBuffers;
+            FixedArray<VkFence, kBufferedFrameCount> swapChainInFlightFences;
         };
 
         PerFrameData& getCurrentFrameData();
