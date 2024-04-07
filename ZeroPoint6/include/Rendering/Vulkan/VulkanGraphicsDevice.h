@@ -34,13 +34,15 @@ namespace zp
 
         void createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) final;
 
+        void resizeSwapchain( zp_uint32_t width, zp_uint32_t height ) final;
+
         void destroySwapchain() final;
 
         void createPerFrameData() final;
 
         void destroyPerFrameData() final;
 
-        void beginFrame( zp_uint64_t frameIndex ) final;
+        void beginFrame() final;
 
         void submit() final;
 
@@ -184,17 +186,17 @@ namespace zp
         {
             zp_handle_t windowHandle;
 
-            VkSwapchainKHR vkSwapChain;
-            VkRenderPass vkSwapChainDefaultRenderPass;
+            VkSwapchainKHR vkSwapchain;
+            VkRenderPass vkSwapchainDefaultRenderPass;
             VkFormat vkSwapChainFormat;
 
-            VkColorSpaceKHR vkSwapChainColorSpace;
-            VkExtent2D vkSwapChainExtent;
+            VkColorSpaceKHR vkSwapchainColorSpace;
+            VkExtent2D vkSwapchainExtent;
 
-            zp_uint32_t swapChainImageCount;
-            FixedArray<VkImage, kBufferedFrameCount> swapChainImages;
-            FixedArray<VkImageView, kBufferedFrameCount> swapChainImageViews;
-            FixedArray<VkFramebuffer, kBufferedFrameCount> swapChainFrameBuffers;
+            zp_uint32_t swapchainImageCount;
+            FixedArray<VkImage, kBufferedFrameCount> swapchainImages;
+            FixedArray<VkImageView, kBufferedFrameCount> swapchainImageViews;
+            FixedArray<VkFramebuffer, kBufferedFrameCount> swapchainFrameBuffers;
         };
 
         PerFrameData& getCurrentFrameData();

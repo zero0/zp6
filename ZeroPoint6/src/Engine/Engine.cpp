@@ -23,6 +23,18 @@ namespace zp
     namespace
     {
         Engine* s_engine = {};
+
+        void OnWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr ){}
+
+        void OnWindowHelpClosed( zp_handle_t windowHandle, void* userPtr )
+        {
+        }
+
+        void OnWindowHelpEvent( zp_handle_t windowHandle, void* userPtr )
+        {
+            Engine::GetInstance()->reload();
+        }
+
     }
 
     Engine* Engine::GetInstance()
@@ -132,8 +144,10 @@ namespace zp
                 .minHeight = 240,
                 .maxWidth = 65535,
                 .maxHeight = 65535,
-                .onWindowResize = onWindowResize,
-                .onWindowHelpEvent = onWindowHelpEvent
+                .onWindowResize = OnWindowResize,
+                .onWindowHelpEvent = OnWindowHelpEvent,
+                .onWindowClosed = OnWindowHelpClosed,
+                .userPtr = this
             };
 
             m_windowHandle = Platform::OpenWindow( {
@@ -296,19 +310,28 @@ namespace zp
             }
         }
 
+
+        void WaitForGPUJob( const JobHandle& parentHandle, EngineJobData* e )
+        {
+            e->engine->getGraphicsDevice()->waitForGPU();
+
+            JobSystem::Start( AdvanceFrameJob, *e ).schedule();
+            JobSystem::ScheduleBatchJobs();
+        }
+
         void EndFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
             e->engine->getGraphicsDevice()->submit();
 
             e->engine->getGraphicsDevice()->present();
 
-            JobSystem::Start( AdvanceFrameJob, *e ).schedule();
+            JobSystem::Start( WaitForGPUJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
         }
 
         void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            e->engine->getGraphicsDevice()->beginFrame( e->engine->getFrameCount() );
+            e->engine->getGraphicsDevice()->beginFrame();
 
             JobSystem::Start( EndFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -437,9 +460,9 @@ namespace zp
                 break;
             case EngineState::Running:
             {
+                zp_printfln( "Enter Running" );
                 startEngine();
             }
-                zp_printfln( "Enter Running" );
                 break;
             case EngineState::Destroy:
             {
@@ -532,9 +555,9 @@ namespace zp
                 break;
             case EngineState::Running:
             {
+                zp_printfln( "Exit Running" );
                 stopEngine();
             }
-                zp_printfln( "Exit Running" );
                 break;
             case EngineState::Destroy:
                 zp_printfln( "Exit Destroy" );
@@ -935,7 +958,7 @@ namespace zp
 
         const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
 
-        MutableFixedString<128> windowTitle;
+        MutableFixedString128 windowTitle;
         windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, Platform::GetCurrentThreadId() );
 
         Platform::SetWindowTitle( m_windowHandle, windowTitle );

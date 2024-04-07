@@ -12,11 +12,11 @@ namespace zp
 
     typedef zp_int64_t (* ProcAddressFunc)();
 
-    typedef void (* OnWindowGetMinMaxSize)( zp_handle_t windowHandle, zp_int32_t& minWidth, zp_int32_t& minHeight, zp_int32_t& maxWidth, zp_int32_t& maxHeight );
+    typedef void (* OnWindowGetMinMaxSizeFunc)( zp_handle_t windowHandle, zp_int32_t& minWidth, zp_int32_t& minHeight, zp_int32_t& maxWidth, zp_int32_t& maxHeight, void* userPtr );
 
-    typedef void (* OnWindowResize)( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
+    typedef void (* OnWindowResizeFunc)( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr );
 
-    typedef void (* OnWindowFocus)( zp_handle_t windowHandle, zp_bool_t isNowFocused );
+    typedef void (* OnWindowFocusFunc)( zp_handle_t windowHandle, zp_bool_t isNowFocused, void* userPtr );
 
     struct WindowKeyEvent
     {
@@ -29,7 +29,7 @@ namespace zp
         ZP_BOOL32( isKeyReleased );
     };
 
-    typedef void (* OnWindowKeyEvent)( zp_handle_t windowHandle, const WindowKeyEvent& windowKeyEvent );
+    typedef void (* OnWindowKeyEvent)( zp_handle_t windowHandle, const WindowKeyEvent& windowKeyEvent, void* userPtr );
 
     struct WindowMouseEvent
     {
@@ -40,22 +40,23 @@ namespace zp
         ZP_BOOL32( isShiftDown );
     };
 
-    typedef void (* OnWindowMouseEvent)( zp_handle_t windowHandle, const WindowMouseEvent& windowMouseEvent );
+    typedef void (* OnWindowMouseEvent)( zp_handle_t windowHandle, const WindowMouseEvent& windowMouseEvent, void* userPtr );
 
-    typedef void (* OnWindowClosed)( zp_handle_t windowHandle );
+    typedef void (* OnWindowClosed)( zp_handle_t windowHandle, void* userPtr );
 
-    typedef void (* OnWindowHelp)( zp_handle_t windowHandle );
+    typedef void (* OnWindowHelp)( zp_handle_t windowHandle, void* userPtr );
 
     struct WindowCallbacks
     {
         zp_int32_t minWidth, minHeight, maxWidth, maxHeight;
-        OnWindowGetMinMaxSize onWindowGetMinMaxSize;
-        OnWindowResize onWindowResize;
-        OnWindowFocus onWindowFocus;
+        OnWindowGetMinMaxSizeFunc onWindowGetMinMaxSize;
+        OnWindowResizeFunc onWindowResize;
+        OnWindowFocusFunc onWindowFocus;
         OnWindowKeyEvent onWindowKeyEvent;
         OnWindowMouseEvent onWindowMouseEvent;
         OnWindowHelp onWindowHelpEvent;
         OnWindowClosed onWindowClosed;
+        void* userPtr;
     };
 
     struct OpenWindowDesc
@@ -307,6 +308,45 @@ namespace zp
         [[nodiscard]] zp_uint32_t GetProcessorCount();
 
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
+    }
+
+    // Semaphore
+    namespace Platform
+    {
+        enum class AcquireSemaphoreResult
+        {
+            Signaled,
+            NotSignaled,
+            Abandoned,
+            Failed,
+        };
+
+        zp_handle_t CreateSemaphore( zp_int32_t initialCount, zp_int32_t maxCount );
+
+        AcquireSemaphoreResult AcquireSemaphore( zp_handle_t semaphore, zp_time_t millisecondTimeout = 0 );
+
+        zp_int32_t ReleaseSemaphore( zp_handle_t semaphore, zp_int32_t releaseCount = 1 );
+
+        zp_bool_t CloseSemaphore( zp_handle_t semaphore );
+    }
+
+    // Mutex
+    namespace Platform
+    {
+        enum class AcquireMutexResult
+        {
+            Acquired,
+            Abandoned,
+            Failed,
+        };
+
+        zp_handle_t CreateMutex( zp_bool_t initialOwner );
+
+        AcquireMutexResult AcquireMutex( zp_handle_t mutex, zp_time_t millisecondTimeout = ZP_TIME_INFINITE );
+
+        zp_bool_t ReleaseMutex( zp_handle_t mutex );
+
+        zp_bool_t CloseMutex( zp_handle_t mutex );
     }
 
     // Time

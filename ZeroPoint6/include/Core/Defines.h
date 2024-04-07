@@ -9,8 +9,12 @@
 #define ZP_DEBUG                    1
 #endif
 
-#if defined(RELEASE_BUILD)
+#if ZP_DEBUG
+#define ZP_DEBUG_BUILD              1
+#elif defined(RELEASE_BUILD)
 #define ZP_RELEASE_BUILD            1
+#elif defined(DIST_BUILD)
+#define ZP_DISTRIBUTION_BUILD       1
 #endif
 
 #if defined(WIN64) || defined(_WIN64)

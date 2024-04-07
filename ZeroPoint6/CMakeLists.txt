@@ -21,6 +21,7 @@ set(ZP_CORE_SRC
         "src/Core/Math.cpp"
         "src/Core/Profiler.cpp"
         "src/Core/String.cpp"
+        "src/Core/Threading.cpp"
         )
 
 set(ZP_PLATFORM_SRC
@@ -78,6 +79,7 @@ set(ZP_CORE_HEADERS
         "include/Core/Queue.h"
         "include/Core/Set.h"
         "include/Core/String.h"
+        "include/Core/Threading.h"
         "include/Core/Types.h"
         "include/Core/Vector.h"
         )
@@ -189,6 +191,11 @@ target_link_libraries(${ZP_TARGET}
 set_target_properties(${ZP_TARGET} PROPERTIES
         VERSION ${ZP_VERSION}
         )
+# include resources on Windows
+if(WIN32)
+        target_sources(${ZP_TARGET}
+                PRIVATE "res/${PLATFORM_FULL_NAME}/resource.rc")
+endif()
 
 if (MSVC)
     set_target_properties(${ZP_TARGET} PROPERTIES

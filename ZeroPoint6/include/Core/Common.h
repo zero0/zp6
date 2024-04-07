@@ -747,32 +747,6 @@ namespace zp
 
 namespace zp
 {
-    class CriticalSection
-    {
-    public:
-        CriticalSection();
-
-        ~CriticalSection();
-
-        CriticalSection( const CriticalSection& other );
-
-        CriticalSection( CriticalSection&& other ) noexcept;
-
-        void enter();
-
-        void leave();
-
-    private:
-        zp_uint8_t m_memory[40]; // matches Windows size but can be larger
-    };
-}
-
-//
-//
-//
-
-namespace zp
-{
     struct SizeInfo
     {
         zp_float32_t size;

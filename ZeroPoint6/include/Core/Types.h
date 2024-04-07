@@ -5,6 +5,8 @@
 #ifndef ZP_TYPES_H
 #define ZP_TYPES_H
 
+#include "Core/Defines.h"
+
 typedef bool zp_bool_t;
 
 typedef signed char zp_int8_t;
@@ -130,5 +132,7 @@ ZP_FORCEINLINE zp_bool_t operator>( const zp_guid128_t& lh, const zp_guid128_t& 
 //
 
 typedef zp_uint64_t zp_time_t;
+
+#define ZP_TIME_INFINITE    static_cast<zp_time_t>( ~0 )
 
 #endif //ZP_TYPES_H

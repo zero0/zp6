@@ -182,7 +182,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                waitOnGpuJob->graphicsDevice->beginFrame( waitOnGpuJob->frameIndex );
+                waitOnGpuJob->graphicsDevice->beginFrame();
             }
         };
 

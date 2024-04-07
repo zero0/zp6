@@ -18,6 +18,7 @@
 #include "Core/Types.h"
 #include "Core/Math.h"
 #include "Core/Common.h"
+#include "Core/Threading.h"
 #include "Core/Version.h"
 #include "Core/Allocator.h"
 #include "Platform/Platform.h"
@@ -79,17 +80,33 @@ namespace
 {
     const char* kZeroPointClassName = "ZeroPoint::WindowClass";
 
+    enum
+    {
+        kMaxWindows = 4
+    };
+
+    zp_size_t s_windowCount {};
+    HWND s_windows[kMaxWindows] {};
+
     LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
     {
         auto windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
 
         switch( uMessage )
         {
+            case WM_CREATE:
+            {
+                // track created window
+                ZP_ASSERT( s_windowCount < kMaxWindows );
+                s_windows[ s_windowCount++ ] = hWnd;
+            }
+                break;
+
             case WM_CLOSE:
             {
                 if( windowCallbacks && windowCallbacks->onWindowClosed )
                 {
-                    windowCallbacks->onWindowClosed( hWnd );
+                    windowCallbacks->onWindowClosed( hWnd, windowCallbacks->userPtr );
                 }
 
                 ::DestroyWindow( hWnd );
@@ -98,8 +115,23 @@ namespace
 
             case WM_DESTROY:
             {
-                //::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR) nullptr );
-                ::PostQuitMessage( 0 );
+                // remove tracked windows
+                for( zp_size_t i = 0; i < s_windowCount; ++i )
+                {
+                    if( s_windows[ i ] == hWnd )
+                    {
+                        --s_windowCount;
+                        s_windows[ i ] = s_windows[ s_windowCount ];
+                        s_windows[ s_windowCount ] = nullptr;
+                        --i;
+                    }
+                }
+
+                // if there are no more windows, quit app
+                if( s_windowCount == 0 )
+                {
+                    ::PostQuitMessage( 0 );
+                }
             }
                 break;
 
@@ -113,7 +145,7 @@ namespace
                     zp_int32_t maxHeight;
                     if( windowCallbacks->onWindowGetMinMaxSize )
                     {
-                        windowCallbacks->onWindowGetMinMaxSize( hWnd, minWidth, minHeight, maxWidth, maxHeight );
+                        windowCallbacks->onWindowGetMinMaxSize( hWnd, minWidth, minHeight, maxWidth, maxHeight, windowCallbacks->userPtr );
                     }
                     else
                     {
@@ -148,7 +180,7 @@ namespace
                         zp_int32_t width = pos->cx - ( rc.right - rc.left );
                         zp_int32_t height = pos->cy - ( rc.bottom - rc.top );
 
-                        windowCallbacks->onWindowResize( hWnd, width, height );
+                        windowCallbacks->onWindowResize( hWnd, width, height, windowCallbacks->userPtr );
                     }
                 }
             }
@@ -158,7 +190,7 @@ namespace
             {
                 if( windowCallbacks && windowCallbacks->onWindowFocus )
                 {
-                    windowCallbacks->onWindowFocus( hWnd, false );
+                    windowCallbacks->onWindowFocus( hWnd, false, windowCallbacks->userPtr );
                 }
             }
                 break;
@@ -167,7 +199,7 @@ namespace
             {
                 if( windowCallbacks && windowCallbacks->onWindowFocus )
                 {
-                    windowCallbacks->onWindowFocus( hWnd, true );
+                    windowCallbacks->onWindowFocus( hWnd, true, windowCallbacks->userPtr );
                 }
             }
                 break;
@@ -207,9 +239,11 @@ namespace
                         case VK_MENU:    // converts to VK_LMENU or VK_RMENU
                             vkCode = LOWORD( MapVirtualKey( scanCode, MAPVK_VSC_TO_VK_EX ) );
                             break;
+                        default:
+                            break;
                     }
 
-                    WindowKeyEvent event {
+                    const WindowKeyEvent event {
                         .keyCode = vkCode,
                         .repeatCount = repeatCount,
                         .isCtrlDown = isCtrlKeyDown,
@@ -218,7 +252,7 @@ namespace
                         .wasKeyDown = wasKeyDown,
                         .isKeyReleased = isKeyReleased,
                     };
-                    windowCallbacks->onWindowKeyEvent( hWnd, event );
+                    windowCallbacks->onWindowKeyEvent( hWnd, event, windowCallbacks->userPtr );
                 }
             }
                 break;
@@ -241,14 +275,14 @@ namespace
                     const zp_bool_t isCtrlDown = ( MK_CONTROL & fwKeys ) == MK_CONTROL;
                     const zp_bool_t isShiftDown = ( MK_SHIFT & fwKeys ) == MK_SHIFT;
 
-                    WindowMouseEvent event {
+                    const WindowMouseEvent event {
                         .x = p.x,
                         .y = p.y,
                         .zDelta = zDelta,
                         .isCtrlDown = isCtrlDown,
                         .isShiftDown = isShiftDown,
                     };
-                    windowCallbacks->onWindowMouseEvent( hWnd, event );
+                    windowCallbacks->onWindowMouseEvent( hWnd, event, windowCallbacks->userPtr );
                 }
             }
                 break;
@@ -266,7 +300,7 @@ namespace
             {
                 if( windowCallbacks && windowCallbacks->onWindowHelpEvent )
                 {
-                    windowCallbacks->onWindowHelpEvent( hWnd );
+                    windowCallbacks->onWindowHelpEvent( hWnd, windowCallbacks->userPtr );
                 }
             }
                 break;
@@ -331,18 +365,18 @@ namespace zp
                 .cbClsExtra = 0,
                 .cbWndExtra = 0,
                 .hInstance = hInstance,
-                .hIcon = LoadIcon( hInstance, IDI_APPLICATION ),
-                .hCursor = LoadCursor( hInstance, IDC_ARROW ),
+                .hIcon = LoadIcon( hInstance, MAKEINTRESOURCE( 101 ) ),
+                .hCursor = LoadCursor( nullptr, IDC_ARROW ),
                 .hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH )),
                 .lpszMenuName = nullptr,
                 .lpszClassName = kZeroPointClassName,
-                .hIconSm = LoadIcon( hInstance, IDI_APPLICATION ),
+                .hIconSm = static_cast<HICON>( LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, 16, 16, 0 ) ),
             };
 
             g_windowClassReg = ::RegisterClassEx( &wc );
         }
 
-        const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME;
+        const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | /*WS_MINIMIZEBOX |*/ WS_THICKFRAME;
         DWORD exStyle = WS_EX_APPWINDOW;
 #if ZP_DEBUG
         exStyle |= WS_EX_ACCEPTFILES;
@@ -1003,5 +1037,131 @@ namespace zp
         }
 
         return static_cast<zp_int32_t>( returnCode );
+    }
+
+    zp_handle_t Platform::CreateSemaphore( zp_int32_t initialCount, zp_int32_t maxCount )
+    {
+        ZP_ASSERT( initialCount <= maxCount );
+
+        HANDLE hSemaphore = ::CreateSemaphore( nullptr, initialCount, maxCount, nullptr );
+        if( hSemaphore == nullptr )
+        {
+            PrintLastErrorMsg( "Failed to create Semaphore" );
+        }
+
+        return hSemaphore;
+    }
+
+    Platform::AcquireSemaphoreResult Platform::AcquireSemaphore( zp_handle_t semaphore, zp_time_t millisecondTimeout )
+    {
+        HANDLE hSemaphore = static_cast<HANDLE>( semaphore );
+
+        const DWORD result = ::WaitForSingleObject( hSemaphore, millisecondTimeout );
+        switch( result )
+        {
+            case WAIT_OBJECT_0:
+                return AcquireSemaphoreResult::Signaled;
+
+            case WAIT_TIMEOUT:
+                return AcquireSemaphoreResult::NotSignaled;
+
+            case WAIT_ABANDONED:
+                return AcquireSemaphoreResult::Abandoned;
+
+            case WAIT_FAILED:
+                PrintLastErrorMsg( "Failed to acquire Semaphore" );
+                return AcquireSemaphoreResult::Failed;
+
+            default:
+                ZP_INVALID_CODE_PATH();
+                return AcquireSemaphoreResult::Failed;
+        }
+    }
+
+    zp_int32_t Platform::ReleaseSemaphore( zp_handle_t semaphore, zp_int32_t releaseCount )
+    {
+        HANDLE hSemaphore = static_cast<HANDLE>( semaphore );
+
+        LONG prevReleaseCount;
+        const WINBOOL ok = ::ReleaseSemaphore( hSemaphore, releaseCount, &prevReleaseCount );
+        if( !ok )
+        {
+            PrintLastErrorMsg( "Failed to release Semaphore" );
+        }
+
+        return prevReleaseCount;
+    }
+
+    zp_bool_t Platform::CloseSemaphore( zp_handle_t semaphore )
+    {
+        HANDLE hSemaphore = static_cast<HANDLE>( semaphore );
+
+        const WINBOOL ok = ::CloseHandle( hSemaphore );
+        if( !ok )
+        {
+            PrintLastErrorMsg( "" );
+        }
+
+        return ok;
+    }
+
+    zp_handle_t Platform::CreateMutex( zp_bool_t initialOwner )
+    {
+        HANDLE hMutex = ::CreateMutex( nullptr, initialOwner, nullptr );
+        if( hMutex == nullptr )
+        {
+            PrintLastErrorMsg( "Failed to create Mutex" );
+        }
+
+        return hMutex;
+    }
+
+    Platform::AcquireMutexResult Platform::AcquireMutex( zp_handle_t mutex, zp_time_t millisecondTimeout )
+    {
+        HANDLE hSemaphore = static_cast<HANDLE>( mutex );
+
+        const DWORD result = ::WaitForSingleObject( hSemaphore, millisecondTimeout );
+        switch( result )
+        {
+            case WAIT_OBJECT_0:
+                return AcquireMutexResult::Acquired;
+
+            case WAIT_ABANDONED:
+                return AcquireMutexResult::Abandoned;
+
+            case WAIT_FAILED:
+                PrintLastErrorMsg( "Failed to acquire Mutex" );
+                return AcquireMutexResult::Failed;
+
+            default:
+                ZP_INVALID_CODE_PATH();
+                return AcquireMutexResult::Failed;
+        }
+    }
+
+    zp_bool_t Platform::ReleaseMutex( zp_handle_t mutex )
+    {
+        HANDLE hMutex = static_cast<HANDLE>( mutex );
+
+        const WINBOOL ok = ::ReleaseMutex( hMutex );
+        if( !ok )
+        {
+            PrintLastErrorMsg( "Failed to release Mutex" );
+        }
+
+        return ok;
+    }
+
+    zp_bool_t Platform::CloseMutex( zp_handle_t mutex )
+    {
+        HANDLE hMutex = static_cast<HANDLE>( mutex );
+
+        const WINBOOL ok = ::CloseHandle( hMutex );
+        if( !ok )
+        {
+            PrintLastErrorMsg( "Failed to close Mutex" );
+        }
+
+        return ok;
     }
 }

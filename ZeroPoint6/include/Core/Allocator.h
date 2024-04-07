@@ -9,6 +9,7 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/Common.h"
+#include "Core/Threading.h"
 #include <new>
 
 #define ZP_USE_MEMORY_PROFILER  ZP_USE_PROFILER

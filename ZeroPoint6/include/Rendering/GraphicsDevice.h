@@ -217,15 +217,19 @@ namespace zp
 
         ~GraphicsDevice() = default;
 
+#pragma region Swapchain
         virtual void createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
+        virtual void resizeSwapchain( zp_uint32_t width, zp_uint32_t height ) = 0;
+
         virtual void destroySwapchain() = 0;
+#pragma endregion
 
         virtual void createPerFrameData() = 0;
 
         virtual void destroyPerFrameData() = 0;
 
-        virtual void beginFrame( zp_uint64_t frameIndex ) = 0;
+        virtual void beginFrame() = 0;
 
         virtual void submit() = 0;
 

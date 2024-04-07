@@ -384,13 +384,15 @@ namespace
         while( t_threadInfo.isRunning )
         {
             Job* job = GetJob();
-            if( job )
+            if( job && t_threadInfo.isRunning )
             {
                 ExecuteJob( job );
             }
 
             Platform::YieldCurrentThread();
         }
+
+        zp_printfln( "Exiting Worker Thread %d", Platform::GetCurrentThreadId() );
 
         t_threadInfo.allocatedJobCount = 0;
         t_threadInfo.localBatchJobQueue = nullptr;

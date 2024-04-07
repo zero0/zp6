@@ -113,12 +113,6 @@ namespace zp
 
         void onStateExited( EngineState engineState );
 
-        static void onWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height ){}
-
-        static void onWindowHelpEvent( zp_handle_t windowHandle ){
-            Engine::GetInstance()->reload();
-        }
-
         zp_handle_t m_windowHandle;
         zp_handle_t m_consoleHandle;
 
