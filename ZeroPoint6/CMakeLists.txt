@@ -25,8 +25,8 @@ set(ZP_CORE_SRC
         )
 
 set(ZP_PLATFORM_SRC
-        "src/Platform/${PLATFORM_FULL_NAME}/${PLATFORM_FULL_NAME}Platform.cpp"
-        "src/Platform/${PLATFORM_FULL_NAME}/${PLATFORM_FULL_NAME}Main.cpp"
+        "src/Platform/${PLATFORM_FULL_NAME}/Platform${PLATFORM_FULL_NAME}.cpp"
+        "src/Platform/${PLATFORM_FULL_NAME}/Main${PLATFORM_FULL_NAME}.cpp"
         )
 
 set(ZP_RENDERING_SRC
