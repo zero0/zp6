@@ -16,6 +16,7 @@
 #include "Engine/EntityQuery.h"
 #include "Engine/MemoryLabels.h"
 #include "Engine/Component.h"
+#include "Engine/Subsystem.h"
 
 namespace zp
 {
@@ -58,7 +59,7 @@ namespace zp
     //
     //
 
-    class EntityComponentManager
+    class EntityComponentManager : public ISubsystem
     {
     public:
         explicit EntityComponentManager( MemoryLabel memoryLabel );

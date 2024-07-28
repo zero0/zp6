@@ -201,6 +201,8 @@ namespace zp
 
         PerFrameData& getCurrentFrameData();
 
+        const PerFrameData& getCurrentFrameData() const;
+
         PerFrameData& getFrameData( zp_uint64_t frameIndex );
 
         PerFrameData m_perFrameData[kBufferedFrameCount];

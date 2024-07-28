@@ -9,6 +9,7 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/Allocator.h"
+#include "Core/String.h"
 
 #if ZP_USE_PROFILER
 #ifndef __FILENAME__
@@ -27,8 +28,9 @@
 #define ZP_PROFILE_CPU_MARK( e )            zp::Profiler::MarkCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = 0, .lineNumber = __LINE__, } )
 #define ZP_PROFILE_CPU_MARK_V( e, v )       zp::Profiler::MarkCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = (v), .lineNumber = __LINE__, } )
 
-#define ZP_PROFILE_CPU_START( e )           const zp_size_t __profilerIndex_##e = zp::Profiler::StartCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = 0, .lineNumber = __LINE__, } )
-#define ZP_PROFILE_CPU_START_V( e, v )      const zp_size_t __profilerIndex_##e = zp::Profiler::StartCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = (v), .lineNumber = __LINE__, } )
+#define ZP_PROFILE_CPU_DEF( e )             namespace { zp_size_t __profilerIndex_##e; }
+#define ZP_PROFILE_CPU_START( e )           __profilerIndex_##e = zp::Profiler::StartCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = 0, .lineNumber = __LINE__, } )
+#define ZP_PROFILE_CPU_START_V( e, v )      __profilerIndex_##e = zp::Profiler::StartCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = (v), .lineNumber = __LINE__, } )
 #define ZP_PROFILE_CPU_END( e )             zp::Profiler::EndCPU( __profilerIndex_##e )
 
 #define ZP_PROFILE_MEM( l, a, f, t, c )     zp::Profiler::MarkMemory( { .allocted = (a), .freed = (f), .total = (t), .capacity = (c), .memoryLabel = (l), } )
@@ -41,15 +43,15 @@
 
 #else // !ZP_USE_PROFILER
 
-#define ZP_PROFILE_CPU_BLOCK()              (void)0
-#define ZP_PROFILE_CPU_BLOCK_E( ... )       (void)0
-
-#define ZP_PROFILE_CPU_BLOCK_V( ... )       (void)0
 #define ZP_PROFILE_CPU_BLOCK_EV( ... )      (void)0
+#define ZP_PROFILE_CPU_BLOCK_E( ... )       (void)0
+#define ZP_PROFILE_CPU_BLOCK_V( ... )       (void)0
+#define ZP_PROFILE_CPU_BLOCK()              (void)0
 
 #define ZP_PROFILE_CPU_MARK( ... )          (void)0
 #define ZP_PROFILE_CPU_MARK_V( ... )        (void)0
 
+#define ZP_PROFILE_CPU_DEF( ... )           (void)0
 #define ZP_PROFILE_CPU_START( ... )         (void)0
 #define ZP_PROFILE_CPU_START_V( ... )       (void)0
 #define ZP_PROFILE_CPU_END( ... )           (void)0

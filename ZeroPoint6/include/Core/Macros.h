@@ -87,10 +87,15 @@
 #define ZP_NONCOPYABLE(x)           \
 private:                            \
     x( const x&) = delete;          \
-    x( x&& ) = delete;              \
     x& operator=(x const&) = delete;
 
-#define ZP_PURE_INTERFACE   class
+#define ZP_NONMOVABLE(x)            \
+private:                            \
+    x( x&& ) = delete;              \
+    x& operator=(x &&) = delete;
+
+
+#define ZP_PURE_INTERFACE       ZP_DECLSPEC_NOVTABLE class
 
 // Bytes
 #define KB              * zp_size_t( 1024 )

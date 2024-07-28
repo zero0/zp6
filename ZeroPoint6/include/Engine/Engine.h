@@ -22,6 +22,8 @@
 #include "Engine/Component.h"
 #include "Engine/EntityComponentManager.h"
 #include "Engine/AssetSystem.h"
+#include "Engine/ExecutionGraph.h"
+#include "Engine/Subsystem.h"
 
 #include "Rendering/RenderSystem.h"
 
@@ -64,6 +66,8 @@ namespace zp
         void processWindowEvents();
 
         void advanceFrame();
+
+        void update();
 
         [[nodiscard]] zp_uint64_t getFrameCount() const
         {
@@ -121,8 +125,10 @@ namespace zp
 
         WindowCallbacks m_windowCallbacks;
 
-        EnginePipeline* m_currentEnginePipeline;
-        EnginePipeline* m_nextEnginePipeline;
+        ExecutionGraph m_executionGraph;
+        CompiledExecutionGraph m_compiledExecutionGraph;
+
+        SubsystemManager m_subsystemManager;
 
         JobHandle m_previousFrameEnginePipelineHandle;
 
@@ -136,7 +142,7 @@ namespace zp
 #endif
 
         zp_uint64_t m_frameCount;
-        zp_time_t m_frameTime;
+        zp_time_t m_frameStartTime;
         zp_time_t m_timeFrequencyS;
 
         ZP_BOOL32( m_shouldReload );

@@ -1832,10 +1832,7 @@ namespace zp
             HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ i ].commandBuffer ), 0 ) );
         }
 
-        VkResult result;
-
-        result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, UINT64_MAX, currentFrameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &currentFrameData.swapChainImageIndex );
-
+        const VkResult result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, UINT64_MAX, currentFrameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &currentFrameData.swapChainImageIndex );
         if( result != VK_SUCCESS )
         {
             if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR )
@@ -1881,7 +1878,7 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        PerFrameData& currentFrameData = getCurrentFrameData();
+        const PerFrameData& currentFrameData = getCurrentFrameData();
 
         // if there are no command queues, add the default swapchain render pass
         if( currentFrameData.commandQueueCount == 0 )
@@ -1907,8 +1904,8 @@ namespace zp
             //HR( vkEndCommandBuffer( buffer ) );
         }
 
-        VkPipelineStageFlags waitStages[] { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-        VkSemaphore waitSemaphores[] { currentFrameData.vkSwapChainAcquireSemaphore };
+        const VkPipelineStageFlags waitStages[] { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        const VkSemaphore waitSemaphores[] { currentFrameData.vkSwapChainAcquireSemaphore };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( waitStages ) == ZP_ARRAY_SIZE( waitSemaphores ) );
 
         VkCommandBuffer graphicsQueueCommandBuffers[currentFrameData.commandQueueCount];
@@ -1936,12 +1933,12 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        PerFrameData& currentFrameData = getCurrentFrameData();
+        const PerFrameData& currentFrameData = getCurrentFrameData();
 
-        VkSemaphore waitSemaphores[] { currentFrameData.vkRenderFinishedSemaphore };
+        const VkSemaphore waitSemaphores[] { currentFrameData.vkRenderFinishedSemaphore };
 
-        VkSwapchainKHR swapchains[] { m_swapchainData.vkSwapchain };
-        uint32_t imageIndices[] { currentFrameData.swapChainImageIndex };
+        const VkSwapchainKHR swapchains[] { m_swapchainData.vkSwapchain };
+        const uint32_t imageIndices[] { currentFrameData.swapChainImageIndex };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( swapchains ) == ZP_ARRAY_SIZE( imageIndices ) );
 
         const VkPresentInfoKHR presentInfo {
@@ -1953,8 +1950,7 @@ namespace zp
             .pImageIndices = imageIndices,
         };
 
-        VkResult result;
-        result = vkQueuePresentKHR( m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ], &presentInfo );
+        const VkResult result = vkQueuePresentKHR( m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ], &presentInfo );
         if( result != VK_SUCCESS )
         {
             if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR )
@@ -3262,6 +3258,12 @@ namespace zp
     }
 
     VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getCurrentFrameData()
+    {
+        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
+        return m_perFrameData[ frame ];
+    }
+
+    const VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getCurrentFrameData() const
     {
         const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
         return m_perFrameData[ frame ];

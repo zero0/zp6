@@ -24,7 +24,9 @@ namespace zp
     {
         Engine* s_engine = {};
 
-        void OnWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr ){}
+        void OnWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr )
+        {
+        }
 
         void OnWindowHelpClosed( zp_handle_t windowHandle, void* userPtr )
         {
@@ -48,8 +50,9 @@ namespace zp
         , m_moduleDll( nullptr )
         , m_moduleAPI( nullptr )
         , m_windowCallbacks {}
-        , m_currentEnginePipeline( nullptr )
-        , m_nextEnginePipeline( nullptr )
+        , m_executionGraph( memoryLabel )
+        , m_compiledExecutionGraph( memoryLabel )
+        , m_subsystemManager( memoryLabel )
         , m_previousFrameEnginePipelineHandle {}
         , m_graphicsDevice( nullptr )
         , m_renderSystem( nullptr )
@@ -59,7 +62,7 @@ namespace zp
         , m_profiler( nullptr )
 #endif
         , m_frameCount( 0 )
-        , m_frameTime( 0 )
+        , m_frameStartTime( 0 )
         , m_timeFrequencyS( Platform::TimeFrequency() )
         , m_shouldReload( false )
         , m_shouldRestart( false )
@@ -119,7 +122,7 @@ namespace zp
         Profiler::InitializeProfilerThread();
 #endif
 
-        ZP_PROFILE_CPU_BLOCK_E(Initialize Engine);
+        ZP_PROFILE_CPU_BLOCK_E( Initialize Engine );
 
         // initialize job system
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
@@ -137,7 +140,7 @@ namespace zp
         const zp_bool_t createWindow = true;
         if( createWindow )
         {
-            ZP_PROFILE_CPU_BLOCK_E(Create Window);
+            ZP_PROFILE_CPU_BLOCK_E( Create Window );
 
             m_windowCallbacks = {
                 .minWidth = 320,
@@ -162,7 +165,7 @@ namespace zp
         const zp_bool_t createConsole = true;
         if( createConsole )
         {
-            ZP_PROFILE_CPU_BLOCK_E(Create Console);
+            ZP_PROFILE_CPU_BLOCK_E( Create Console );
 
             m_consoleHandle = Platform::OpenConsole();
         }
@@ -170,7 +173,7 @@ namespace zp
         // graphics device
         if( !headless )
         {
-            ZP_PROFILE_CPU_BLOCK_E(Create Graphics Device);
+            ZP_PROFILE_CPU_BLOCK_E( Create Graphics Device );
 
             m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, {
                 .appName = String::As( "AppName" ),
@@ -182,11 +185,15 @@ namespace zp
 
             m_graphicsDevice->createSwapchain( m_windowHandle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
-        // create systems
-        //m_renderSystem = ZP_NEW( MemoryLabels::Default, RenderSystem );
 
         // show window when graphics device is created
-        Platform::ShowWindow(m_windowHandle, true );
+        if( m_windowHandle )
+        {
+            Platform::ShowWindow( m_windowHandle, true );
+        }
+
+        // create systems
+        m_subsystemManager.RegisterSubsystem<EntityComponentManager>( memoryLabel );
 
         return;
         const char* moduleDLLPath = "";
@@ -295,7 +302,7 @@ namespace zp
             Engine* engine;
         };
 
-        void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e );
+        void UpdateEngineJob( const JobHandle& parentHandle, EngineJobData* e );
 
         void AdvanceFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
@@ -303,13 +310,10 @@ namespace zp
             {
                 e->engine->advanceFrame();
 
-                ZP_PROFILE_ADVANCE_FRAME( e->engine->getFrameCount() );
-
-                JobSystem::Start( StartFrameJob, *e ).schedule();
+                JobSystem::Start( UpdateEngineJob, *e ).schedule();
                 JobSystem::ScheduleBatchJobs();
             }
         }
-
 
         void WaitForGPUJob( const JobHandle& parentHandle, EngineJobData* e )
         {
@@ -337,9 +341,17 @@ namespace zp
             JobSystem::ScheduleBatchJobs();
         }
 
+        void UpdateEngineJob( const JobHandle& parentHandle, EngineJobData* e )
+        {
+            e->engine->update();
+
+            JobSystem::Start( StartFrameJob, *e ).schedule();
+            JobSystem::ScheduleBatchJobs();
+        }
+
         void InitialEngineJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            JobSystem::Start( StartFrameJob, *e ).schedule();
+            JobSystem::Start( UpdateEngineJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
         }
     }
@@ -574,176 +586,6 @@ namespace zp
         }
     }
 
-    struct InitializeEngineJob;
-    struct InitializeModuleJob;
-    struct ProcessWindowEventsJob;
-
-    struct StartJob;
-    struct FixedUpdateJob;
-    struct UpdateJob;
-    struct LateUpdateJob;
-    struct BeginFrameJob;
-    struct EndFrameJob;
-
-#if ZP_USE_PROFILER
-    struct AdvanceProfilerFrameJob;
-#endif
-
-    struct EndFrameJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const EndFrameJob* data );
-    };
-
-    struct BeginFrameJob
-    {
-        Engine* engine;
-
-        static void Execute( const JobHandle& parentJobHandle, const BeginFrameJob* data )
-        {
-            ZP_PROFILE_CPU_BLOCK();
-
-        }
-    };
-
-    struct LateUpdateJob
-    {
-        Engine* engine;
-
-        static void Execute( const JobHandle& parentJobHandle, const LateUpdateJob* data )
-        {
-            ZP_PROFILE_CPU_BLOCK();
-
-        }
-    };
-
-    struct UpdateJob
-    {
-        Engine* engine;
-
-        static void Execute( const JobHandle& parentJobHandle, const UpdateJob* data )
-        {
-            ZP_PROFILE_CPU_BLOCK();
-
-            EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
-
-            EntityQueryIterator iterator {};
-            entityComponentManager->iterateEntities( {
-                .notIncludedTags = entityComponentManager->getTagSignature<DisabledTag>(),
-                .requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData, ChildComponentData>(),
-            }, &iterator );
-
-            while( iterator.next() )
-            {
-            };
-
-        }
-    };
-
-
-    struct FixedUpdateJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const FixedUpdateJob* data )
-        {
-            ZP_PROFILE_CPU_BLOCK();
-
-            EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
-
-            EntityQueryIterator iterator {};
-            entityComponentManager->iterateEntities( {
-                .notIncludedTags = entityComponentManager->getTagSignature<DisabledTag>(),
-                .requiredStructures = entityComponentManager->getComponentSignature<TransformComponentData>(),
-            }, &iterator );
-
-            while( iterator.next() )
-            {
-            };
-
-
-        }
-    };
-
-    struct StartJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const StartJob* data )
-        {
-            ZP_PROFILE_CPU_BLOCK();
-
-            EntityComponentManager* entityComponentManager = data->engine->getEntityComponentManager();
-
-            // replay command buffers
-            entityComponentManager->replayCommandBuffers();
-
-            // destroy tagged entities
-            EntityQueryIterator iterator {};
-            entityComponentManager->iterateEntities( {
-                .requiredTags = entityComponentManager->getTagSignature<DestroyedTag>(),
-            }, &iterator );
-
-            while( iterator.next() )
-            {
-                iterator.destroyEntity();
-            };
-
-        }
-    };
-
-#if ZP_USE_PROFILER
-
-    struct AdvanceProfilerFrameJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const AdvanceProfilerFrameJob* data )
-        {
-            ZP_PROFILE_ADVANCE_FRAME( data->engine->getFrameCount() );
-
-
-        }
-    };
-
-#endif
-
-    void EndFrameJob::Execute( const JobHandle& parentJobHandle, const EndFrameJob* data )
-    {
-        if( data->engine->isRunning() )
-        {
-            data->engine->advanceFrame();
-
-
-        }
-    }
-
-    struct InitializeModuleJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const InitializeModuleJob* data )
-        {
-
-        }
-    };
-
-    struct InitializeEngineJob
-    {
-        Engine* engine;
-
-
-        static void Execute( const JobHandle& parentJobHandle, const InitializeEngineJob* data )
-        {
-        }
-    };
-
     void Engine::processWindowEvents()
     {
         //if( m_windowHandle )
@@ -953,8 +795,8 @@ namespace zp
         ++m_frameCount;
 
         const zp_time_t now = Platform::TimeNow();
-        const zp_time_t totalCPUTime = now - m_frameTime;
-        m_frameTime = now;
+        const zp_time_t totalCPUTime = now - m_frameStartTime;
+        m_frameStartTime = now;
 
         const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
 
@@ -964,5 +806,26 @@ namespace zp
         Platform::SetWindowTitle( m_windowHandle, windowTitle );
 
         ZP_PROFILE_ADVANCE_FRAME( m_frameCount );
+    }
+
+    void Engine::update()
+    {
+        zp_bool_t requiresRebuild = true;
+        if( requiresRebuild )
+        {
+            m_executionGraph.BeginRecording();
+
+            m_subsystemManager.BuildExecutionGraph( m_executionGraph );
+
+            m_executionGraph.EndRecording();
+
+            m_executionGraph.Compile( m_compiledExecutionGraph );
+
+            requiresRebuild = false;
+        }
+
+        JobHandle inputHandle = JobSystem::Start().schedule();
+        inputHandle = m_compiledExecutionGraph.Execute( inputHandle, {} );
+        inputHandle.complete();
     }
 }

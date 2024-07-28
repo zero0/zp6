@@ -47,6 +47,7 @@ set(ZP_ENGINE_SRC
         "src/Engine/Entity.cpp"
         "src/Engine/EntityComponentManager.cpp"
         "src/Engine/EntityQuery.cpp"
+        "src/Engine/ExecutionGraph.cpp"
         "src/Engine/Subsystem.cpp"
         )
 
@@ -71,6 +72,7 @@ set(ZP_CORE_HEADERS
         "include/Core/Common.h"
         "include/Core/Data.h"
         "include/Core/Defines.h"
+        "include/Core/Function.h"
         "include/Core/Job.h"
         "include/Core/Macros.h"
         "include/Core/Map.h"
@@ -95,6 +97,8 @@ set(ZP_ENGINE_HEADERS
         "include/Engine/Entity.h"
         "include/Engine/EntityComponentManager.h"
         "include/Engine/EntityQuery.h"
+        "include/Engine/EntryPoint.h"
+        "include/Engine/ExecutionGraph.h"
         "include/Engine/MemoryLabels.h"
         "include/Engine/ModuleEntryPointAPI.h"
         "include/Engine/Subsystem.h"
@@ -152,7 +156,8 @@ set(ZP_EXTERNAL_SRC
         "external/tlsf/tlsf.c"
         )
 
-add_executable(${ZP_TARGET})
+add_executable(${ZP_TARGET}
+                "res/${PLATFORM_FULL_NAME}/resource.rc")
 target_sources(${ZP_TARGET}
         PRIVATE ${ZP_HEADERS}
         PRIVATE ${ZP_SRC}
@@ -191,11 +196,6 @@ target_link_libraries(${ZP_TARGET}
 set_target_properties(${ZP_TARGET} PROPERTIES
         VERSION ${ZP_VERSION}
         )
-# include resources on Windows
-if(WIN32)
-        target_sources(${ZP_TARGET}
-                PRIVATE "res/${PLATFORM_FULL_NAME}/resource.rc")
-endif()
 
 if (MSVC)
     set_target_properties(${ZP_TARGET} PROPERTIES
