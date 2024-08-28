@@ -34,7 +34,11 @@ set(ZP_RENDERING_SRC
         "src/Rendering/GraphicsDevice.cpp"
         "src/Rendering/GraphicsResource.cpp"
         "src/Rendering/ImmediateModeRenderer.cpp"
+        "src/Rendering/RenderGraph.cpp"
         "src/Rendering/RenderSystem.cpp"
+        )
+
+set(ZP_RENDERING_API_SRC
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.cpp"
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}RenderingEngine.cpp"
         "src/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}Shader.cpp"
@@ -55,7 +59,9 @@ set(ZP_SRC
         ${ZP_CORE_SRC}
         ${ZP_PLATFORM_SRC}
         ${ZP_ENGINE_SRC}
-        ${ZP_RENDERING_SRC})
+        ${ZP_RENDERING_SRC}
+        ${ZP_RENDERING_API_SRC}
+        )
 
 # Header Files
 configure_file(
@@ -117,6 +123,7 @@ set(ZP_RENDERING_HEADERS
         "include/Rendering/GraphicsResource.h"
         "include/Rendering/ImmediateModeRenderer.h"
         "include/Rendering/Material.h"
+        "include/Rendering/RenderGraph.h"
         "include/Rendering/RenderPass.h"
         "include/Rendering/RenderPipeline.h"
         "include/Rendering/RenderSystem.h"
@@ -125,6 +132,9 @@ set(ZP_RENDERING_HEADERS
         "include/Rendering/Shader.h"
         "include/Rendering/Texture.h"
         "include/Rendering/Swapchain.h"
+        )
+
+set(ZP_RENDERING_API_HEADERS
         "include/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.h"
         )
 
@@ -133,6 +143,7 @@ set(ZP_HEADERS
         ${ZP_ENGINE_HEADERS}
         ${ZP_PLATFORM_HEADERS}
         ${ZP_RENDERING_HEADERS}
+        ${ZP_RENDERING_API_HEADERS}
         )
 
 # set(ZP_CORE_MODULE
@@ -155,6 +166,12 @@ set(ZP_EXTERNAL_HEADERS
 set(ZP_EXTERNAL_SRC
         "external/tlsf/tlsf.c"
         )
+
+#if (GCC OR CLANG)
+#target_compile_definitions(${ZP_TARGET}}
+#        PUBLIC -D_WIN32_WINNT=0x0A00
+#        )
+#endif ()
 
 add_executable(${ZP_TARGET}
                 "res/${PLATFORM_FULL_NAME}/resource.rc")
@@ -190,6 +207,7 @@ target_link_libraries(${ZP_TARGET}
         PRIVATE ${Vulkan_LIBRARIES}
         PRIVATE "rpcrt4.lib"
         PRIVATE "dwmapi.dll"
+        PRIVATE "Ws2_32.lib"
         )
 #endif ()
 

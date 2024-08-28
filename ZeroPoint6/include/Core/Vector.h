@@ -288,6 +288,64 @@ namespace zp
 namespace zp
 {
     template<typename T>
+    struct MemoryList
+    {
+    public:
+        typedef T value_type;
+        typedef T& reference;
+        typedef const T& const_reference;
+        typedef T* pointer;
+        typedef const T* const_pointer;
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+    public:
+        MemoryList() = default;
+
+        MemoryList( void* ptr, zp_size_t capacity );
+
+        explicit MemoryList( Memory memory );
+
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
+
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
+
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t capacity() const;
+
+        [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
+
+        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
+
+        ZP_FORCEINLINE void push_back( const T& value );
+
+        ZP_FORCEINLINE void push_back( T&& value );
+
+        ZP_FORCEINLINE T& push_back_empty();
+
+        ZP_FORCEINLINE T& push_back_uninitialized();
+
+        [[nodiscard]] ZP_FORCEINLINE iterator begin();
+
+        [[nodiscard]] ZP_FORCEINLINE iterator end();
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const;
+
+        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
+
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index ) const;
+
+        [[nodiscard]] ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index, zp_size_t count ) const;
+
+    private:
+        T* m_ptr;
+        zp_size_t m_length;
+        zp_size_t m_capacity;
+    };
+}
+
+namespace zp
+{
+    template<typename T>
     class ReadonlyMemoryArray
     {
     public:
@@ -1020,6 +1078,130 @@ namespace zp
     {
         ZP_ASSERT( ptr && ( index + count ) < count );
         return { .ptr = ptr + index, .length = count };
+    }
+}
+
+namespace zp
+{
+    template<typename T>
+    MemoryList<T>::MemoryList( void* ptr, zp_size_t capacity )
+        : m_ptr( static_cast<T*>( ptr ) )
+        , m_length( 0 )
+        , m_capacity( capacity )
+    {
+    }
+
+    template<typename T>
+    MemoryList<T>::MemoryList( Memory memory )
+        : m_ptr( static_cast<T*>( memory.ptr ) )
+        , m_length( 0 )
+        , m_capacity( memory.size / sizeof( T ) )
+    {
+    }
+
+    template<typename T>
+    zp_bool_t MemoryList<T>::isEmpty() const
+    {
+        return m_ptr == nullptr || m_length == 0;
+    }
+
+    template<typename T>
+    zp_size_t MemoryList<T>::length() const
+    {
+        return m_length;
+    }
+
+    template<typename T>
+    zp_size_t MemoryList<T>::capacity() const
+    {
+        return m_capacity;
+    }
+
+    template<typename T>
+    MemoryList<T>::reference MemoryList<T>::operator[]( zp_size_t index )
+    {
+        ZP_ASSERT( index < m_length );
+        return *( m_ptr + index );
+    }
+
+    template<typename T>
+    MemoryList<T>::const_reference MemoryList<T>::operator[]( zp_size_t index ) const
+    {
+        ZP_ASSERT( index < m_length );
+        return *( m_ptr + index );
+    }
+
+    template<typename T>
+    void MemoryList<T>::push_back( const T& value )
+    {
+        ZP_ASSERT( m_length < m_capacity );
+        *( m_ptr + m_length ) = value;
+        ++m_length;
+    }
+
+    template<typename T>
+    void MemoryList<T>::push_back( T&& value )
+    {
+        ZP_ASSERT( m_length < m_capacity );
+        *( m_ptr + m_length ) = value;
+        ++m_length;
+    }
+
+    template<typename T>
+    T& MemoryList<T>::push_back_empty()
+    {
+        ZP_ASSERT( m_length < m_capacity );
+        T* value = m_ptr + m_length;
+        *value = {};
+        ++m_length;
+        return *value;
+    }
+
+    template<typename T>
+    T& MemoryList<T>::push_back_uninitialized()
+    {
+        ZP_ASSERT( m_length < m_capacity );
+        T* value = m_ptr + m_length;
+        ++m_length;
+        return *value;
+    }
+
+    template<typename T>
+    MemoryList<T>::iterator MemoryList<T>::begin()
+    {
+        return m_ptr;
+    }
+
+    template<typename T>
+    MemoryList<T>::iterator MemoryList<T>::end()
+    {
+        return m_ptr + m_length;
+    }
+
+    template<typename T>
+    MemoryList<T>::const_iterator MemoryList<T>::begin() const
+    {
+        return m_ptr;
+    }
+
+    template<typename T>
+    MemoryList<T>::const_iterator MemoryList<T>::end() const
+    {
+        return m_ptr + m_length;
+    }
+
+    template<typename T>
+    MemoryArray<T> MemoryList<T>::split( zp_size_t index ) const
+    {
+        ZP_ASSERT( index < m_length );
+        return { .ptr = m_ptr + index, .length = m_length - index };
+    }
+
+    template<typename T>
+    MemoryArray<T> MemoryList<T>::split( zp_size_t index, zp_size_t count ) const
+    {
+        ZP_ASSERT( ( count + index ) < m_length );
+        return { .ptr = m_ptr + index, .length = count };
     }
 }
 

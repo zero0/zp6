@@ -135,21 +135,36 @@ namespace zp
         ZP_MESSAGE_BOX_RESULT_TRY_AGAIN,
     };
 
-    enum AddressFamily
+    enum class AddressFamily
     {
-        ZP_ADDRESS_FAMILY_IPv4,
-        ZP_ADDRESS_FAMILY_IPv6,
+        IPv4,
+        IPv6,
+        NetBIOS,
+        Bluetooth,
     };
 
-    enum ConnectionProtocol
+    enum class SocketType
     {
-        ZP_CONNECTION_PROTOCOL_TCP,
-        ZP_CONNECTION_PROTOCOL_UDP,
+        Stream,
+        Datagram,
+        Raw,
+    };
+
+    enum class ConnectionProtocol
+    {
+        TCP,
+        UDP,
+    };
+
+    enum class SocketDirection
+    {
+        Connect,
+        Listen,
     };
 
     struct IPAddress
     {
-        char addr[64];
+        char addr[16];
         zp_uint16_t port;
     };
 
@@ -158,35 +173,52 @@ namespace zp
         const char* name;
         IPAddress address;
         AddressFamily addressFamily;
+        SocketType socketType;
         ConnectionProtocol connectionProtocol;
+        SocketDirection socketDirection;
+
+    };
+
+    struct WindowHandle
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
     };
 
     // Window
     namespace Platform
     {
-        zp_handle_t OpenWindow( const OpenWindowDesc& desc );
+        WindowHandle OpenWindow( const OpenWindowDesc& desc );
 
-        zp_bool_t DispatchWindowMessages( zp_handle_t windowHandle, zp_int32_t& exitCode );
+        zp_bool_t DispatchWindowMessages( WindowHandle windowHandle, zp_int32_t& exitCode );
 
         zp_bool_t DispatchMessages( zp_int32_t& exitCode );
 
-        void ShowWindow( zp_handle_t windowHandle, zp_bool_t show );
+        void ShowWindow( WindowHandle windowHandle, zp_bool_t show );
 
-        void CloseWindow( zp_handle_t windowHandle );
+        void CloseWindow( WindowHandle windowHandle );
 
-        void SetWindowTitle( zp_handle_t windowHandle, const String& title );
+        void SetWindowTitle( WindowHandle windowHandle, const String& title );
 
-        void SetWindowSize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height );
+        void SetWindowSize( WindowHandle windowHandle, zp_int32_t width, zp_int32_t height );
     }
+
+    struct ConsoleHandle
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+    };
 
     // Console
     namespace Platform
     {
-        zp_handle_t OpenConsole();
+        ConsoleHandle OpenConsole();
 
-        zp_bool_t CloseConsole( zp_handle_t );
+        zp_bool_t CloseConsole( ConsoleHandle );
 
-        zp_bool_t SetConsoleTitle( zp_handle_t, const String& title );
+        zp_bool_t SetConsoleTitle( ConsoleHandle, const String& title );
     }
 
     // Memory
@@ -310,6 +342,13 @@ namespace zp
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
     }
 
+    struct Semaphore
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+    };
+
     // Semaphore
     namespace Platform
     {
@@ -321,32 +360,39 @@ namespace zp
             Failed,
         };
 
-        zp_handle_t CreateSemaphore( zp_int32_t initialCount, zp_int32_t maxCount );
+        Semaphore CreateSemaphore( zp_int32_t initialCount, zp_int32_t maxCount, const char* name = nullptr );
 
-        AcquireSemaphoreResult AcquireSemaphore( zp_handle_t semaphore, zp_time_t millisecondTimeout = 0 );
+        AcquireSemaphoreResult AcquireSemaphore( Semaphore semaphore, zp_time_t millisecondTimeout = 0 );
 
-        zp_int32_t ReleaseSemaphore( zp_handle_t semaphore, zp_int32_t releaseCount = 1 );
+        zp_int32_t ReleaseSemaphore( Semaphore semaphore, zp_int32_t releaseCount = 1 );
 
-        zp_bool_t CloseSemaphore( zp_handle_t semaphore );
+        zp_bool_t CloseSemaphore( Semaphore semaphore );
     }
+
+    struct Mutex
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+    };
+
+    enum class AcquireMutexResult
+    {
+        Acquired,
+        Abandoned,
+        Failed,
+    };
 
     // Mutex
     namespace Platform
     {
-        enum class AcquireMutexResult
-        {
-            Acquired,
-            Abandoned,
-            Failed,
-        };
+        Mutex CreateMutex( zp_bool_t initialOwner, const char* name = nullptr );
 
-        zp_handle_t CreateMutex( zp_bool_t initialOwner );
+        AcquireMutexResult AcquireMutex( Mutex mutex, zp_time_t millisecondTimeout = ZP_TIME_INFINITE );
 
-        AcquireMutexResult AcquireMutex( zp_handle_t mutex, zp_time_t millisecondTimeout = ZP_TIME_INFINITE );
+        zp_bool_t ReleaseMutex( Mutex mutex );
 
-        zp_bool_t ReleaseMutex( zp_handle_t mutex );
-
-        zp_bool_t CloseMutex( zp_handle_t mutex );
+        zp_bool_t CloseMutex( Mutex mutex );
     }
 
     // Time
@@ -367,20 +413,31 @@ namespace zp
         void DebugBreak();
     }
 
+    constexpr zp_ptr_t ZP_INVALID_SOCKET = ~0;
+
+    struct Socket
+    {
+        zp_ptr_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != ZP_INVALID_SOCKET; }
+    };
+
     // Networking
     namespace Platform
     {
-        zp_handle_t OpenSocket( const SocketDesc& desc );
+        zp_bool_t InitializeNetworking();
 
-        void ListenSocket( zp_handle_t socket );
+        void ShutdownNetworking();
 
-        zp_handle_t AcceptSocket( zp_handle_t socket );
+        Socket OpenSocket( const SocketDesc& desc );
 
-        zp_size_t ReceiveSocket( zp_handle_t socket, void* dst, zp_size_t dstSize );
+        Socket AcceptSocket( Socket socket );
 
-        zp_size_t SendSocket( zp_handle_t socket, const void* src, zp_size_t srcSize );
+        zp_size_t ReceiveSocket( Socket socket, void* dst, zp_size_t dstSize );
 
-        void CloseSocket( zp_handle_t socket );
+        zp_size_t SendSocket( Socket socket, const void* src, zp_size_t srcSize );
+
+        void CloseSocket( Socket socket );
     };
 }
 

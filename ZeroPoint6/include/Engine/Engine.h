@@ -117,8 +117,8 @@ namespace zp
 
         void onStateExited( EngineState engineState );
 
-        zp_handle_t m_windowHandle;
-        zp_handle_t m_consoleHandle;
+        WindowHandle m_windowHandle;
+        ConsoleHandle m_consoleHandle;
 
         zp_handle_t m_moduleDll;
         ModuleEntryPointAPI* m_moduleAPI;

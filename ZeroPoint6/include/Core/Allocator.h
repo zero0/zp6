@@ -79,6 +79,7 @@ namespace zp
         typedef const Storage& storage_const_reference;
 
         typedef Policy policy_value;
+        typedef Policy& policy_reference;
         typedef const Policy& policy_const_reference;
 
         typedef Locking lock_value;
@@ -94,6 +95,11 @@ namespace zp
         void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment ) final;
 
         void free( void* ptr ) final;
+
+        policy_reference policy()
+        {
+            return m_policy;
+        }
 
     private:
         storage_value m_storage;
@@ -359,6 +365,31 @@ namespace zp
 }
 #pragma endregion
 
+namespace zp
+{
+    struct LinearAllocatorPolicy
+    {
+        void add_memory( void* mem, zp_size_t size );
+
+        [[nodiscard]] zp_size_t allocated() const;
+
+        [[nodiscard]] zp_size_t total() const;
+
+        void* allocate( zp_size_t size, zp_size_t alignment );
+
+        void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment );
+
+        void free( void* ptr );
+
+        void reset();
+
+    protected:
+        void* m_ptr;
+        zp_size_t m_allocated {};
+        zp_size_t m_size {};
+    };
+}
+
 #pragma region TLSF Memory Allocator
 namespace zp
 {
@@ -391,10 +422,10 @@ namespace zp
     class FixedMemoryStorage
     {
     public:
-        void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize )
         {
             requestedSize = Size;
-            return m_memory;
+            return static_cast<void*>( m_memory );
         }
 
         [[nodiscard]] zp_bool_t is_fixed() const
@@ -403,7 +434,36 @@ namespace zp
         }
 
     private:
-        zp_uint8_t m_memory[ Size ];
+        zp_uint8_t m_memory[Size];
+    };
+}
+
+namespace zp
+{
+    class FixedAllocatedMemoryStorage
+    {
+    public:
+        FixedAllocatedMemoryStorage( void* memory, zp_size_t size )
+            : m_memory( memory )
+            , m_size( size )
+        {
+        }
+
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize )
+        {
+            ZP_ASSERT( size <= m_size );
+            requestedSize = m_size;
+            return static_cast<void*>( m_memory );
+        }
+
+        [[nodiscard]] zp_bool_t is_fixed() const
+        {
+            return true;
+        }
+
+    private:
+        void* m_memory;
+        zp_size_t m_size;
     };
 }
 

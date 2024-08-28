@@ -52,7 +52,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
     using namespace zp;
 
-    const zp_time_t startTime = zp_time_now();
+    const zp_time_t startTime = Platform::TimeNow();
 
     MemoryConfig memoryConfig {
         .defaultAllocatorPageSize = 16 MB,
@@ -260,8 +260,8 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
         cmdLine.printHelp();
     }
 
-    const zp_time_t endTime = zp_time_now();
-    zp_printfln( "%s Duration: %fs", exitCode == 0 ? "Success" : "Error", zp_float32_t( endTime - startTime ) / zp_float32_t( zp_time_frequency() ) );
+    const zp_time_t endTime = Platform::TimeNow();
+    zp_printfln( "%s Duration: %fs", exitCode == 0 ? "Success" : "Error", zp_float32_t( endTime - startTime ) / zp_float32_t( Platform::TimeFrequency() ) );
 
     return exitCode;
 }

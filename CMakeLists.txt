@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(zp)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -12,14 +12,14 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if (GCC OR CLANG)
-    set(CMAKE_CXX_FLAGS "-fms-extensions")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fms-extensions")
 endif()
 
 if (USE_MODULES)
 if (GCC OR CLANG)
-    set(CMAKE_CXX_FLAGS "-fmodules-ts")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmodules-ts")
 elseif(MSVC)
-    set(CMAKE_CXX_FLAGS "/experimental:module")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /experimental:module")
 endif()
 
 function(add_module name)

@@ -9,6 +9,45 @@
 #include "Core/Types.h"
 
 template<typename T>
+struct zp_limit
+{
+    static constexpr zp_size_t size() noexcept;
+
+    static constexpr T min() noexcept;
+
+    static constexpr T max() noexcept;
+};
+
+#define LIMIT_DEF( t, mi, ma )                                  \
+template<>                                                      \
+struct zp_limit<t>                                              \
+{                                                               \
+    static constexpr zp_size_t size() { return sizeof(t); }     \
+    static constexpr t min() { return mi; }                     \
+    static constexpr t max() { return ma; }                     \
+}
+
+// @formatter:off
+//        type          min                 max
+LIMIT_DEF(zp_bool_t,    false,              true );
+
+LIMIT_DEF(zp_char8_t,   0,                  0xFFu );
+
+LIMIT_DEF(zp_uint8_t,   0,                  0xFFu );
+LIMIT_DEF(zp_uint16_t,  0,                  0xFFFFu );
+LIMIT_DEF(zp_uint32_t,  0,                  0xFFFFFFFFu );
+LIMIT_DEF(zp_uint64_t,  0,                  0xFFFFFFFFFFFFFFFFull );
+
+LIMIT_DEF(zp_int8_t,    0x80,               0x7F );
+LIMIT_DEF(zp_int16_t,   0x8000,             0x7FFF );
+LIMIT_DEF(zp_int32_t,   0x80000000,         0x7FFFFFFF );
+LIMIT_DEF(zp_int64_t,   0x8000000000000000, 0x7FFFFFFFFFFFFFFFll );
+// @formatter:on
+
+#undef LIMIT_DEF
+
+
+template<typename T>
 constexpr T zp_min( const T& a, const T& b )
 {
     return a < b ? a : b;

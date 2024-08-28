@@ -177,6 +177,50 @@ namespace zp
 
 namespace zp
 {
+    void LinearAllocatorPolicy::add_memory( void* mem, zp_size_t size )
+    {
+        m_ptr = mem;
+        m_allocated = 0;
+        m_size = size;
+    }
+
+    zp_size_t LinearAllocatorPolicy::allocated() const
+    {
+        return m_allocated;
+    }
+
+    zp_size_t LinearAllocatorPolicy::total() const
+    {
+        return m_size;
+    }
+
+    void* LinearAllocatorPolicy::allocate( zp_size_t size, zp_size_t alignment )
+    {
+        zp_uint8_t* mem = static_cast<zp_uint8_t*>( m_ptr ) + m_allocated;
+        m_allocated += size;
+        return mem;
+    }
+
+    void* LinearAllocatorPolicy::reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
+    {
+        zp_uint8_t* mem = static_cast<zp_uint8_t*>( m_ptr ) + m_allocated;
+        m_allocated += size;
+        return mem;
+    }
+
+    void LinearAllocatorPolicy::free( void* ptr )
+    {
+        // no-op
+    }
+
+    void LinearAllocatorPolicy::reset()
+    {
+        m_allocated = 0;
+    }
+}
+
+namespace zp
+{
     void TlsfAllocatorPolicy::add_memory( void* mem, zp_size_t size )
     {
         if( m_tlsf )

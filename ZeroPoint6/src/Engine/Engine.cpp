@@ -177,13 +177,13 @@ namespace zp
 
             m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, {
                 .appName = String::As( "AppName" ),
-                .windowHandle = m_windowHandle,
+                .windowHandle = m_windowHandle.handle,
                 .stagingBufferSize = 32 MB,
                 .threadCount = numJobThreads,
                 .bufferedFrameCount = 4,
             } );
 
-            m_graphicsDevice->createSwapchain( m_windowHandle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
+            m_graphicsDevice->createSwapchain( m_windowHandle.handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
 
         // show window when graphics device is created
@@ -234,7 +234,7 @@ namespace zp
         }
 
 
-        m_renderSystem->initialize( m_windowHandle, {
+        m_renderSystem->initialize( m_windowHandle.handle, {
             .appName = ZP_STR_T( "AppName" ),
             .stagingBufferSize = 32 MB,
             .threadCount = numJobThreads,
@@ -412,13 +412,13 @@ namespace zp
         if( m_windowHandle )
         {
             Platform::CloseWindow( m_windowHandle );
-            m_windowHandle = nullptr;
+            m_windowHandle = {};
         }
 
         if( m_consoleHandle )
         {
             Platform::CloseConsole( m_consoleHandle );
-            m_consoleHandle = nullptr;
+            m_consoleHandle = {};
         }
 
         DestroyGraphicsDevice( m_graphicsDevice );

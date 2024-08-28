@@ -1177,6 +1177,11 @@ namespace zp
             return reinterpret_cast<const char*>( m_str );
         }
 
+        [[nodiscard]] char* mutable_str()
+        {
+            return reinterpret_cast<char*>( m_str );
+        }
+
         [[nodiscard]] const zp_char8_t* str() const
         {
             return m_str;
@@ -1187,7 +1192,6 @@ namespace zp
             m_length = 0;
             m_str[ 0 ] = '\0';
         }
-
 
         void append( char ch )
         {

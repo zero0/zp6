@@ -30,28 +30,4 @@ namespace zp
     };
 }
 
-//
-//
-//
-
-namespace zp
-{
-    class MutexAutoScope
-    {
-    ZP_NONCOPYABLE( MutexAutoScope );
-
-    public:
-        MutexAutoScope() = delete;
-
-        ZP_FORCEINLINE explicit MutexAutoScope( zp_handle_t mutex, zp_time_t millisecondTimeout = ZP_TIME_INFINITE );
-
-        ZP_FORCEINLINE ~MutexAutoScope();
-
-        [[nodiscard]] ZP_FORCEINLINE zp_bool_t acquired() const;
-
-    private:
-        zp_handle_t m_mutex;
-    };
-}
-
 #endif //ZP_THREADING_H
