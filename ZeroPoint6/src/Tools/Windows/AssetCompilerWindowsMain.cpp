@@ -3,11 +3,15 @@
 #include "Core/Allocator.h"
 #include "Core/Queue.h"
 #include "Core/CommandLine.h"
+#include "Core/String.h"
 
 #include "Platform/Platform.h"
 
 #include "Tools/AssetCompiler.h"
 #include "Tools/ShaderCompiler.h"
+
+#include "EntryPoint/EntryPoint.h"
+
 
 #define WIN32_LEAN_AND_MEAN
 
@@ -46,8 +50,58 @@ void TestExec( zp::Job* job, zp::Memory memory )
     zp_printfln( "Exec Thead ID - %d", zp::Platform::GetCurrentThreadId() );
 }
 
+namespace zp
+{
+
+    class AssetCompilerEngine
+    {
+    public:
+        explicit AssetCompilerEngine( MemoryLabel memoryLabel )
+            : m_exitCode( 0 )
+            , memoryLabel( memoryLabel )
+        {
+
+        }
+
+        void processCommandLine( const String& cmdLine )
+        {
+        }
+
+        void process()
+        {
+        }
+
+        [[nodiscard]] zp_bool_t isRunning() const
+        {
+            return false;
+        }
+
+        [[nodiscard]] zp_int32_t getExitCode() const
+        {
+            return m_exitCode;
+        }
+
+    private:
+        zp_int32_t m_exitCode;
+
+    public:
+        MemoryLabel memoryLabel;
+    };
+}
+
 int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow )
 {
+    using namespace zp;
+
+    EntryPointDesc desc;
+    int ret = EntryPointMain<AssetCompilerEngine>( String::As( lpCmdLine ), desc );
+    return ret;
+
+#if 0
+    using namespace zp;
+    const zp_int32_t exitCode = EntryPointMain<int>();
+    return exitCode;
+
     int exitCode = 0;
 
     using namespace zp;
@@ -264,4 +318,5 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     zp_printfln( "%s Duration: %fs", exitCode == 0 ? "Success" : "Error", zp_float32_t( endTime - startTime ) / zp_float32_t( Platform::TimeFrequency() ) );
 
     return exitCode;
+#endif
 }

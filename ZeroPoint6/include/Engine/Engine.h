@@ -10,6 +10,8 @@
 #include "Core/Allocator.h"
 #include "Core/Job.h"
 
+#include "Platform/Platform.h"
+
 #if ZP_USE_PROFILER
 
 #include "Core/Profiler.h"

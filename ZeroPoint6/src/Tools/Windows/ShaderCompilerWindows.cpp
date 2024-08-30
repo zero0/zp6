@@ -742,7 +742,7 @@ namespace
         zp_int32_t result;
         zp_hash128_t resultShaderHash;
         zp_hash64_t resultShaderFeatureHash;
-        MutableFixedString512 resultShaderFilePath;
+        FilePath resultShaderFilePath;
     };
 
     struct DxcCompilerThreadData
@@ -760,7 +760,7 @@ namespace
         AssetCompilerTask* task = compilerJobData->task;
 
         HRESULT hr;
-        const zp_uint32_t currentThreadId = zp_current_thread_id();
+        const zp_uint32_t currentThreadId = Platform::GetCurrentThreadId();
 
         zp_bool_t debugDisplay = true;
 
@@ -1542,40 +1542,38 @@ namespace
 
             zp_bool_t r;
 
-            MutableFixedString512 dstFilePath;
-            dstFilePath.append( currentDirPath );
-            dstFilePath.append( Platform::PathSep );
-            dstFilePath.append( "Library" );
-            dstFilePath.append( Platform::PathSep );
+            FilePath dstFilePath;
+            dstFilePath / currentDirPath / "Library";
 
             r = Platform::CreateDirectory( dstFilePath.c_str() );
             ZP_ASSERT_MSG_ARGS( r, "dir: %s", dstFilePath.c_str() );
 
-            dstFilePath.append( "ShaderCache" );
-            dstFilePath.append( Platform::PathSep );
+            dstFilePath / "ShaderCache";
 
             r = Platform::CreateDirectory( dstFilePath.c_str() );
             ZP_ASSERT_MSG_ARGS( r, "dir: %s", dstFilePath.c_str() );
 
             const char* srcFileName = zp_strrchr( task->srcFile.c_str(), Platform::PathSep ) + 1;
 
-            dstFilePath.append( srcFileName );
-            dstFilePath.append( Platform::PathSep );
+            dstFilePath / srcFileName;
 
             r = Platform::CreateDirectory( dstFilePath.c_str() );
             ZP_ASSERT_MSG_ARGS( r, "dir: %s", dstFilePath.c_str() );
 
-            dstFilePath.append( hashStr );
-            dstFilePath.append( '.' );
-            dstFilePath.append( featureHashStr );
-            dstFilePath.append( '.' );
-            dstFilePath.append( kShaderTypes[ compilerJobData->shaderProgram ] );
+            MutableFixedString128 dstFileName;
+            dstFileName.append( hashStr );
+            dstFileName.append( '.' );
+            dstFileName.append( featureHashStr );
+            dstFileName.append( '.' );
+            dstFileName.append( kShaderTypes[ compilerJobData->shaderProgram ] );
+
+            dstFilePath / dstFileName;
 
             // store out resulting path
             compilerJobData->resultShaderFilePath = dstFilePath;
             compilerJobData->resultShaderFeatureHash = compilerJobData->shaderFeature.shaderFeatureHash;
 
-            zp_handle_t dstFileHandle = Platform::OpenFileHandle( dstFilePath.c_str(), ZP_OPEN_FILE_MODE_WRITE );
+            FileHandle dstFileHandle = Platform::OpenFileHandle( dstFilePath.c_str(), ZP_OPEN_FILE_MODE_WRITE );
             Platform::WriteFile( dstFileHandle, shaderStreamMemory.ptr, shaderStreamMemory.size );
             Platform::CloseFileHandle( dstFileHandle );
         }
@@ -1756,7 +1754,7 @@ namespace zp::ShaderCompiler
 
             const Memory shaderDataMemory = shaderDataStream.memory();
 
-            zp_handle_t dstFileHandle = Platform::OpenFileHandle( task->dstFile.c_str(), ZP_OPEN_FILE_MODE_WRITE );
+            FileHandle dstFileHandle = Platform::OpenFileHandle( task->dstFile.c_str(), ZP_OPEN_FILE_MODE_WRITE );
             Platform::WriteFile( dstFileHandle, shaderDataMemory.ptr, shaderDataMemory.size );
             Platform::CloseFileHandle( dstFileHandle );
         }
@@ -2283,7 +2281,7 @@ namespace zp::ShaderCompiler
                 ZP_INVALID_CODE_PATH_MSG( "Unsupported shader file type used" );
             }
 
-            zp_handle_t inFileHandle = Platform::OpenFileHandle( inFile.c_str(), ZP_OPEN_FILE_MODE_READ );
+            FileHandle inFileHandle = Platform::OpenFileHandle( inFile.c_str(), ZP_OPEN_FILE_MODE_READ );
             const zp_size_t inFileSize = Platform::GetFileSize( inFileHandle );
             void* inFileData = ZP_MALLOC( memoryLabel, inFileSize );
 

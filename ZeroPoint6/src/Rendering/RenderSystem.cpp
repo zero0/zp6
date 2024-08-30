@@ -268,7 +268,7 @@ namespace zp
                     Platform::GetCurrentDir( buff );
                     zp_printfln( buff );
 
-                    zp_handle_t fileHandle = Platform::OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.vert.spv", ZP_OPEN_FILE_MODE_READ );
+                    FileHandle fileHandle = Platform::OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.vert.spv", ZP_OPEN_FILE_MODE_READ );
                     zp_size_t fileSize = Platform::GetFileSize( fileHandle );
 
                     void* memPtr = GetAllocator( MemoryLabels::FileIO )->allocate( fileSize, kDefaultMemoryAlignment );
@@ -289,7 +289,7 @@ namespace zp
                 }
 
                 {
-                    zp_handle_t fileHandle = Platform::OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.frag.spv", ZP_OPEN_FILE_MODE_READ );
+                    FileHandle fileHandle = Platform::OpenFileHandle( "../../ZeroPoint6/bin/Shaders/DebugColor.frag.spv", ZP_OPEN_FILE_MODE_READ );
                     zp_size_t fileSize = Platform::GetFileSize( fileHandle );
 
                     void* memPtr = GetAllocator( MemoryLabels::FileIO )->allocate( fileSize, kDefaultMemoryAlignment );

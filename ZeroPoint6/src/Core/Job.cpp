@@ -212,7 +212,7 @@ namespace
 
     MemoryArray<JobThreadInfo*> g_allJobThreadInfos;
 
-    MemoryArray<zp_handle_t> g_allJobThreadHandles;
+    MemoryArray<ThreadHandle> g_allJobThreadHandles;
 
     zp_size_t g_stealJobQueueIndex;
 
@@ -523,7 +523,7 @@ void JobSystem::Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount )
     zp_zero_memory_array( g_allJobThreadInfos.ptr, g_allJobThreadInfos.length );
 
     g_allJobThreadHandles = {
-        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, zp_handle_t, threadCount ),
+        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, ThreadHandle, threadCount ),
         .length = threadCount
     };
     zp_zero_memory_array( g_allJobThreadHandles.ptr, g_allJobThreadHandles.length );
@@ -548,7 +548,7 @@ void JobSystem::InitializeJobThreads()
     for( zp_uint32_t i = 0; i < g_allJobThreadHandles.length; ++i )
     {
         zp_uint32_t threadID;
-        zp_handle_t threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &threadID );
+        ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &threadID );
 
         Platform::SetThreadIdealProcessor( threadHandle, 1 + ( i % numAvailableProcessors ) ); // proc 0 is used for main thread
 

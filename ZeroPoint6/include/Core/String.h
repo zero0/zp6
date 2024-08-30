@@ -956,11 +956,6 @@ namespace zp
             m_str = str;
             m_length = length;
         }
-//
-        //explicit operator MutableString()
-        //{
-        //    return { .str = m_str, .length = length, .capacity = m_capacity };
-        //}
 
     private:
         zp_char8_t* m_str;
@@ -1252,7 +1247,7 @@ namespace zp
 //
         //explicit operator MutableString()
         //{
-        //    return { .str = m_str, .length = length, .capacity = Size };
+        //    return { .str = m_path, .length = length, .capacity = Size };
         //}
 
     private:
@@ -1297,7 +1292,7 @@ namespace zp
     class Tokenizer
     {
     public:
-        Tokenizer( const String& str, const char* delim)
+        Tokenizer( const String& str, const char* delim )
             : m_str( str )
             , m_delim( String::As( delim ) )
             , m_next( 0 )

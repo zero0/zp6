@@ -80,7 +80,7 @@ namespace zp
 
             static void Execute( const JobHandle& parentJobHandle, const LoadFileJob* ptr )
             {
-                zp_handle_t fileHandle = Platform::OpenFileHandle( ptr->filePath, ZP_OPEN_FILE_MODE_READ );
+                FileHandle fileHandle = Platform::OpenFileHandle( ptr->filePath, ZP_OPEN_FILE_MODE_READ );
 
                 const zp_size_t fileSize = Platform::GetFileSize( fileHandle );
 

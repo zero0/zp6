@@ -183,7 +183,10 @@ namespace zp
     {
         zp_handle_t handle;
 
-        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
     };
 
     // Window
@@ -204,11 +207,30 @@ namespace zp
         void SetWindowSize( WindowHandle windowHandle, zp_int32_t width, zp_int32_t height );
     }
 
+    struct OpenSystemTrayDesc
+    {
+    };
+
+    struct SystemTrayHandle
+    {
+        zp_handle_t handle;
+    };
+
+    namespace Platform
+    {
+        SystemTrayHandle OpenSystemTray( const OpenSystemTrayDesc& desc );
+
+        void CloseSystemTray( SystemTrayHandle systemTrayHandle );
+    }
+
     struct ConsoleHandle
     {
         zp_handle_t handle;
 
-        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
     };
 
     // Console
@@ -234,6 +256,16 @@ namespace zp
 
         void DecommitMemoryPage( void* ptr, zp_size_t size );
     }
+
+    struct FileHandle
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
+    };
 
     // File & Path
     namespace Platform
@@ -271,19 +303,19 @@ namespace zp
 
         zp_bool_t FileMove( const char* srcFilePath, const char* dstFilePath );
 
-        zp_handle_t OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode = ZP_CREATE_FILE_MODE_OPEN, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
+        FileHandle OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode = ZP_CREATE_FILE_MODE_OPEN, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
 
-        zp_handle_t OpenTempFileHandle( const char* tempFileNamePrefix = nullptr, const char* tempFileNameExtension = nullptr, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
+        FileHandle OpenTempFileHandle( const char* tempFileNamePrefix = nullptr, const char* tempFileNameExtension = nullptr, FileCachingMode fileCachingMode = ZP_FILE_CACHING_MODE_DEFAULT );
 
-        void SeekFile( zp_handle_t fileHandle, zp_ptrdiff_t distanceToMoveInBytes, MoveMethod moveMethod );
+        void SeekFile( FileHandle fileHandle, zp_ptrdiff_t distanceToMoveInBytes, MoveMethod moveMethod );
 
-        zp_size_t GetFileSize( zp_handle_t fileHandle );
+        zp_size_t GetFileSize( FileHandle fileHandle );
 
-        void CloseFileHandle( zp_handle_t fileHandle );
+        void CloseFileHandle( FileHandle fileHandle );
 
-        zp_size_t ReadFile( zp_handle_t fileHandle, void* buffer, zp_size_t bytesToRead );
+        zp_size_t ReadFile( FileHandle fileHandle, void* buffer, zp_size_t bytesToRead );
 
-        zp_size_t WriteFile( zp_handle_t fileHandle, const void* data, zp_size_t size );
+        zp_size_t WriteFile( FileHandle fileHandle, const void* data, zp_size_t size );
 
         extern zp_char8_t PathSep;
     }
@@ -304,6 +336,16 @@ namespace zp
         }
     }
 
+    struct ThreadHandle
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
+    };
+
     // Threading
     namespace Platform
     {
@@ -311,9 +353,9 @@ namespace zp
 
         void FreeThreadPool( zp_handle_t threadPool );
 
-        zp_handle_t CreateThread( ThreadFunc threadFunc, void* param, zp_size_t stackSize, zp_uint32_t* threadId );
+        ThreadHandle CreateThread( ThreadFunc threadFunc, void* param, zp_size_t stackSize, zp_uint32_t* threadId );
 
-        [[nodiscard]] zp_handle_t GetCurrentThread();
+        [[nodiscard]] ThreadHandle GetCurrentThread();
 
         [[nodiscard]] zp_uint32_t GetCurrentThreadId();
 
@@ -321,21 +363,21 @@ namespace zp
 
         void SleepCurrentThread( zp_uint64_t milliseconds );
 
-        zp_uint32_t GetThreadId( zp_handle_t threadHandle );
+        zp_uint32_t GetThreadId( ThreadHandle threadHandle );
 
-        void SetThreadName( zp_handle_t threadHandle, const String& threadName );
+        void SetThreadName( ThreadHandle threadHandle, const String& threadName );
 
-        void SetThreadPriority( zp_handle_t threadHandle, zp_int32_t priority );
+        void SetThreadPriority( ThreadHandle threadHandle, zp_int32_t priority );
 
-        zp_int32_t GetThreadPriority( zp_handle_t threadHandle );
+        zp_int32_t GetThreadPriority( ThreadHandle threadHandle );
 
-        void SetThreadAffinity( zp_handle_t threadHandle, zp_uint64_t affinityMask );
+        void SetThreadAffinity( ThreadHandle threadHandle, zp_uint64_t affinityMask );
 
-        void SetThreadIdealProcessor( zp_handle_t threadHandle, zp_uint32_t processorIndex );
+        void SetThreadIdealProcessor( ThreadHandle threadHandle, zp_uint32_t processorIndex );
 
-        void CloseThread( zp_handle_t threadHandle );
+        void CloseThread( ThreadHandle threadHandle );
 
-        void JoinThreads( zp_handle_t* threadHandles, zp_size_t threadHandleCount );
+        void JoinThreads( ThreadHandle* threadHandles, zp_size_t threadHandleCount );
 
         [[nodiscard]] zp_uint32_t GetProcessorCount();
 
@@ -346,7 +388,10 @@ namespace zp
     {
         zp_handle_t handle;
 
-        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
     };
 
     // Semaphore
@@ -373,7 +418,10 @@ namespace zp
     {
         zp_handle_t handle;
 
-        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != nullptr; }
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
     };
 
     enum class AcquireMutexResult
@@ -419,7 +467,10 @@ namespace zp
     {
         zp_ptr_t handle;
 
-        ZP_FORCEINLINE explicit operator zp_bool_t() const { return handle != ZP_INVALID_SOCKET; }
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != ZP_INVALID_SOCKET;
+        }
     };
 
     // Networking
@@ -439,6 +490,69 @@ namespace zp
 
         void CloseSocket( Socket socket );
     };
+
+#pragma region Path
+
+    class FilePath
+    {
+    public:
+        enum
+        {
+            kMaxFilePath = 512
+        };
+
+        FilePath() = default;
+
+        ~FilePath() = default;
+
+        [[nodiscard]] zp_bool_t exists() const
+        {
+            const zp_bool_t found = isFile() || isDirectory();
+            return found;
+        }
+
+        [[nodiscard]] zp_bool_t isFile() const
+        {
+            return Platform::FileExists( m_path.c_str() );
+        }
+
+        [[nodiscard]] zp_bool_t isDirectory() const
+        {
+            return Platform::DirectoryExists( m_path.c_str() );
+        }
+
+        FilePath& operator/( const char* other )
+        {
+            m_path.append( Platform::PathSep );
+            m_path.append( other );
+            return *this;
+        }
+
+        FilePath& operator/( const String& other )
+        {
+            m_path.append( Platform::PathSep );
+            m_path.append( other );
+            return *this;
+        }
+
+        FilePath& operator/( const FilePath& other )
+        {
+            m_path.append( Platform::PathSep );
+            m_path.append( other.m_path );
+            return *this;
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE const char* c_str() const
+        {
+            return m_path.c_str();
+        }
+
+    private:
+        MutableFixedString<kMaxFilePath> m_path;
+    };
+
+#pragma endregion
+
 }
 
 #endif //ZP_PLATFORM_H

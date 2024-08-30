@@ -13,10 +13,20 @@
 #include "Platform/Platform.h"
 
 #include "Engine/MemoryLabels.h"
-#include "Engine/Engine.h"
 
 namespace zp
 {
+    ZP_PURE_INTERFACE IEngine
+    {
+    public:
+        virtual void ProcessCommandLine( const String& cmdLine ) = 0;
+
+        virtual void Process() = 0;
+
+        [[nodiscard]] virtual zp_bool_t IsRunning() const = 0;
+
+        [[nodiscard]] virtual zp_int32_t GetExitCode() const = 0;
+    };
 
     struct MemoryConfig
     {
@@ -37,6 +47,7 @@ namespace zp
     };
     // @formatter:on
 
+    template<typename T>
     ZP_FORCEINLINE zp_int32_t EntryPointMain( const String& commandLine, const EntryPointDesc& desc )
     {
 #if ZP_DEBUG
@@ -117,7 +128,7 @@ namespace zp
         RegisterAllocator( MemoryLabels::Debug, &s_debugAllocator );
 
         // run engine
-        auto engine = ZP_NEW( MemoryLabels::Default, Engine );
+        T* engine = ZP_NEW( MemoryLabels::Default, T );
 
         engine->processCommandLine( commandLine );
 
@@ -128,7 +139,7 @@ namespace zp
 
         const zp_int32_t exitCode = engine->getExitCode();
 
-        ZP_SAFE_DELETE( Engine, engine );
+        ZP_SAFE_DELETE( T, engine );
 
         return exitCode;
     }

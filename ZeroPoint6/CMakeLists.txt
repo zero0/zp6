@@ -26,7 +26,6 @@ set(ZP_CORE_SRC
 
 set(ZP_PLATFORM_SRC
         "src/Platform/${PLATFORM_FULL_NAME}/Platform${PLATFORM_FULL_NAME}.cpp"
-        "src/Platform/${PLATFORM_FULL_NAME}/Main${PLATFORM_FULL_NAME}.cpp"
         )
 
 set(ZP_RENDERING_SRC
@@ -53,6 +52,7 @@ set(ZP_ENGINE_SRC
         "src/Engine/EntityQuery.cpp"
         "src/Engine/ExecutionGraph.cpp"
         "src/Engine/Subsystem.cpp"
+        "src/Engine/${PLATFORM_FULL_NAME}/Main${PLATFORM_FULL_NAME}.cpp"
         )
 
 set(ZP_SRC
@@ -103,12 +103,15 @@ set(ZP_ENGINE_HEADERS
         "include/Engine/Entity.h"
         "include/Engine/EntityComponentManager.h"
         "include/Engine/EntityQuery.h"
-        "include/Engine/EntryPoint.h"
         "include/Engine/ExecutionGraph.h"
         "include/Engine/MemoryLabels.h"
         "include/Engine/ModuleEntryPointAPI.h"
         "include/Engine/Subsystem.h"
         "include/Engine/TransformComponent.h"
+        )
+
+set(ZP_ENTRY_POINT_HEADERS
+        "include/EntryPoint/EntryPoint.h"
         )
 
 set(ZP_PLATFORM_HEADERS
@@ -141,6 +144,7 @@ set(ZP_RENDERING_API_HEADERS
 set(ZP_HEADERS
         ${ZP_CORE_HEADERS}
         ${ZP_ENGINE_HEADERS}
+        ${ZP_ENTRY_POINT}
         ${ZP_PLATFORM_HEADERS}
         ${ZP_RENDERING_HEADERS}
         ${ZP_RENDERING_API_HEADERS}
@@ -251,53 +255,56 @@ set(ZP_TOOLS_SRC
         "src/Tools/AssetCompiler.cpp"
         "src/Tools/${PLATFORM_FULL_NAME}/AssetCompiler${PLATFORM_FULL_NAME}Main.cpp"
         "src/Tools/${PLATFORM_FULL_NAME}/ShaderCompiler${PLATFORM_FULL_NAME}.cpp"
-        )
+)
 
 set(ZP_TOOLS_HEADERS
         "include/Tools/AssetCompiler.h"
-        )
+)
 
 add_executable(${ZP_TOOLS_TARGET})
 target_sources(${ZP_TOOLS_TARGET}
         PRIVATE ${ZP_CORE_HEADERS}
         PRIVATE ${ZP_CORE_SRC}
+        PRIVATE ${ZP_ENTRY_POINT}
         PRIVATE ${ZP_PLATFORM_HEADERS}
         PRIVATE ${ZP_PLATFORM_SRC}
         PRIVATE ${ZP_EXTERNAL_HEADERS}
         PRIVATE ${ZP_EXTERNAL_SRC}
         PRIVATE ${ZP_TOOLS_HEADERS}
         PRIVATE ${ZP_TOOLS_SRC}
-        )
+)
 target_include_directories(${ZP_TOOLS_TARGET}
         PRIVATE include
         PRIVATE external
-        )
+)
 
 set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
         VERSION ${ZP_VERSION}
-        )
+)
 
 target_include_directories(${ZP_TOOLS_TARGET}
         PRIVATE ${Vulkan_INCLUDE_DIRS}
-        )
+)
 target_link_options(${ZP_TOOLS_TARGET}
         PRIVATE -static-libgcc -static-libstdc++ -static
-        )
+)
 target_link_libraries(${ZP_TOOLS_TARGET}
         PRIVATE ${Vulkan_LIBRARIES}
         PRIVATE ${Vulkan_dxc_LIBRARY}
         PRIVATE "rpcrt4.lib"
-        )
+        PRIVATE "dwmapi.dll"
+        PRIVATE "Ws2_32.lib"
+)
 
 if (MSVC)
-    set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
-            LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-            VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            )
-    set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
-            LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-            VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            )
+        set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
+                LINK_FLAGS "/SUBSYSTEM:WINDOWS"
+                VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+        )
+        set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
+                LINK_FLAGS "/SUBSYSTEM:WINDOWS"
+                VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+        )
 elseif (GCC OR CLANG)
 else ()
 endif ()
@@ -305,8 +312,8 @@ endif ()
 install(TARGETS ${ZP_TOOLS_TARGET}
         CONFIGURATIONS Debug
         RUNTIME DESTINATION ${ROOT_DIR}/Debug/bin
-        )
+)
 install(TARGETS ${ZP_TOOLS_TARGET}
         CONFIGURATIONS Release
         RUNTIME DESTINATION ${ROOT_DIR}/Release/bin
-        )
+)

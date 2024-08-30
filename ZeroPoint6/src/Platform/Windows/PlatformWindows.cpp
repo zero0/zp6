@@ -12,6 +12,7 @@
 #include <excpt.h>
 #include <winsock2.h>
 #include <dwmapi.h>
+#include <shellapi.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "user32.lib")
@@ -84,6 +85,7 @@ void CriticalSection::leave()
 namespace
 {
     const char* kZeroPointClassName = "ZeroPoint::WindowClass";
+    const char* kZeroPointSystemTrayClassName = "ZeroPoint::SystemTrayClass";
 
     enum
     {
@@ -404,6 +406,7 @@ namespace
 namespace zp
 {
     zp_char8_t Platform::PathSep = '\\';
+
     namespace
     {
         ATOM g_windowClassReg = 0;
@@ -422,12 +425,12 @@ namespace zp
                 .cbClsExtra = 0,
                 .cbWndExtra = 0,
                 .hInstance = hInstance,
-                .hIcon = LoadIcon( hInstance, MAKEINTRESOURCE( 101 ) ),
-                .hCursor = LoadCursor( nullptr, IDC_ARROW ),
-                .hbrBackground = static_cast<HBRUSH>(GetStockObject( DKGRAY_BRUSH )),
+                .hIcon = ::LoadIcon( hInstance, MAKEINTRESOURCE( 101 ) ),
+                .hCursor = ::LoadCursor( hInstance, IDC_ARROW ),
+                .hbrBackground = static_cast<HBRUSH>( ::GetStockObject( DKGRAY_BRUSH ) ),
                 .lpszMenuName = nullptr,
                 .lpszClassName = kZeroPointClassName,
-                .hIconSm = static_cast<HICON>( LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, 16, 16, 0 ) ),
+                .hIconSm = static_cast<HICON>( ::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR ) ),
             };
 
             g_windowClassReg = ::RegisterClassEx( &wc );
@@ -566,6 +569,109 @@ namespace zp
         }
     }
 
+    LRESULT CALLBACK SystemTrayProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
+    {
+        switch( uMessage )
+        {
+            case WM_CLOSE:
+                break;
+
+            case WM_DESTROY:
+                break;
+
+            case 0xBEEF:
+                break;
+
+            default:
+                return DefWindowProc( hWnd, uMessage, wParam, lParam );
+        }
+
+        return 0;
+    }
+
+    namespace
+    {
+        ATOM g_systemTrayClassReg = 0;
+    }
+
+    SystemTrayHandle Platform::OpenSystemTray( const OpenSystemTrayDesc& desc )
+    {
+        HINSTANCE hInstance = {};
+
+        if( g_systemTrayClassReg == 0 )
+        {
+            const WNDCLASSEX wc {
+                .cbSize = sizeof( WNDCLASSEX ),
+                .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
+                .lpfnWndProc = SystemTrayProc,
+                .cbClsExtra = 0,
+                .cbWndExtra = 0,
+                .hInstance = hInstance,
+                .hIcon = ::LoadIcon( hInstance, MAKEINTRESOURCE( 101 ) ),
+                .hCursor = ::LoadCursor( hInstance, IDC_ARROW ),
+                .hbrBackground = static_cast<HBRUSH>( ::GetStockObject( DKGRAY_BRUSH ) ),
+                .lpszMenuName = nullptr,
+                .lpszClassName = kZeroPointSystemTrayClassName,
+                .hIconSm = static_cast<HICON>( ::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR ) ),
+            };
+
+            g_systemTrayClassReg = ::RegisterClassEx( &wc );
+        }
+
+        void* mem = ::HeapAlloc( ::GetProcessHeap(), HEAP_NO_SERIALIZE, sizeof( NOTIFYICONDATA ) );
+        PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( mem );
+
+        HWND hWnd = ::CreateWindowEx(
+            0,
+            kZeroPointSystemTrayClassName,
+            "SystemTray",
+            0,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            nullptr,
+            nullptr,
+            hInstance,
+            nullptr
+        );
+        ZP_ASSERT( hWnd );
+
+        ::ShowWindow( hWnd, SW_HIDE );
+
+        *notifyIconData = {
+            .cbSize = sizeof( NOTIFYICONDATA ),
+            .hWnd = hWnd,
+            .uID = *(UINT*)notifyIconData,
+            .uFlags = NIF_ICON | NIF_TIP,
+            .uCallbackMessage = 0xBEEF,
+            .hIcon = static_cast<HICON>( LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR ) ),
+            .uVersion = NOTIFYICON_VERSION_4,
+        };
+
+        WINBOOL ok = ::Shell_NotifyIcon( NIM_ADD, notifyIconData );
+        if( !ok )
+        {
+            ::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, notifyIconData );
+
+            notifyIconData = nullptr;
+        }
+
+        return { .handle = notifyIconData };
+    }
+
+    void Platform::CloseSystemTray( SystemTrayHandle systemTrayHandle )
+    {
+        if( systemTrayHandle.handle )
+        {
+            PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.handle );
+
+            ::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
+
+            ::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, notifyIconData );
+        }
+    }
+
     ConsoleHandle Platform::OpenConsole()
     {
         const WINBOOL ok = ::AllocConsole();
@@ -680,7 +786,7 @@ namespace zp
         return ok;
     }
 
-    zp_handle_t Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode, FileCachingMode fileCachingMode )
+    FileHandle Platform::OpenFileHandle( const char* filePath, OpenFileMode openFileMode, CreateFileMode createFileMode, FileCachingMode fileCachingMode )
     {
         DWORD access = 0;
         DWORD shareMode = 0;
@@ -728,16 +834,16 @@ namespace zp
             createDesc,
             attributes,
             nullptr );
-        return fileHandle;
+        return { .handle = fileHandle };
     }
 
-    zp_handle_t Platform::OpenTempFileHandle( const char* tempFileNamePrefix, const char* tempFileNameExtension, FileCachingMode fileCachingMode )
+    FileHandle Platform::OpenTempFileHandle( const char* tempFileNamePrefix, const char* tempFileNameExtension, FileCachingMode fileCachingMode )
     {
         char tempPath[MAX_PATH];
-        zp_size_t len = ::GetTempPath( ZP_ARRAY_SIZE( tempPath ), tempPath );
+        const zp_size_t len = ::GetTempPath( ZP_ARRAY_SIZE( tempPath ), tempPath );
 
-        MutableFixedString<MAX_PATH> tempRootPath;
-        tempRootPath.format( "%s%c%s%c", tempPath, PathSep, "ZeroPoint", PathSep );
+        FilePath tempRootPath;
+        tempRootPath / tempPath / "ZeroPoint";
 
         //char tempRootPath[MAX_PATH];
         //zp_snprintf( tempRootPath, "%s%c%s%c", tempPath, '\\', "ZeroPoint " ZP_VERSION, '\\' );
@@ -748,8 +854,8 @@ namespace zp
         const zp_time_t unique = Platform::TimeNow();
         zp_snprintf( tempFileName, "%s-%x.%s", tempFileNamePrefix ? tempFileNamePrefix : "tmp", unique, tempFileNameExtension ? tempFileNameExtension : "tmp" );
 
-        char finalFileNamePath[MAX_PATH];
-        zp_snprintf( finalFileNamePath, "%s%c%s", tempRootPath, PathSep, tempFileName );
+        FilePath finalFileNamePath;
+        finalFileNamePath / tempRootPath / tempFileName;
 
         DWORD attributes = FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE;
 
@@ -759,17 +865,17 @@ namespace zp
         TestFlag( attributes, fileCachingMode, ZP_FILE_CACHING_MODE_WRITE_THROUGH, FILE_FLAG_WRITE_THROUGH );
 
         zp_handle_t fileHandle = ::CreateFile(
-            finalFileNamePath,
+            finalFileNamePath.c_str(),
             FILE_ALL_ACCESS,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             nullptr,
             CREATE_ALWAYS,
             attributes,
             nullptr );
-        return fileHandle;
+        return { .handle = fileHandle };
     }
 
-    void Platform::SeekFile( zp_handle_t fileHandle, const zp_ptrdiff_t distanceToMoveInBytes, const MoveMethod moveMethod )
+    void Platform::SeekFile( FileHandle fileHandle, const zp_ptrdiff_t distanceToMoveInBytes, const MoveMethod moveMethod )
     {
         LARGE_INTEGER distance {
             .QuadPart = distanceToMoveInBytes,
@@ -781,32 +887,32 @@ namespace zp
             FILE_END
         };
 
-        ::SetFilePointerEx( fileHandle, distance, nullptr, moveMethodMapping[ moveMethod ] );
+        ::SetFilePointerEx( fileHandle.handle, distance, nullptr, moveMethodMapping[ moveMethod ] );
     }
 
-    zp_size_t Platform::GetFileSize( zp_handle_t fileHandle )
+    zp_size_t Platform::GetFileSize( FileHandle fileHandle )
     {
         LARGE_INTEGER fileSize;
-        const BOOL ok = ::GetFileSizeEx( fileHandle, &fileSize );
+        const BOOL ok = ::GetFileSizeEx( fileHandle.handle, &fileSize );
         return ok ? static_cast<zp_size_t>(fileSize.QuadPart) : 0;
     }
 
-    void Platform::CloseFileHandle( zp_handle_t fileHandle )
+    void Platform::CloseFileHandle( FileHandle fileHandle )
     {
-        ::CloseHandle( fileHandle );
+        ::CloseHandle( fileHandle.handle );
     }
 
-    zp_size_t Platform::ReadFile( zp_handle_t fileHandle, void* buffer, const zp_size_t bytesToRead )
+    zp_size_t Platform::ReadFile( FileHandle fileHandle, void* buffer, const zp_size_t bytesToRead )
     {
         DWORD bytesRead = 0;
-        const BOOL ok = ::ReadFile( fileHandle, buffer, bytesToRead, &bytesRead, nullptr );
+        const BOOL ok = ::ReadFile( fileHandle.handle, buffer, bytesToRead, &bytesRead, nullptr );
         return ok ? bytesRead : 0;
     }
 
-    zp_size_t Platform::WriteFile( zp_handle_t fileHandle, const void* data, const zp_size_t size )
+    zp_size_t Platform::WriteFile( FileHandle fileHandle, const void* data, const zp_size_t size )
     {
         DWORD bytesWritten = 0;
-        const BOOL ok = ::WriteFile( fileHandle, data, size, &bytesWritten, nullptr );
+        const BOOL ok = ::WriteFile( fileHandle.handle, data, size, &bytesWritten, nullptr );
 
         return ok ? bytesWritten : 0;
     }
@@ -860,7 +966,7 @@ namespace zp
         ::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, threadPool );
     }
 
-    zp_handle_t Platform::CreateThread( ThreadFunc threadFunc, void* param, const zp_size_t stackSize, zp_uint32_t* threadId )
+    ThreadHandle Platform::CreateThread( ThreadFunc threadFunc, void* param, const zp_size_t stackSize, zp_uint32_t* threadId )
     {
         DWORD id;
         HANDLE threadHandle = ::CreateThread(
@@ -877,13 +983,13 @@ namespace zp
             *threadId = id;
         }
 
-        return threadHandle;
+        return { .handle = threadHandle };
     }
 
-    zp_handle_t Platform::GetCurrentThread()
+    ThreadHandle Platform::GetCurrentThread()
     {
         HANDLE threadHandle = ::GetCurrentThread();
-        return static_cast<zp_handle_t>( threadHandle );
+        return { .handle = static_cast<zp_handle_t>( threadHandle ) };
     }
 
     zp_uint32_t Platform::GetCurrentThreadId()
@@ -902,13 +1008,13 @@ namespace zp
         ::Sleep( milliseconds );
     }
 
-    zp_uint32_t Platform::GetThreadId( zp_handle_t threadHandle )
+    zp_uint32_t Platform::GetThreadId( ThreadHandle threadHandle )
     {
-        const DWORD threadId = ::GetThreadId( static_cast<HANDLE>( threadHandle ) );
+        const DWORD threadId = ::GetThreadId( static_cast<HANDLE>( threadHandle.handle ) );
         return static_cast<zp_uint32_t>( threadId );
     }
 
-    void Platform::SetThreadName( zp_handle_t threadHandle, const String& threadName )
+    void Platform::SetThreadName( ThreadHandle threadHandle, const String& threadName )
     {
         //::SetThreadDescription();
 
@@ -926,7 +1032,7 @@ namespace zp
         THREADNAME_INFO info {
             .dwType = 0x1000,
             .szName = threadName.c_str(),
-            .dwThreadID = ::GetThreadId( static_cast<HANDLE>( threadHandle ) ),
+            .dwThreadID = ::GetThreadId( static_cast<HANDLE>( threadHandle.handle ) ),
             .dwFlags = 0,
         };
 
@@ -943,26 +1049,23 @@ namespace zp
 #pragma warning(pop)
     }
 
-    void Platform::SetThreadPriority( zp_handle_t threadHandle, zp_int32_t priority )
+    void Platform::SetThreadPriority( ThreadHandle threadHandle, zp_int32_t priority )
     {
-        ::SetThreadPriority( static_cast<HANDLE>( threadHandle ), priority );
+        ::SetThreadPriority( static_cast<HANDLE>( threadHandle.handle ), priority );
     }
 
-    zp_int32_t Platform::GetThreadPriority( zp_handle_t threadHandle )
+    zp_int32_t Platform::GetThreadPriority( ThreadHandle threadHandle )
     {
-        CRITICAL_SECTION f;
-        InitializeCriticalSection( &f );
-
-        const zp_int32_t priority = ::GetThreadPriority( static_cast<HANDLE>( threadHandle) );
+        const zp_int32_t priority = ::GetThreadPriority( static_cast<HANDLE>( threadHandle.handle ) );
         return priority;
     }
 
-    void Platform::SetThreadAffinity( zp_handle_t threadHandle, zp_uint64_t affinityMask )
+    void Platform::SetThreadAffinity( ThreadHandle threadHandle, zp_uint64_t affinityMask )
     {
-        ::SetThreadAffinityMask( static_cast<HANDLE>( threadHandle), affinityMask );
+        ::SetThreadAffinityMask( static_cast<HANDLE>( threadHandle.handle ), affinityMask );
     }
 
-    void Platform::SetThreadIdealProcessor( zp_handle_t threadHandle, zp_uint32_t processorIndex )
+    void Platform::SetThreadIdealProcessor( ThreadHandle threadHandle, zp_uint32_t processorIndex )
     {
         SYSTEM_INFO systemInfo;
         ::GetSystemInfo( &systemInfo );
@@ -976,18 +1079,24 @@ namespace zp
                 .Number = static_cast<BYTE>( 0xFFu & processorIndex )
             };
 
-            ::SetThreadIdealProcessorEx( static_cast<HANDLE>( threadHandle ), &processorNumber, nullptr );
+            ::SetThreadIdealProcessorEx( static_cast<HANDLE>( threadHandle.handle ), &processorNumber, nullptr );
         }
     }
 
-    void Platform::CloseThread( zp_handle_t threadHandle )
+    void Platform::CloseThread( ThreadHandle threadHandle )
     {
-        ::CloseHandle( threadHandle );
+        ::CloseHandle( threadHandle.handle );
     }
 
-    void Platform::JoinThreads( zp_handle_t* threadHandles, zp_size_t threadHandleCount )
+    void Platform::JoinThreads( ThreadHandle* threadHandles, zp_size_t threadHandleCount )
     {
-        ::WaitForMultipleObjects( threadHandleCount, threadHandles, true, INFINITE );
+        HANDLE handles[threadHandleCount];
+        for( zp_size_t i = 0; i < threadHandleCount; ++i )
+        {
+            handles[ i ] = threadHandles[ i ].handle;
+        }
+
+        ::WaitForMultipleObjects( threadHandleCount, handles, true, INFINITE );
     }
 
     zp_uint32_t Platform::GetProcessorCount()
