@@ -11,9 +11,15 @@
 
 #if ZP_DEBUG
 #define ZP_DEBUG_BUILD              1
+#define ZP_RELEASE_BUILD            0
+#define ZP_DISTRIBUTION_BUILD       0
 #elif defined(RELEASE_BUILD)
+#define ZP_DEBUG_BUILD              0
 #define ZP_RELEASE_BUILD            1
+#define ZP_DISTRIBUTION_BUILD       0
 #elif defined(DIST_BUILD)
+#define ZP_DEBUG_BUILD              0
+#define ZP_RELEASE_BUILD            0
 #define ZP_DISTRIBUTION_BUILD       1
 #endif
 

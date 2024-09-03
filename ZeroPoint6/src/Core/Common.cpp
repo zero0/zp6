@@ -10,6 +10,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/String.h"
 
 #if ZP_OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -131,6 +132,21 @@ zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... 
     va_end( args );
 
     return write;
+}
+
+zp_int32_t zp_atoi32( const char* str, zp_int32_t base )
+{
+    return ::strtol( str, nullptr, base );
+}
+
+zp_int64_t zp_atoi64( const char* str, zp_int32_t base )
+{
+    return ::strtoll( str, nullptr, base );
+}
+
+zp_float32_t zp_atof32( const char* str )
+{
+    return ::strtof( str, nullptr );
 }
 
 void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength )

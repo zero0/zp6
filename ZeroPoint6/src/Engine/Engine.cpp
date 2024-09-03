@@ -379,7 +379,7 @@ namespace zp
         }
     }
 
-    void Engine::destroy()
+    void Engine::shutdown()
     {
         m_previousFrameEnginePipelineHandle.complete();
         m_previousFrameEnginePipelineHandle = {};
@@ -462,14 +462,11 @@ namespace zp
         switch( engineState )
         {
             case EngineState::Uninitialized:
-                zp_printfln( "Enter Uninitialized" );
-                break;
-            case EngineState::Initialize:
             {
-                initialize();
+                zp_printfln( "Enter Uninitialized" );
             }
-                zp_printfln( "Enter Initialize" );
                 break;
+
             case EngineState::Running:
             {
                 zp_printfln( "Enter Running" );
@@ -478,27 +475,23 @@ namespace zp
                 break;
             case EngineState::Destroy:
             {
-
-            }
                 zp_printfln( "Enter Destroy" );
+            }
                 break;
             case EngineState::Reloading:
             {
-
-            }
                 zp_printfln( "Enter Reloading" );
+            }
                 break;
             case EngineState::Restarting:
             {
-                destroy();
-            }
                 zp_printfln( "Enter Restarting" );
+            }
                 break;
             case EngineState::Exit:
             {
-                destroy();
-            }
                 zp_printfln( "Enter Exit" );
+            }
                 break;
         }
     }
@@ -508,11 +501,6 @@ namespace zp
         switch( engineState )
         {
             case EngineState::Uninitialized:
-            {
-                m_nextEngineState = EngineState::Initialize;
-            }
-                break;
-            case EngineState::Initialize:
             {
                 m_nextEngineState = EngineState::Running;
             }
@@ -547,7 +535,7 @@ namespace zp
                 break;
             case EngineState::Restarting:
             {
-                m_nextEngineState = EngineState::Initialize;
+                m_nextEngineState = EngineState::Running;
             }
                 break;
             case EngineState::Exit:
@@ -561,9 +549,6 @@ namespace zp
         {
             case EngineState::Uninitialized:
                 zp_printfln( "Exit Uninitialized" );
-                break;
-            case EngineState::Initialize:
-                zp_printfln( "Exit Initialize" );
                 break;
             case EngineState::Running:
             {

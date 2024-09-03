@@ -13,6 +13,13 @@
 
 namespace zp
 {
+    enum class CommandLineOperationParameterType
+    {
+        Any,
+        Int32,
+        String,
+    };
+
     struct CommandLineOperationDesc
     {
         String shortName;
@@ -20,6 +27,7 @@ namespace zp
         String description;
         zp_size_t minParameterCount;
         zp_size_t maxParameterCount;
+        CommandLineOperationParameterType type = CommandLineOperationParameterType::Any;
     };
 
     struct CommandLineOperation
@@ -36,11 +44,13 @@ namespace zp
 
         zp_bool_t parse( const char* cmdLine );
 
-        zp_bool_t hasFlag( const CommandLineOperation& operation, zp_bool_t includeParameters = false ) const;
+        [[nodiscard]] zp_bool_t hasFlag( const CommandLineOperation& operation, zp_bool_t includeParameters = false ) const;
 
         zp_bool_t hasParameter( const CommandLineOperation& operation, Vector<String>& outParameters ) const;
 
-        zp_bool_t hasFlag( const CommandLineOperationDesc& desc, zp_bool_t includeParameters = false ) const;
+        zp_bool_t tryGetParameterAsInt32( const CommandLineOperation& operation, zp_int32_t& value ) const;
+
+        [[nodiscard]] zp_bool_t hasFlag( const CommandLineOperationDesc& desc, zp_bool_t includeParameters = false ) const;
 
         zp_bool_t hasParameter( const CommandLineOperationDesc& desc, Vector<String>& outParameters ) const;
 

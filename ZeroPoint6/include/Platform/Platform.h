@@ -443,6 +443,25 @@ namespace zp
         zp_bool_t CloseMutex( Mutex mutex );
     }
 
+    namespace
+    {
+        const char* kDefaultDateTimeFormat = "%Y-%m-%d %H:%M:%S";
+    }
+
+    struct DateTime
+    {
+        zp_uint16_t year;
+        zp_uint8_t month;
+        zp_uint8_t day;
+        zp_uint8_t hour;
+        zp_uint8_t minute;
+        zp_uint8_t second;
+        zp_uint32_t microseconds;
+        zp_uint16_t year_day;
+        zp_uint8_t week_day;
+        ZP_BOOL8( is_dst );
+    };
+
     // Time
     namespace Platform
     {
@@ -451,6 +470,18 @@ namespace zp
         [[nodiscard]] zp_time_t TimeFrequency();
 
         [[nodiscard]] zp_uint64_t TimeCycles();
+
+        [[nodiscard]] DateTime DateTimeNowLocal();
+
+        [[nodiscard]] DateTime DateTimeNowUTC();
+
+        zp_size_t DateTimeToString( const DateTime& dateTime, char* str, zp_size_t length, const char* format = kDefaultDateTimeFormat ); //"%d-%m-%Y %H:%M:%S" );
+
+        template<zp_size_t Size>
+        zp_size_t DateTimeToString( const DateTime& dateTime, char (& str)[Size], const char* format = kDefaultDateTimeFormat )
+        {
+            return DateTimeToString( dateTime, str, Size, format );
+        }
     }
 
     // Util

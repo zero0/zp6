@@ -53,40 +53,7 @@ void TestExec( zp::Job* job, zp::Memory memory )
 namespace zp
 {
 
-    class AssetCompilerEngine
-    {
-    public:
-        explicit AssetCompilerEngine( MemoryLabel memoryLabel )
-            : m_exitCode( 0 )
-            , memoryLabel( memoryLabel )
-        {
 
-        }
-
-        void processCommandLine( const String& cmdLine )
-        {
-        }
-
-        void process()
-        {
-        }
-
-        [[nodiscard]] zp_bool_t isRunning() const
-        {
-            return false;
-        }
-
-        [[nodiscard]] zp_int32_t getExitCode() const
-        {
-            return m_exitCode;
-        }
-
-    private:
-        zp_int32_t m_exitCode;
-
-    public:
-        MemoryLabel memoryLabel;
-    };
 }
 
 int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow )
@@ -94,7 +61,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
     using namespace zp;
 
     EntryPointDesc desc;
-    int ret = EntryPointMain<AssetCompilerEngine>( String::As( lpCmdLine ), desc );
+    int ret = EntryPointMain<AssetCompilerApplication>( String::As( lpCmdLine ), desc );
     return ret;
 
 #if 0

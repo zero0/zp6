@@ -127,19 +127,23 @@ namespace zp
         RegisterAllocator( MemoryLabels::Profiling, &s_profilingAllocator );
         RegisterAllocator( MemoryLabels::Debug, &s_debugAllocator );
 
-        // run engine
-        T* engine = ZP_NEW( MemoryLabels::Default, T );
+        // run app
+        T* app = ZP_NEW( MemoryLabels::Default, T );
 
-        engine->processCommandLine( commandLine );
+        app->processCommandLine( commandLine );
+
+        app->initialize();
 
         do
         {
-            engine->process();
-        } while( engine->isRunning() );
+            app->process();
+        } while( app->isRunning() );
 
-        const zp_int32_t exitCode = engine->getExitCode();
+        app->shutdown();
 
-        ZP_SAFE_DELETE( T, engine );
+        const zp_int32_t exitCode = app->getExitCode();
+
+        ZP_SAFE_DELETE( T, app );
 
         return exitCode;
     }

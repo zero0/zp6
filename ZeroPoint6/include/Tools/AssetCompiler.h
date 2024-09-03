@@ -80,6 +80,36 @@ namespace zp
     public:
         const MemoryLabel memoryLabel;
     };
+
+    class AssetCompilerApplication
+    {
+    public:
+        explicit AssetCompilerApplication( MemoryLabel memoryLabel );
+
+        void processCommandLine( const String& cmdLine );
+
+        void initialize();
+
+        void process();
+
+        void shutdown();
+
+        [[nodiscard]] zp_bool_t isRunning() const;
+
+        [[nodiscard]] zp_int32_t getExitCode() const;
+
+    private:
+        AssetCompiler m_assetCompiler;
+
+        zp_int32_t m_exitCode;
+        ZP_BOOL32(m_isRunning);
+
+        zp_uint16_t m_infoPort;
+        zp_uint16_t m_assetPort;
+
+    public:
+        MemoryLabel memoryLabel;
+    };
 }
 
 #endif //ZP_ASSETCOMPILER_H

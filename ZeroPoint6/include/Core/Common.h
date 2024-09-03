@@ -79,6 +79,12 @@ zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... 
 #define ZP_INVALID_CODE_PATH_MSG_ARGS(...)  (void)0
 #endif // ZP_USE_ASSERTIONS
 
+zp_int32_t zp_atoi32( const char* str, zp_int32_t base = 10 );
+
+zp_int64_t zp_atoi64( const char* str, zp_int32_t base = 10 );
+
+zp_float32_t zp_atof32( const char* str );
+
 template<typename T, int CountLog2>
 constexpr T zp_upper_pow2_generic( T val )
 {
@@ -97,9 +103,9 @@ constexpr T zp_upper_pow2_generic( T val )
 #define zp_upper_pow2_64( x )     zp_upper_pow2_generic<zp_uint64_t, 6>( x )
 
 #if ZP_ARCH64
-#define zp_upper_pow2_size( x )   zp_upper_pow2_generic<zp_size_t, 5>( x )
+#define zp_upper_pow2_size( x )   zp_upper_pow2_generic<zp_size_t, 6>( x )
 #else
-#define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 6>( x )
+#define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 5>( x )
 #endif
 
 template<typename T, zp_size_t Size>

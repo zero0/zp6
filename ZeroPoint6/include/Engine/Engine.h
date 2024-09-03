@@ -51,19 +51,19 @@ namespace zp
 
         void initialize();
 
+        void process();
+
+        void shutdown();
+
         void startEngine();
 
         void stopEngine();
-
-        void destroy();
 
         void reload();
 
         void restart();
 
         void exit( zp_int32_t exitCode );
-
-        void process();
 
         void processWindowEvents();
 
@@ -105,7 +105,6 @@ namespace zp
         enum class EngineState : zp_uint32_t
         {
             Uninitialized,
-            Initialize,
             Running,
             Destroy,
             Reloading,

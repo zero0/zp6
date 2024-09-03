@@ -13,6 +13,8 @@
 #include <winsock2.h>
 #include <dwmapi.h>
 #include <shellapi.h>
+#include <time.h>
+#include <sys/time.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "user32.lib")
@@ -1124,6 +1126,92 @@ namespace zp
     {
         const zp_uint64_t cycles = ::__rdtsc();
         return cycles;
+    }
+
+    namespace
+    {
+        thread_local tm t_tm;
+    }
+
+    DateTime Platform::DateTimeNowLocal()
+    {
+        timeval tv {};
+        ::gettimeofday( &tv, nullptr );
+
+        const time_t t = tv.tv_sec;
+        ::localtime_s( &t_tm, &t );
+
+        return {
+            .year = static_cast<zp_uint16_t>( t_tm.tm_year + 1900 ),
+            .month = static_cast<zp_uint8_t>( t_tm.tm_mon ),
+            .day = static_cast<zp_uint8_t>( t_tm.tm_mday ),
+            .hour = static_cast<zp_uint8_t>( t_tm.tm_hour ),
+            .minute = static_cast<zp_uint8_t>( t_tm.tm_min ),
+            .second = static_cast<zp_uint8_t>( t_tm.tm_sec ),
+            .microseconds = static_cast<zp_uint32_t>( tv.tv_usec ),
+            .year_day = static_cast<zp_uint16_t>( t_tm.tm_yday ),
+            .week_day = static_cast<zp_uint8_t>( t_tm.tm_wday ),
+            .is_dst = !!t_tm.tm_isdst
+        };
+    }
+
+    DateTime Platform::DateTimeNowUTC()
+    {
+        timeval tv {};
+        ::gettimeofday( &tv, nullptr );
+
+        const time_t t = tv.tv_sec;
+        ::gmtime_s( &t_tm, &t );
+
+        return {
+            .year = static_cast<zp_uint16_t>( t_tm.tm_year + 1900 ),
+            .month = static_cast<zp_uint8_t>( t_tm.tm_mon ),
+            .day = static_cast<zp_uint8_t>( t_tm.tm_mday ),
+            .hour = static_cast<zp_uint8_t>( t_tm.tm_hour ),
+            .minute = static_cast<zp_uint8_t>( t_tm.tm_min ),
+            .second = static_cast<zp_uint8_t>( t_tm.tm_sec ),
+            .microseconds = static_cast<zp_uint32_t>( tv.tv_usec ),
+            .year_day = static_cast<zp_uint16_t>( t_tm.tm_yday ),
+            .week_day = static_cast<zp_uint8_t>( t_tm.tm_wday ),
+            .is_dst = !!t_tm.tm_isdst
+        };
+    }
+
+    zp_size_t Platform::DateTimeToString( const DateTime& dateTime, char* str, zp_size_t length, const char* format )
+    {
+        const tm tm {
+            .tm_sec = dateTime.second,
+            .tm_min = dateTime.minute,
+            .tm_hour = dateTime.hour,
+            .tm_mday = dateTime.day,
+            .tm_mon = dateTime.month,
+            .tm_year = dateTime.year - 1900,
+            .tm_wday = dateTime.week_day,
+            .tm_yday = dateTime.year_day,
+            .tm_isdst = dateTime.is_dst,
+        };
+
+
+        zp_size_t end;
+
+        // handle special case of %S. to append milliseconds to the seconds
+        if( const char* milli = zp_strstr( format, "%S." ) )
+        {
+            milli += zp_strlen( "%S." );
+
+            MutableFixedString64 formatBuffer;
+            formatBuffer.append( format, milli - format );
+            formatBuffer.appendFormat( "%3d", dateTime.microseconds / 1000 );
+            formatBuffer.append( milli );
+
+            end = ::strftime( str, length, formatBuffer.c_str(), &tm );
+        }
+        else
+        {
+            end = ::strftime( str, length, format, &tm );
+        }
+
+        return end;
     }
 
     MessageBoxResult Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton )
