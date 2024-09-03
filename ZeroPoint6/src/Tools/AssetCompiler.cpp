@@ -34,7 +34,7 @@ const AssetCompilerProcessor* AssetCompiler::getCompilerProcessor( const String&
 AssetCompilerApplication::AssetCompilerApplication( MemoryLabel memoryLabel )
     : m_assetCompiler( memoryLabel )
     , m_exitCode( 0 )
-    , m_isRunning( false )
+    , m_isRunning( true )
     , m_infoPort( 8080 )
     , m_assetPort( 40000 )
     , memoryLabel( memoryLabel )
@@ -43,7 +43,11 @@ AssetCompilerApplication::AssetCompilerApplication( MemoryLabel memoryLabel )
 
 void AssetCompilerApplication::initialize()
 {
-    Log::message() << "Register File Extensions..." << Log::endl;
+    Platform::InitializeNetworking();
+
+    m_systemTray = Platform::OpenSystemTray( {} );
+
+    Log::info() << "Register File Extensions..." << Log::endl;
 
     // register file extensions
     m_assetCompiler.registerFileExtension( String::As( ".shader" ), {
@@ -59,12 +63,55 @@ void AssetCompilerApplication::initialize()
     m_assetCompiler.registerFileExtension( String::As( ".jpg" ), {} );
     m_assetCompiler.registerFileExtension( String::As( ".jpeg" ), {} );
 
-    Log::info() << "Info Port:  " << m_infoPort << Log::endl;
     Log::info() << "Asset Port: " << m_assetPort << Log::endl;
+
+    m_infoSocket = Platform::OpenSocket( {
+        .name = "AssetCompiler::InfoSocket",
+        .address = IPAddress::Localhost( m_infoPort ),
+        .addressFamily = AddressFamily::IPv4,
+        .socketType = SocketType::Stream,
+        .connectionProtocol = ConnectionProtocol::TCP,
+        .socketDirection = SocketDirection::Listen,
+    } );
+    Log::info() << "Info Listening on Port:  " << m_infoPort << Log::endl;
+
+    m_receiveThread = Platform::CreateThread( ReceiveInfoSocketThreadFunc, this, 1 MB, nullptr );
+}
+
+zp_uint32_t AssetCompilerApplication::ReceiveInfoSocketThreadFunc( void* param )
+{
+    AssetCompilerApplication* app = static_cast<AssetCompilerApplication*>(param);
+
+    while( app->m_isRunning )
+    {
+        Socket acceptedSocket = Platform::AcceptSocket( app->m_infoSocket );
+        if( acceptedSocket && app->m_isRunning )
+        {
+            FixedArray<zp_uint8_t, 8 KB> mem;
+            zp_size_t read = Platform::ReceiveSocket( acceptedSocket, mem.data(), mem.length() );
+
+            zp_printfln( "%d: %.*s", read, read, mem.data() );
+
+            //Platform::SendSocket( acceptedSocket, mem.data(), read );
+
+            Platform::CloseSocket( acceptedSocket );
+        }
+    }
+
+    return 0;
 }
 
 void AssetCompilerApplication::shutdown()
 {
+    Platform::CloseSocket( m_infoSocket );
+
+    Platform::JoinThreads( &m_receiveThread, 1 );
+    Platform::CloseThread( m_receiveThread );
+
+    Platform::CloseSystemTray( m_systemTray );
+
+    Platform::ShutdownNetworking();
+
     Log::info() << "Shutdown" << Log::endl;
 }
 
@@ -126,6 +173,7 @@ void AssetCompilerApplication::processCommandLine( const String& commandLine )
 
 void AssetCompilerApplication::process()
 {
+    m_isRunning = Platform::DispatchMessages( m_exitCode );
 }
 
 [[nodiscard]] zp_bool_t AssetCompilerApplication::isRunning() const

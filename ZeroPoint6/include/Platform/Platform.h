@@ -166,6 +166,14 @@ namespace zp
     {
         char addr[16];
         zp_uint16_t port;
+
+        static IPAddress Localhost( zp_uint16_t port )
+        {
+            return {
+                .addr = "127.0.0.1",
+                .port = port
+            };
+        }
     };
 
     struct SocketDesc
@@ -496,7 +504,7 @@ namespace zp
 
     struct Socket
     {
-        zp_ptr_t handle;
+        zp_ptr_t handle = ZP_INVALID_SOCKET;
 
         ZP_FORCEINLINE explicit operator zp_bool_t() const
         {

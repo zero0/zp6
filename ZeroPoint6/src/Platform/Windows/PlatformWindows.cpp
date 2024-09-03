@@ -97,6 +97,33 @@ namespace
     zp_size_t s_windowCount {};
     HWND s_windows[kMaxWindows] {};
 
+    void TrackWindow( HWND hWnd )
+    {
+        ZP_ASSERT( s_windowCount < kMaxWindows );
+        s_windows[ s_windowCount++ ] = hWnd;
+    }
+
+    void UntrackWindow( HWND hWnd, zp_bool_t andPostQuit = true, zp_int32_t exitCode = 0 )
+    {
+        // remove tracked windows
+        for( zp_size_t i = 0; i < s_windowCount; ++i )
+        {
+            if( s_windows[ i ] == hWnd )
+            {
+                --s_windowCount;
+                s_windows[ i ] = s_windows[ s_windowCount ];
+                s_windows[ s_windowCount ] = nullptr;
+                --i;
+            }
+        }
+
+        // if there are no more windows, quit app
+        if( s_windowCount == 0 && andPostQuit )
+        {
+            ::PostQuitMessage( exitCode );
+        }
+    }
+
     LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
     {
         auto windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
@@ -105,9 +132,7 @@ namespace
         {
             case WM_CREATE:
             {
-                // track created window
-                ZP_ASSERT( s_windowCount < kMaxWindows );
-                s_windows[ s_windowCount++ ] = hWnd;
+                TrackWindow( hWnd );
 #if USE_CUSTOM_TOOLBAR_HEADER
                 RECT rect;
                 ::GetWindowRect(hWnd, &rect);
@@ -133,23 +158,7 @@ namespace
 
             case WM_DESTROY:
             {
-                // remove tracked windows
-                for( zp_size_t i = 0; i < s_windowCount; ++i )
-                {
-                    if( s_windows[ i ] == hWnd )
-                    {
-                        --s_windowCount;
-                        s_windows[ i ] = s_windows[ s_windowCount ];
-                        s_windows[ s_windowCount ] = nullptr;
-                        --i;
-                    }
-                }
-
-                // if there are no more windows, quit app
-                if( s_windowCount == 0 )
-                {
-                    ::PostQuitMessage( 0 );
-                }
+                UntrackWindow( hWnd );
             }
                 break;
 
@@ -571,17 +580,87 @@ namespace zp
         }
     }
 
+    enum
+    {
+        ZP_SYSTRAY_CMD = WM_USER,
+        ZP_SYSTRAY_CMD_EXIT,
+    };
+
     LRESULT CALLBACK SystemTrayProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
     {
         switch( uMessage )
         {
+            case WM_CREATE:
+            {
+                TrackWindow( hWnd );
+            }
+                break;
+
             case WM_CLOSE:
+            {
+                ::DestroyWindow( hWnd );
+            }
                 break;
 
             case WM_DESTROY:
+            {
+                PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( ::GetWindowLongPtr( hWnd, GWLP_USERDATA ) );
+                ZP_ASSERT( notifyIconData );
+
+                ::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
+
+                ::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, notifyIconData );
+
+                UntrackWindow( hWnd );
+            }
                 break;
 
-            case 0xBEEF:
+            case ZP_SYSTRAY_CMD:
+            {
+                switch( lParam )
+                {
+                    case WM_RBUTTONDOWN:
+                    case WM_CONTEXTMENU:
+                    {
+                        POINT pt;
+                        ::GetCursorPos( &pt );
+                        HMENU hMenu = ::CreatePopupMenu();
+                        if( hMenu )
+                        {
+                            ::InsertMenu( hMenu, -1, MF_BYPOSITION, ZP_SYSTRAY_CMD_EXIT, "Exit" );
+
+                            // NOTE: must set to foreground or the menu won't disappear properly
+                            ::SetForegroundWindow( hWnd );
+
+                            ::TrackPopupMenu( hMenu, TPM_BOTTOMALIGN, pt.x, pt.y, 0, hWnd, nullptr );
+                            ::DestroyMenu( hMenu );
+                        }
+                    }
+                        break;
+
+                    default:
+                        return DefWindowProc( hWnd, uMessage, wParam, lParam );
+                }
+            }
+                break;
+
+            case WM_COMMAND:
+            {
+                const WORD wmId = LOWORD( wParam );
+                const WORD wmEvent = HIWORD( wParam );
+
+                switch( wmId )
+                {
+                    case ZP_SYSTRAY_CMD_EXIT:
+                    {
+                        ::DestroyWindow( hWnd );
+                    }
+                        break;
+
+                    default:
+                        return DefWindowProc( hWnd, uMessage, wParam, lParam );
+                }
+            }
                 break;
 
             default:
@@ -639,23 +718,30 @@ namespace zp
         );
         ZP_ASSERT( hWnd );
 
-        ::ShowWindow( hWnd, SW_HIDE );
-
         *notifyIconData = {
             .cbSize = sizeof( NOTIFYICONDATA ),
             .hWnd = hWnd,
             .uID = *(UINT*)notifyIconData,
-            .uFlags = NIF_ICON | NIF_TIP,
-            .uCallbackMessage = 0xBEEF,
+            .uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP,
+            .uCallbackMessage = ZP_SYSTRAY_CMD,
             .hIcon = static_cast<HICON>( LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR ) ),
+            .szTip = "ZeroPoint AssetCompiler",
+            .szInfo = "AssetCompiler",
             .uVersion = NOTIFYICON_VERSION_4,
         };
 
         WINBOOL ok = ::Shell_NotifyIcon( NIM_ADD, notifyIconData );
-        if( !ok )
+        if( ok )
+        {
+            ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)notifyIconData );
+        }
+        else
         {
             ::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, notifyIconData );
 
+            ::DestroyWindow( hWnd );
+
+            hWnd = nullptr;
             notifyIconData = nullptr;
         }
 
@@ -666,11 +752,11 @@ namespace zp
     {
         if( systemTrayHandle.handle )
         {
-            PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.handle );
-
-            ::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
-
-            ::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, notifyIconData );
+            //PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.handle );
+//
+            //::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
+//
+            //::HeapFree( ::GetProcessHeap(), HEAP_NO_SERIALIZE, notifyIconData );
         }
     }
 
@@ -1434,7 +1520,7 @@ namespace zp
         return true;
     }
 
-    void ShutdownNetworking()
+    void Platform::ShutdownNetworking()
     {
         WSACleanup();
     }

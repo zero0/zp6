@@ -14,6 +14,8 @@
 #include "Core/CommandLine.h"
 #include "Core/Job.h"
 
+#include "Platform/Platform.h"
+
 namespace zp
 {
     enum AssetCompilerExecuteType
@@ -106,6 +108,15 @@ namespace zp
 
         zp_uint16_t m_infoPort;
         zp_uint16_t m_assetPort;
+
+        SystemTrayHandle m_systemTray;
+
+        Socket m_infoSocket;
+        Socket m_assetSocket;
+
+        ThreadHandle m_receiveThread;
+
+        static zp_uint32_t ReceiveInfoSocketThreadFunc( void* param );
 
     public:
         MemoryLabel memoryLabel;
