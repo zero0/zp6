@@ -10,6 +10,19 @@
 
 using namespace zp;
 
+
+void zp::AssetCompilerTask::Execute( const zp::JobHandle& jobHandle, zp::AssetCompilerTask* task )
+{
+    if( task->jobExec )
+    {
+        task->jobExec( jobHandle, task );
+    }
+    else if( task->exec )
+    {
+        task->exec( task );
+    }
+}
+
 AssetCompiler::AssetCompiler( MemoryLabel memoryLabel )
     : m_assetProcessors( memoryLabel, 16, memoryLabel )
     , memoryLabel( memoryLabel )
@@ -145,7 +158,7 @@ void AssetCompilerApplication::processCommandLine( const String& commandLine )
 
         if( cmdLine.hasFlag( versionOp ) )
         {
-            zp_printfln( "Version: ???" );
+            Log::message() << "Version: " << "???" << Log::endl;
         }
 
         if( cmdLine.hasFlag( helpOp ) )

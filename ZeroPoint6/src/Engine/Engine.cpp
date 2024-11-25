@@ -104,7 +104,7 @@ namespace zp
 
     void Engine::initialize()
     {
-        ThreadHandle mainThreadHandle = Platform::GetCurrentThread();
+        const ThreadHandle mainThreadHandle = Platform::GetCurrentThread();
         Platform::SetThreadName( mainThreadHandle, String::As( "MainThread" ) );
         Platform::SetThreadIdealProcessor( mainThreadHandle, 0 );
 

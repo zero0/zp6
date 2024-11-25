@@ -22,11 +22,11 @@ namespace zp
 
     struct CommandLineOperationDesc
     {
-        String shortName;
-        String longName;
-        String description;
-        zp_size_t minParameterCount;
-        zp_size_t maxParameterCount;
+        String shortName = {};
+        String longName = {};
+        String description = {};
+        zp_size_t minParameterCount = 0;
+        zp_size_t maxParameterCount = 0;
         CommandLineOperationParameterType type = CommandLineOperationParameterType::Any;
     };
 

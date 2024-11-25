@@ -11,6 +11,7 @@
 #include "Core/Atomic.h"
 #include "Core/Profiler.h"
 #include "Core/String.h"
+#include "Core/Log.h"
 
 #include "Platform/Platform.h"
 
@@ -33,7 +34,17 @@
 #endif
 
 #if ZP_DEBUG
-#define HR( r )   do { const VkResult ZP_CONCAT(_vkResult_,__LINE__) = (r); if( ZP_CONCAT(_vkResult_,__LINE__) != VK_SUCCESS ) { zp_error_printfln("HR Failed: " #r ); Platform::DebugBreak(); } } while( false )
+#define HR( r )                                             \
+do                                                          \
+{                                                           \
+    const VkResult ZP_CONCAT(_vkResult_,__LINE__) = (r);    \
+    if( ZP_CONCAT(_vkResult_,__LINE__) != VK_SUCCESS )      \
+    {                                                       \
+        Log::error() << "HR Failed: " #r << Log::endl;      \
+        Platform::DebugBreak();                             \
+    }                                                       \
+}                                                           \
+while( false )
 #else
 #define HR( r )   r
 #endif
@@ -783,7 +794,7 @@ namespace zp
                 VK_API_VERSION_MINOR( properties.apiVersion ),
                 VK_API_VERSION_PATCH( properties.apiVersion ) );
 
-            zp_printfln( info.c_str() );
+            Log::message() << info.c_str() << Log::endl;
         }
 
         zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const GraphicsDeviceDesc& graphicsDeviceDesc )
@@ -824,12 +835,12 @@ namespace zp
             };
 
             uint32_t extensionCount = 0;
-            vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE );
+            HR( vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE ) );
 
             Vector<VkExtensionProperties> availableExtensions( extensionCount, MemoryLabels::Temp );
             availableExtensions.resize_unsafe( extensionCount );
 
-            vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, availableExtensions.data() );
+            HR( vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, availableExtensions.data() ) );
 
             zp_uint32_t foundRequiredExtensions = 0;
             for( const VkExtensionProperties& availableExtension : availableExtensions )
@@ -857,10 +868,10 @@ namespace zp
             if( surface != VK_NULL_HANDLE && areExtensionsAvailable )
             {
                 uint32_t formatCount = 0;
-                vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE );
+                HR( vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE ) );
 
                 uint32_t presentModeCount = 0;
-                vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE );
+                HR( vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE ) );
 
                 isSuitable &= formatCount != 0 && presentModeCount != 0;
             }
@@ -2247,6 +2258,16 @@ namespace zp
             }
         };
 
+        const VkDynamicState dynamicStates[] {
+            VK_DYNAMIC_STATE_CULL_MODE,
+        };
+
+        VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = ZP_ARRAY_SIZE( dynamicStates ),
+            .pDynamicStates = dynamicStates,
+        };
+
         VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .stageCount = static_cast<uint32_t>( graphicsPipelineStateCreateDesc->shaderStageCount ),
@@ -2259,7 +2280,7 @@ namespace zp
             .pMultisampleState = &multisampleStateCreateInfo,
             .pDepthStencilState = &depthStencilStateCreateInfo,
             .pColorBlendState = &colorBlendStateCreateInfo,
-            .pDynamicState = nullptr,
+            .pDynamicState = nullptr, //&pipelineDynamicStateCreateInfo,
             .layout = static_cast<VkPipelineLayout>( graphicsPipelineStateCreateDesc->layout->layout ),
             .renderPass = static_cast<VkRenderPass>( graphicsPipelineStateCreateDesc->renderPass->internalRenderPass ),
             .subpass = graphicsPipelineStateCreateDesc->subPass,
@@ -2294,16 +2315,57 @@ namespace zp
 
     void VulkanGraphicsDevice::createPipelineLayout( const PipelineLayoutDesc* pipelineLayoutDesc, PipelineLayout* pipelineLayout )
     {
-        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {};
+        VkSamplerCreateInfo samplerCreateInfo {
+            .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        };
 
-        VkSamplerCreateInfo samplerCreateInfo {};
+        VkSampler sampler;
+        vkCreateSampler(m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &sampler);
+
+        SetDebugObjectName(m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_SAMPLER, sampler);
+
+        VkDescriptorSetLayoutBinding bindings[] = {
+            {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                .descriptorCount = 0,
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .pImmutableSamplers = nullptr,
+            }
+        };
+
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .flags = 0,
+            .bindingCount = ZP_ARRAY_SIZE( bindings ),
+            .pBindings = bindings,
+        };
+
+        VkDescriptorSetLayout setLayout;
+        HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &descriptorSetLayoutCreateInfo, &m_vkAllocationCallbacks, &setLayout ) );
+
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, setLayout );
+
+        VkDescriptorSetAllocateInfo alloc {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = m_vkDescriptorPool,
+            .descriptorSetCount = 0,
+            .pSetLayouts = &setLayout,
+        };
+
+        VkDescriptorSet descriptorSet;
+        vkAllocateDescriptorSets( m_vkLocalDevice, &alloc, &descriptorSet );
+
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptorSet );
+
+        VkPushConstantRange pushConstantRange[] = {{}};
 
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .setLayoutCount = 0,
-            .pSetLayouts = nullptr,
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = nullptr,
+            .setLayoutCount = 1,
+            .pSetLayouts = &setLayout,
+            .pushConstantRangeCount = ZP_ARRAY_SIZE(pushConstantRange),
+            .pPushConstantRanges = pushConstantRange,
         };
 
         VkPipelineLayout layout;

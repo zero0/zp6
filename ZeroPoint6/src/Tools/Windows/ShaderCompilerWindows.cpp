@@ -742,7 +742,7 @@ namespace
         zp_int32_t result;
         zp_hash128_t resultShaderHash;
         zp_hash64_t resultShaderFeatureHash;
-        FilePath resultShaderFilePath;
+        //FilePath resultShaderFilePath;
     };
 
     struct DxcCompilerThreadData
@@ -1570,7 +1570,7 @@ namespace
             dstFilePath / dstFileName;
 
             // store out resulting path
-            compilerJobData->resultShaderFilePath = dstFilePath;
+            //compilerJobData->resultShaderFilePath = dstFilePath;
             compilerJobData->resultShaderFeatureHash = compilerJobData->shaderFeature.shaderFeatureHash;
 
             FileHandle dstFileHandle = Platform::OpenFileHandle( dstFilePath.c_str(), ZP_OPEN_FILE_MODE_WRITE );

@@ -4,6 +4,7 @@
 
 #include "Core/Data.h"
 #include "Core/Map.h"
+#include "Core/Hash.h"
 
 using namespace zp;
 
@@ -167,7 +168,7 @@ zp_size_t DataStreamWriter::writeAt( const void* ptr, zp_size_t size, zp_ptrdiff
     return m_position;
 }
 
-zp_size_t DataStreamWriter::writeAlignment( zp_size_t alignment, zp_bool_t zeroes )
+zp_size_t DataStreamWriter::writeAlignment( zp_size_t alignment, zp_bool_t fillWithPadding, zp_uint8_t padding )
 {
     ZP_ASSERT( zp_is_pow2( alignment ) );
     const zp_size_t alignedPosition = ZP_ALIGN_SIZE( m_position, alignment );
@@ -178,25 +179,27 @@ zp_size_t DataStreamWriter::writeAlignment( zp_size_t alignment, zp_bool_t zeroe
 
     const zp_size_t oldPosition = m_position;
 
-    if( zeroes )
+    // fill padded data with provided data
+    if( fillWithPadding )
     {
         for( ; m_position < alignedPosition; ++m_position )
         {
-            m_buffer[ m_position ] = 0xCB; //0;
+            m_buffer[ m_position ] = padding;
         }
     }
     else
     {
+        // otherwise, fill with "random" data
         zp_hash64_t hash = zp_fnv64_1a( m_position );
-        for( zp_size_t a = 0; m_position < alignedPosition; ++m_position, a += 8 )
+        for( zp_size_t i = 0; m_position < alignedPosition; ++m_position, i += 8 )
         {
-            if( a == 64 )
+            if( i == 64 )
             {
                 hash = zp_fnv64_1a( m_position, hash );
-                a = 0;
+                i = 0;
             }
 
-            m_buffer[ m_position ] = zp_uint8_t( 0xFF & ( hash >> a ) );
+            m_buffer[ m_position ] = zp_uint8_t( 0xFFU & ( hash >> i ) );
         }
     }
 
@@ -228,18 +231,9 @@ void DataStreamWriter::ensureCapacity( zp_size_t capacity )
 //
 //
 
-DataStreamReader::DataStreamReader( MemoryLabel memoryLabel )
-    : m_memory()
-    , m_position( 0 )
-    , memoryLabel( memoryLabel )
-{
-
-}
-
-DataStreamReader::DataStreamReader( MemoryLabel memoryLabel, Memory memory )
+DataStreamReader::DataStreamReader( Memory memory )
     : m_memory( memory )
     , m_position( 0 )
-    , memoryLabel( memoryLabel )
 {
 }
 
@@ -302,7 +296,7 @@ Memory DataStreamReader::memory( zp_size_t offset, zp_size_t size ) const
 
 DataStreamReader DataStreamReader::slice( zp_size_t size )
 {
-    return DataStreamReader( memoryLabel, { .ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position ), .size = size } );
+    return DataStreamReader( { .ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position ), .size = size } );
 }
 
 zp_size_t DataStreamReader::read( void* ptr, zp_size_t size )
@@ -474,20 +468,26 @@ DataBuilderElement& DataBuilderElement::operator[]( const char* key )
 
 DataBuilderElement& DataBuilderElement::operator=( const DataBuilderElement& other )
 {
-    ensureDataType( other.m_dataType );
+    if( &other != this )
+    {
+        ensureDataType( other.m_dataType );
 
-    zp_memcpy( m_data, ZP_ARRAY_SIZE( m_data ), other.m_data, ZP_ARRAY_SIZE( other.m_data ) );
+        zp_memcpy( m_data, ZP_ARRAY_SIZE( m_data ), other.m_data, ZP_ARRAY_SIZE( other.m_data ) );
+    }
 
     return *this;
 }
 
 DataBuilderElement& DataBuilderElement::operator=( DataBuilderElement&& other )
 {
-    ensureDataType( other.m_dataType );
+    if( &other != this )
+    {
+        ensureDataType( other.m_dataType );
 
-    zp_memcpy( m_data, ZP_ARRAY_SIZE( m_data ), other.m_data, ZP_ARRAY_SIZE( other.m_data ) );
+        zp_memcpy( m_data, ZP_ARRAY_SIZE( m_data ), other.m_data, ZP_ARRAY_SIZE( other.m_data ) );
 
-    other.ensureDataType( ZP_DATA_BUILDER_ELEMENT_TYPE_NULL );
+        other.ensureDataType( ZP_DATA_BUILDER_ELEMENT_TYPE_NULL );
+    }
 
     return *this;
 }
@@ -570,7 +570,7 @@ namespace
     struct ArchiveBlockInfo
     {
         zp_uint64_t offset; // from header to block header
-        zp_uint64_t length; // in data
+        zp_uint64_t length; // in data (without padding)
     };
 
     struct ArchiveBlockHash
@@ -608,7 +608,7 @@ ArchiveBuilder::~ArchiveBuilder()
 
 ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
 {
-    DataStreamReader reader( memoryLabel, archiveMemory );
+    DataStreamReader reader( archiveMemory );
 
     ArchiveHeader header {};
     reader.read( header );
@@ -632,7 +632,7 @@ ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
     // read in blocks
     for( zp_size_t i = 0; i < blockCount; ++i )
     {
-        reader.seek( blockInfos[ i ].offset, DataStreamSeekOrigin::Exact );
+        reader.seek( zp_ptrdiff_t( blockInfos[ i ].offset ), DataStreamSeekOrigin::Exact );
 
         ArchiveBlockHeader blockHeader {};
         reader.read( blockHeader );
@@ -640,7 +640,7 @@ ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
         ArchiveBuilderBlock block {
             .id  = blockIds[ i ].id,
             .type = 0,
-            .flags = 0,
+            .flags = ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE,
         };
 
         if( blockHeader.headerSize > 0 )
@@ -665,17 +665,17 @@ ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
 
 zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
 {
-    zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
-    zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
+    const zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
+    const zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
     {
         return v.id == id;
     } );
 
-    if( index == -1 )
+    if( index == Vector<ArchiveBuilderBlock>::npos )
     {
         m_blocks.pushBack( {
             .id = id,
-            .flags = 0,
+            .flags = ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE,
             .header = {},
             .data = data,
         } );
@@ -684,7 +684,7 @@ zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
     {
         m_blocks[ index ] = {
             .id = id,
-            .flags = 0,
+            .flags = ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE,
             .header = {},
             .data = data,
         };
@@ -695,17 +695,17 @@ zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
 
 zp_hash64_t ArchiveBuilder::addBlock( String name, Memory header, Memory data )
 {
-    zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
-    zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
+    const zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
+    const zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
     {
         return v.id == id;
     } );
 
-    if( index == -1 )
+    if( index == Vector<ArchiveBuilderBlock>::npos )
     {
         m_blocks.pushBack( {
             .id = id,
-            .flags = 0,
+            .flags = ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE,
             .header = header,
             .data = data,
         } );
@@ -714,7 +714,7 @@ zp_hash64_t ArchiveBuilder::addBlock( String name, Memory header, Memory data )
     {
         m_blocks[ index ] = {
             .id = id,
-            .flags = 0,
+            .flags = ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE,
             .header = header,
             .data = data,
         };
@@ -730,7 +730,7 @@ void ArchiveBuilder::clearBlock( zp_hash64_t id )
         return v.id == id;
     } );
 
-    if( index != -1 )
+    if( index != Vector<ArchiveBuilderBlock>::npos )
     {
         ArchiveBuilderBlock& block = m_blocks[ index ];
         block.flags |= ZP_ARCHIVE_BUILDER_BLOCK_FLAG_CLEAR;
@@ -744,7 +744,7 @@ void ArchiveBuilder::removeBlock( zp_hash64_t id )
         return v.id == id;
     } );
 
-    if( index != -1 )
+    if( index != Vector<ArchiveBuilderBlock>::npos )
     {
         ArchiveBuilderBlock& block = m_blocks[ index ];
         block.flags |= ZP_ARCHIVE_BUILDER_BLOCK_FLAG_REMOVE;
@@ -754,7 +754,7 @@ void ArchiveBuilder::removeBlock( zp_hash64_t id )
 void ArchiveBuilder::getBlockIDs( Vector<zp_hash64_t>& outBlockIDs )
 {
     outBlockIDs.clear();
-    for( auto block : m_blocks )
+    for( const ArchiveBuilderBlock& block : m_blocks )
     {
         outBlockIDs.pushBack( block.id );
     }
@@ -804,7 +804,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
     struct BlockOffsetSize
     {
         zp_size_t offset;
-        zp_size_t size;
+        zp_size_t size;     // block size without alignment
     };
     Map<zp_hash64_t, BlockOffsetSize> blockIdToOffset( memoryLabel, sortedBlockCount );
 
@@ -828,24 +828,28 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
             offset = outCompiledData.write<ArchiveBlockHeader>( {
                 .type = block.type,
                 .headerSize = block.header.ptr && block.header.size ? zp_uint32_t( block.header.size ) : 0,
-                .dataSize = block.data.size
+                .dataSize = block.data.ptr && block.data.size ? zp_uint32_t( block.data.size ) : 0,
             } );
-
+// TODO: compress?
             // write header if provided
             if( block.header.ptr && block.header.size )
             {
                 outCompiledData.write( block.header.ptr, block.header.size );
             }
 
-            // write data
-            outCompiledData.write( block.data.ptr, block.data.size );
+            // write data if provided
+            if( block.data.ptr && block.data.size )
+            {
+                outCompiledData.write( block.data.ptr, block.data.size );
+            }
         }
-
-        // align blocks
-        outCompiledData.writeAlignment( kBlockAlignment );
 
         // store offset
         blockIdToOffset.set( blockSortKey.id, { .offset = offset, .size = outCompiledData.position() - offset } );
+
+        // align blocks
+        const zp_bool_t fillPadding = ( ( options & ZP_ARCHIVE_BUILDER_COMPILER_OPTION_PAD_ZEROS ) == ZP_ARCHIVE_BUILDER_COMPILER_OPTION_PAD_ZEROS );
+        outCompiledData.writeAlignment( kBlockAlignment, fillPadding, 0xCD );
     }
     ZP_ASSERT( outCompiledData.position() == ZP_ALIGN_SIZE( outCompiledData.position(), kBlockAlignment ) );
 
@@ -871,7 +875,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
         // hash writen data, including alignment padding
         const Memory mem = outCompiledData.memory( offsetSize.offset, offsetSize.size );
 
-        const zp_hash128_t blockHash = zp_fnv128_1a( mem.ptr, mem.size );
+        const zp_hash128_t blockHash = zp_fnv128_1a( mem );
         outCompiledData.write<ArchiveBlockHash>( { .hash = blockHash } );
     }
 
@@ -885,7 +889,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
 
     // hash archive
     const Memory archiveMemory = outCompiledData.memory();
-    const zp_hash128_t archiveHash = zp_fnv128_1a( archiveMemory.ptr, archiveMemory.size );
+    const zp_hash128_t archiveHash = zp_fnv128_1a( archiveMemory );
 
     // write footer
     outCompiledData.write<ArchiveFooter>( {

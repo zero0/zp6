@@ -10,6 +10,7 @@
 #include "Core/Macros.h"
 #include "Core/Common.h"
 #include "Core/Allocator.h"
+#include "Core/Hash.h"
 
 namespace zp
 {

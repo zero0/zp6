@@ -83,6 +83,7 @@ namespace zp
         ZP_CREATE_FILE_MODE_CREATE,
         ZP_CREATE_FILE_MODE_CREATE_NEW,
         ZP_CREATE_FILE_MODE_TRUNCATE,
+        CreateFileMode_Count,
     };
 
     enum FileCachingMode
@@ -197,6 +198,13 @@ namespace zp
         }
     };
 
+    enum class WindowFullscreenType
+    {
+        Window,
+        BorderlessWindow,
+        Fullscreen,
+    };
+
     // Window
     namespace Platform
     {
@@ -212,7 +220,7 @@ namespace zp
 
         void SetWindowTitle( WindowHandle windowHandle, const String& title );
 
-        void SetWindowSize( WindowHandle windowHandle, zp_int32_t width, zp_int32_t height );
+        void SetWindowSize( WindowHandle windowHandle, zp_int32_t width, zp_int32_t height, WindowFullscreenType windowFullscreenType = WindowFullscreenType::Window );
     }
 
     struct OpenSystemTrayDesc
@@ -361,7 +369,7 @@ namespace zp
 
         void FreeThreadPool( zp_handle_t threadPool );
 
-        ThreadHandle CreateThread( ThreadFunc threadFunc, void* param, zp_size_t stackSize, zp_uint32_t* threadId );
+        ThreadHandle CreateThread( ThreadFunc threadFunc, void* param, zp_size_t stackSize, zp_uint32_t* outThreadId );
 
         [[nodiscard]] ThreadHandle GetCurrentThread();
 
@@ -458,16 +466,16 @@ namespace zp
 
     struct DateTime
     {
-        zp_uint16_t year;
-        zp_uint8_t month;
-        zp_uint8_t day;
-        zp_uint8_t hour;
-        zp_uint8_t minute;
-        zp_uint8_t second;
-        zp_uint32_t microseconds;
-        zp_uint16_t year_day;
-        zp_uint8_t week_day;
-        ZP_BOOL8( is_dst );
+        zp_int32_t year;
+        zp_int32_t month;
+        zp_int32_t day;
+        zp_int32_t hour;
+        zp_int32_t minute;
+        zp_int32_t second;
+        zp_int32_t microseconds;
+        zp_int32_t year_day;
+        zp_int32_t week_day;
+        zp_int32_t is_dst;
     };
 
     // Time
@@ -544,6 +552,21 @@ namespace zp
 
         ~FilePath() = default;
 
+        FilePath& operator=( const FilePath& other )
+        {
+            if( this != &other )
+            {
+                m_path = other.m_path;
+            }
+            return *this;
+        }
+
+        FilePath& operator=( FilePath&& other ) noexcept
+        {
+            m_path = zp_move( other.m_path );
+            return *this;
+        }
+
         [[nodiscard]] zp_bool_t exists() const
         {
             const zp_bool_t found = isFile() || isDirectory();
@@ -581,9 +604,32 @@ namespace zp
             return *this;
         }
 
+        FilePath& operator+( const char* other )
+        {
+            m_path.append( other );
+            return *this;
+        }
+
+        FilePath& operator+( const String& other )
+        {
+            m_path.append( other );
+            return *this;
+        }
+
+        FilePath& operator+( const FilePath& other )
+        {
+            m_path.append( other.m_path );
+            return *this;
+        }
+
         [[nodiscard]] ZP_FORCEINLINE const char* c_str() const
         {
             return m_path.c_str();
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE char* str()
+        {
+            return m_path.mutable_str();
         }
 
     private:

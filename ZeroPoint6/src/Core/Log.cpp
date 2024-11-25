@@ -38,29 +38,31 @@ namespace zp
     {
         const char* LogTypeNames[] {
             "",
-            "  [MSG]",
-            " [INFO]",
-            " [WARN]",
+            "[MSG]",
+            "[INFO]",
+            "[WARN]",
             "[ERROR]",
             "[FATAL]"
         };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( LogTypeNames ) == (int)LogType::Count );
 
-        template<zp_bool_t IsError>
-        void PrintLogEntry( const char* color, LogType logType, const char* msg )
+        template<zp_bool_t IsError, LogType LogType>
+        void PrintLogEntry( const char* color, const char* msg )
         {
             const DateTime dateTime = Platform::DateTimeNowLocal();
 
             char dt[64];
-            Platform::DateTimeToString( dateTime, dt,  "%Y-%m-%d %H:%M:%S." );
+            Platform::DateTimeToString( dateTime, dt, "%Y-%m-%d %H:%M:%S." );
+
+            const char* format = "%s%23s %7s (%10d): %s" ZP_CC_RESET;
 
             if( IsError )
             {
-                zp_error_printfln( "%s%s %s: %s" ZP_CC_RESET, color, dt, LogTypeNames[ (int)logType ], msg );
+                zp_error_printfln( format, color, dt, LogTypeNames[ (int)LogType ], msg );
             }
             else
             {
-                zp_printfln( "%s%s %s: %s" ZP_CC_RESET, color, dt, LogTypeNames[ (int)logType ], msg );
+                zp_printfln( format, color, dt, LogTypeNames[ (int)LogType ], msg );
             }
         }
     }
@@ -105,7 +107,7 @@ namespace zp
     template<>
     void LogEntry<LogType::Message>::operator<<( Log::EndToken )
     {
-        PrintLogEntry<false>( ZP_CC( NORMAL, BLUE, DEFAULT ), LogType::Message, m_log.c_str() );
+        PrintLogEntry<false, LogType::Message>( ZP_CC( NORMAL, BLUE, DEFAULT ), m_log.c_str() );
     }
 }
 
@@ -128,7 +130,7 @@ namespace zp
     template<>
     void LogEntry<LogType::Info>::operator<<( Log::EndToken )
     {
-        PrintLogEntry<false>( ZP_CC( NORMAL, DEFAULT, DEFAULT ), LogType::Info, m_log.c_str() );
+        PrintLogEntry<false, LogType::Info>( ZP_CC( NORMAL, DEFAULT, DEFAULT ), m_log.c_str() );
     }
 }
 
@@ -151,7 +153,7 @@ namespace zp
     template<>
     void LogEntry<LogType::Warning>::operator<<( Log::EndToken )
     {
-        PrintLogEntry<false>( ZP_CC( NORMAL, YELLOW, DEFAULT ), LogType::Warning, m_log.c_str() );
+        PrintLogEntry<false, LogType::Warning>( ZP_CC( NORMAL, YELLOW, DEFAULT ), m_log.c_str() );
     }
 }
 
@@ -174,7 +176,7 @@ namespace zp
     template<>
     void LogEntry<LogType::Error>::operator<<( Log::EndToken )
     {
-        PrintLogEntry<true>( ZP_CC( NORMAL, RED, DEFAULT ), LogType::Error, m_log.c_str() );
+        PrintLogEntry<true, LogType::Error>( ZP_CC( NORMAL, RED, DEFAULT ), m_log.c_str() );
     }
 }
 
@@ -197,6 +199,6 @@ namespace zp
     template<>
     void LogEntry<LogType::Fatal>::operator<<( Log::EndToken )
     {
-        PrintLogEntry<true>( ZP_CC( BOLD, RED, DEFAULT ), LogType::Fatal, m_log.c_str() );
+        PrintLogEntry<true, LogType::Fatal>( ZP_CC( BOLD, RED, DEFAULT ), m_log.c_str() );
     }
 }

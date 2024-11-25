@@ -20,10 +20,10 @@
 #endif // ZP_OS_WINDOWS
 #endif // __FILENAME__
 
-#define ZP_PROFILE_CPU_BLOCK_EV( e, v )     ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = (v), .lineNumber = __LINE__, } )
-#define ZP_PROFILE_CPU_BLOCK_E( e )         ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = 0, .lineNumber = __LINE__, } )
-#define ZP_PROFILE_CPU_BLOCK_V( v )         ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = nullptr, .userData = (v), .lineNumber = __LINE__, } )
-#define ZP_PROFILE_CPU_BLOCK()              ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = nullptr, .userData = 0, .lineNumber = __LINE__, } )
+#define ZP_PROFILE_CPU_BLOCK_EV( e, v )     const zp::ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = (v), .lineNumber = __LINE__, } )
+#define ZP_PROFILE_CPU_BLOCK_E( e )         const zp::ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = 0, .lineNumber = __LINE__, } )
+#define ZP_PROFILE_CPU_BLOCK_V( v )         const zp::ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = nullptr, .userData = (v), .lineNumber = __LINE__, } )
+#define ZP_PROFILE_CPU_BLOCK()              const zp::ProfileBlock ZP_CONCAT(__profileBlock_,__LINE__)( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = nullptr, .userData = 0, .lineNumber = __LINE__, } )
 
 #define ZP_PROFILE_CPU_MARK( e )            zp::Profiler::MarkCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = 0, .lineNumber = __LINE__, } )
 #define ZP_PROFILE_CPU_MARK_V( e, v )       zp::Profiler::MarkCPU( { .filename = __FILENAME__, .functionName = __FUNCTION__, .eventName = (#e), .userData = (v), .lineNumber = __LINE__, } )

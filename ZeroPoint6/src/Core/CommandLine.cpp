@@ -272,7 +272,8 @@ namespace zp
             {
                 outParameters.clear();
 
-                zp_size_t i, idx;
+                zp_size_t i;
+                zp_size_t idx;
                 for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.size(); ++i, ++idx )
                 {
                     const String& token = m_commandLineTokens[ idx ];

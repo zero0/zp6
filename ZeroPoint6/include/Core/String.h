@@ -9,6 +9,7 @@
 #include "Core/Macros.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/Hash.h"
 #include "Core/Math.h"
 #include "Core/Allocator.h"
 

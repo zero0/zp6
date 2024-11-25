@@ -80,6 +80,7 @@ set(ZP_CORE_HEADERS
         "include/Core/Data.h"
         "include/Core/Defines.h"
         "include/Core/Function.h"
+        "include/Core/Hash.h"
         "include/Core/Job.h"
         "include/Core/Log.h"
         "include/Core/Macros.h"

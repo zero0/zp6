@@ -82,7 +82,7 @@ namespace zp
             return writeAt( &value, sizeof( T ), offset, origin );
         }
 
-        zp_size_t writeAlignment( zp_size_t alignment, zp_bool_t zeroes = true );
+        zp_size_t writeAlignment( zp_size_t alignment, zp_bool_t fillWithPadding = true, zp_uint8_t padding = 0 );
 
     private:
         DataStreamWriter( MemoryLabel memoryLabel, zp_uint8_t* ptr, zp_size_t capacity );
@@ -101,9 +101,9 @@ namespace zp
     class DataStreamReader
     {
     public:
-        explicit DataStreamReader( MemoryLabel memoryLabel );
+        DataStreamReader() = delete;
 
-        DataStreamReader( MemoryLabel memoryLabel, Memory memory );
+        explicit DataStreamReader( Memory memory );
 
         ~DataStreamReader() = default;
 
@@ -148,9 +148,6 @@ namespace zp
     private:
         Memory m_memory;
         zp_size_t m_position;
-
-    public:
-        const MemoryLabel memoryLabel;
     };
 }
 
@@ -171,8 +168,8 @@ constexpr zp_uint32_t zp_make_cc4( const char* str )
     zp_uint32_t cc = 0;
     for( zp_size_t i = 0; i < 4 && i < len; ++i )
     {
-        //cc |= str[ i ] << ( 32 - ( ( i + 1 ) * 8 ) );
-        cc |= str[i] << ( i * 8 );
+        cc |= str[ i ] << ( 32 - ( ( i + 1 ) * 8 ) );
+        //cc |= str[i] << ( i * 8 );
     }
     return cc;
 }
@@ -442,6 +439,7 @@ namespace zp
         ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE = 0,
         ZP_ARCHIVE_BUILDER_BLOCK_FLAG_CLEAR = 1 << 0,
         ZP_ARCHIVE_BUILDER_BLOCK_FLAG_REMOVE = 1 << 1,
+        ZP_ARCHIVE_BUILDER_BLOCK_FLAG_KEEP_UNCOMPRESSED = 1 << 2,
         ZP_ARCHIVE_BUILDER_BLOCK_FLAG_ALL = ~0u,
     };
     typedef zp_uint32_t ArchiveBuilderBlockFlags;
@@ -465,6 +463,7 @@ namespace zp
     enum ArchiveBuilderCompilerOption
     {
         ZP_ARCHIVE_BUILDER_COMPILER_OPTION_NONE = 0,
+        ZP_ARCHIVE_BUILDER_COMPILER_OPTION_PAD_ZEROS = 1 << 0,
         ZP_ARCHIVE_BUILDER_COMPILER_OPTION_ALL = ~0u,
     };
     typedef zp_uint32_t ArchiveBuilderCompilerOptions;
