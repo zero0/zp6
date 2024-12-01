@@ -295,6 +295,9 @@ constexpr zp_int32_t zp_cmp_dsc( const T& lh, const T& rh )
     return lh < rh ? 1 : rh < lh ? -1 : 0;
 }
 
+//
+//
+//
 
 template<typename T, typename Eq>
 constexpr T* zp_find( T* begin, T* end, const T& value, Eq eq )
@@ -313,6 +316,13 @@ constexpr T* zp_find( T* begin, T* end, const T& value, Eq eq )
     return found;
 }
 
+template<typename T>
+constexpr T* zp_find( T* begin, T* end, const T& value )
+{
+    T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t { return lh == rh; } );
+    return found;
+}
+
 template<typename T, typename Eq>
 constexpr zp_size_t zp_find_index( T* begin, T* end, const T& value, Eq eq )
 {
@@ -321,14 +331,34 @@ constexpr zp_size_t zp_find_index( T* begin, T* end, const T& value, Eq eq )
 }
 
 template<typename T, typename Eq>
+constexpr zp_size_t zp_index_of( T* begin, T* end, const T& value )
+{
+    T* found = zp_find( begin, end, value );
+    return found == nullptr ? -1 : found - begin;
+}
+
+template<typename T, typename Eq>
 constexpr zp_bool_t zp_try_find_index( T* begin, T* end, const T& value, Eq eq, zp_size_t& index )
 {
-    T* found = zp_find( begin, end, value, eq );
-    if( found != nullptr )
+    T* element = zp_find( begin, end, value, eq );
+    const zp_bool_t found = element != nullptr;
+    if( found )
     {
-        index = found - begin;
+        index = element - begin;
     }
-    return found != nullptr;
+    return found;
+}
+
+template<typename T, typename Eq>
+constexpr zp_bool_t zp_try_index_of( T* begin, T* end, const T& value, zp_size_t& index )
+{
+    T* element = zp_find( begin, end, value );
+    const zp_bool_t found = element != nullptr;
+    if( found )
+    {
+        index = element - begin;
+    }
+    return found;
 }
 
 template<typename T, zp_size_t Size, typename Eq>
@@ -469,8 +499,7 @@ namespace zp
     struct SizeInfo
     {
         zp_float32_t size;
-        zp_char8_t k;
-        zp_char8_t b;
+        zp_char8_t mem[4];
     };
 
     constexpr SizeInfo GetSizeInfoFromBytes( zp_size_t bytes, zp_bool_t asBits = false )
@@ -479,60 +508,62 @@ namespace zp
 
         if( asBits )
         {
-            info.b = 'b';
+            info.mem[1] = 'b';
             if( bytes > 1 tb )
             {
                 info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 tb ) );
-                info.k = 't';
+                info.mem[0] = 't';
             }
             else if( bytes > 1 gb )
             {
                 info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 gb );
-                info.k = 'g';
+                info.mem[0] = 'g';
             }
             else if( bytes > 1 mb )
             {
                 info.size = (zp_float32_t)bytes / ( 1 mb );
-                info.k = 'm';
+                info.mem[0] = 'm';
             }
             else if( bytes > 1 kb )
             {
                 info.size = (zp_float32_t)bytes / ( 1 kb );
-                info.k = 'k';
+                info.mem[0] = 'k';
             }
             else
             {
                 info.size = (zp_float32_t)bytes;
-                info.k = ' ';
+                info.mem[0] = 'b';
+                info.mem[1] = '\0';
             }
         }
         else
         {
-            info.b = 'B';
+            info.mem[1] = 'B';
             if( bytes > 1 TB )
             {
                 info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 TB ) );
-                info.k = 'T';
+                info.mem[0] = 'T';
             }
             else if( bytes > 1 GB )
             {
                 info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 GB );
-                info.k = 'G';
+                info.mem[0] = 'G';
             }
             else if( bytes > 1 MB )
             {
                 info.size = (zp_float32_t)bytes / ( 1 MB );
-                info.k = 'M';
+                info.mem[0] = 'M';
             }
             else if( bytes > 1 KB )
             {
                 info.size = (zp_float32_t)bytes / ( 1 KB );
-                info.k = 'K';
+                info.mem[0] = 'K';
             }
             else
             {
                 info.size = (zp_float32_t)bytes;
-                info.k = ' ';
+                info.mem[0] = 'B';
+                info.mem[1] = '\0';
             }
         }
 

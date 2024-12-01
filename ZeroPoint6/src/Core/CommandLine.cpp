@@ -123,6 +123,11 @@ namespace zp
         return ok;
     }
 
+    zp_bool_t CommandLine::parse( const String& cmdLine )
+    {
+        return parse( cmdLine.c_str() );
+    }
+
     zp_bool_t CommandLine::hasFlag( const CommandLineOperation& operation, zp_bool_t includeParameters ) const
     {
         zp_bool_t found = false;

@@ -130,9 +130,7 @@ namespace zp
         // run app
         T* app = ZP_NEW( MemoryLabels::Default, T );
 
-        app->processCommandLine( commandLine );
-
-        app->initialize();
+        app->initialize( commandLine );
 
         do
         {

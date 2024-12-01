@@ -44,6 +44,8 @@ namespace zp
 
         zp_bool_t parse( const char* cmdLine );
 
+        zp_bool_t parse( const String& cmdLine );
+
         [[nodiscard]] zp_bool_t hasFlag( const CommandLineOperation& operation, zp_bool_t includeParameters = false ) const;
 
         zp_bool_t hasParameter( const CommandLineOperation& operation, Vector<String>& outParameters ) const;

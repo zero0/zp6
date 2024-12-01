@@ -6,6 +6,8 @@
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/String.h"
+#include "Core/CommandLine.h"
+#include "Core/Log.h"
 
 #include "Platform/Platform.h"
 
@@ -97,13 +99,32 @@ namespace zp
 
     }
 
-    void Engine::processCommandLine( const String& cmdLine )
+    void Engine::initialize( const String& cmdLine )
     {
+        CommandLine cmd( MemoryLabels::Temp );
+        auto maxJobThreadParam = cmd.addOperation(
+            {
+                .shortName = {},
+                .longName = String::As( "max-job-threads" ),
+                .minParameterCount = 1,
+                .maxParameterCount = 1,
+                .type = CommandLineOperationParameterType::Int32,
+            } );
+        auto headlessParam = cmd.addOperation(
+            {
+                .longName = String::As( "headless" ),
+            } );
 
-    }
+        if( !cmd.parse( cmdLine ) )
+        {
+            Log::error() << "Failed to parse Command Line" << Log::endl;
+        }
 
-    void Engine::initialize()
-    {
+        cmd.printHelp();
+
+        zp_int32_t maxJobThreads = 2;
+        cmd.tryGetParameterAsInt32( maxJobThreadParam, maxJobThreads );
+
         const ThreadHandle mainThreadHandle = Platform::GetCurrentThread();
         Platform::SetThreadName( mainThreadHandle, String::As( "MainThread" ) );
         Platform::SetThreadIdealProcessor( mainThreadHandle, 0 );
@@ -127,7 +148,7 @@ namespace zp
         // initialize job system
         JobSystem::Setup( MemoryLabels::Default, numJobThreads );
 
-        const zp_bool_t headless = false;
+        const zp_bool_t headless = cmd.hasFlag( headlessParam );
         const Rect2Di windowSize {
             .offset {},
             .size {
@@ -137,7 +158,7 @@ namespace zp
         };
 
         // create window
-        const zp_bool_t createWindow = true;
+        const zp_bool_t createWindow = !headless;
         if( createWindow )
         {
             ZP_PROFILE_CPU_BLOCK_E( Create Window );
@@ -153,12 +174,13 @@ namespace zp
                 .userPtr = this
             };
 
-            m_windowHandle = Platform::OpenWindow( {
-                .callbacks = &m_windowCallbacks,
-                .width = windowSize.size.width,
-                .height = windowSize.size.height,
-                .showWindow = false
-            } );
+            m_windowHandle = Platform::OpenWindow(
+                {
+                    .callbacks = &m_windowCallbacks,
+                    .width = windowSize.size.width,
+                    .height = windowSize.size.height,
+                    .showWindow = false
+                } );
         }
 
         // create console
@@ -276,18 +298,18 @@ namespace zp
 
         // Main Camera Signature
         m_entityComponentManager->registerComponentSignature( {
-            .tagSignature = m_entityComponentManager->getTagSignature<MainCameraTag>(),
-            .structuralSignature = m_entityComponentManager->getComponentSignature<CameraComponentData, RigidTransformComponentData>(),
-        } );
+                                                                  .tagSignature = m_entityComponentManager->getTagSignature<MainCameraTag>(),
+                                                                  .structuralSignature = m_entityComponentManager->getComponentSignature<CameraComponentData, RigidTransformComponentData>(),
+                                                              } );
 
         // Asset Signature
         m_entityComponentManager->registerComponentSignature( {
-            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData>()
-        } );
+                                                                  .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData>()
+                                                              } );
 
         m_entityComponentManager->registerComponentSignature( {
-            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData, AssetReferenceCountComponentData>()
-        } );
+                                                                  .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData, AssetReferenceCountComponentData>()
+                                                              } );
 
         if( m_moduleAPI )
         {

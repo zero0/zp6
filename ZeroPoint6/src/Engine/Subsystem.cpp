@@ -17,8 +17,27 @@ namespace zp
     {
     }
 
+    SubsystemManager::~SubsystemManager()
+    {
+        for( auto s : m_subsystems )
+        {
+            ZP_ASSERT( s->refCount == 0 );
+            ZP_DELETE_LABEL( s->memoryLabel, ISubsystem, s->subsystem );
+
+            ZP_FREE( memoryLabel, s );
+        }
+
+        m_subsystems.clear();
+    }
+
     void SubsystemManager::BuildExecutionGraph( zp::ExecutionGraph& executionGraph )
     {
+        m_subsystems.sort(
+            []( auto lh, auto rh ) -> zp_int32_t
+            {
+                return zp_cmp_asc( lh->order, rh->order );
+            } );
+
         for( auto s : m_subsystems )
         {
             if( s->refCount > 0 )
@@ -33,7 +52,7 @@ namespace zp
     {
         const zp_int32_t order = zp_int32_t( m_subsystems.size() ) * 100;
 
-        Subsystem* subsystem = ZP_MALLOC_T( memoryLabel, Subsystem );
+        auto subsystem = ZP_MALLOC_T( memoryLabel, SubsystemInstance );
         *subsystem = {
             .subsystem = desc.subsystem,
             .id = desc.id,
@@ -45,10 +64,13 @@ namespace zp
         m_subsystems.pushBack( subsystem );
     }
 
-    Subsystem* SubsystemManager::FindSubsystem( zp_hash64_t id ) const
+    SubsystemInstance* SubsystemManager::FindSubsystem( zp_hash64_t id ) const
     {
-        const zp_size_t index = m_subsystems.findIndexOf( [ &id ]( const auto& x ) -> zp_bool_t
-        { return x->id == id; } );
-        return index == Vector<Subsystem>::npos ? nullptr : m_subsystems[ index ];
+        const zp_size_t index = m_subsystems.findIndexOf(
+            [ &id ]( auto x ) -> zp_bool_t
+            {
+                return x->id == id;
+            } );
+        return index == Vector<SubsystemInstance*>::npos ? nullptr : m_subsystems[ index ];
     }
 }

@@ -9,11 +9,7 @@
 #define ZP_DEBUG                    1
 #endif
 
-#if ZP_DEBUG
-#define ZP_DEBUG_BUILD              1
-#define ZP_RELEASE_BUILD            0
-#define ZP_DISTRIBUTION_BUILD       0
-#elif defined(RELEASE_BUILD)
+#if defined(RELEASE_BUILD)
 #define ZP_DEBUG_BUILD              0
 #define ZP_RELEASE_BUILD            1
 #define ZP_DISTRIBUTION_BUILD       0
@@ -21,6 +17,10 @@
 #define ZP_DEBUG_BUILD              0
 #define ZP_RELEASE_BUILD            0
 #define ZP_DISTRIBUTION_BUILD       1
+#else
+#define ZP_DEBUG_BUILD              1
+#define ZP_RELEASE_BUILD            0
+#define ZP_DISTRIBUTION_BUILD       0
 #endif
 
 #if defined(WIN64) || defined(_WIN64)

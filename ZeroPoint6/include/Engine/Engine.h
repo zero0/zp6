@@ -47,9 +47,7 @@ namespace zp
 
         [[nodiscard]] zp_int32_t getExitCode() const;
 
-        void processCommandLine( const String& cmdLine );
-
-        void initialize();
+        void initialize( const String& cmdLine );
 
         void process();
 
