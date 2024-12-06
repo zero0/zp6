@@ -20,7 +20,7 @@
 
 #define ZP_ARRAY_SIZE(a)                zp_array_size( a )
 
-#define ZP_ALIGN_SIZE(s,a)              ( ( (s) + ( (a) - 1 ) ) & -(a) )
+#define ZP_ALIGN_SIZE(s,a)              zp_align_size( s, a )
 
 #define ZP_OFFSET_PTR(ptr, offset)      static_cast<void*>( static_cast<zp_uint8_t*>(ptr) + static_cast<zp_ptrdiff_t>(offset) )
 

@@ -8,9 +8,7 @@ namespace zp
 {
     RenderGraph::RenderGraph( Memory scratchMemory, MemoryLabel memoryLabel )
         : m_frameAllocator( { scratchMemory.ptr, scratchMemory.size }, {}, {} )
-        , m_executionPasses()
-        , m_rasterPasses()
-        , m_computePasses()
+        , m_allPassData()
         , m_executions()
         , m_conditionals()
         , m_resourceCounts()
@@ -25,10 +23,7 @@ namespace zp
     {
         m_frameAllocator.policy().reset();
 
-        m_executionPasses = MemoryList<ExecutionPass>( AllocateFrameMemoryArray<ExecutionPass>( m_executionPassCount ) );
-        m_rasterPasses = MemoryList<RasterPass>( AllocateFrameMemoryArray<RasterPass>( m_rasterPassCount ) );
-        m_computePasses = MemoryList<ComputePass>( AllocateFrameMemoryArray<ComputePass>( m_computePassCount ) );
-
+        m_allPassData = MemoryList<PassData>( AllocateFrameMemoryArray<PassData>( m_executionPassCount ) );
 
         m_resourceTexture = MemoryList<int>( AllocateFrameMemoryArray<int>( m_resourceCounts[ ( zp_size_t)RenderGraphResourceType::Texture ] ) );
         m_resourceRenderTexture = MemoryList<int>( AllocateFrameMemoryArray<int>( m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ] ) );
@@ -54,7 +49,7 @@ namespace zp
 
         m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ] = zp_max( m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ], m_resourceRenderTexture.length() );
 
-        return { .index = static_cast<zp_uint32_t>( index ) };
+        return { index, 0};
     }
 
     RenderTextureHandle RenderGraph::ImportBackBufferDepth()
@@ -64,7 +59,7 @@ namespace zp
 
         m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ] = zp_max( m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ], m_resourceRenderTexture.length() );
 
-        return { .index = static_cast<zp_uint32_t>( index ) };
+        return { index, 0 };
     }
 
     RenderTextureHandle RenderGraph::CreateRenderTexture( int renderTextureDesc )
@@ -74,7 +69,7 @@ namespace zp
 
         m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ] = zp_max( m_resourceCounts[ (zp_size_t)RenderGraphResourceType::RenderTexture ], m_resourceRenderTexture.length() );
 
-        return { .index = static_cast<zp_uint32_t>( index ) };
+        return { index, 0 };
     }
 
     FloatHandle RenderGraph::CreateGlobalFloat( zp_float32_t value )
@@ -84,7 +79,7 @@ namespace zp
 
         m_resourceCounts[ (zp_size_t)RenderGraphResourceType::Float ] = zp_max( m_resourceCounts[ (zp_size_t)RenderGraphResourceType::Float ], m_resourceFloat.length() );
 
-        return { .index = static_cast<zp_uint32_t>( index ) };
+        return { index, 0 };
     }
 
     void RenderGraph::Present( const RenderTextureHandle& present )
@@ -102,34 +97,5 @@ namespace zp
     Memory RenderGraph::AllocateFrameMemory( zp_size_t size )
     {
         return { .ptr = m_frameAllocator.allocate( size, kDefaultMemoryAlignment ), .size = size };
-    }
-
-    zp_size_t RenderGraph::RequestExecutionPass()
-    {
-        const zp_size_t index = m_executionPasses.length();
-        m_executionPasses.push_back_empty();
-        m_executionPassCount = zp_max( m_executionPasses.length(), m_executionPassCount );
-        return index;
-    }
-
-    zp_size_t RenderGraph::RequestRasterPass()
-    {
-        const zp_size_t index = m_rasterPasses.length();
-        m_rasterPasses.push_back_empty();
-        m_rasterPassCount = zp_max( m_rasterPasses.length(), m_rasterPassCount );
-        return index;
-    }
-
-    zp_size_t RenderGraph::RequestComputePass()
-    {
-        const zp_size_t index = m_computePasses.length();
-        m_computePasses.push_back_empty();
-        m_computePassCount = zp_max( m_computePasses.length(), m_computePassCount );
-        return index;
-    }
-
-    void RenderGraph::RequestPassData( zp_size_t passDataSize, void** outPassData )
-    {
-        *outPassData = m_frameAllocator.allocate( passDataSize, kDefaultMemoryAlignment );
     }
 }

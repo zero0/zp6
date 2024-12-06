@@ -119,6 +119,11 @@ constexpr zp_bool_t zp_is_pow2( zp_uint32_t x )
     return ( x & ( x - 1 ) ) == 0;
 }
 
+constexpr zp_size_t zp_align_size( zp_size_t size, zp_size_t alignment )
+{
+    return ( size + ( alignment - 1 ) ) & -alignment;
+}
+
 void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength );
 
 void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value );

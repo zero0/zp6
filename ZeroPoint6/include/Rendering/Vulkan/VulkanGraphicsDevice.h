@@ -13,8 +13,6 @@
 
 #include "Rendering/GraphicsDevice.h"
 
-#include <vulkan/vulkan.h>
-
 namespace zp
 {
     enum
@@ -143,6 +141,7 @@ namespace zp
 #pragma endregion
 
     private:
+#if 0
         VkCommandPool getCommandPool( CommandQueue* commandQueue );
 
         VkDescriptorSetLayout getDescriptorSetLayout( const VkDescriptorSetLayoutCreateInfo& createInfo );
@@ -217,7 +216,7 @@ namespace zp
 
         VkAllocationCallbacks m_vkAllocationCallbacks;
 
-        VkQueue m_vkRenderQueues[RenderQueue_Count];
+        VkQueue m_vkQueues[RenderQueue_Count];
 
         VkPipelineCache m_vkPipelineCache;
         VkDescriptorPool m_vkDescriptorPool;
@@ -239,7 +238,7 @@ namespace zp
         QueueFamilies m_queueFamilies;
 
         zp_uint64_t m_currentFrameIndex;
-
+#endif
     public:
         const MemoryLabel memoryLabel;
     };

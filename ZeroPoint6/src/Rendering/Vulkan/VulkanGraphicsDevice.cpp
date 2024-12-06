@@ -20,25 +20,19 @@
 #include "Rendering/GraphicsDevice.h"
 #include "Rendering/Vulkan/VulkanGraphicsDevice.h"
 
-#include <vulkan/vulkan.h>
-
 #if ZP_OS_WINDOWS
-#define WIN32_LEAN_AND_MEAN
-
-#include <windows.h>
-
 #define VK_USE_PLATFORM_WIN32_KHR
-
-#include <vulkan/vulkan_win32.h>
-
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
+
+#include "Volk/volk.h"
 
 #if ZP_DEBUG
 #define HR( r )                                             \
 do                                                          \
 {                                                           \
-    const VkResult ZP_CONCAT(_vkResult_,__LINE__) = (r);    \
-    if( ZP_CONCAT(_vkResult_,__LINE__) != VK_SUCCESS )      \
+    if( const VkResult result = (r); result != VK_SUCCESS ) \
     {                                                       \
         Log::error() << "HR Failed: " #r << Log::endl;      \
         Platform::DebugBreak();                             \
@@ -562,7 +556,30 @@ namespace zp
 
 #pragma region Create Hash Functions
 
-        zp_hash128_t CalculateHash( const VkDescriptorSetLayoutCreateInfo& createInfo )
+        constexpr zp_hash128_t CalculateHash( const VkSamplerCreateInfo& createInfo )
+        {
+            zp_hash128_t hash = zp_fnv128_1a( ZP_NAMEOF( VkSamplerCreateInfo ) );
+            hash = zp_fnv128_1a( createInfo.flags, hash );
+            hash = zp_fnv128_1a( createInfo.magFilter, hash );
+            hash = zp_fnv128_1a( createInfo.minFilter, hash );
+            hash = zp_fnv128_1a( createInfo.mipmapMode, hash );
+            hash = zp_fnv128_1a( createInfo.addressModeU, hash );
+            hash = zp_fnv128_1a( createInfo.addressModeV, hash );
+            hash = zp_fnv128_1a( createInfo.addressModeW, hash );
+            hash = zp_fnv128_1a( createInfo.mipLodBias, hash );
+            hash = zp_fnv128_1a( createInfo.anisotropyEnable, hash );
+            hash = zp_fnv128_1a( createInfo.maxAnisotropy, hash );
+            hash = zp_fnv128_1a( createInfo.compareEnable, hash );
+            hash = zp_fnv128_1a( createInfo.compareOp, hash );
+            hash = zp_fnv128_1a( createInfo.minLod, hash );
+            hash = zp_fnv128_1a( createInfo.maxLod, hash );
+            hash = zp_fnv128_1a( createInfo.borderColor, hash );
+            hash = zp_fnv128_1a( createInfo.unnormalizedCoordinates, hash );
+
+            return hash;
+        }
+
+        constexpr zp_hash128_t CalculateHash( const VkDescriptorSetLayoutCreateInfo& createInfo )
         {
             zp_hash128_t hash = zp_fnv128_1a( ZP_NAMEOF( VkDescriptorSetLayoutCreateInfo ) );
             hash = zp_fnv128_1a( createInfo.flags, hash );
@@ -580,7 +597,7 @@ namespace zp
             return hash;
         }
 
-        zp_hash128_t CalculateHash( const VkRenderPassCreateInfo& createInfo )
+        constexpr zp_hash128_t CalculateHash( const VkRenderPassCreateInfo& createInfo )
         {
             zp_hash128_t hash = zp_fnv128_1a( ZP_NAMEOF( VkRenderPassCreateInfo ) );
             hash = zp_fnv128_1a( createInfo.flags, hash );
@@ -669,15 +686,15 @@ namespace zp
             {
                 if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT )
                 {
-                    zp_printfln( "[INFO] %s", pCallbackData->pMessage );
+                    Log::info() << pCallbackData->pMessage << Log::endl;
                 }
                 else if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT )
                 {
-                    zp_printfln( "[WARN] %s", pCallbackData->pMessage );
+                    Log::warning() << pCallbackData->pMessage << Log::endl;
                 }
                 else if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
                 {
-                    zp_error_printfln( pCallbackData->pMessage );
+                    Log::error() << pCallbackData->pMessage << Log::endl;
                 }
 
                 if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
@@ -685,7 +702,7 @@ namespace zp
                     MessageBoxResult result = Platform::ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
                     if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
                     {
-                        exit( 1 );
+                        Platform::Exit( 1 );
                     }
                     else if( result == ZP_MESSAGE_BOX_RESULT_RETRY )
                     {
@@ -745,7 +762,7 @@ namespace zp
             info.append( ' ' );
 
             SizeInfo sizeInfo = GetSizeInfoFromBytes( properties.limits.maxMemoryAllocationCount MB );
-            info.appendFormat( "%1.1f %c%c", sizeInfo.size, sizeInfo.k, sizeInfo.b );
+            info.appendFormat( "%1.1f %s", sizeInfo.size, sizeInfo.mem );
             info.append( ' ' );
 
             switch( properties.deviceType )
@@ -774,10 +791,10 @@ namespace zp
             if( properties.vendorID == 4318 ) // NVidia
             {
                 info.appendFormat( "%d.%d.%d.%d",
-                    ( properties.driverVersion >> 22 ) & 0x03FFU,
-                    ( properties.driverVersion >> 14 ) & 0xFFU,
-                    ( properties.driverVersion >> 6 ) & 0xFFU,
-                    ( properties.driverVersion ) & 0x3FU );
+                                   ( properties.driverVersion >> 22 ) & 0x03FFU,
+                                   ( properties.driverVersion >> 14 ) & 0xFFU,
+                                   ( properties.driverVersion >> 6 ) & 0xFFU,
+                                   ( properties.driverVersion ) & 0x3FU );
             }
             else
             {
@@ -788,11 +805,13 @@ namespace zp
             info.append( "Vulkan" );
             info.append( ' ' );
 
-            info.appendFormat( "%d.%d.%d.%d",
-                VK_API_VERSION_VARIANT( properties.apiVersion ),
+            info.appendFormat(
+                "%d.%d.%d (%d)",
                 VK_API_VERSION_MAJOR( properties.apiVersion ),
                 VK_API_VERSION_MINOR( properties.apiVersion ),
-                VK_API_VERSION_PATCH( properties.apiVersion ) );
+                VK_API_VERSION_PATCH( properties.apiVersion ),
+                VK_API_VERSION_VARIANT( properties.apiVersion )
+            );
 
             Log::message() << info.c_str() << Log::endl;
         }
@@ -806,9 +825,8 @@ namespace zp
             vkGetPhysicalDeviceProperties( physicalDevice, &physicalDeviceProperties );
             vkGetPhysicalDeviceFeatures( physicalDevice, &physicalDeviceFeatures );
 
-#if ZP_DEBUG
-            zp_printfln( "Testing %s", physicalDeviceProperties.deviceName );
-#endif
+            Log::message() << "Testing " << physicalDeviceProperties.deviceName << "..." << Log::endl;
+
             // require discrete gpu
             isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
@@ -1044,6 +1062,183 @@ namespace zp
                     break;
             }
         }
+
+        template<typename T0, typename T1>
+        constexpr void pNextPushFront( T0& t0, T1& t1 )
+        {
+            t1.pNext = t0.pNext;
+            t0.pNext = &t1;
+        }
+
+        zp_bool_t IsExtensionSupported( const String& extension, const Vector<VkExtensionProperties>& availableExtensions )
+        {
+            for( const auto& ext : availableExtensions )
+            {
+                if( zp_strcmp( extension, ext.extensionName ) == 0 )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    namespace
+    {
+        class VulkanContext
+        {
+        public:
+            VulkanContext() = default;
+            ~VulkanContext();
+
+            void Initialize(const GraphicsDeviceDesc& graphicsDeviceDesc);
+
+            void Destroy();
+
+            [[nodiscard]] VkInstance GetInstance() const
+            {
+                return m_vkInstance;
+            }
+
+            [[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const
+            {
+                return m_vkPhysicalDevice;
+            }
+
+            [[nodiscard]] VkDevice GetLocalDevice() const
+            {
+                return m_vkLocalDevice;
+            }
+
+            [[nodiscard]] VkQueue GetQueue( RenderQueue renderQueue = ZP_RENDER_QUEUE_GRAPHICS ) const
+            {
+                ZP_ASSERT( renderQueue < RenderQueue_Count );
+                return m_vkQueues[ renderQueue ];
+            }
+
+        private:
+            VkInstance m_vkInstance;
+            VkPhysicalDevice m_vkPhysicalDevice;
+            VkDevice m_vkLocalDevice;
+#if ZP_DEBUG
+            VkDebugUtilsMessengerEXT m_vkDebugMessenger;
+#endif
+            VkAllocationCallbacks m_vkAllocationCallbacks;
+
+            VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties;
+
+            VkQueue m_vkQueues[RenderQueue_Count];
+        };
+
+        VulkanContext::~VulkanContext()
+        {
+            ZP_ASSERT(m_vkInstance == VK_NULL_HANDLE);
+        }
+
+        void VulkanContext::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
+        {
+            const VkApplicationInfo applicationInfo {
+                .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                .pApplicationName = !graphicsDeviceDesc.appName.empty() ? graphicsDeviceDesc.appName.c_str() : "ZeroPoint Application",
+                .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
+                .pEngineName = "ZeroPoint",
+                .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
+                .apiVersion = VK_API_VERSION_1_1,
+            };
+
+            zp_uint32_t count {};
+            vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr );
+            Vector<VkExtensionProperties> availableExtensionProperties( count, MemoryLabels::Temp );
+            availableExtensionProperties.resize_unsafe( count );
+            vkEnumerateInstanceExtensionProperties( nullptr, &count, availableExtensionProperties.data() );
+
+            Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
+
+            const char* kExtensionNames[] {
+                VK_KHR_SURFACE_EXTENSION_NAME,
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+                VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+#if ZP_OS_WINDOWS
+                VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
+#if ZP_DEBUG
+                VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
+            };
+
+            const char* kValidationLayers[] {
+#if ZP_DEBUG
+                "VK_LAYER_KHRONOS_validation"
+#endif
+            };
+
+            // create instance
+            VkInstanceCreateInfo instanceCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                .pApplicationInfo = &applicationInfo,
+                .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
+                .ppEnabledLayerNames = kValidationLayers,
+                .enabledExtensionCount = ZP_ARRAY_SIZE( kExtensionNames ),
+                .ppEnabledExtensionNames = kExtensionNames,
+            };
+
+#if ZP_DEBUG
+            // add debug info to create instance
+            VkDebugUtilsMessengerCreateInfoEXT createInstanceDebugMessengerInfo {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                .pfnUserCallback = DebugCallback,
+                .pUserData = nullptr, // Optional
+            };
+
+            //instanceCreateInfo.pNext = &createInstanceDebugMessengerInfo;
+            pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
+#endif
+            HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
+
+            volkLoadInstance( m_vkInstance );
+
+#if ZP_DEBUG
+            // create debug messenger
+            const VkDebugUtilsMessengerCreateInfoEXT createDebugMessengerInfo {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                .pfnUserCallback = DebugCallback,
+                .pUserData = nullptr, // Optional
+            };
+
+            HR( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger ) );
+            //HR( CreateDebugUtilsMessengerEXT( m_vkInstance, &createDebugMessengerInfo, nullptr, &m_vkDebugMessenger ));
+#endif
+        }
+
+        void VulkanContext::Destroy()
+        {
+            ZP_ASSERT(m_vkLocalDevice);
+
+            HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
+#if ZP_DEBUG
+            CallDebugUtil( vkDestroyDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, m_vkDebugMessenger, &m_vkAllocationCallbacks );
+#endif // ZP_DEBUG
+
+            vkDestroyDevice( m_vkLocalDevice );
+            vkDestroyInstance( m_vkInstance );
+
+            zp_zero_memory( this );
+        }
     }
 
     //
@@ -1089,7 +1284,7 @@ namespace zp
     {
         zp_zero_memory_array( m_perFrameData );
 
-        VkApplicationInfo applicationInfo {
+        const VkApplicationInfo applicationInfo {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .pApplicationName = !graphicsDeviceDesc.appName.empty() ? graphicsDeviceDesc.appName.c_str() : "ZeroPoint Application",
             .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
@@ -1138,13 +1333,14 @@ namespace zp
             .pUserData = nullptr, // Optional
         };
 
-        instanceCreateInfo.pNext = &createInstanceDebugMessengerInfo;
+        //instanceCreateInfo.pNext = &createInstanceDebugMessengerInfo;
+        pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
 #endif
         HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
 
 #if ZP_DEBUG
         // create debug messenger
-        VkDebugUtilsMessengerCreateInfoEXT createDebugMessengerInfo {
+        const VkDebugUtilsMessengerCreateInfoEXT createDebugMessengerInfo {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
             .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -1192,7 +1388,7 @@ namespace zp
             auto hInstance = reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
 
             // create surface
-            VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
+            const VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
                 .hinstance = hInstance,
                 .hwnd = hWnd,
@@ -1297,16 +1493,16 @@ namespace zp
             VkPhysicalDeviceFeatures deviceFeatures {};
             vkGetPhysicalDeviceFeatures( m_vkPhysicalDevice, &deviceFeatures );
 
-            VkPhysicalDeviceSynchronization2Features synchronization2Features {
+            const VkPhysicalDeviceSynchronization2Features synchronization2Features {
                 .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
                 .pNext = nullptr,
                 .synchronization2 = VK_TRUE
             };
 
-            VkDeviceCreateInfo localDeviceCreateInfo {
+            const VkDeviceCreateInfo localDeviceCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
                 .pNext = &synchronization2Features,
-                .queueCreateInfoCount = static_cast<uint32_t >(deviceQueueCreateInfos.size()),
+                .queueCreateInfoCount = static_cast<uint32_t>( deviceQueueCreateInfos.size() ),
                 .pQueueCreateInfos = deviceQueueCreateInfos.data(),
                 .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
                 .ppEnabledLayerNames = kValidationLayers,
@@ -1321,11 +1517,16 @@ namespace zp
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.transferFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ] );
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.computeFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_COMPUTE ] );
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.presentFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ] );
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], "Graphics Queue" );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ], "Transfer Queue" );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_vkRenderQueues[ ZP_RENDER_QUEUE_COMPUTE ], "Compute Queue" );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ], "Present Queue" );
         }
 
         // create pipeline cache
         {
-            VkPipelineCacheCreateInfo pipelineCacheCreateInfo {
+            const VkPipelineCacheCreateInfo pipelineCacheCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
                 .initialDataSize = 0,
                 .pInitialData = nullptr,
@@ -1384,7 +1585,7 @@ namespace zp
                 { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = 128 }
             };
 
-            VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
+            const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                 .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
                 .maxSets = 128,
@@ -2320,9 +2521,9 @@ namespace zp
         };
 
         VkSampler sampler;
-        vkCreateSampler(m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &sampler);
+        vkCreateSampler( m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &sampler );
 
-        SetDebugObjectName(m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_SAMPLER, sampler);
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_SAMPLER, sampler );
 
         VkDescriptorSetLayoutBinding bindings[] = {
             {
@@ -2358,13 +2559,13 @@ namespace zp
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptorSet );
 
-        VkPushConstantRange pushConstantRange[] = {{}};
+        VkPushConstantRange pushConstantRange[] = { {} };
 
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .setLayoutCount = 1,
             .pSetLayouts = &setLayout,
-            .pushConstantRangeCount = ZP_ARRAY_SIZE(pushConstantRange),
+            .pushConstantRangeCount = ZP_ARRAY_SIZE( pushConstantRange ),
             .pPushConstantRanges = pushConstantRange,
         };
 
@@ -3280,9 +3481,9 @@ namespace zp
             {
                 // sort delayed destroy handles by how they were allocated
                 handlesToDestroy.sort( []( const DelayedDestroy& a, const DelayedDestroy& b )
-                {
-                    return zp_cmp( a.order, b.order );
-                } );
+                                       {
+                                           return zp_cmp( a.order, b.order );
+                                       } );
 
                 // destroy each delayed destroy handle
                 for( const DelayedDestroy& delayedDestroy : handlesToDestroy )

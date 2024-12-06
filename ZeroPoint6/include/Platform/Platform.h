@@ -350,6 +350,8 @@ namespace zp
         {
             return (T)GetProcAddress( libraryHandle, name.c_str() );
         }
+
+        void Exit( zp_int32_t exitCode );
     }
 
     struct ThreadHandle

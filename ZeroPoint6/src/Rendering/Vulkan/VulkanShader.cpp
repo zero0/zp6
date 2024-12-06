@@ -24,11 +24,12 @@ static VkResult CreateShader(
         .pCode = reinterpret_cast<const uint32_t*>(data),
     };
 
-    const VkResult result = vkCreateShaderModule(
-        localDevice,
-        &shaderModuleCreateInfo,
-        allocationCallbacks,
-        &shaderModule );
+    const VkResult result = {};
+        //vkCreateShaderModule(
+        //localDevice,
+        //&shaderModuleCreateInfo,
+        //allocationCallbacks,
+        //&shaderModule );
     return result;
 }
 
@@ -37,7 +38,7 @@ static void DestroyShader(
     const VkAllocationCallbacks* allocationCallbacks,
     VkShaderModule shaderModule )
 {
-    vkDestroyShaderModule( localDevice, shaderModule, allocationCallbacks );
+    //vkDestroyShaderModule( localDevice, shaderModule, allocationCallbacks );
 }
 
 static VkResult CreateVertexShader(

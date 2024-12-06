@@ -1053,6 +1053,11 @@ namespace zp
         return static_cast<ProcAddressFunc>( procAddress );
     }
 
+    void Platform::Exit( zp_int32_t exitCode )
+    {
+        ::exit( exitCode );
+    }
+
     zp_handle_t Platform::AllocateThreadPool( zp_uint32_t minThreads, zp_uint32_t maxThreads )
     {
         void* mem = ::HeapAlloc( ::GetProcessHeap(), HEAP_NO_SERIALIZE, sizeof( TP_CALLBACK_ENVIRON ) );
