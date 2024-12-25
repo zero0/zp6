@@ -352,34 +352,58 @@ namespace zp
         typedef T value_type;
         typedef T& reference;
         typedef const T& const_reference;
-        typedef T* pointer;
         typedef const T* const_pointer;
-        typedef T* iterator;
         typedef const T* const_iterator;
 
     public:
-        ReadonlyMemoryArray();
+        ReadonlyMemoryArray() = default;
 
-        ~ReadonlyMemoryArray();
+        ~ReadonlyMemoryArray() = default;
 
-        ReadonlyMemoryArray( pointer ptr, zp_size_t length );
+        ReadonlyMemoryArray( const_pointer ptr, zp_size_t length )
+            : m_ptr( ptr )
+            , m_length( length )
+        {
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const
+        {
+            return m_length;
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t empty() const
+        {
+            return m_length == 0;
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
+        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const
+        {
+            ZP_ASSERT( index < m_length );
+            return m_ptr[ index ];
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const;
+        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const
+        {
+            return m_ptr;
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
+        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const
+        {
+            return m_ptr + m_length;
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray split( zp_size_t index ) const;
+        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray split( zp_size_t index ) const
+        {
+            return ReadonlyMemoryArray<T>( m_ptr + index, m_length - index );
+        }
 
-        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray split( zp_size_t index, zp_size_t length ) const;
+        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray split( zp_size_t index, zp_size_t length ) const
+        {
+            return ReadonlyMemoryArray<T>( m_ptr + index, length );
+        }
 
     private:
-        pointer m_ptr;
+        const_pointer m_ptr;
         zp_size_t m_length;
     };
 }
@@ -402,7 +426,7 @@ namespace zp
     public:
         FixedArray();
 
-        FixedArray( value_type (& ptr)[Size] );
+        explicit FixedArray( value_type (& ptr)[Size] );
 
         template<typename ... Args>
         FixedArray( Args ... m );
@@ -411,7 +435,7 @@ namespace zp
 
         [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
 
-        [[nodiscard]] ZP_FORCEINLINE zp_bool_t isEmpty() const;
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t empty() const;
 
         [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
 
@@ -1243,9 +1267,9 @@ namespace zp
     }
 
     template<typename T, zp_size_t Size>
-    zp_bool_t FixedArray<T, Size>::isEmpty() const
+    zp_bool_t FixedArray<T, Size>::empty() const
     {
-        return Size > 0;
+        return Size == 0;
     }
 
     template<typename T, zp_size_t Size>
@@ -1308,6 +1332,12 @@ namespace zp
     {
         ZP_ASSERT( m_ptr && ( index + length ) < Size );
         return FixedArray<T, Size>( m_ptr + index, length );
+    }
+
+    template<typename T, zp_size_t Size>
+    ReadonlyMemoryArray<T> FixedArray<T, Size>::asReadonly() const
+    {
+        return ReadonlyMemoryArray<T>( m_ptr, Size );
     }
 }
 

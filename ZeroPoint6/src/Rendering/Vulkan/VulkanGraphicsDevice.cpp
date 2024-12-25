@@ -8,7 +8,6 @@
 #include "Core/Vector.h"
 #include "Core/Set.h"
 #include "Core/Math.h"
-#include "Core/Atomic.h"
 #include "Core/Profiler.h"
 #include "Core/String.h"
 #include "Core/Log.h"
@@ -20,21 +19,16 @@
 #include "Rendering/GraphicsDevice.h"
 #include "Rendering/Vulkan/VulkanGraphicsDevice.h"
 
-#if ZP_OS_WINDOWS
-#define VK_USE_PLATFORM_WIN32_KHR
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
 #include "Volk/volk.h"
 
+// ZP_CONCAT(_vkResult_,__LINE__)
 #if ZP_DEBUG
 #define HR( r )                                             \
 do                                                          \
 {                                                           \
     if( const VkResult result = (r); result != VK_SUCCESS ) \
     {                                                       \
-        Log::error() << "HR Failed: " #r << Log::endl;      \
+        Log::error() << #r << Log::endl;      \
         Platform::DebugBreak();                             \
     }                                                       \
 }                                                           \
@@ -682,24 +676,24 @@ namespace zp
                                             | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
                                             | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 
-            if( messageSeverity & messageMask )
+            if( zp_flag32_any_set( messageSeverity, messageMask ) )
             {
-                if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT )
+                if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT ) )
                 {
                     Log::info() << pCallbackData->pMessage << Log::endl;
                 }
-                else if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT )
+                else if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) )
                 {
                     Log::warning() << pCallbackData->pMessage << Log::endl;
                 }
-                else if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
+                else if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) )
                 {
                     Log::error() << pCallbackData->pMessage << Log::endl;
                 }
 
-                if( messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
+                if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) )
                 {
-                    MessageBoxResult result = Platform::ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
+                    const MessageBoxResult result = Platform::ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
                     if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
                     {
                         Platform::Exit( 1 );
@@ -711,7 +705,7 @@ namespace zp
                 }
             }
 
-            const VkBool32 shouldAbort = messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? VK_TRUE : VK_FALSE;
+            const VkBool32 shouldAbort = zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) ? VK_TRUE : VK_FALSE;
             return shouldAbort;
         }
 
@@ -719,11 +713,11 @@ namespace zp
 
 #if ZP_DEBUG
 
-        void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, const char* name, VkObjectType objectType, void* objectHandle )
+        void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, VkObjectType objectType, void* objectHandle, const char* name )
         {
-            if( name )
+            if( name != nullptr )
             {
-                VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
+                const VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
                     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                     .objectType = objectType,
                     .objectHandle = reinterpret_cast<uint64_t>(objectHandle),
@@ -734,16 +728,13 @@ namespace zp
             }
         }
 
-        void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, VkObjectType objectType, void* objectHandle, const char* format, ... )
+        template<typename ... Args>
+        void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, VkObjectType objectType, void* objectHandle, const char* format, Args... args )
         {
-            char name[512];
+            MutableFixedString512 name;
+            name.appendFormat( format, args... );
 
-            va_list args;
-            va_start( args, format );
-            zp_snprintf( name, format, args );
-            va_end( args );
-
-            SetDebugObjectName( vkInstance, vkDevice, name, objectType, objectHandle );
+            SetDebugObjectName( vkInstance, vkDevice, objectType, objectHandle, name.c_str() );
         }
 
 #else // !ZP_DEBUG
@@ -752,11 +743,13 @@ namespace zp
 
 #pragma endregion
 
-        void PrintPhysicalDeviceInfo( VkPhysicalDevice physicalDevice )
+        enum VenderIDs
         {
-            VkPhysicalDeviceProperties properties {};
-            vkGetPhysicalDeviceProperties( physicalDevice, &properties );
+            kNVidiaVenderID = 4318,
+        };
 
+        void PrintPhysicalDeviceInfo( const VkPhysicalDeviceProperties& properties )
+        {
             MutableFixedString512 info;
             info.append( properties.deviceName );
             info.append( ' ' );
@@ -788,13 +781,13 @@ namespace zp
             }
             info.append( ' ' );
 
-            if( properties.vendorID == 4318 ) // NVidia
+            if( properties.vendorID == kNVidiaVenderID ) // NVidia
             {
                 info.appendFormat( "%d.%d.%d.%d",
-                                   ( properties.driverVersion >> 22 ) & 0x03FFU,
-                                   ( properties.driverVersion >> 14 ) & 0xFFU,
-                                   ( properties.driverVersion >> 6 ) & 0xFFU,
-                                   ( properties.driverVersion ) & 0x3FU );
+                    ( properties.driverVersion >> 22 ) & 0x03FFU,
+                    ( properties.driverVersion >> 14 ) & 0xFFU,
+                    ( properties.driverVersion >> 6 ) & 0xFFU,
+                    ( properties.driverVersion ) & 0x3FU );
             }
             else
             {
@@ -816,74 +809,31 @@ namespace zp
             Log::message() << info.c_str() << Log::endl;
         }
 
-        zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const GraphicsDeviceDesc& graphicsDeviceDesc )
+        zp_bool_t IsPhysicalDeviceSuitable( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface )
         {
             zp_bool_t isSuitable = true;
 
-            VkPhysicalDeviceProperties physicalDeviceProperties;
-            VkPhysicalDeviceFeatures physicalDeviceFeatures;
-            vkGetPhysicalDeviceProperties( physicalDevice, &physicalDeviceProperties );
-            vkGetPhysicalDeviceFeatures( physicalDevice, &physicalDeviceFeatures );
+            VkPhysicalDeviceProperties2 physicalDeviceProperties {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+            };
+            vkGetPhysicalDeviceProperties2( physicalDevice, &physicalDeviceProperties );
 
-            Log::message() << "Testing " << physicalDeviceProperties.deviceName << "..." << Log::endl;
+            Log::message() << "Testing " << physicalDeviceProperties.properties.deviceName << "..." << Log::endl;
 
             // require discrete gpu
-            isSuitable &= physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-
-            // support geometry shaders
-            if( graphicsDeviceDesc.geometryShaderSupport )
-            {
-                isSuitable &= physicalDeviceFeatures.geometryShader;
-            }
-
-            // support tessellation shaders
-            if( graphicsDeviceDesc.tessellationShaderSupport )
-            {
-                isSuitable &= physicalDeviceFeatures.tessellationShader;
-            }
+            isSuitable &= physicalDeviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
 #if ZP_USE_PROFILER
-            isSuitable &= physicalDeviceProperties.limits.timestampComputeAndGraphics;
+            isSuitable &= physicalDeviceProperties.properties.limits.timestampComputeAndGraphics;
 
-            isSuitable &= physicalDeviceFeatures.pipelineStatisticsQuery;
+            //VkPhysicalDeviceFeatures physicalDeviceFeatures {};
+            //vkGetPhysicalDeviceFeatures( physicalDevice, &physicalDeviceFeatures );
+            //
+            //isSuitable &= physicalDeviceFeatures.pipelineStatisticsQuery;
 #endif
-
-            const char* kRequiredExtensions[] {
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME
-            };
-
-            uint32_t extensionCount = 0;
-            HR( vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE ) );
-
-            Vector<VkExtensionProperties> availableExtensions( extensionCount, MemoryLabels::Temp );
-            availableExtensions.resize_unsafe( extensionCount );
-
-            HR( vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &extensionCount, availableExtensions.data() ) );
-
-            zp_uint32_t foundRequiredExtensions = 0;
-            for( const VkExtensionProperties& availableExtension : availableExtensions )
-            {
-                zp_bool_t found = false;
-                for( const char* requiredExtension : kRequiredExtensions )
-                {
-                    if( zp_strcmp( availableExtension.extensionName, requiredExtension ) == 0 )
-                    {
-                        found = true;
-                        ++foundRequiredExtensions;
-                        break;
-                    }
-                }
-#if ZP_DEBUG
-                zp_printfln( "[%c] %s", found ? 'X' : ' ', availableExtension.extensionName );
-#endif
-            }
-
-            // check that required extensions are available
-            const zp_bool_t areExtensionsAvailable = foundRequiredExtensions == ZP_ARRAY_SIZE( kRequiredExtensions );
-            isSuitable &= areExtensionsAvailable;
 
             // check that surface has formats and present modes
-            if( surface != VK_NULL_HANDLE && areExtensionsAvailable )
+            if( surface != VK_NULL_HANDLE )
             {
                 uint32_t formatCount = 0;
                 HR( vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE ) );
@@ -899,18 +849,20 @@ namespace zp
 
 #pragma region Swapchain
 
-        VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& surfaceFormats, int format, ColorSpace colorSpace )
+        VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& supportedSurfaceFormats, const ReadonlyMemoryArray<VkSurfaceFormatKHR>& preferredSurfaceFormats )
         {
-            VkSurfaceFormatKHR chosenFormat = surfaceFormats[ 0 ];
+            VkSurfaceFormatKHR chosenFormat = supportedSurfaceFormats[ 0 ];
 
-            const VkColorSpaceKHR searchColorSpace = Convert( colorSpace );
-
-            for( const VkSurfaceFormatKHR& surfaceFormat : surfaceFormats )
+            for( const VkSurfaceFormatKHR& supportedFormat : supportedSurfaceFormats )
             {
-                // VK_FORMAT_B8G8R8A8_SNORM
-                if( surfaceFormat.format == format && surfaceFormat.colorSpace == searchColorSpace )
+                const zp_size_t foundIndex = zp_find_index( preferredSurfaceFormats.begin(), preferredSurfaceFormats.end(), [ &supportedFormat ]( const VkSurfaceFormatKHR& preferredFormat )
                 {
-                    chosenFormat = surfaceFormat;
+                    return supportedFormat.format == preferredFormat.format && supportedFormat.colorSpace == preferredFormat.colorSpace;
+                } );
+
+                if( foundIndex != zp::npos )
+                {
+                    chosenFormat = supportedFormat;
                     break;
                 }
             }
@@ -942,28 +894,166 @@ namespace zp
             return chosenPresentMode;
         }
 
-        constexpr VkExtent2D ChooseSwapChainExtent( const VkSurfaceCapabilitiesKHR& surfaceCapabilities, uint32_t requestedWidth, uint32_t requestedHeight )
+        constexpr VkExtent2D ChooseSwapChainExtent( const VkSurfaceCapabilitiesKHR& surfaceCapabilities, const VkExtent2D& requestedExtents )
         {
             VkExtent2D chosenExtents;
 
-            if( surfaceCapabilities.currentExtent.width == UINT32_MAX && surfaceCapabilities.currentExtent.height == UINT32_MAX )
+            if( surfaceCapabilities.currentExtent.width == zp_limit<zp_uint32_t>::max() && surfaceCapabilities.currentExtent.height == zp_limit<zp_uint32_t>::max() )
             {
-                chosenExtents.width = requestedWidth;
-                chosenExtents.height = requestedHeight;
+                chosenExtents.width = requestedExtents.width;
+                chosenExtents.height = requestedExtents.height;
             }
             else
             {
                 chosenExtents.width = zp_clamp(
-                    requestedWidth,
+                    requestedExtents.width,
                     surfaceCapabilities.minImageExtent.width,
                     surfaceCapabilities.maxImageExtent.width );
                 chosenExtents.height = zp_clamp(
-                    requestedHeight,
+                    requestedExtents.height,
                     surfaceCapabilities.minImageExtent.height,
                     surfaceCapabilities.maxImageExtent.height );
             }
 
             return chosenExtents;
+        }
+
+        struct PipelineStateAccess
+        {
+            VkPipelineStageFlags2 stage;
+            VkAccessFlags2 access;
+        };
+
+        PipelineStateAccess MakePipelineStageAccess( VkImageLayout state )
+        {
+            switch( state )
+            {
+                case VK_IMAGE_LAYOUT_UNDEFINED:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                        .access = VK_ACCESS_2_NONE
+                    };
+
+                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        .access = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                    };
+
+                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT,
+                        .access = VK_ACCESS_2_SHADER_READ_BIT
+                    };
+
+                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                        .access = VK_ACCESS_2_TRANSFER_WRITE_BIT
+                    };
+
+                case VK_IMAGE_LAYOUT_GENERAL:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                        .access = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT
+                    };
+
+                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        .access = VK_ACCESS_2_NONE
+                    };
+
+                default:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                        .access = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT
+                    };
+            }
+        }
+
+        void CmdTransitionImageLayout( VkCommandBuffer cmd, VkImage image, VkImageLayout srcLayout, VkImageLayout dstLayout, VkImageSubresourceRange subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1 } )
+        {
+            const auto [srcStage, srcAccess] = MakePipelineStageAccess( srcLayout );
+            const auto [dstStage, dstAccess] = MakePipelineStageAccess( dstLayout );
+
+            const VkImageMemoryBarrier2 imageMemoryBarrier {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = srcStage,
+                .srcAccessMask       = srcAccess,
+                .dstStageMask        = dstStage,
+                .dstAccessMask       = dstAccess,
+                .oldLayout           = srcLayout,
+                .newLayout           = dstLayout,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image               = image,
+                .subresourceRange    = subresourceRange,
+            };
+
+            const VkDependencyInfo dependencyInfo {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &imageMemoryBarrier,
+            };
+
+            vkCmdPipelineBarrier2( cmd, &dependencyInfo );
+        }
+
+        VkCommandBuffer RequestSingleUseCommandBuffer( VkDevice device, VkCommandPool cmdPool )
+        {
+            const VkCommandBufferAllocateInfo allocateInfo {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .commandPool = cmdPool,
+                .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                .commandBufferCount = 1,
+            };
+
+            VkCommandBuffer cmdBuffer {};
+            HR( vkAllocateCommandBuffers( device, &allocateInfo, &cmdBuffer ) );
+
+            const VkCommandBufferBeginInfo beginInfo {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            };
+
+            HR( vkBeginCommandBuffer( cmdBuffer, &beginInfo ) );
+
+            return cmdBuffer;
+        }
+
+        void ReleaseSingleUseCommandBuffer( VkDevice device, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkQueue queue, const VkAllocationCallbacks* allocationCallbacks )
+        {
+            HR( vkEndCommandBuffer( cmdBuffer ) );
+
+            const VkFenceCreateInfo fenceCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            };
+
+            VkFence fence {};
+            HR( vkCreateFence( device, &fenceCreateInfo, allocationCallbacks, &fence ) );
+
+            const VkCommandBufferSubmitInfo cmdBufferInfo {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .commandBuffer = cmdBuffer
+            };
+
+            const VkSubmitInfo2 submitInfo {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &cmdBufferInfo
+            };
+
+            HR( vkQueueSubmit2( queue, 1, &submitInfo, fence ) );
+            HR( vkWaitForFences( device, 1, &fence, VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
+
+            vkDestroyFence( device, fence, allocationCallbacks );
+            vkFreeCommandBuffers( device, cmdPool, 1, &cmdBuffer );
         }
 
 #pragma endregion
@@ -973,7 +1063,7 @@ namespace zp
             for( uint32_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++ )
             {
                 const VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties.memoryTypes[ i ].propertyFlags;
-                if( ( typeFilter & ( 1 << i ) ) && ( flags & memoryPropertyFlags ) == memoryPropertyFlags )
+                if( zp_flag32_is_set( typeFilter, ( 1 << i ) ) && zp_flag32_all_set( flags, memoryPropertyFlags ) )
                 {
                     return i;
                 }
@@ -987,23 +1077,90 @@ namespace zp
 
         void* AllocationCallback( void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope )
         {
-            IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
+            auto* allocator = static_cast<IMemoryAllocator*>(pUserData);
             return allocator->allocate( size, alignment );
         }
 
         void* ReallocationCallback( void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope )
         {
-            IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
+            auto* allocator = static_cast<IMemoryAllocator*>(pUserData);
             return allocator->reallocate( pOriginal, size, alignment );
         }
 
         void FreeCallback( void* pUserData, void* pMemory )
         {
-            IMemoryAllocator* allocator = static_cast<IMemoryAllocator*>(pUserData);
+            auto* allocator = static_cast<IMemoryAllocator*>(pUserData);
             allocator->free( pMemory );
         }
 
 #pragma endregion
+
+
+        struct DelayedDestroyInfo
+        {
+            zp_uint64_t frameIndex;
+            VkInstance vkInstance;
+            VkDevice vkLocalDevice;
+            const VkAllocationCallbacks* vkAllocatorCallbacks;
+            zp_size_t order;
+            zp_handle_t vkHandle;
+            VkObjectType vkObjectType;
+        };
+
+        void ProcessDelayedDestroy( const DelayedDestroyInfo& info )
+        {
+            switch( info.vkObjectType )
+            {
+                case VK_OBJECT_TYPE_BUFFER:
+                    vkDestroyBuffer( info.vkLocalDevice, static_cast<VkBuffer>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_BUFFER_VIEW:
+                    vkDestroyBufferView( info.vkLocalDevice, static_cast<VkBufferView>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_IMAGE:
+                    vkDestroyImage( info.vkLocalDevice, static_cast<VkImage>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_IMAGE_VIEW:
+                    vkDestroyImageView( info.vkLocalDevice, static_cast<VkImageView>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_FRAMEBUFFER:
+                    vkDestroyFramebuffer( info.vkLocalDevice, static_cast<VkFramebuffer>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_SWAPCHAIN_KHR:
+                    vkDestroySwapchainKHR( info.vkLocalDevice, static_cast<VkSwapchainKHR>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_SURFACE_KHR:
+                    vkDestroySurfaceKHR( info.vkInstance, static_cast<VkSurfaceKHR>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_SHADER_MODULE:
+                    vkDestroyShaderModule( info.vkLocalDevice, static_cast<VkShaderModule>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_RENDER_PASS:
+                    vkDestroyRenderPass( info.vkLocalDevice, static_cast<VkRenderPass>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_SAMPLER:
+                    vkDestroySampler( info.vkLocalDevice, static_cast<VkSampler>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_FENCE:
+                    vkDestroyFence( info.vkLocalDevice, static_cast<VkFence>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_SEMAPHORE:
+                    vkDestroySemaphore( info.vkLocalDevice, static_cast<VkSemaphore>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_PIPELINE:
+                    vkDestroyPipeline( info.vkLocalDevice, static_cast<VkPipeline>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_PIPELINE_LAYOUT:
+                    vkDestroyPipelineLayout( info.vkLocalDevice, static_cast<VkPipelineLayout>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                case VK_OBJECT_TYPE_DEVICE_MEMORY:
+                    vkFreeMemory( info.vkLocalDevice, static_cast<VkDeviceMemory>(info.vkHandle), info.vkAllocatorCallbacks );
+                    break;
+                default:
+                    ZP_INVALID_CODE_PATH_MSG_ARGS( "Delayed Destroyed not defined: %d", info.vkObjectType );
+                    break;
+            }
+        }
 
         void DestroyDelayedDestroyHandle( const DelayedDestroy& delayedDestroy )
         {
@@ -1064,37 +1221,126 @@ namespace zp
         }
 
         template<typename T0, typename T1>
-        constexpr void pNextPushFront( T0& t0, T1& t1 )
+        constexpr void pNextPushFront( T0& mainInfo, T1& nextInfo )
         {
-            t1.pNext = t0.pNext;
-            t0.pNext = &t1;
+            nextInfo.pNext = mainInfo.pNext;
+            mainInfo.pNext = &nextInfo;
         }
 
-        zp_bool_t IsExtensionSupported( const String& extension, const Vector<VkExtensionProperties>& availableExtensions )
+        template<typename T0, typename T1>
+        constexpr void pNext( T0& mainInfo, T1& nextInfo )
         {
-            for( const auto& ext : availableExtensions )
+            mainInfo.pNext = &nextInfo;
+        }
+
+        zp_bool_t IsExtensionPropertySupported( const char* extension, const Vector<VkExtensionProperties>& availableExtensions )
+        {
+            const zp_size_t index = availableExtensions.findIndexOf( [ &extension ]( const VkExtensionProperties& ext ) -> zp_bool_t
             {
-                if( zp_strcmp( extension, ext.extensionName ) == 0 )
-                {
-                    return true;
-                }
-            }
+                return zp_strcmp( extension, ext.extensionName ) == 0;
+            } );
 
-            return false;
+            return index != zp::npos;
         }
+
+        zp_bool_t IsExtensionSupported( const char* extension, const Vector<VkExtensionProperties>& availableExtensions )
+        {
+            const zp_size_t index = availableExtensions.findIndexOf( [ &extension ]( const VkExtensionProperties& ext ) -> zp_bool_t
+            {
+                return zp_strcmp( extension, ext.extensionName ) == 0;
+            } );
+
+            return index != zp::npos;
+        }
+
+
+#pragma region GetObjectType
+
+        template<typename T>
+        constexpr auto GetObjectType( T /*unused*/ ) -> VkObjectType
+        {
+            return VK_OBJECT_TYPE_UNKNOWN;
+        }
+
+        // @formatter:off
+#define MAKE_OBJECT_TYPE( vk, ot )                              \
+template<>                                                      \
+constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
+{                                                               \
+    return ot;                                                  \
+}
+        // @formatter:on
+
+        MAKE_OBJECT_TYPE( VkInstance, VK_OBJECT_TYPE_INSTANCE );
+
+        MAKE_OBJECT_TYPE( VkPhysicalDevice, VK_OBJECT_TYPE_PHYSICAL_DEVICE );
+
+        MAKE_OBJECT_TYPE( VkDevice, VK_OBJECT_TYPE_DEVICE );
+
+        MAKE_OBJECT_TYPE( VkQueue, VK_OBJECT_TYPE_QUEUE );
+
+        MAKE_OBJECT_TYPE( VkSemaphore, VK_OBJECT_TYPE_SEMAPHORE );
+
+        MAKE_OBJECT_TYPE( VkCommandBuffer, VK_OBJECT_TYPE_COMMAND_BUFFER );
+
+        MAKE_OBJECT_TYPE( VkFence, VK_OBJECT_TYPE_FENCE );
+
+        MAKE_OBJECT_TYPE( VkDeviceMemory, VK_OBJECT_TYPE_DEVICE_MEMORY );
+
+        MAKE_OBJECT_TYPE( VkBuffer, VK_OBJECT_TYPE_BUFFER );
+
+#undef MAKE_OBJECT_TYPE
+
+#pragma endregion
     }
 
     namespace
     {
+
+        struct QueueFamilyIndices
+        {
+            zp_uint32_t graphicsFamily;
+            zp_uint32_t transferFamily;
+            zp_uint32_t computeFamily;
+            zp_uint32_t presentFamily;
+        };
+
+        struct QueueInfo
+        {
+            zp_uint32_t familyIndex;
+            zp_uint32_t queueIndex;
+            VkQueue vkQueue;
+        };
+
+        struct Queues
+        {
+            QueueInfo graphics;
+            QueueInfo transfer;
+            QueueInfo compute;
+            QueueInfo present;
+        };
+
         class VulkanContext
         {
         public:
             VulkanContext() = default;
+
             ~VulkanContext();
 
-            void Initialize(const GraphicsDeviceDesc& graphicsDeviceDesc);
+            void Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc );
 
             void Destroy();
+
+            void EndFrame( VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence );
+
+            template<typename T>
+            void QueueDestroy( T handle )
+            {
+                QueueDestroy( handle, GetObjectType( handle ) );
+            }
+
+            void QueueDestroy( void* handle, VkObjectType objectType );
+
 
             [[nodiscard]] VkInstance GetInstance() const
             {
@@ -1111,16 +1357,42 @@ namespace zp
                 return m_vkLocalDevice;
             }
 
-            [[nodiscard]] VkQueue GetQueue( RenderQueue renderQueue = ZP_RENDER_QUEUE_GRAPHICS ) const
+            [[nodiscard]] VkSurfaceKHR GetSurface() const
             {
-                ZP_ASSERT( renderQueue < RenderQueue_Count );
-                return m_vkQueues[ renderQueue ];
+                return m_vkSurface;
+            }
+
+            [[nodiscard]] const Queues& GetQueues() const
+            {
+                return m_queues;
+            }
+
+            [[nodiscard]] VkCommandPool GetTransientCommandPool() const
+            {
+                return m_vkTransientCommandPool;
+            }
+
+            [[nodiscard]] VkPipelineCache GetPipelineCache() const
+            {
+                return m_vkPipelineCache;
+            }
+
+            [[nodiscard]] const VkAllocationCallbacks* GetAllocationCallbacks() const
+            {
+                return &m_vkAllocationCallbacks;
             }
 
         private:
             VkInstance m_vkInstance;
             VkPhysicalDevice m_vkPhysicalDevice;
             VkDevice m_vkLocalDevice;
+            VkSurfaceKHR m_vkSurface;
+
+            VkPipelineCache m_vkPipelineCache;
+            VkDescriptorPool m_vkDescriptorPool;
+            VkCommandPool m_vkTransientCommandPool;
+            FixedArray<VkCommandPool, kBufferedFrameCount> m_vkCommandPools;
+
 #if ZP_DEBUG
             VkDebugUtilsMessengerEXT m_vkDebugMessenger;
 #endif
@@ -1128,51 +1400,85 @@ namespace zp
 
             VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties;
 
-            VkQueue m_vkQueues[RenderQueue_Count];
+            Queues m_queues;
+
+            Vector<DelayedDestroyInfo> m_delayedDestroyed;
+
+            zp_uint64_t m_frameIndex;
         };
 
         VulkanContext::~VulkanContext()
         {
-            ZP_ASSERT(m_vkInstance == VK_NULL_HANDLE);
+            ZP_ASSERT( m_vkInstance == VK_NULL_HANDLE );
         }
 
         void VulkanContext::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
-            const VkApplicationInfo applicationInfo {
-                .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                .pApplicationName = !graphicsDeviceDesc.appName.empty() ? graphicsDeviceDesc.appName.c_str() : "ZeroPoint Application",
-                .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
-                .pEngineName = "ZeroPoint",
-                .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
-                .apiVersion = VK_API_VERSION_1_1,
+            m_vkAllocationCallbacks = {
+                .pUserData = GetAllocator( MemoryLabels::Graphics ),
+                .pfnAllocation = AllocationCallback,
+                .pfnReallocation = ReallocationCallback,
+                .pfnFree = FreeCallback,
             };
 
-            zp_uint32_t count {};
-            vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr );
-            Vector<VkExtensionProperties> availableExtensionProperties( count, MemoryLabels::Temp );
-            availableExtensionProperties.resize_unsafe( count );
-            vkEnumerateInstanceExtensionProperties( nullptr, &count, availableExtensionProperties.data() );
+            HR( volkInitialize() );
 
-            Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
+            //
+            if( 0 )
+            {
+                zp_uint32_t count {};
+                vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr );
 
-            const char* kExtensionNames[] {
+                Vector<VkExtensionProperties> availableInstanceExtensionProperties( count, MemoryLabels::Temp );
+                availableInstanceExtensionProperties.resize_unsafe( count );
+
+                vkEnumerateInstanceExtensionProperties( nullptr, &count, availableInstanceExtensionProperties.data() );
+
+                for( const auto& ext : availableInstanceExtensionProperties )
+                {
+                    zp_printfln( "%s: %d", ext.extensionName, ext.specVersion );
+                }
+            }
+
+            // TODO: filter out available extensions with requested extensions
+            //Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
+
+            constexpr const char* kInstanceExtensionNames[] {
                 VK_KHR_SURFACE_EXTENSION_NAME,
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-                VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 #if ZP_OS_WINDOWS
                 VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #endif
 #if ZP_DEBUG
+                VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
                 VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif
             };
 
-            const char* kValidationLayers[] {
+            constexpr const char* kValidationLayers[] {
 #if ZP_DEBUG
                 "VK_LAYER_KHRONOS_validation"
 #endif
+            };
+
+            const char* kDeviceExtensions[] {
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+                VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
+                VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
+                VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+                VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+                VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
+                VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+            };
+
+            // app info
+            const VkApplicationInfo applicationInfo {
+                .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                .pApplicationName = graphicsDeviceDesc.appName.empty() ? "ZeroPoint Application" : graphicsDeviceDesc.appName.c_str(),
+                .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
+                .pEngineName = "ZeroPoint",
+                .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
+                .apiVersion = VK_API_VERSION_1_3,
             };
 
             // create instance
@@ -1181,8 +1487,8 @@ namespace zp
                 .pApplicationInfo = &applicationInfo,
                 .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
                 .ppEnabledLayerNames = kValidationLayers,
-                .enabledExtensionCount = ZP_ARRAY_SIZE( kExtensionNames ),
-                .ppEnabledExtensionNames = kExtensionNames,
+                .enabledExtensionCount = ZP_ARRAY_SIZE( kInstanceExtensionNames ),
+                .ppEnabledExtensionNames = kInstanceExtensionNames,
             };
 
 #if ZP_DEBUG
@@ -1196,15 +1502,16 @@ namespace zp
                                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
                 .pfnUserCallback = DebugCallback,
-                .pUserData = nullptr, // Optional
+                .pUserData = nullptr,
             };
 
-            //instanceCreateInfo.pNext = &createInstanceDebugMessengerInfo;
+            // TODO: does this need to be here twice?
             pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
 #endif
+
             HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
 
-            volkLoadInstance( m_vkInstance );
+            volkLoadInstanceOnly( m_vkInstance );
 
 #if ZP_DEBUG
             // create debug messenger
@@ -1223,21 +1530,842 @@ namespace zp
             HR( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger ) );
             //HR( CreateDebugUtilsMessengerEXT( m_vkInstance, &createDebugMessengerInfo, nullptr, &m_vkDebugMessenger ));
 #endif
+            // create surface
+            {
+#if ZP_OS_WINDOWS
+                HWND hWnd = static_cast<HWND>( graphicsDeviceDesc.windowHandle.handle );
+                HINSTANCE hInstance = nullptr; //reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
+
+                // create surface
+                const VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+                    .hinstance = hInstance,
+                    .hwnd = hWnd,
+                };
+
+                HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface ) );
+#else
+#error "Platform not defined to create VkSurface"
+#endif
+            }
+
+            // select physical device
+            {
+                uint32_t physicalDeviceCount = 0;
+                HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, VK_NULL_HANDLE ) );
+
+                Vector<VkPhysicalDevice> physicalDevices( physicalDeviceCount, MemoryLabels::Temp );
+                physicalDevices.resize_unsafe( physicalDeviceCount );
+
+                HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, physicalDevices.data() ) );
+
+                for( const VkPhysicalDevice& physicalDevice : physicalDevices )
+                {
+                    if( IsPhysicalDeviceSuitable( physicalDevice, m_vkSurface ) )
+                    {
+                        m_vkPhysicalDevice = physicalDevice;
+                        break;
+                    }
+                }
+
+                ZP_ASSERT( m_vkPhysicalDevice );
+            }
+
+            // create local device and queue families
+            {
+                const QueueInfo kDefaultQueueInfo {
+                    .familyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .queueIndex = 0,
+                    .vkQueue = VK_NULL_HANDLE
+                };
+
+                m_queues.graphics = kDefaultQueueInfo;
+                m_queues.transfer = kDefaultQueueInfo;
+                m_queues.compute = kDefaultQueueInfo;
+                m_queues.present = kDefaultQueueInfo;
+
+                uint32_t queueFamilyCount = 0;
+                vkGetPhysicalDeviceQueueFamilyProperties( m_vkPhysicalDevice, &queueFamilyCount, VK_NULL_HANDLE );
+
+                Vector<VkQueueFamilyProperties> queueFamilyProperties( queueFamilyCount, MemoryLabels::Temp );
+                queueFamilyProperties.resize_unsafe( queueFamilyCount );
+
+                vkGetPhysicalDeviceQueueFamilyProperties( m_vkPhysicalDevice, &queueFamilyCount, queueFamilyProperties.data() );
+
+                // find base queries
+                for( zp_size_t i = 0; i < queueFamilyCount; ++i )
+                {
+                    const VkQueueFamilyProperties& queueFamilyProperty = queueFamilyProperties[ i ];
+                    if( queueFamilyProperty.queueCount == 0 )
+                    {
+                        continue;
+                    }
+
+                    if( m_queues.graphics.familyIndex == VK_QUEUE_FAMILY_IGNORED &&
+                        zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT ) )
+                    {
+                        m_queues.graphics.familyIndex = i;
+
+                        VkBool32 presentSupport = VK_FALSE;
+                        HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
+
+                        if( m_queues.present.familyIndex == VK_QUEUE_FAMILY_IGNORED && presentSupport == VK_TRUE )
+                        {
+                            m_queues.present.familyIndex = i;
+                        }
+                    }
+
+                    if( m_queues.transfer.familyIndex == VK_QUEUE_FAMILY_IGNORED &&
+                        zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_TRANSFER_BIT ) )
+                    {
+                        m_queues.transfer.familyIndex = i;
+                    }
+
+                    if( m_queues.compute.familyIndex == VK_QUEUE_FAMILY_IGNORED &&
+                        zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_COMPUTE_BIT ) )
+                    {
+                        m_queues.compute.familyIndex = i;
+                    }
+                }
+
+                // find dedicated compute and transfer queues
+                for( zp_size_t i = 0; i < queueFamilyCount; ++i )
+                {
+                    const VkQueueFamilyProperties& queueFamilyProperty = queueFamilyProperties[ i ];
+                    if( queueFamilyProperty.queueCount == 0 )
+                    {
+                        continue;
+                    }
+
+                    if( zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_TRANSFER_BIT ) &&
+                        !zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT ) )
+                    {
+                        m_queues.transfer.familyIndex = i;
+                    }
+
+                    if( zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_COMPUTE_BIT ) &&
+                        !zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT ) )
+                    {
+                        m_queues.compute.familyIndex = i;
+                    }
+                }
+
+                Set<zp_uint32_t, zp_hash64_t, CastEqualityComparer<zp_uint32_t, zp_hash64_t>> uniqueFamilyIndices( 4, MemoryLabels::Temp );
+                uniqueFamilyIndices.add( m_queues.graphics.familyIndex );
+                uniqueFamilyIndices.add( m_queues.transfer.familyIndex );
+                uniqueFamilyIndices.add( m_queues.compute.familyIndex );
+                uniqueFamilyIndices.add( m_queues.present.familyIndex );
+
+                Vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos( 4, MemoryLabels::Temp );
+
+                const zp_float32_t queuePriority = 1.0F;
+                for( const zp_uint32_t& queueFamily : uniqueFamilyIndices )
+                {
+                    deviceQueueCreateInfos.pushBack( {
+                        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                        .queueFamilyIndex = queueFamily,
+                        .queueCount = 1,
+                        .pQueuePriorities = &queuePriority,
+                    } );
+                }
+
+                //
+                uint32_t extensionCount = 0;
+                HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE ) );
+
+                Vector<VkExtensionProperties> availableDeviceExtensions( extensionCount, MemoryLabels::Temp );
+                availableDeviceExtensions.resize_unsafe( extensionCount );
+
+                HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, availableDeviceExtensions.data() ) );
+
+                //
+                Vector<const char*> supportedExtensions( ZP_ARRAY_SIZE( kDeviceExtensions ), MemoryLabels::Temp );
+
+                VkPhysicalDeviceFeatures2 deviceFeatures {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+                };
+
+                VkPhysicalDeviceVulkan11Features deviceFeaturesVulkan11 {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+                };
+                pNextPushFront( deviceFeatures, deviceFeaturesVulkan11 );
+
+                VkPhysicalDeviceVulkan12Features deviceFeaturesVulkan12 {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+                };
+                pNextPushFront( deviceFeatures, deviceFeaturesVulkan12 );
+
+                VkPhysicalDeviceVulkan13Features deviceFeaturesVulkan13 {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+                };
+                pNextPushFront( deviceFeatures, deviceFeaturesVulkan13 );
+
+                VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
+                };
+
+                if( IsExtensionSupported( VK_KHR_MAINTENANCE_5_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, maintenance5Features );
+                    supportedExtensions.pushBack( VK_KHR_MAINTENANCE_5_EXTENSION_NAME );
+                }
+
+                VkPhysicalDeviceMaintenance6FeaturesKHR maintenance6Features {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES_KHR,
+                };
+
+                if( IsExtensionSupported( VK_KHR_MAINTENANCE_6_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, maintenance6Features );
+                    supportedExtensions.pushBack( VK_KHR_MAINTENANCE_6_EXTENSION_NAME );
+                }
+
+                VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
+                };
+
+                if( IsExtensionSupported( VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, extendedDynamicStateFeatures );
+                    supportedExtensions.pushBack( VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME );
+                }
+
+                VkPhysicalDeviceExtendedDynamicState2FeaturesEXT extendedDynamicState2Features {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT,
+                };
+
+                if( IsExtensionSupported( VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, extendedDynamicState2Features );
+                    supportedExtensions.pushBack( VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME );
+                }
+
+                VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extendedDynamicState3Features {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT,
+                };
+
+                if( IsExtensionSupported( VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, extendedDynamicState3Features );
+                    supportedExtensions.pushBack( VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME );
+                }
+
+                if( IsExtensionSupported( VK_KHR_SWAPCHAIN_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    supportedExtensions.pushBack( VK_KHR_SWAPCHAIN_EXTENSION_NAME );
+                }
+
+                vkGetPhysicalDeviceFeatures2( m_vkPhysicalDevice, &deviceFeatures );
+
+                ZP_ASSERT( deviceFeaturesVulkan13.dynamicRendering );
+                ZP_ASSERT( deviceFeaturesVulkan13.maintenance4 );
+                ZP_ASSERT( maintenance5Features.maintenance5 );
+                //ZP_ASSERT( maintenance6Features.maintenance6 );
+
+                //
+                VkPhysicalDeviceProperties2 deviceProperties {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+                };
+
+                VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR,
+                };
+                pNextPushFront( deviceProperties, pushDescriptorProperties );
+
+                vkGetPhysicalDeviceProperties2( m_vkPhysicalDevice, &deviceProperties );
+
+                PrintPhysicalDeviceInfo( deviceProperties.properties );
+
+                //
+                VkDeviceCreateInfo localDeviceCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                    .queueCreateInfoCount = static_cast<uint32_t>( deviceQueueCreateInfos.size() ),
+                    .pQueueCreateInfos = deviceQueueCreateInfos.data(),
+                    .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
+                    .ppEnabledLayerNames = kValidationLayers,
+                    .enabledExtensionCount = static_cast<zp_uint32_t>( supportedExtensions.size() ),
+                    .ppEnabledExtensionNames = supportedExtensions.data(),
+                };
+                pNext( localDeviceCreateInfo, deviceFeatures );
+
+                HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
+
+                volkLoadDevice( m_vkLocalDevice );
+
+                //
+                vkGetDeviceQueue( m_vkLocalDevice, m_queues.graphics.familyIndex, m_queues.graphics.queueIndex, &m_queues.graphics.vkQueue );
+                vkGetDeviceQueue( m_vkLocalDevice, m_queues.transfer.familyIndex, m_queues.transfer.queueIndex, &m_queues.transfer.vkQueue );
+                vkGetDeviceQueue( m_vkLocalDevice, m_queues.compute.familyIndex, m_queues.compute.queueIndex, &m_queues.compute.vkQueue );
+                vkGetDeviceQueue( m_vkLocalDevice, m_queues.present.familyIndex, m_queues.present.queueIndex, &m_queues.present.vkQueue );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.graphics.vkQueue, "Graphics Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.transfer.vkQueue, "Transfer Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.compute.vkQueue, "Compute Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.present.vkQueue, "Present Queue" );
+            }
+
+            // create pipeline cache
+            {
+                // TODO: load cached pipeline cache
+                const Memory loadedPipelineCache {};
+
+                const VkPipelineCacheCreateInfo pipelineCacheCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+                    .initialDataSize = loadedPipelineCache.size,
+                    .pInitialData = loadedPipelineCache.ptr,
+                };
+
+                HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_PIPELINE_CACHE, m_vkPipelineCache, "Pipeline Cache" );
+            }
+
+            // create descriptor pool
+            {
+                const zp_uint32_t kDefaultDescriptorCount = 32;
+
+                // @formatter:off
+                const VkDescriptorPoolSize poolSizes[] {
+                    { .type = VK_DESCRIPTOR_TYPE_SAMPLER,                   .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,    .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,             .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,             .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,      .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,      .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,            .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,            .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,    .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,    .descriptorCount = kDefaultDescriptorCount },
+                    { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,          .descriptorCount = kDefaultDescriptorCount }
+                };
+                // @formatter:on
+
+                const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                    .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+                    .maxSets = 128,
+                    .poolSizeCount = ZP_ARRAY_SIZE( poolSizes ),
+                    .pPoolSizes = poolSizes,
+                };
+
+                HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_vkDescriptorPool, "Descriptor Pool" );
+            }
+
+            // create transient command pool
+            {
+                const VkCommandPoolCreateInfo transientCommandPoolCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                    .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+                    .queueFamilyIndex = m_queues.graphics.familyIndex,
+                };
+
+                HR( vkCreateCommandPool( m_vkLocalDevice, &transientCommandPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkTransientCommandPool ) );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, m_vkTransientCommandPool, "Transient Command Pool" );
+            }
         }
 
         void VulkanContext::Destroy()
         {
-            ZP_ASSERT(m_vkLocalDevice);
+            ZP_ASSERT( m_vkLocalDevice );
 
             HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
+
+            // TODO: write out pipeline cache?
+            vkDestroyPipelineCache( m_vkLocalDevice, m_vkPipelineCache, &m_vkAllocationCallbacks );
+
+            vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, &m_vkAllocationCallbacks );
+
 #if ZP_DEBUG
             CallDebugUtil( vkDestroyDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, m_vkDebugMessenger, &m_vkAllocationCallbacks );
 #endif // ZP_DEBUG
 
-            vkDestroyDevice( m_vkLocalDevice );
-            vkDestroyInstance( m_vkInstance );
+            vkDestroyDevice( m_vkLocalDevice, &m_vkAllocationCallbacks );
+            vkDestroyInstance( m_vkInstance, &m_vkAllocationCallbacks );
 
-            zp_zero_memory( this );
+            volkFinalize();
+
+            m_vkInstance = nullptr;
+            m_vkLocalDevice = nullptr;
+
+#if ZP_DEBUG
+            zp_zero_memory( &m_vkAllocationCallbacks );
+#endif // ZP_DEBUG
+
+            m_vkDescriptorPool = nullptr;
+            m_vkPipelineCache = nullptr;
+        }
+
+        void VulkanContext::EndFrame( VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence )
+        {
+            VkSemaphoreSubmitInfo waitSemaphores {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .semaphore = waitSemaphore,
+                .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            };
+            VkCommandBufferSubmitInfo commandBuffers {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .commandBuffer = nullptr,
+            };
+            VkSemaphoreSubmitInfo signalSemaphores {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .semaphore = signalSemaphore,
+                .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            };
+
+            const VkSubmitInfo2 submitInfo {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .waitSemaphoreInfoCount = 1,
+                .pWaitSemaphoreInfos = &waitSemaphores,
+                .commandBufferInfoCount = 0,
+                .pCommandBufferInfos = &commandBuffers,
+                .signalSemaphoreInfoCount = 1,
+                .pSignalSemaphoreInfos = &signalSemaphores,
+            };
+
+            HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
+        }
+
+        void VulkanContext::QueueDestroy( void* handle, VkObjectType objectType )
+        {
+            const zp_size_t index = m_delayedDestroyed.pushBackEmptyRangeAtomic( 1, false );
+            m_delayedDestroyed[ index ] = {
+                .frameIndex = m_frameIndex,
+                .vkInstance = m_vkInstance,
+                .vkLocalDevice = m_vkLocalDevice,
+                .vkAllocatorCallbacks = &m_vkAllocationCallbacks,
+                .order = index,
+                .vkHandle = handle,
+                .vkObjectType = objectType,
+            };
+        }
+    };
+
+    //
+    //
+    //
+
+    namespace
+    {
+        class VulkanSwapchain
+        {
+        public:
+
+            void Initialize( VulkanContext* context, WindowHandle windowHandle );
+
+            void Destroy();
+
+            void AcquireNextImage();
+
+            void Present();
+
+            void Rebuild();
+
+            VkSemaphore GetWaitSemaphore() const
+            {
+                return m_vkSwapchainAcquireSemaphores[ m_currentFrameIndex ];
+            }
+
+            VkSemaphore GetSignalSemaphore() const
+            {
+                return m_vkRenderFinishedSemaphores[ m_currentFrameIndex ];
+            }
+
+            VkFence GetFrameInFlightFence() const
+            {
+                return m_vkFrameInFlightFences[ m_currentFrameIndex ];
+            }
+
+        private:
+            void CreateSwapchain();
+
+            void DestroySwapchain();
+
+            WindowHandle m_windowHandle;
+
+            VulkanContext* m_context;
+
+            VkSwapchainKHR m_vkSwapchain;
+            VkSurfaceFormatKHR m_vkSwapChainFormat;
+            VkColorSpaceKHR vkSwapchainColorSpace;
+
+            VkExtent2D m_vkSwapchainExtent;
+            VkRenderPass m_vkSwapchainDefaultRenderPass;
+
+            FixedArray<VkImage, kBufferedFrameCount> m_vkSwapchainImages;
+            FixedArray<VkImageView, kBufferedFrameCount> m_vkSwapchainImageViews;
+            FixedArray<VkFramebuffer, kBufferedFrameCount> m_vkSwapchainFrameBuffers;
+
+            FixedArray<VkSemaphore, kBufferedFrameCount> m_vkSwapchainAcquireSemaphores;
+            FixedArray<VkSemaphore, kBufferedFrameCount> m_vkRenderFinishedSemaphores;
+            FixedArray<VkFence, kBufferedFrameCount> m_vkFrameInFlightFences;
+            FixedArray<VkFence, kBufferedFrameCount> m_vkSwapchainImageAcquiredFences;
+            FixedArray<zp_uint32_t, kBufferedFrameCount> m_swapchainImageIndices;
+
+            zp_size_t m_currentFrameIndex;
+            zp_uint32_t m_maxFramesInFlight;
+
+            zp_bool_t m_requiresRebuild;
+            zp_bool_t m_vSync;
+        };
+
+        void VulkanSwapchain::Initialize( VulkanContext* context, WindowHandle windowHandle )
+        {
+            m_context = context;
+            m_windowHandle = windowHandle;
+
+            CreateSwapchain();
+        }
+
+        void VulkanSwapchain::Destroy()
+        {
+            DestroySwapchain();
+
+            m_context = nullptr;
+            m_windowHandle = {};
+        }
+
+        void VulkanSwapchain::AcquireNextImage()
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            if( m_requiresRebuild )
+            {
+                HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
+
+                DestroySwapchain();
+                CreateSwapchain();
+
+                m_requiresRebuild = false;
+            }
+
+            HR( vkWaitForFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ m_currentFrameIndex ], VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
+
+            const VkResult acquireNextImageResult = vkAcquireNextImageKHR( m_context->GetLocalDevice(), m_vkSwapchain, zp_limit<zp_uint64_t>::max(), m_vkSwapchainAcquireSemaphores[ m_currentFrameIndex ], VK_NULL_HANDLE, &m_swapchainImageIndices[ m_currentFrameIndex ] );
+
+            if( acquireNextImageResult != VK_SUCCESS )
+            {
+                if( acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR || acquireNextImageResult == VK_SUBOPTIMAL_KHR )
+                {
+                    m_requiresRebuild = true;
+                }
+                else
+                {
+                    HR( acquireNextImageResult );
+                }
+            }
+
+            HR( vkResetFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ m_currentFrameIndex ] ) );
+        }
+
+        void VulkanSwapchain::Present()
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VkPresentInfoKHR presentInfo {
+                .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &m_vkRenderFinishedSemaphores[ m_currentFrameIndex ],
+                .swapchainCount = 1,
+                .pSwapchains = &m_vkSwapchain,
+                .pImageIndices = &m_swapchainImageIndices[ m_currentFrameIndex ],
+            };
+
+            HR( vkQueuePresentKHR( m_context->GetQueues().present.vkQueue, &presentInfo ) );
+
+            m_currentFrameIndex = ( m_currentFrameIndex + 1 ) % m_maxFramesInFlight;
+        }
+
+        void VulkanSwapchain::Rebuild()
+        {
+            m_requiresRebuild = true;
+        }
+
+        void VulkanSwapchain::CreateSwapchain()
+        {
+            //
+            VkSurfaceCapabilitiesKHR surfaceCapabilities {};
+            HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &surfaceCapabilities ) );
+
+            m_vkSwapchainExtent = ChooseSwapChainExtent( surfaceCapabilities, surfaceCapabilities.currentExtent );
+            if( m_vkSwapchainExtent.width == 0 && m_vkSwapchainExtent.height == 0 )
+            {
+                return;
+            }
+
+            //
+            uint32_t formatCount = 0;
+            HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &formatCount, VK_NULL_HANDLE ) );
+
+            Vector<VkSurfaceFormatKHR> supportedSurfaceFormats( formatCount, MemoryLabels::Temp );
+            supportedSurfaceFormats.resize_unsafe( formatCount );
+
+            HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &formatCount, supportedSurfaceFormats.data() ) );
+
+            //
+            uint32_t presentModeCount = 0;
+            HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &presentModeCount, VK_NULL_HANDLE ) );
+
+            Vector<VkPresentModeKHR> presentModes( presentModeCount, MemoryLabels::Temp );
+            presentModes.resize_unsafe( presentModeCount );
+
+            HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &presentModeCount, presentModes.data() ) );
+
+            const VkPresentModeKHR presentMode = ChooseSwapChainPresentMode( presentModes, m_vSync );
+
+            // TODO: make configurable?
+            const FixedArray<VkSurfaceFormatKHR, 2> preferredSurfaceFormats = {
+                VkSurfaceFormatKHR { .format = VK_FORMAT_B8G8R8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
+                VkSurfaceFormatKHR { .format = VK_FORMAT_R8G8B8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
+            };
+
+            m_vkSwapChainFormat = ChooseSwapChainSurfaceFormat( supportedSurfaceFormats, preferredSurfaceFormats.asReadonly() );
+
+            //
+            // TODO: make this configurable?
+            const zp_uint32_t preferredImageCount = 3;
+            uint32_t imageCount = zp_max( preferredImageCount, surfaceCapabilities.minImageCount );
+            if( surfaceCapabilities.maxImageCount > 0 )
+            {
+                imageCount = zp_min( imageCount, surfaceCapabilities.maxImageCount );
+            }
+
+            m_maxFramesInFlight = imageCount;
+            ZP_ASSERT_MSG_ARGS( m_maxFramesInFlight < kBufferedFrameCount, "Increase buffered frames %d < %d", m_maxFramesInFlight, kBufferedFrameCount );
+
+            //
+            const Queues& queues = m_context->GetQueues();
+            const bool useConcurrentSharingMode = queues.graphics.familyIndex != queues.present.familyIndex;
+
+            const FixedArray<zp_uint32_t, 2> indices = { queues.graphics.familyIndex, queues.present.familyIndex };
+
+            const VkSwapchainCreateInfoKHR swapChainCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+                .surface = m_context->GetSurface(),
+                .minImageCount = m_maxFramesInFlight,
+                .imageFormat = m_vkSwapChainFormat.format,
+                .imageColorSpace = m_vkSwapChainFormat.colorSpace,
+                .imageExtent = m_vkSwapchainExtent,
+                .imageArrayLayers = 1,
+                .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                .imageSharingMode = useConcurrentSharingMode ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = useConcurrentSharingMode ? static_cast<zp_uint32_t>( indices.length() ) : 0,
+                .pQueueFamilyIndices = useConcurrentSharingMode ? indices.data() : nullptr,
+                .preTransform = surfaceCapabilities.currentTransform,
+                .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+                .presentMode = presentMode,
+                .clipped = VK_TRUE,
+                .oldSwapchain = m_vkSwapchain
+            };
+
+            HR( vkCreateSwapchainKHR( m_context->GetLocalDevice(), &swapChainCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchain ) );
+
+            SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_SWAPCHAIN_KHR, m_vkSwapchain, "Swapchain" );
+
+            if( swapChainCreateInfo.oldSwapchain != VK_NULL_HANDLE )
+            {
+                // TODO: delayed destroy?
+                m_context->QueueDestroy( swapChainCreateInfo.oldSwapchain );
+                //vkDestroySwapchainKHR( m_context->GetLocalDevice(), swapChainCreateInfo.oldSwapchain, m_context->GetAllocationCallbacks() );
+            }
+
+            //
+            zp_uint32_t swapchainImageCount = 0;
+            HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, VK_NULL_HANDLE ) );
+            ZP_ASSERT_MSG( m_maxFramesInFlight == swapchainImageCount, "Mismatch swapchain images and frames in flight" );
+
+            HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, m_vkSwapchainImages.data() ) );
+
+#if 0
+            {
+                if( m_swapchainData.vkSwapchainDefaultRenderPass )
+                {
+                    const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
+
+                    m_delayedDestroy[ index ] = {
+                        .frameIndex = m_currentFrameIndex,
+                        .handle = m_swapchainData.vkSwapchainDefaultRenderPass,
+                        .allocator = &m_vkAllocationCallbacks,
+                        .localDevice = m_vkLocalDevice,
+                        .instance = m_vkInstance,
+                        .order = index,
+                        .type = DelayedDestroyType::RenderPass,
+                    };
+
+                    m_swapchainData.vkSwapchainDefaultRenderPass = VK_NULL_HANDLE;
+                }
+
+                VkAttachmentDescription colorAttachments[] {
+                    {
+                        .format = m_vkSwapChainFormat,
+                        .samples = VK_SAMPLE_COUNT_1_BIT,
+                        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                    }
+                };
+
+                VkAttachmentReference colorAttachmentRefs[] {
+                    {
+                        .attachment = 0,
+                        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    }
+                };
+
+                VkSubpassDescription subPassDescriptions[] {
+                    {
+                        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        .colorAttachmentCount = ZP_ARRAY_SIZE( colorAttachmentRefs ),
+                        .pColorAttachments = colorAttachmentRefs,
+                    }
+                };
+
+                VkSubpassDependency subPassDependencies[] {
+                    {
+                        .srcSubpass = VK_SUBPASS_EXTERNAL,
+                        .dstSubpass = 0,
+                        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        .srcAccessMask = 0,
+                        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                    }
+                };
+
+                VkRenderPassCreateInfo renderPassInfo {
+                    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+                    .attachmentCount = ZP_ARRAY_SIZE( colorAttachments ),
+                    .pAttachments = colorAttachments,
+                    .subpassCount = ZP_ARRAY_SIZE( subPassDescriptions ),
+                    .pSubpasses = subPassDescriptions,
+                    .dependencyCount = ZP_ARRAY_SIZE( subPassDependencies ),
+                    .pDependencies = subPassDependencies,
+                };
+
+                HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchainDefaultRenderPass ) );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_RENDER_PASS, m_swapchainData.vkSwapchainDefaultRenderPass, "Swapchain Default Render Pass" );
+            }
+#endif
+            for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
+            {
+                const VkImageViewCreateInfo imageViewCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .image = m_vkSwapchainImages[ i ],
+                    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                    .format = m_vkSwapChainFormat.format,
+                    .components {
+                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    },
+                    .subresourceRange {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    }
+                };
+
+                if( m_vkSwapchainImageViews[ i ] != VK_NULL_HANDLE )
+                {
+                    m_context->QueueDestroy( m_vkSwapchainImageViews[ i ] );
+                    m_vkSwapchainImageViews[ i ] = VK_NULL_HANDLE;
+                };
+
+                HR( vkCreateImageView( m_context->GetLocalDevice(), &imageViewCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageViews[ i ] ) );
+
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, m_vkSwapchainImageViews[ i ], "Swapchain Image View %d", i );
+
+                //
+                VkImageView attachments[] { m_vkSwapchainImageViews[ i ] };
+
+                const VkFramebufferCreateInfo framebufferCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                    .renderPass = nullptr, //m_swapchainData.vkSwapchainDefaultRenderPass,
+                    .attachmentCount = 0, //ZP_ARRAY_SIZE( attachments ),
+                    .pAttachments = attachments,
+                    .width = m_vkSwapchainExtent.width,
+                    .height = m_vkSwapchainExtent.height,
+                    .layers = 1,
+                };
+
+                if( m_vkSwapchainFrameBuffers[ i ] != VK_NULL_HANDLE )
+                {
+                    m_context->QueueDestroy( m_vkSwapchainFrameBuffers[ i ] );
+                    m_vkSwapchainFrameBuffers[ i ] = VK_NULL_HANDLE;
+                }
+
+                //HR( vkCreateFramebuffer( m_context->GetLocalDevice(), &framebufferCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainFrameBuffers[ i ] ) );
+
+                //SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, m_vkSwapchainFrameBuffers[ i ], "Swapchain Framebuffer %d", i );
+            }
+
+            //
+            const VkSemaphoreCreateInfo semaphoreCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+            };
+
+            const VkFenceCreateInfo fenceCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+                .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+            };
+
+            for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
+            {
+                HR( vkCreateSemaphore( m_context->GetLocalDevice(), &semaphoreCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainAcquireSemaphores[ i ] ) );
+                HR( vkCreateSemaphore( m_context->GetLocalDevice(), &semaphoreCreateInfo, m_context->GetAllocationCallbacks(), &m_vkRenderFinishedSemaphores[ i ] ) );
+                HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkFrameInFlightFences[ i ] ) );
+                HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageAcquiredFences[ i ] ) );
+
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_SEMAPHORE, m_vkSwapchainAcquireSemaphores[ i ], "Swapchain Acquire Semaphore %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_SEMAPHORE, m_vkRenderFinishedSemaphores[ i ], "Render Finished Semaphore %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_FENCE, m_vkFrameInFlightFences[ i ], "In Flight Fence %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_FENCE, m_vkSwapchainImageAcquiredFences[ i ], "Swapchain Image Acquire Fence %d", i );
+            }
+
+            // transition swapchain images to present layout
+            VkCommandBuffer cmdBuffer = RequestSingleUseCommandBuffer( m_context->GetLocalDevice(), m_context->GetTransientCommandPool() );
+            for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
+            {
+                CmdTransitionImageLayout( cmdBuffer, m_vkSwapchainImages[ i ], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
+            }
+            ReleaseSingleUseCommandBuffer( m_context->GetLocalDevice(), m_context->GetTransientCommandPool(), cmdBuffer, m_context->GetQueues().graphics.vkQueue, m_context->GetAllocationCallbacks() );
+        }
+
+        void VulkanSwapchain::DestroySwapchain()
+        {
+            for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
+            {
+                vkDestroySemaphore( m_context->GetLocalDevice(), m_vkSwapchainAcquireSemaphores[ i ], m_context->GetAllocationCallbacks() );
+                vkDestroySemaphore( m_context->GetLocalDevice(), m_vkRenderFinishedSemaphores[ i ], m_context->GetAllocationCallbacks() );
+                vkDestroyFence( m_context->GetLocalDevice(), m_vkFrameInFlightFences[ i ], m_context->GetAllocationCallbacks() );
+                vkDestroyFence( m_context->GetLocalDevice(), m_vkSwapchainImageAcquiredFences[ i ], m_context->GetAllocationCallbacks() );
+            }
+
+            vkDestroyRenderPass( m_context->GetLocalDevice(), m_vkSwapchainDefaultRenderPass, m_context->GetAllocationCallbacks() );
+            m_vkSwapchainDefaultRenderPass = VK_NULL_HANDLE;
+
+            for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
+            {
+                VkFramebuffer swapChainFramebuffer = m_vkSwapchainFrameBuffers[ i ];
+                vkDestroyFramebuffer( m_context->GetLocalDevice(), swapChainFramebuffer, m_context->GetAllocationCallbacks() );
+            }
+
+            for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
+            {
+                VkImageView swapChainImageView = m_vkSwapchainImageViews[ i ];
+                vkDestroyImageView( m_context->GetLocalDevice(), swapChainImageView, m_context->GetAllocationCallbacks() );
+            }
+
+            vkDestroySwapchainKHR( m_context->GetLocalDevice(), m_vkSwapchain, m_context->GetAllocationCallbacks() );
+            m_vkSwapchain = VK_NULL_HANDLE;
         }
     }
 
@@ -1245,6 +2373,84 @@ namespace zp
     //
     //
 
+    namespace
+    {
+        class VulkanGraphicsDevice : public GraphicsDevice
+        {
+        public:
+            explicit VulkanGraphicsDevice( MemoryLabel memoryLabel );
+
+            void Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc );
+
+            void Destroy();
+
+            void BeginFrame();
+
+            void EndFrame();
+
+        private:
+            VulkanContext m_context;
+            VulkanSwapchain m_swapchain;
+
+        public:
+            MemoryLabel memoryLabel;
+        };
+
+        VulkanGraphicsDevice::VulkanGraphicsDevice( MemoryLabel memoryLabel )
+            : memoryLabel( memoryLabel )
+        {
+        }
+
+        void VulkanGraphicsDevice::Initialize( const zp::GraphicsDeviceDesc& graphicsDeviceDesc )
+        {
+            m_context.Initialize( graphicsDeviceDesc );
+
+            m_swapchain.Initialize( &m_context, graphicsDeviceDesc.windowHandle );
+        }
+
+        void VulkanGraphicsDevice::Destroy()
+        {
+            m_swapchain.Destroy();
+
+            m_context.Destroy();
+        }
+
+        void VulkanGraphicsDevice::BeginFrame()
+        {
+            m_swapchain.AcquireNextImage();
+
+
+        }
+
+        void VulkanGraphicsDevice::EndFrame()
+        {
+            m_context.EndFrame( m_swapchain.GetWaitSemaphore(), m_swapchain.GetSignalSemaphore(), m_swapchain.GetFrameInFlightFence() );
+
+            m_swapchain.Present();
+        }
+    };
+
+    //
+    //
+    //
+
+    namespace internal
+    {
+        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel )
+        {
+            return ZP_NEW( memoryLabel, VulkanGraphicsDevice );
+        }
+
+        void DestroyVulkanGraphicsDevice( GraphicsDevice* graphicsDevice )
+        {
+            ZP_SAFE_DELETE( VulkanGraphicsDevice, graphicsDevice );
+        }
+    }
+
+    //
+    // Old
+    //
+#if 0
     VulkanGraphicsDevice::VulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc )
         : GraphicsDevice()
         , m_perFrameData {}
@@ -1415,33 +2621,33 @@ namespace zp
             {
                 const VkQueueFamilyProperties& queueFamilyProperty = queueFamilyProperties[ i ];
 
-                if( m_queueFamilies.graphicsFamily == VK_QUEUE_FAMILY_IGNORED &&
+                if( m_queueFamilies.graphicsQueue == VK_QUEUE_FAMILY_IGNORED &&
                     queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT )
                 {
-                    m_queueFamilies.graphicsFamily = i;
+                    m_queueFamilies.graphicsQueue = i;
 
                     VkBool32 presentSupport = VK_FALSE;
                     HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
 
-                    if( m_queueFamilies.presentFamily == VK_QUEUE_FAMILY_IGNORED && presentSupport )
+                    if( m_queueFamilies.presentQueue == VK_QUEUE_FAMILY_IGNORED && presentSupport )
                     {
-                        m_queueFamilies.presentFamily = i;
+                        m_queueFamilies.presentQueue = i;
                     }
                 }
 
-                if( m_queueFamilies.transferFamily == VK_QUEUE_FAMILY_IGNORED &&
+                if( m_queueFamilies.transferQueue == VK_QUEUE_FAMILY_IGNORED &&
                     queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_TRANSFER_BIT )
                 {
-                    m_queueFamilies.transferFamily = i;
+                    m_queueFamilies.transferQueue = i;
                 }
 
-                if( m_queueFamilies.computeFamily == VK_QUEUE_FAMILY_IGNORED &&
+                if( m_queueFamilies.computeQueue == VK_QUEUE_FAMILY_IGNORED &&
                     queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT )
                 {
-                    m_queueFamilies.computeFamily = i;
+                    m_queueFamilies.computeQueue = i;
                 }
             }
 
@@ -1454,22 +2660,22 @@ namespace zp
                     !( queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT ) &&
                     !( queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT ) )
                 {
-                    m_queueFamilies.transferFamily = i;
+                    m_queueFamilies.transferQueue = i;
                 }
 
                 if( queueFamilyProperty.queueCount > 0 &&
                     queueFamilyProperty.queueFlags & VK_QUEUE_COMPUTE_BIT &&
                     !( queueFamilyProperty.queueFlags & VK_QUEUE_GRAPHICS_BIT ) )
                 {
-                    m_queueFamilies.computeFamily = i;
+                    m_queueFamilies.computeQueue = i;
                 }
             }
 
             Set<zp_uint32_t, zp_hash64_t, CastEqualityComparer<zp_uint32_t, zp_hash64_t>> uniqueFamilyIndices( 4, MemoryLabels::Temp );
-            uniqueFamilyIndices.add( m_queueFamilies.graphicsFamily );
-            uniqueFamilyIndices.add( m_queueFamilies.transferFamily );
-            uniqueFamilyIndices.add( m_queueFamilies.computeFamily );
-            uniqueFamilyIndices.add( m_queueFamilies.presentFamily );
+            uniqueFamilyIndices.add( m_queueFamilies.graphicsQueue );
+            uniqueFamilyIndices.add( m_queueFamilies.transferQueue );
+            uniqueFamilyIndices.add( m_queueFamilies.computeQueue );
+            uniqueFamilyIndices.add( m_queueFamilies.presentQueue );
 
             Vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos( 4, MemoryLabels::Temp );
 
@@ -1513,10 +2719,10 @@ namespace zp
 
             HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
 
-            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.graphicsFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ] );
-            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.transferFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ] );
-            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.computeFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_COMPUTE ] );
-            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.presentFamily, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ] );
+            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.graphicsQueue, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ] );
+            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.transferQueue, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ] );
+            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.computeQueue, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_COMPUTE ] );
+            vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.presentQueue, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_PRESENT ] );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], "Graphics Queue" );
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ], "Transfer Queue" );
@@ -1547,13 +2753,13 @@ namespace zp
             //        .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             //    };
             //
-            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsFamily;
+            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsQueue;
             //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkGraphicsCommandPool ) );
             //
-            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferFamily;
+            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferQueue;
             //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkTransferCommandPool ) );
             //
-            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
+            //    commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeQueue;
             //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkComputeCommandPool ) );
         }
 
@@ -1664,8 +2870,8 @@ namespace zp
         VkSurfaceCapabilitiesKHR swapChainSupportDetails;
         HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_vkPhysicalDevice, m_vkSurface, &swapChainSupportDetails ) );
 
-        m_swapchainData.vkSwapchainExtent = ChooseSwapChainExtent( swapChainSupportDetails, width, height );
-        if( m_swapchainData.vkSwapchainExtent.width == 0 && m_swapchainData.vkSwapchainExtent.height == 0 )
+        m_swapchainData.m_vkSwapchainExtent = ChooseSwapChainExtent( swapChainSupportDetails, width, height );
+        if( m_swapchainData.m_vkSwapchainExtent.width == 0 && m_swapchainData.m_vkSwapchainExtent.height == 0 )
         {
             return;
         }
@@ -1673,10 +2879,10 @@ namespace zp
         uint32_t formatCount = 0;
         HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, VK_NULL_HANDLE ) );
 
-        Vector<VkSurfaceFormatKHR> surfaceFormats( formatCount, MemoryLabels::Temp );
-        surfaceFormats.resize_unsafe( formatCount );
+        Vector<VkSurfaceFormatKHR> supportedSurfaceFormats( formatCount, MemoryLabels::Temp );
+        supportedSurfaceFormats.resize_unsafe( formatCount );
 
-        HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, surfaceFormats.data() ) );
+        HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, supportedSurfaceFormats.data() ) );
 
         uint32_t presentModeCount = 0;
         HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_vkPhysicalDevice, m_vkSurface, &presentModeCount, VK_NULL_HANDLE ) );
@@ -1689,7 +2895,7 @@ namespace zp
         // TODO: remove when enums are created
         displayFormat = VK_FORMAT_B8G8R8A8_SNORM;
 
-        VkSurfaceFormatKHR surfaceFormat = ChooseSwapChainSurfaceFormat( surfaceFormats, displayFormat, colorSpace );
+        VkSurfaceFormatKHR surfaceFormat = ChooseSwapChainSurfaceFormat( supportedSurfaceFormats, displayFormat, colorSpace );
         m_swapchainData.vkSwapChainFormat = surfaceFormat.format;
         m_swapchainData.vkSwapchainColorSpace = Convert( colorSpace );
 
@@ -1707,7 +2913,7 @@ namespace zp
             .minImageCount = imageCount,
             .imageFormat = surfaceFormat.format,
             .imageColorSpace = surfaceFormat.colorSpace,
-            .imageExtent = m_swapchainData.vkSwapchainExtent,
+            .imageExtent = m_swapchainData.m_vkSwapchainExtent,
             .imageArrayLayers = 1,
             .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             .preTransform = swapChainSupportDetails.currentTransform,
@@ -1717,9 +2923,9 @@ namespace zp
             .oldSwapchain = m_swapchainData.vkSwapchain
         };
 
-        const uint32_t queueFamilyIndices[] = { m_queueFamilies.graphicsFamily, m_queueFamilies.presentFamily };
+        const uint32_t queueFamilyIndices[] = { m_queueFamilies.graphicsQueue, m_queueFamilies.presentQueue };
 
-        if( m_queueFamilies.graphicsFamily != m_queueFamilies.presentFamily )
+        if( m_queueFamilies.graphicsQueue != m_queueFamilies.presentQueue )
         {
             swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             swapChainCreateInfo.queueFamilyIndexCount = ZP_ARRAY_SIZE( queueFamilyIndices );
@@ -1869,8 +3075,8 @@ namespace zp
                 .renderPass = m_swapchainData.vkSwapchainDefaultRenderPass,
                 .attachmentCount = ZP_ARRAY_SIZE( attachments ),
                 .pAttachments = attachments,
-                .width = m_swapchainData.vkSwapchainExtent.width,
-                .height = m_swapchainData.vkSwapchainExtent.height,
+                .width = m_swapchainData.m_vkSwapchainExtent.width,
+                .height = m_swapchainData.m_vkSwapchainExtent.height,
                 .layers = 1,
             };
 
@@ -3013,7 +4219,7 @@ namespace zp
             .framebuffer = m_swapchainData.swapchainFrameBuffers[ frameData.swapChainImageIndex ],
             .renderArea {
                 .offset { 0, 0 },
-                .extent { m_swapchainData.vkSwapchainExtent },
+                .extent { m_swapchainData.m_vkSwapchainExtent },
             },
             .clearValueCount = ZP_ARRAY_SIZE( clearValues ),
             .pClearValues = clearValues,
@@ -3404,13 +4610,13 @@ namespace zp
                 .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             };
 
-            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsFamily;
+            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsQueue;
             HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkGraphicsCommandPool ) );
 
-            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferFamily;
+            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferQueue;
             HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkTransferCommandPool ) );
 
-            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeFamily;
+            commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeQueue;
             HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkComputeCommandPool ) );
 
             const zp_size_t index = Atomic::AddSizeT( &m_commandPoolCount, 3 ) - 3;
@@ -3481,9 +4687,9 @@ namespace zp
             {
                 // sort delayed destroy handles by how they were allocated
                 handlesToDestroy.sort( []( const DelayedDestroy& a, const DelayedDestroy& b )
-                                       {
-                                           return zp_cmp( a.order, b.order );
-                                       } );
+                {
+                    return zp_cmp( a.order, b.order );
+                } );
 
                 // destroy each delayed destroy handle
                 for( const DelayedDestroy& delayedDestroy : handlesToDestroy )
@@ -3537,4 +4743,5 @@ namespace zp
         const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
         return m_perFrameData[ frame ];
     }
+#endif
 }

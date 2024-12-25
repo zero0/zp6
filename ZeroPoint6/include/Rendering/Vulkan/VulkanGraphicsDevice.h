@@ -15,12 +15,20 @@
 
 namespace zp
 {
+    namespace internal
+    {
+        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel );
+
+        void DestroyVulkanGraphicsDevice( GraphicsDevice* graphicsDevice );
+    }
+
     enum
     {
         kBufferedFrameCount = 4,
     };
     ZP_STATIC_ASSERT( zp_is_pow2( kBufferedFrameCount ) );
 
+#if 0
     class VulkanGraphicsDevice final : public GraphicsDevice
     {
     ZP_NONCOPYABLE( VulkanGraphicsDevice );
@@ -152,12 +160,12 @@ namespace zp
 
         void rebuildSwapchain();
 
-        struct QueueFamilies
+        struct QueueFamilyIndices
         {
-            zp_uint32_t graphicsFamily;
-            zp_uint32_t transferFamily;
-            zp_uint32_t computeFamily;
-            zp_uint32_t presentFamily;
+            zp_uint32_t graphicsQueue;
+            zp_uint32_t transferQueue;
+            zp_uint32_t computeQueue;
+            zp_uint32_t presentQueue;
         };
 
         struct PerFrameData
@@ -190,7 +198,7 @@ namespace zp
             VkFormat vkSwapChainFormat;
 
             VkColorSpaceKHR vkSwapchainColorSpace;
-            VkExtent2D vkSwapchainExtent;
+            VkExtent2D m_vkSwapchainExtent;
 
             zp_uint32_t swapchainImageCount;
             FixedArray<VkImage, kBufferedFrameCount> swapchainImages;
@@ -235,13 +243,14 @@ namespace zp
 
         GraphicsBuffer m_stagingBuffer;
 
-        QueueFamilies m_queueFamilies;
+        QueueFamilyIndices m_queueFamilies;
 
         zp_uint64_t m_currentFrameIndex;
 #endif
     public:
         const MemoryLabel memoryLabel;
     };
+#endif
 }
 
 #endif //ZP_VULKANGRAPHICSDEVICE_H

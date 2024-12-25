@@ -197,15 +197,18 @@ namespace zp
         {
             ZP_PROFILE_CPU_BLOCK_E( Create Graphics Device );
 
-            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, {
+            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics );
+
+            const GraphicsDeviceDesc dd {
                 .appName = String::As( "AppName" ),
-                .windowHandle = m_windowHandle.handle,
+                .windowHandle = m_windowHandle,
                 .stagingBufferSize = 32 MB,
                 .threadCount = numJobThreads,
                 .bufferedFrameCount = 4,
-            } );
+            };
 
-            m_graphicsDevice->createSwapchain( m_windowHandle.handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
+            m_graphicsDevice->Initialize( dd );
+            //m_graphicsDevice->createSwapchain( m_windowHandle.handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
 
         // show window when graphics device is created
@@ -339,7 +342,7 @@ namespace zp
 
         void WaitForGPUJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            e->engine->getGraphicsDevice()->waitForGPU();
+            //e->engine->getGraphicsDevice()->waitForGPU();
 
             JobSystem::Start( AdvanceFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -347,9 +350,7 @@ namespace zp
 
         void EndFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            e->engine->getGraphicsDevice()->submit();
-
-            e->engine->getGraphicsDevice()->present();
+            e->engine->getGraphicsDevice()->EndFrame();
 
             JobSystem::Start( WaitForGPUJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -357,7 +358,7 @@ namespace zp
 
         void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e )
         {
-            e->engine->getGraphicsDevice()->beginFrame();
+            e->engine->getGraphicsDevice()->BeginFrame();
 
             JobSystem::Start( EndFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
@@ -442,6 +443,8 @@ namespace zp
             Platform::CloseConsole( m_consoleHandle );
             m_consoleHandle = {};
         }
+
+        m_graphicsDevice->Destroy();
 
         DestroyGraphicsDevice( m_graphicsDevice );
         m_graphicsDevice = nullptr;

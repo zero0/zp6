@@ -169,7 +169,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                waitOnGpuJob->graphicsDevice->waitForGPU();
+                //waitOnGpuJob->graphicsDevice->waitForGPU();
             }
         };
 
@@ -182,7 +182,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                waitOnGpuJob->graphicsDevice->beginFrame();
+                //waitOnGpuJob->graphicsDevice->beginFrame();
             }
         };
 
@@ -195,7 +195,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                waitOnGpuJob->m_graphicsDevice->submit();
+                //waitOnGpuJob->m_graphicsDevice->submit();
             }
         };
 
@@ -207,7 +207,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                presentGpuJob->m_graphicsDevice->present();
+                //presentGpuJob->m_graphicsDevice->present();
             }
         };
     }
@@ -236,7 +236,7 @@ namespace zp
             // create render pass
             {
                 RenderPassDesc renderPassDesc {};
-                graphicsDevice->createRenderPass( &renderPassDesc, m_renderPass.data() );
+                //graphicsDevice->createRenderPass( &renderPassDesc, m_renderPass.data() );
             }
 
             // create shaders
@@ -249,7 +249,7 @@ namespace zp
                         .codeData = vertexShaderCode,
                         .shaderStage = ZP_SHADER_STAGE_VERTEX,
                     };
-                    graphicsDevice->createShader( shaderDesc, m_vertexShader.data() );
+                    //graphicsDevice->createShader( shaderDesc, m_vertexShader.data() );
                 }
 
                 {
@@ -260,7 +260,7 @@ namespace zp
                         .codeData = fragmentShaderCode,
                         .shaderStage = ZP_SHADER_STAGE_FRAGMENT,
                     };
-                    graphicsDevice->createShader( shaderDesc, m_fragmentShader.data() );
+                    //graphicsDevice->createShader( shaderDesc, m_fragmentShader.data() );
                 }
 
                 {
@@ -283,7 +283,7 @@ namespace zp
                         .codeData = memPtr,
                         .shaderStage = ZP_SHADER_STAGE_VERTEX,
                     };
-                    graphicsDevice->createShader( shaderDesc, m_colorVertexShader.data() );
+                    //graphicsDevice->createShader( shaderDesc, m_colorVertexShader.data() );
 
                     GetAllocator( MemoryLabels::FileIO )->free( memPtr );
                 }
@@ -304,7 +304,7 @@ namespace zp
                         .codeData = memPtr,
                         .shaderStage = ZP_SHADER_STAGE_FRAGMENT,
                     };
-                    graphicsDevice->createShader( shaderDesc, m_colorFragmentShader.data() );
+                    //graphicsDevice->createShader( shaderDesc, m_colorFragmentShader.data() );
 
                     GetAllocator( MemoryLabels::FileIO )->free( memPtr );
                 }
@@ -312,7 +312,7 @@ namespace zp
 
             {
                 PipelineLayoutDesc pipelineLayoutDesc {};
-                graphicsDevice->createPipelineLayout( &pipelineLayoutDesc, m_pipelineLayout.data() );
+                //graphicsDevice->createPipelineLayout( &pipelineLayoutDesc, m_pipelineLayout.data() );
             }
 
             // create pipeline
@@ -353,7 +353,7 @@ namespace zp
                 graphicsPipelineStateDesc.blendStates[ 0 ].alphaBlendOp = ZP_BLEND_OP_ADD;
                 graphicsPipelineStateDesc.blendStates[ 0 ].writeMask = ZP_COLOR_COMPONENT_RGBA;
 
-                graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_graphicsPipelineState );
+                //graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_graphicsPipelineState );
 
                 // color
                 m_colorMaterial = {};
@@ -371,7 +371,7 @@ namespace zp
                 graphicsPipelineStateDesc.vertexAttributes[ 1 ] = { 1, 0, offsetof( struct VertexVUC, color ), ZP_GRAPHICS_FORMAT_R32G32B32A32_SFLOAT };
                 graphicsPipelineStateDesc.vertexAttributes[ 2 ] = { 2, 0, offsetof( struct VertexVUC, uv0 ), ZP_GRAPHICS_FORMAT_R32G32_SFLOAT };
 
-                graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_colorMaterial.get().materialRenderPipeline );
+                //graphicsDevice->createGraphicsPipeline( &graphicsPipelineStateDesc, &m_colorMaterial.get().materialRenderPipeline );
             }
 
             {
@@ -383,14 +383,14 @@ namespace zp
         {
             GraphicsDevice* graphicsDevice = renderSystem->getGraphicsDevice();
 
-            graphicsDevice->destroyShader( m_fragmentShader.data() );
-            graphicsDevice->destroyShader( m_vertexShader.data() );
-            graphicsDevice->destroyShader( m_colorVertexShader.data() );
-            graphicsDevice->destroyShader( m_colorFragmentShader.data() );
-            graphicsDevice->destroyPipelineLayout( m_pipelineLayout.data() );
-            graphicsDevice->destroyGraphicsPipeline( &m_graphicsPipelineState );
-            graphicsDevice->destroyGraphicsPipeline( &m_colorMaterial.get().materialRenderPipeline );
-            graphicsDevice->destroyRenderPass( m_renderPass.data() );
+            //graphicsDevice->destroyShader( m_fragmentShader.data() );
+            //graphicsDevice->destroyShader( m_vertexShader.data() );
+            //graphicsDevice->destroyShader( m_colorVertexShader.data() );
+            //graphicsDevice->destroyShader( m_colorFragmentShader.data() );
+            //graphicsDevice->destroyPipelineLayout( m_pipelineLayout.data() );
+            //graphicsDevice->destroyGraphicsPipeline( &m_graphicsPipelineState );
+            //graphicsDevice->destroyGraphicsPipeline( &m_colorMaterial.get().materialRenderPipeline );
+            //graphicsDevice->destroyRenderPass( m_renderPass.data() );
         }
 
         struct PipelineJob
@@ -414,6 +414,7 @@ namespace zp
 
                 context.endRenderPass();
 #endif
+#if 0
                 CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
 
                 graphicsDevice->beginRenderPass( data->renderPass.data(), cmd );
@@ -425,6 +426,7 @@ namespace zp
                 graphicsDevice->endRenderPass( cmd );
 
                 graphicsDevice->releaseCommandQueue( cmd );
+#endif
             }
         };
 
@@ -460,9 +462,9 @@ namespace zp
     {
         s_renderPipeline = {};
 
-        m_graphicsDevice = CreateGraphicsDevice( memoryLabel, graphicsDeviceDesc );
+        m_graphicsDevice = CreateGraphicsDevice( memoryLabel );
 
-        m_graphicsDevice->createSwapchain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
+        //m_graphicsDevice->createSwapchain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
 
         BatchModeRendererConfig batchModeRendererConfig {};
         m_batchModeRenderer = ZP_NEW_ARGS( memoryLabel, BatchModeRenderer, &batchModeRendererConfig );
@@ -585,12 +587,12 @@ namespace zp
                 else
                 {
                     GraphicsDevice* graphicsDevice = ctx.m_graphicsDevice;
-                    CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
+                    //CommandQueue* cmd = graphicsDevice->requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
 
-                    graphicsDevice->beginRenderPass( nullptr, cmd );
-                    graphicsDevice->endRenderPass( cmd );
+                    //graphicsDevice->beginRenderPass( nullptr, cmd );
+                    //graphicsDevice->endRenderPass( cmd );
 
-                    graphicsDevice->releaseCommandQueue( cmd );
+                    //graphicsDevice->releaseCommandQueue( cmd );
                 }
             }
         } processRenderPipeline {

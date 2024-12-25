@@ -7,32 +7,32 @@
 
 #include "Core/Defines.h"
 
-typedef bool zp_bool_t;
+using zp_bool_t = bool;
 
-typedef signed char zp_int8_t;
-typedef unsigned char zp_uint8_t;
+using zp_int8_t = signed char;
+using zp_uint8_t = unsigned char;
 
-typedef signed short zp_int16_t;
-typedef unsigned short zp_uint16_t;
+using zp_int16_t = short;
+using zp_uint16_t = unsigned short;
 
 #define USE_LONG_AS_INT 0
 #if USE_LONG_AS_INT
-typedef signed long zp_int32_t;
-typedef unsigned long zp_uint32_t;
+using zp_int32_t = long;
+using zp_uint32_t = unsigned long;
 #else
-typedef signed int zp_int32_t;
-typedef unsigned int zp_uint32_t;
+using zp_int32_t = int;
+using zp_uint32_t = unsigned int;
 #endif
 
-typedef signed long long zp_int64_t;
-typedef unsigned long long zp_uint64_t;
+using zp_int64_t = long long;
+using zp_uint64_t = unsigned long long;
 
-typedef zp_uint16_t zp_float16_t;
-typedef float zp_float32_t;
-typedef double zp_float64_t;
+using zp_float16_t = zp_uint16_t;
+using zp_float32_t = float;
+using zp_float64_t = double;
 
-typedef void* zp_handle_t;
-#define ZP_NULL_HANDLE  static_cast<zp_handle_t>(nullptr)
+using zp_handle_t = void *;
+constexpr zp_handle_t ZP_NULL_HANDLE = static_cast<zp_handle_t>(nullptr);
 
 #define ZP_BOOL8( x )       zp_uint8_t x : 1
 #define ZP_BOOL16( x )      zp_uint16_t x : 1
@@ -40,19 +40,19 @@ typedef void* zp_handle_t;
 #define ZP_BOOL64( x )      zp_uint64_t x : 1
 
 #ifdef ZP_ARCH64
-typedef unsigned long long zp_size_t;
-typedef long long zp_ptrdiff_t;
-typedef unsigned long long zp_ptr_t;
+using zp_size_t = unsigned long long;
+using zp_ptrdiff_t = long long;
+using zp_ptr_t = unsigned long long;
 #else
-typedef unsigned int zp_size_t;
-typedef signed int zp_ptrdiff_t;
-typedef unsigned int zp_ptr_t;
+using zp_size_t = unsigned int;
+using zp_ptrdiff_t = int;
+using zp_ptr_t = unsigned int;
 #endif
 
 #if ZP_USE_UTF8_LITERALS
-typedef char8_t zp_char8_t;
+using zp_char8_t = char8_t;
 #else
-typedef char zp_char8_t;
+using zp_char8_t = char;
 #endif
 
 //
@@ -74,7 +74,7 @@ ZP_FORCEINLINE zp_bool_t operator==( const zp_hash128_t& lh, const zp_hash128_t&
 
 ZP_FORCEINLINE zp_bool_t operator!=( const zp_hash128_t& lh, const zp_hash128_t& rh )
 {
-    return !( lh.m32 == rh.m32 && lh.m10 == rh.m10 );
+    return !( lh == rh );
 }
 
 ZP_FORCEINLINE zp_bool_t operator<( const zp_hash128_t& lh, const zp_hash128_t& rh )

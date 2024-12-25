@@ -56,7 +56,7 @@ namespace zp
             .usageFlags = ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST,
             .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
         };
-        m_graphicsDevice->createBuffer( vertexBufferDesc, &m_vertexGraphicsBuffer );
+        //m_graphicsDevice->createBuffer( vertexBufferDesc, &m_vertexGraphicsBuffer );
 
         GraphicsBufferDesc indexBufferDesc {
             .name = "Immediate Mode Index Buffer",
@@ -64,7 +64,7 @@ namespace zp
             .usageFlags = ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER | ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST,
             .memoryPropertyFlags = ZP_MEMORY_PROPERTY_HOST_VISIBLE,
         };
-        m_graphicsDevice->createBuffer( indexBufferDesc, &m_indexGraphicsBuffer );
+        //m_graphicsDevice->createBuffer( indexBufferDesc, &m_indexGraphicsBuffer );
 
         for( zp_size_t i = 0; i < kMaxBufferedImmediateFrames; ++i )
         {
@@ -95,8 +95,8 @@ namespace zp
             perFrameData = {};
         }
 
-        m_graphicsDevice->destroyBuffer( &m_vertexGraphicsBuffer );
-        m_graphicsDevice->destroyBuffer( &m_indexGraphicsBuffer );
+        //m_graphicsDevice->destroyBuffer( &m_vertexGraphicsBuffer );
+        //m_graphicsDevice->destroyBuffer( &m_indexGraphicsBuffer );
 
         m_registeredMaterials.clear();
 
@@ -268,8 +268,8 @@ namespace zp
 
             void* vertexMemory = nullptr;
             void* indexMemory = nullptr;
-            m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, perFrameData.vertexBuffer, &vertexMemory );
-            m_graphicsDevice->mapBuffer( 0, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), perFrameData.indexBuffer, &indexMemory );
+            //m_graphicsDevice->mapBuffer( 0, perFrameData.vertexBufferOffset, perFrameData.vertexBuffer, &vertexMemory );
+            //m_graphicsDevice->mapBuffer( 0, perFrameData.indexBufferLength * sizeof( zp_uint16_t ), perFrameData.indexBuffer, &indexMemory );
 
             zp_uint8_t* vertexBuffer = static_cast<zp_uint8_t*>( vertexMemory );
             zp_uint8_t* indexBuffer = static_cast<zp_uint8_t*>( indexMemory );
@@ -310,8 +310,8 @@ namespace zp
                 indexWriteOffset += cmdIndexSize;
             }
 
-            m_graphicsDevice->unmapBuffer( perFrameData.vertexBuffer );
-            m_graphicsDevice->unmapBuffer( perFrameData.indexBuffer );
+            //m_graphicsDevice->unmapBuffer( perFrameData.vertexBuffer );
+            //m_graphicsDevice->unmapBuffer( perFrameData.indexBuffer );
         }
     }
 }

@@ -15,7 +15,10 @@
 #include <intrin.h>
 #endif
 
-constexpr zp_size_t ZP_NPOS = -1;
+namespace zp
+{
+    constexpr zp_size_t npos = -1;
+}
 
 #if ZP_USE_PRINTF
 
@@ -60,14 +63,23 @@ zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... 
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
-#define ZP_ASSERT( t )                                      do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t, __FILE__, __LINE__ ); return; }} while( false )
-#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t, __FILE__, __LINE__ ); return v; }} while( false )
-#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t ": " msg, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) { zp_error_printfln( "Assertion failed %s:%d - " #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
-#define ZP_INVALID_CODE_PATH()                              do { zp_error_printfln( "Invalid Code Path %s:%d", __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_error_printfln( "Invalid Code Path %s:%d - " msg, __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_error_printfln( "Invalid Code Path %s:%d - " msg, __FILE__, __LINE__, args ); } while( false )
+template<typename ... Args>
+void zp_assert( const char* msg, const char* file, zp_size_t line, Args... args)
+{
+    char assertMsg[ 512 ];
+    zp_snprintf(assertMsg, msg, args...);
+
+    zp_error_printfln( "Assertion failed %s:%d - %s", file, line, assertMsg );
+}
+
+#define ZP_ASSERT( t )                                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return; }} while( false )
+#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return v; }} while( false )
+#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
+#define ZP_INVALID_CODE_PATH()                              do { zp_assert( "Invalid Code Path", __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); } while( false )
 #else // !ZP_USE_ASSERTIONS
 #define ZP_ASSERT(...)                      (void)0
 #define ZP_ASSERT_RETURN(...)               (void)0
@@ -304,10 +316,46 @@ constexpr zp_int32_t zp_cmp_dsc( const T& lh, const T& rh )
 //
 //
 
-template<typename T, typename Eq>
-constexpr T* zp_find( T* begin, T* end, const T& value, Eq eq )
+ZP_FORCEINLINE constexpr auto zp_flag32_is_set( zp_uint32_t flag, zp_uint32_t test ) -> zp_bool_t
 {
-    T* found = nullptr;
+    return ( flag & test ) == test;
+}
+
+ZP_FORCEINLINE constexpr auto zp_flag32_all_set( zp_uint32_t flag, zp_uint32_t mask ) -> zp_bool_t
+{
+    return ( flag & mask ) == mask;
+}
+
+ZP_FORCEINLINE constexpr auto zp_flag32_any_set( zp_uint32_t flag, zp_uint32_t mask ) -> zp_bool_t
+{
+    return ( flag & mask ) != 0;
+}
+
+//
+//
+//
+
+template<typename T, typename Eq>
+constexpr const T* zp_find( const T* begin, const T* end, Eq eq )
+{
+    const T* found = nullptr;
+
+    for( ; begin != end; ++begin )
+    {
+        if( eq( *begin ) )
+        {
+            found = begin;
+            break;
+        }
+    }
+
+    return found;
+}
+
+template<typename T, typename Eq>
+constexpr const T* zp_find( const T* begin, const T* end, const T& value, Eq eq )
+{
+    const T* found = nullptr;
 
     for( ; begin != end; ++begin )
     {
@@ -322,24 +370,31 @@ constexpr T* zp_find( T* begin, T* end, const T& value, Eq eq )
 }
 
 template<typename T>
-constexpr T* zp_find( T* begin, T* end, const T& value )
+constexpr const T* zp_find( const T* begin, const T* end, const T& value )
 {
-    T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t { return lh == rh; } );
+    const T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t { return lh == rh; } );
     return found;
 }
 
 template<typename T, typename Eq>
-constexpr zp_size_t zp_find_index( T* begin, T* end, const T& value, Eq eq )
+constexpr zp_size_t zp_find_index( const T* begin, const T* end, Eq eq )
+{
+    const T* found = zp_find( begin, end, eq );
+    return found == nullptr ? zp::npos : found - begin;
+}
+
+template<typename T, typename Eq>
+constexpr zp_size_t zp_find_index( const T* begin, const T* end, const T& value, Eq eq )
 {
     T* found = zp_find( begin, end, value, eq );
-    return found == nullptr ? -1 : found - begin;
+    return found == nullptr ? zp::npos : found - begin;
 }
 
 template<typename T, typename Eq>
 constexpr zp_size_t zp_index_of( T* begin, T* end, const T& value )
 {
     T* found = zp_find( begin, end, value );
-    return found == nullptr ? -1 : found - begin;
+    return found == nullptr ? zp::npos : found - begin;
 }
 
 template<typename T, typename Eq>
@@ -369,7 +424,7 @@ constexpr zp_bool_t zp_try_index_of( T* begin, T* end, const T& value, zp_size_t
 template<typename T, zp_size_t Size, typename Eq>
 constexpr zp_size_t zp_find_index( const T (& arr)[Size], const T& value, Eq eq )
 {
-    zp_size_t index = -1;
+    zp_size_t index = zp::npos;
 
     for( zp_size_t i = 0; i < Size; ++i )
     {

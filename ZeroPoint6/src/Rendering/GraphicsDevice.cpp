@@ -24,10 +24,10 @@
 
 namespace zp
 {
-    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc )
+    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel )
     {
 #if ZP_RENDERING_API_VULKAN
-        return ZP_NEW_ARGS( memoryLabel, VulkanGraphicsDevice, graphicsDeviceDesc );
+        return internal::CreateVulkanGraphicsDevice( memoryLabel );
 #elif ZP_RENDERING_API_D3D12
         ZP_INVALID_CODE_PATH_MSG("Graphics API D3D12 not supported");
         return nullptr;
@@ -40,8 +40,7 @@ namespace zp
     void DestroyGraphicsDevice( GraphicsDevice* graphicsDevice )
     {
 #if ZP_RENDERING_API_VULKAN
-        auto ptr = reinterpret_cast<VulkanGraphicsDevice*>( graphicsDevice );
-        ZP_SAFE_DELETE( VulkanGraphicsDevice, ptr );
+        internal::DestroyVulkanGraphicsDevice( graphicsDevice );
 #elif ZP_RENDERING_API_D3D12
         ZP_INVALID_CODE_PATH_MSG("Graphics API D3D12 not supported");
 #else

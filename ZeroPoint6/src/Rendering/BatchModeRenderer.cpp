@@ -119,7 +119,7 @@ namespace zp
     void BatchModeRenderer::process( GraphicsDevice* graphicsDevice )
     {
         ZP_PROFILE_CPU_BLOCK();
-
+#if 0
         // fill sort commands
         const zp_size_t sortCapacity = m_tempBatchRenderCommands.size() + m_persistentBatchRenderCommands.size();
         if( sortCapacity == 0 ) return;
@@ -198,6 +198,7 @@ namespace zp
         graphicsDevice->endRenderPass( commandQueue );
 
         graphicsDevice->releaseCommandQueue( commandQueue );
+#endif
     }
 
     BatchModeRenderCommandHandle BatchModeRenderer::acquirePersistentRenderCommand()

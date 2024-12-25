@@ -393,7 +393,7 @@ namespace zp
     zp_bool_t Map<Key, Value, H, KeyComparer, KeyHash, Allocator>::tryGet( key_const_reference key, value_reference value ) const
     {
         const zp_size_t index = findIndex( key );
-        const zp_bool_t found = index != ZP_NPOS;
+        const zp_bool_t found = index != zp::npos;
         if( found )
         {
             value = m_entries[ index ].value;
@@ -406,7 +406,7 @@ namespace zp
     zp_bool_t Map<Key, Value, H, KeyComparer, KeyHash, Allocator>::tryGet( key_const_reference key, value_pointer value ) const
     {
         const zp_size_t index = findIndex( key );
-        const zp_bool_t found = index != ZP_NPOS;
+        const zp_bool_t found = index != zp::npos;
         if( found )
         {
             *value = m_entries[ index ].value;
@@ -419,7 +419,7 @@ namespace zp
     zp_bool_t Map<Key, Value, H, KeyComparer, KeyHash, Allocator>::tryGet( key_const_reference key, value_pointer_reference value ) const
     {
         const zp_size_t index = findIndex( key );
-        const zp_bool_t found = index != ZP_NPOS;
+        const zp_bool_t found = index != zp::npos;
         if( found )
         {
             value = &m_entries[ index ].value;
@@ -432,7 +432,7 @@ namespace zp
     zp_bool_t Map<Key, Value, H, KeyComparer, KeyHash, Allocator>::tryGet( key_const_reference key, value_pointer_pointer value ) const
     {
         const zp_size_t index = findIndex( key );
-        const zp_bool_t found = index != ZP_NPOS;
+        const zp_bool_t found = index != zp::npos;
         if( found )
         {
             *value = &m_entries[ index ].value;
@@ -452,7 +452,7 @@ namespace zp
         const_hash_value h = m_hash( key );
         zp_size_t index = h % m_capacity;
 
-        for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+        for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
         {
             if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
             {
@@ -499,7 +499,7 @@ namespace zp
         const_hash_value h = m_hash( key );
         zp_size_t index = h % m_capacity;
 
-        for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+        for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
         {
             if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
             {
@@ -547,7 +547,7 @@ namespace zp
         zp_size_t index = h % m_capacity;
         zp_size_t numSteps = 0;
 
-        for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+        for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
         {
             if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
             {
@@ -601,7 +601,7 @@ namespace zp
         zp_size_t index = h % m_capacity;
         zp_size_t numSteps = 0;
 
-        for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+        for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
         {
             if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
             {
@@ -654,7 +654,7 @@ namespace zp
         zp_size_t index = h % m_capacity;
         zp_size_t numSteps = 0;
 
-        for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+        for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
         {
             if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
             {
@@ -707,7 +707,7 @@ namespace zp
         zp_size_t index = h % m_capacity;
         zp_size_t numSteps = 0;
 
-        for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+        for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
         {
             if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
             {
@@ -764,7 +764,7 @@ namespace zp
     zp_bool_t Map<Key, Value, H, KeyComparer, KeyHash, Allocator>::containsKey( key_const_reference key ) const
     {
         const zp_size_t index = findIndex( key );
-        return index != ZP_NPOS;
+        return index != zp::npos;
     }
 
     template<typename Key, typename Value, typename H, typename KeyComparer, typename KeyHash, typename Allocator>
@@ -776,13 +776,13 @@ namespace zp
         {
             const_hash_value h = m_hash( key );
             const zp_size_t index = h % m_capacity;
-            zp_size_t removeIndex = ZP_NPOS;
+            zp_size_t removeIndex = zp::npos;
 
-            for( zp_size_t b = m_buckets[ index ]; b != ZP_NPOS; b = m_entries[ b ].next )
+            for( zp_size_t b = m_buckets[ index ]; b != zp::npos; b = m_entries[ b ].next )
             {
                 if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
                 {
-                    if( removeIndex == ZP_NPOS )
+                    if( removeIndex == zp::npos )
                     {
                         m_buckets[ index ] = m_entries[ b ].next;
                     }
@@ -826,7 +826,7 @@ namespace zp
         {
             for( zp_size_t i = 0; i < m_capacity; ++i )
             {
-                m_buckets[ i ] = ZP_NPOS;
+                m_buckets[ i ] = zp::npos;
             }
 
             for( zp_size_t i = 0; i < m_count; ++i )
@@ -834,7 +834,7 @@ namespace zp
                 ( m_entries + i )->~MapEntry();
             }
 
-            m_freeList = ZP_NPOS;
+            m_freeList = zp::npos;
             m_freeCount = 0;
             m_count = 0;
         }
@@ -907,7 +907,7 @@ namespace zp
 
         for( zp_size_t i = 0; i < capacity; ++i )
         {
-            buckets[ i ] = ZP_NPOS;
+            buckets[ i ] = zp::npos;
         }
 
         if( m_entries != nullptr )
@@ -957,13 +957,13 @@ namespace zp
     template<typename Key, typename Value, typename H, typename KeyComparer, typename KeyHash, typename Allocator>
     zp_size_t Map<Key, Value, H, KeyComparer, KeyHash, Allocator>::findIndex( key_const_reference key ) const
     {
-        zp_size_t index = ZP_NPOS;
+        zp_size_t index = zp::npos;
 
         if( m_buckets != nullptr )
         {
             const_hash_value h = m_hash( key );
             const zp_size_t idx = h % m_capacity;
-            for( zp_size_t b = m_buckets[ idx ]; b != ZP_NPOS; b = m_entries[ b ].next )
+            for( zp_size_t b = m_buckets[ idx ]; b != zp::npos; b = m_entries[ b ].next )
             {
                 if( m_entries[ b ].hash == h && m_cmp( m_entries[ b ].key, key ) )
                 {

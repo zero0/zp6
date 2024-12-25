@@ -17,6 +17,8 @@
 #include "Rendering/Shader.h"
 #include "Rendering/Texture.h"
 
+#include "Platform/Platform.h"
+
 namespace zp
 {
     struct GraphicsDeviceEnumerator
@@ -188,9 +190,9 @@ namespace zp
     struct GraphicsDeviceDesc
     {
         String appName;
-        zp_handle_t windowHandle;
-        zp_size_t stagingBufferSize;
+        WindowHandle windowHandle;
 
+        zp_size_t stagingBufferSize;
         zp_uint32_t threadCount;
         zp_uint32_t bufferedFrameCount;
 
@@ -200,7 +202,7 @@ namespace zp
 
     class GraphicsDevice;
 
-    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& graphicsDeviceDesc );
+    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel );
 
     void DestroyGraphicsDevice( GraphicsDevice* graphicsDevice );
 
@@ -210,12 +212,24 @@ namespace zp
 
     ZP_DECLSPEC_NOVTABLE class GraphicsDevice
     {
-    ZP_NONCOPYABLE( GraphicsDevice );
+    public:
+        virtual void Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc ) = 0;
+
+        virtual void Destroy() = 0;
+
+        virtual void BeginFrame() = 0;
+
+        virtual void EndFrame() = 0;
+    };
+
+    ZP_DECLSPEC_NOVTABLE class GraphicsDeviceOld
+    {
+    ZP_NONCOPYABLE( GraphicsDeviceOld );
 
     public:
-        GraphicsDevice() = default;
+        GraphicsDeviceOld() = default;
 
-        ~GraphicsDevice() = default;
+        ~GraphicsDeviceOld() = default;
 
 #pragma region Swapchain
         virtual void createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;

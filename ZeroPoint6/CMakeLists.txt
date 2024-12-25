@@ -4,12 +4,13 @@ set(ZP_VERSION_MINOR 0)
 set(ZP_VERSION_PATCH 0)
 set(ZP_VERSION ${ZP_VERSION_MAJOR}.${ZP_VERSION_MINOR}.${ZP_VERSION_PATCH})
 
+find_package(Vulkan REQUIRED COMPONENTS volk dxc)
+
 project(ZeroPoint VERSION ${ZP_VERSION} LANGUAGES CXX)
 
 set(ZP_TARGET ${PROJECT_NAME}_${PLATFORM_NAME}_${PLATFORM_ARCH})
 
 set(ZP_RENDERING_API Vulkan)
-find_package(Vulkan REQUIRED)
 
 # Source Files
 set(ZP_CORE_SRC
@@ -169,10 +170,13 @@ set(ZP_HEADERS
 set(ZP_EXTERNAL_HEADERS
     "external/tlsf/tlsf.h"
 )
+source_group(External Header FILES ${ZP_EXTERNAL_HEADERS})
 
 set(ZP_EXTERNAL_SRC
     "external/tlsf/tlsf.c"
+    "${Vulkan_INCLUDE_DIRS}/Volk/volk.c"
 )
+source_group(External Source FILES ${ZP_EXTERNAL_SRC})
 
 #if (GCC OR CLANG)
 #target_compile_definitions(${ZP_TARGET}}
@@ -182,11 +186,11 @@ set(ZP_EXTERNAL_SRC
 
 add_executable(${ZP_TARGET}
     "res/${PLATFORM_FULL_NAME}/resource.rc")
-target_sources(${ZP_TARGET}
-    PRIVATE ${ZP_HEADERS}
-    PRIVATE ${ZP_SRC}
-    PRIVATE ${ZP_EXTERNAL_HEADERS}
-    PRIVATE ${ZP_EXTERNAL_SRC}
+target_sources(${ZP_TARGET} PRIVATE
+    ${ZP_HEADERS}
+    ${ZP_SRC}
+    ${ZP_EXTERNAL_HEADERS}
+    ${ZP_EXTERNAL_SRC}
 )
 target_include_directories(${ZP_TARGET}
     PRIVATE include
@@ -204,9 +208,23 @@ target_include_directories(${ZP_TARGET}
 #if (${ZP_RENDERING_API} EQUAL Vulkan)
 #cmake_path(SET VulkanSDK $ENV{VULKAN_SDK})
 
+get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
+
+message(CHECK_START "Finding volk")
+if(Vulkan_volk_FOUND)
+
+    message(CHECK_PASS "Found volk ${Vulkan_volk_LIBRARY}")
+else()
+    message(CHECK_FAIL "Unable to find volk")
+endif()
+
 # Define VK_NO_PROTOTYPES to avoid including Vulkan prototypes
 # This is necessary because we are using volk to load Vulkan functions
 target_compile_definitions(${ZP_TARGET} PRIVATE VK_NO_PROTOTYPES)
+
+if(${PLATFORM_NAME} STREQUAL "Win")
+    target_compile_definitions(${ZP_TARGET} PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+endif()
 
 find_program(SLANGC_EXE
     NAMES slangc
@@ -240,7 +258,7 @@ if(SLANGC_EXE)
         get_filename_component(OUTPUT_NAME ${OUTPUT_FILE} NAME)
         add_custom_command(
             OUTPUT ${OUTPUT_FILE}
-            COMMAND ${SLANGC_EXECUTABLE} ${_SLANG_FLAGS} -source-embed-name ${EMBED_SHADER_NAME} -o ${OUTPUT_FILE} ${SHADER}
+            COMMAND ${SLANGC_EXE} ${_SLANG_FLAGS} -source-embed-name ${EMBED_SHADER_NAME} -o ${OUTPUT_FILE} ${SHADER}
             MAIN_DEPENDENCY ${SHADER}
             COMMENT "slangc: Compiling shader ${SHADER_NAME} -> ${OUTPUT_NAME}..."
             VERBATIM
@@ -257,14 +275,16 @@ target_include_directories(${ZP_TARGET} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen
 target_include_directories(${ZP_TARGET}
     PRIVATE ${Vulkan_INCLUDE_DIRS}
 )
+target_link_directories(${ZP_TARGET}
+    PRIVATE ${_Vulkan_LIB_DIR}
+)
 target_link_options(${ZP_TARGET}
     PRIVATE -static-libgcc -static-libstdc++ -static
 )
-target_link_libraries(${ZP_TARGET}
-    PRIVATE Vulkan_volk_LIBRARY
-    PRIVATE "rpcrt4.lib"
-    PRIVATE "dwmapi.dll"
-    PRIVATE "Ws2_32.lib"
+target_link_libraries(${ZP_TARGET} PRIVATE
+    rpcrt4
+    dwmapi
+    Ws2_32
 )
 #endif ()
 
@@ -299,8 +319,6 @@ install(TARGETS ${ZP_TARGET}
 #
 
 project(ZeroPointTools VERSION ${ZP_VERSION} LANGUAGES CXX)
-
-find_package(Vulkan REQUIRED COMPONENTS dxc)
 
 set(ZP_TOOLS_TARGET ${PROJECT_NAME}_${PLATFORM_NAME}_${PLATFORM_ARCH})
 

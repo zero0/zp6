@@ -27,26 +27,23 @@ namespace zp
         Count,
     };
 
-    namespace
-    {
-        // @formatter:off
-        constexpr LogType LogMessageType =  ZP_USE_LOG_MESSAGE ?    LogType::Message : LogType::Null;
-        constexpr LogType LogInfoType =     ZP_USE_LOG_INFO ?       LogType::Info : LogType::Null;
-        constexpr LogType LogWarningType =  ZP_USE_LOG_WARNING ?    LogType::Warning : LogType::Null;
-        constexpr LogType LogErrorType =    ZP_USE_LOG_ERROR ?      LogType::Error : LogType::Null;
-        constexpr LogType LogFatalType =    ZP_USE_LOG_FATAL ?      LogType::Fatal : LogType::Null;
-        // @formatter:on
-    }
+    // @formatter:off
+    constexpr LogType LogMessageType =  ZP_USE_LOG_MESSAGE ?    LogType::Message : LogType::Null;
+    constexpr LogType LogInfoType =     ZP_USE_LOG_INFO ?       LogType::Info : LogType::Null;
+    constexpr LogType LogWarningType =  ZP_USE_LOG_WARNING ?    LogType::Warning : LogType::Null;
+    constexpr LogType LogErrorType =    ZP_USE_LOG_ERROR ?      LogType::Error : LogType::Null;
+    constexpr LogType LogFatalType =    ZP_USE_LOG_FATAL ?      LogType::Fatal : LogType::Null;
+    // @formatter:on
 
     template<LogType Type>
     struct LogEntry;
 
     // @formatter:off
-    typedef LogEntry<LogMessageType>    LogEntryMessage;
-    typedef LogEntry<LogInfoType>       LogEntryInfo;
-    typedef LogEntry<LogWarningType>    LogEntryWarning;
-    typedef LogEntry<LogErrorType>      LogEntryError;
-    typedef LogEntry<LogFatalType>      LogEntryFatal;
+    using LogEntryMessage = LogEntry<LogMessageType>;
+    using LogEntryInfo =    LogEntry<LogInfoType>;
+    using LogEntryWarning = LogEntry<LogWarningType>;
+    using LogEntryError =   LogEntry<LogErrorType>;
+    using LogEntryFatal =   LogEntry<LogFatalType>;
     // @formatter:on
 
     class Log
