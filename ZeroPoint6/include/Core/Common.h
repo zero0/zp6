@@ -286,6 +286,10 @@ constexpr zp_int32_t zp_bitscan_reverse( zp_uint64_t val )
 #endif
 }
 
+//
+//
+//
+
 zp_guid128_t zp_generate_unique_guid128();
 
 zp_guid128_t zp_generate_guid128();

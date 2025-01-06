@@ -671,7 +671,7 @@ zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
         return v.id == id;
     } );
 
-    if( index == Vector<ArchiveBuilderBlock>::npos )
+    if( index == zp::npos )
     {
         m_blocks.pushBack( {
             .id = id,
@@ -701,7 +701,7 @@ zp_hash64_t ArchiveBuilder::addBlock( String name, Memory header, Memory data )
         return v.id == id;
     } );
 
-    if( index == Vector<ArchiveBuilderBlock>::npos )
+    if( index == zp::npos )
     {
         m_blocks.pushBack( {
             .id = id,
@@ -730,7 +730,7 @@ void ArchiveBuilder::clearBlock( zp_hash64_t id )
         return v.id == id;
     } );
 
-    if( index != Vector<ArchiveBuilderBlock>::npos )
+    if( index != zp::npos )
     {
         ArchiveBuilderBlock& block = m_blocks[ index ];
         block.flags |= ZP_ARCHIVE_BUILDER_BLOCK_FLAG_CLEAR;
@@ -744,7 +744,7 @@ void ArchiveBuilder::removeBlock( zp_hash64_t id )
         return v.id == id;
     } );
 
-    if( index != Vector<ArchiveBuilderBlock>::npos )
+    if( index != zp::npos )
     {
         ArchiveBuilderBlock& block = m_blocks[ index ];
         block.flags |= ZP_ARCHIVE_BUILDER_BLOCK_FLAG_REMOVE;

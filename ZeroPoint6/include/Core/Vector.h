@@ -29,6 +29,20 @@ namespace zp
         }
     };
 
+    template<zp_size_t Size>
+    struct FixedMemoryVectorAllocator
+    {
+        [[nodiscard]] void* allocate( zp_size_t size ) const
+        {
+            return m_data;
+        }
+
+        void free( void* ptr ) const
+        {
+        }
+
+        zp_uint8_t m_data[Size];
+    };
 
     template<typename T, typename Allocator = MemoryLabelAllocator>
     class Vector
@@ -38,7 +52,7 @@ namespace zp
 
         typedef zp_bool_t (* ComparerFunc)( const T& value );
 
-        static const zp_size_t npos = -1;
+        using self_type = Vector<T, Allocator>;
 
         typedef T value_type;
         typedef T& reference;
@@ -62,11 +76,16 @@ namespace zp
 
         ~Vector();
 
+        self_type& operator=( const self_type& other );
+
+        self_type& operator=( self_type&& other ) noexcept;
+
         reference operator[]( zp_size_t index );
 
         const_reference operator[]( zp_size_t index ) const;
 
         const_reference at( zp_size_t index ) const;
+
 
         [[nodiscard]] zp_size_t size() const;
 
@@ -411,6 +430,9 @@ namespace zp
 namespace zp
 {
     template<typename T, zp_size_t Size>
+    using FixedVector = Vector<T, FixedMemoryVectorAllocator<Size>>;
+
+    template<typename T, zp_size_t Size>
     class FixedArray
     {
     public:
@@ -512,6 +534,39 @@ namespace zp
     Vector<T, Allocator>::~Vector()
     {
         destroy();
+    }
+
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::self_type& Vector<T, Allocator>::operator=( const self_type& other )
+    {
+        clear();
+
+        ensureCapacity( other.size() );
+
+        m_size = other.m_size;
+
+        for( zp_size_t i = 0; i != m_size; ++i )
+        {
+            m_data[ i ] = zp_move( other.m_data[ i ] );
+        }
+
+        return *this;
+    }
+
+    template<typename T, typename Allocator>
+    Vector<T, Allocator>::self_type& Vector<T, Allocator>::operator=( self_type&& other ) noexcept
+    {
+        destroy();
+
+        m_data  = other.m_data;
+        m_size = other.m_size;
+        m_capacity = other.m_capacity;
+
+        other.m_data = nullptr;
+        other.m_size = 0;
+        other.m_capacity = 0;
+
+        return *this;
     }
 
     template<typename T, typename Allocator>
@@ -759,8 +814,8 @@ namespace zp
     template<typename T, typename Allocator>
     zp_bool_t Vector<T, Allocator>::erase( const_reference val, EqualityComparerFunc comparer )
     {
-        zp_size_t index = indexOf( val, comparer );
-        zp_bool_t found = index != npos;
+        const zp_size_t index = indexOf( val, comparer );
+        const zp_bool_t found = index != npos;
 
         if( found )
         {
@@ -773,8 +828,8 @@ namespace zp
     template<typename T, typename Allocator>
     zp_bool_t Vector<T, Allocator>::eraseSwapBack( const_reference val, EqualityComparerFunc comparer )
     {
-        zp_size_t index = indexOf( val, comparer );
-        zp_bool_t found = index != npos;
+        const zp_size_t index = indexOf( val, comparer );
+        const zp_bool_t found = index != npos;
 
         if( found )
         {
@@ -813,8 +868,8 @@ namespace zp
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::clear()
     {
-        iterator b = m_data;
-        iterator e = m_data + m_size;
+        iterator b = begin();
+        iterator e = end();
         for( ; b != e; ++b )
         {
             b->~T();
@@ -892,8 +947,8 @@ namespace zp
         {
             EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
 
-            const_iterator b = m_data;
-            const_iterator e = m_data + m_size;
+            const_iterator b = begin();
+            const_iterator e = end();
             for( ; b != e; )
             {
                 --e;
@@ -938,8 +993,8 @@ namespace zp
 
         if( m_size > 0 )
         {
-            const_iterator b = m_data;
-            const_iterator e = m_data + m_size;
+            const_iterator b = begin();
+            const_iterator e = end();
             for( ; b != e; )
             {
                 --e;

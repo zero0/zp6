@@ -65,7 +65,7 @@ namespace zp
     void* MallocMemoryStorage::request_memory( zp_size_t size, zp_size_t& requestedSize )
     {
         requestedSize = size;
-        void* mem = _aligned_malloc( requestedSize, kDefaultMemoryAlignment );
+        void* mem = ::_aligned_malloc( requestedSize, kDefaultMemoryAlignment );
         return mem;
     }
 
@@ -109,7 +109,7 @@ namespace zp
         const zp_size_t allocatedSize = size;
 #endif
 
-        void* mem = _aligned_malloc( allocatedSize, alignment );
+        void* mem = ::_aligned_malloc( allocatedSize, alignment );
         ZP_ASSERT( mem );
 
 #if ZP_USE_MEMORY_PROFILER
@@ -141,7 +141,7 @@ namespace zp
         }
 
         const zp_size_t allocatedSize = size + sizeof( MallocHeader );
-        mem = _aligned_realloc( ptr, allocatedSize, alignment );
+        mem = ::_aligned_realloc( ptr, allocatedSize, alignment );
 
         if( mem )
         {
@@ -223,15 +223,15 @@ namespace zp
 {
     void TlsfAllocatorPolicy::add_memory( void* mem, zp_size_t size )
     {
-        if( m_tlsf )
-        {
-            tlsf_add_pool( m_tlsf, mem, size );
-            m_size += size - tlsf_pool_overhead();
-        }
-        else
+        if( m_tlsf == nullptr )
         {
             m_tlsf = tlsf_create_with_pool( mem, size );
             m_size += size - ( tlsf_size() + tlsf_pool_overhead() );
+        }
+        else
+        {
+            tlsf_add_pool( m_tlsf, mem, size );
+            m_size += size - tlsf_pool_overhead();
         }
     }
 
@@ -271,11 +271,11 @@ namespace zp
 {
     void CriticalSectionMemoryLock::acquire()
     {
-        m_criticalSection.enter();
+        //Platform::EnterCriticalSection( m_criticalSection );
     }
 
     void CriticalSectionMemoryLock::release()
     {
-        m_criticalSection.leave();
+        //Platform::LeaveCriticalSection( m_criticalSection );
     }
 }

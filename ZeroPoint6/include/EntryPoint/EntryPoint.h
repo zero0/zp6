@@ -7,8 +7,9 @@
 
 #include "Core/Defines.h"
 #include "Core/Macros.h"
-#include "Core/Common.h"
+#include "Core/Types.h"
 #include "Core/Allocator.h"
+#include "Core/String.h"
 
 #include "Platform/Platform.h"
 
@@ -37,12 +38,12 @@ namespace zp
     // @formatter:off
     struct EntryPointDesc
     {
-        zp_size_t totalMemorySize = 256 MB;
+        zp_size_t totalMemorySize = 512 MB;
         MemoryConfig defaultAllocator =     { .totalSize = 0 MB,    .pageSize = 16 MB };
-        MemoryConfig tempAllocator =        { .totalSize = 16 MB,   .pageSize = 2 MB };
-        MemoryConfig threadSafeAllocator =  { .totalSize = 8 MB,    .pageSize = 2 MB };
-        MemoryConfig profilerAllocator =    { .totalSize = 16 MB,   .pageSize = 2 MB };
-        MemoryConfig debugAllocator =       { .totalSize = 8 MB,    .pageSize = 2 MB };
+        MemoryConfig tempAllocator =        { .totalSize = 32 MB,   .pageSize = 2 MB };
+        MemoryConfig threadSafeAllocator =  { .totalSize = 16 MB,   .pageSize = 2 MB };
+        MemoryConfig profilerAllocator =    { .totalSize = 64 MB,   .pageSize = 2 MB };
+        MemoryConfig debugAllocator =       { .totalSize = 16 MB,   .pageSize = 2 MB };
         MemoryConfig graphicsAllocator =    { .totalSize = 0 MB,    .pageSize = 4 MB };
     };
     // @formatter:on
@@ -142,6 +143,8 @@ namespace zp
         const zp_int32_t exitCode = app->getExitCode();
 
         ZP_SAFE_DELETE( T, app );
+
+        Platform::FreeSystemMemory( systemMemory );
 
         return exitCode;
     }

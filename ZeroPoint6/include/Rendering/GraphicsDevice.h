@@ -202,7 +202,7 @@ namespace zp
 
     class GraphicsDevice;
 
-    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel );
+    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& desc );
 
     void DestroyGraphicsDevice( GraphicsDevice* graphicsDevice );
 
@@ -213,10 +213,6 @@ namespace zp
     ZP_DECLSPEC_NOVTABLE class GraphicsDevice
     {
     public:
-        virtual void Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc ) = 0;
-
-        virtual void Destroy() = 0;
-
         virtual void BeginFrame() = 0;
 
         virtual void EndFrame() = 0;

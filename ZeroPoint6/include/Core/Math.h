@@ -74,12 +74,12 @@ constexpr T zp_max3( const T& a, const T& b, const T& c )
 template<typename T>
 constexpr T zp_clamp( const T& v, const T& a, const T& b )
 {
-    return v < a ? a : b < v ? b : v;
+    return zp_max( a, zp_min( v, b ) );
 }
 
 constexpr zp_float32_t zp_clamp01( const zp_float32_t v )
 {
-    return zp_clamp( v, 0.f, 1.f );
+    return zp_clamp( v, 0.F, 1.F );
 }
 
 constexpr zp_float32_t zp_floor( const zp_float32_t v )
@@ -118,7 +118,7 @@ constexpr zp_int64_t zp_sign( const zp_int64_t v )
 
 constexpr zp_float32_t zp_sign( const zp_float32_t v )
 {
-    return v < 0.f ? -1.f : 1.f;
+    return v < 0.F ? -1.F : 1.F;
 }
 
 constexpr zp_int32_t zp_abs( const zp_int32_t v )
@@ -128,17 +128,23 @@ constexpr zp_int32_t zp_abs( const zp_int32_t v )
 
 constexpr zp_float32_t zp_abs( const zp_float32_t v )
 {
-    return v < 0.f ? -v : v;
+    return v < 0.F ? -v : v;
 }
 
 constexpr zp_float32_t zp_rcp( const zp_float32_t v )
 {
-    return 1.f / v;
+    return 1.F / v;
 }
 
 zp_float32_t zp_sinf( zp_float32_t v );
 
 zp_float32_t zp_cosf( zp_float32_t v );
+
+constexpr zp_size_t zp_divide_round_up( zp_size_t length, zp_size_t count )
+{
+    count = zp_max( static_cast<zp_size_t>( 1 ), count );
+    return ( length + ( count - 1 ) ) / count;
+}
 
 //
 //

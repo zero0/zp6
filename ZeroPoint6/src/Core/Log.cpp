@@ -2,8 +2,11 @@
 // Created by phosg on 9/2/2024.
 //
 
-#include "Core/Log.h"
 #include "Core/Macros.h"
+#include "Core/Types.h"
+#include "Core/Log.h"
+#include "Core/Common.h"
+#include "Core/String.h"
 
 #include "Platform/Platform.h"
 
@@ -51,20 +54,21 @@ namespace zp
         {
             const DateTime dateTime = Platform::DateTimeNowLocal();
 
-            char dt[64];
-            Platform::DateTimeToString( dateTime, dt, "%Y-%m-%d %H:%M:%S." );
+            const zp_size_t kDateTimeStrSize = 64;
+            MutableFixedString<kDateTimeStrSize> dateTimeStr;
+            Platform::DateTimeToString( dateTime, dateTimeStr.mutable_str(), dateTimeStr.capacity(), "%Y-%m-%d %H:%M:%S." );
 
             const zp_uint32_t threadID = Platform::GetCurrentThreadId();
 
             const char* format = "%s%23s %7s (%10d): %s " ZP_CC_RESET;
 
-            if( IsError )
+            if constexpr( IsError )
             {
-                zp_error_printfln( format, color, dt, LogTypeNames[ (int)LogType ], threadID, msg );
+                zp_error_printfln( format, color, dateTimeStr.c_str(), LogTypeNames[ (int)LogType ], threadID, msg );
             }
             else
             {
-                zp_printfln( format, color, dt, LogTypeNames[ (int)LogType ], threadID, msg );
+                zp_printfln( format, color, dateTimeStr.c_str(), LogTypeNames[ (int)LogType ], threadID, msg );
             }
         }
     }

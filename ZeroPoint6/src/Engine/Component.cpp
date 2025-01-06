@@ -107,7 +107,7 @@ namespace zp
     void ComponentArchetypeManager::removeEntity( Entity entity )
     {
         zp_size_t index = getEntityIndex( entity );
-        if( index != Vector<Entity>::npos )
+        if( index != zp::npos )
         {
             const EntityMap& entityMap = m_entityMap[ index ];
             EntityMap& endEntityMap = m_entityMap.back();
@@ -209,7 +209,7 @@ namespace zp
 
     zp_size_t ComponentArchetypeManager::getEntityIndex( const Entity entity ) const
     {
-        zp_size_t index = Vector<Entity>::npos;
+        zp_size_t index = zp::npos;
         for( zp_size_t i = 0; i < m_entities.size(); ++i )
         {
             if( m_entities[ i ] == entity )

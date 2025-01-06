@@ -159,7 +159,6 @@ namespace zp
 
         //
 
-        JobSystem* m_jobSystem;
         EntityComponentManager* m_entityComponentManager;
         VirtualFileSystem* m_virtualFileSystem;
 

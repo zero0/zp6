@@ -8,6 +8,8 @@
 #include "Core/String.h"
 #include "Core/CommandLine.h"
 #include "Core/Log.h"
+#include "Core/Job.h"
+#include "Core/Function.h"
 
 #include "Platform/Platform.h"
 
@@ -20,6 +22,8 @@
 #include "Rendering/RenderSystem.h"
 #include "Rendering/GraphicsDevice.h"
 
+//#include <functional>
+
 namespace zp
 {
     namespace
@@ -28,6 +32,24 @@ namespace zp
 
         void OnWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr )
         {
+#if 0
+            std::function fff = [&](int a){ return width; };
+
+            std::function iii( [](){} );
+
+            std::function rrrrr = OnWindowResize;
+
+            std::function ouu( OnWindowResize );
+
+
+            Function eee = [&](int a){ return width; };
+
+            Function yyy( [](){} );
+
+            const Function uuu = OnWindowResize;
+
+            Function pp( OnWindowResize );
+#endif
         }
 
         void OnWindowHelpClosed( zp_handle_t windowHandle, void* userPtr )
@@ -38,7 +60,6 @@ namespace zp
         {
             Engine::GetInstance()->reload();
         }
-
     }
 
     Engine* Engine::GetInstance()
@@ -197,7 +218,6 @@ namespace zp
         {
             ZP_PROFILE_CPU_BLOCK_E( Create Graphics Device );
 
-            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics );
 
             const GraphicsDeviceDesc dd {
                 .appName = String::As( "AppName" ),
@@ -207,7 +227,7 @@ namespace zp
                 .bufferedFrameCount = 4,
             };
 
-            m_graphicsDevice->Initialize( dd );
+            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, dd );
             //m_graphicsDevice->createSwapchain( m_windowHandle.handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
 
@@ -301,18 +321,18 @@ namespace zp
 
         // Main Camera Signature
         m_entityComponentManager->registerComponentSignature( {
-                                                                  .tagSignature = m_entityComponentManager->getTagSignature<MainCameraTag>(),
-                                                                  .structuralSignature = m_entityComponentManager->getComponentSignature<CameraComponentData, RigidTransformComponentData>(),
-                                                              } );
+            .tagSignature = m_entityComponentManager->getTagSignature<MainCameraTag>(),
+            .structuralSignature = m_entityComponentManager->getComponentSignature<CameraComponentData, RigidTransformComponentData>(),
+        } );
 
         // Asset Signature
         m_entityComponentManager->registerComponentSignature( {
-                                                                  .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData>()
-                                                              } );
+            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData>()
+        } );
 
         m_entityComponentManager->registerComponentSignature( {
-                                                                  .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData, AssetReferenceCountComponentData>()
-                                                              } );
+            .structuralSignature = m_entityComponentManager->getComponentSignature<RawAssetComponentData, AssetReferenceCountComponentData>()
+        } );
 
         if( m_moduleAPI )
         {
@@ -335,7 +355,6 @@ namespace zp
             {
                 e->engine->advanceFrame();
 
-                JobSystem::Start( UpdateEngineJob, *e ).schedule();
                 JobSystem::ScheduleBatchJobs();
             }
         }
@@ -344,7 +363,6 @@ namespace zp
         {
             //e->engine->getGraphicsDevice()->waitForGPU();
 
-            JobSystem::Start( AdvanceFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
         }
 
@@ -352,7 +370,6 @@ namespace zp
         {
             e->engine->getGraphicsDevice()->EndFrame();
 
-            JobSystem::Start( WaitForGPUJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
         }
 
@@ -360,7 +377,6 @@ namespace zp
         {
             e->engine->getGraphicsDevice()->BeginFrame();
 
-            JobSystem::Start( EndFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
         }
 
@@ -368,16 +384,15 @@ namespace zp
         {
             e->engine->update();
 
-            JobSystem::Start( StartFrameJob, *e ).schedule();
             JobSystem::ScheduleBatchJobs();
         }
 
-        void InitialEngineJob( const JobHandle& parentHandle, EngineJobData* e )
+        void InitialEngineJob( Engine* engine )
         {
-            JobSystem::Start( UpdateEngineJob, *e ).schedule();
-            JobSystem::ScheduleBatchJobs();
+            Log::info() << "Init Engine" << Log::endl;
         }
     }
+
 
     void Engine::startEngine()
     {
@@ -388,12 +403,28 @@ namespace zp
             m_moduleAPI->onEngineStarted( this );
         }
 
-        JobSystem::Start( InitialEngineJob, { .engine = this } ).schedule();
-        JobSystem::ScheduleBatchJobs();
+        int a = 0 ,b = 1;zp_size_t d = 1;
+        Engine* engine = this;
+        auto fffff = [&]( const JobWorkArgs& args ) -> void
+        {
+            if(a + b == d)
+            {
+
+            }
+            m_moduleAPI->onEnginePostInitialize( engine );
+            InitialEngineJob( engine );
+        };
+
+        JobWorkFunc eee = JobWorkFunc::from_lambda( fffff );
+
+        //JobSystem::Execute( eee );
     }
 
     void Engine::stopEngine()
     {
+        JobSystem::Complete( m_previousFrameEnginePipelineHandle );
+        m_previousFrameEnginePipelineHandle = {};
+
         JobSystem::ExitJobThreads();
 
         if( m_moduleAPI )
@@ -404,9 +435,6 @@ namespace zp
 
     void Engine::shutdown()
     {
-        m_previousFrameEnginePipelineHandle.complete();
-        m_previousFrameEnginePipelineHandle = {};
-
         //m_assetSystem->teardown();
 
         if( m_moduleAPI )
@@ -443,8 +471,6 @@ namespace zp
             Platform::CloseConsole( m_consoleHandle );
             m_consoleHandle = {};
         }
-
-        m_graphicsDevice->Destroy();
 
         DestroyGraphicsDevice( m_graphicsDevice );
         m_graphicsDevice = nullptr;
@@ -834,8 +860,5 @@ namespace zp
             requiresRebuild = false;
         }
 
-        JobHandle inputHandle = JobSystem::Start().schedule();
-        inputHandle = m_compiledExecutionGraph.Execute( inputHandle, {} );
-        inputHandle.complete();
     }
 }

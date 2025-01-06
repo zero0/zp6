@@ -55,6 +55,8 @@ using zp_char8_t = char8_t;
 using zp_char8_t = char;
 #endif
 
+using zp_nullptr_t = decltype(nullptr);
+
 //
 //
 //

@@ -1873,10 +1873,19 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
 
+            vkDestroySurfaceKHR( m_vkInstance, m_vkSurface, &m_vkAllocationCallbacks );
+
             // TODO: write out pipeline cache?
             vkDestroyPipelineCache( m_vkLocalDevice, m_vkPipelineCache, &m_vkAllocationCallbacks );
 
             vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, &m_vkAllocationCallbacks );
+
+            vkDestroyCommandPool( m_vkLocalDevice, m_vkTransientCommandPool, &m_vkAllocationCallbacks );
+
+            for( auto pool : m_vkCommandPools )
+            {
+                vkDestroyCommandPool( m_vkLocalDevice, pool, &m_vkAllocationCallbacks );
+            }
 
 #if ZP_DEBUG
             CallDebugUtil( vkDestroyDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, m_vkDebugMessenger, &m_vkAllocationCallbacks );
@@ -2064,6 +2073,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
+            VkResult swapchainResult {};
             const VkPresentInfoKHR presentInfo {
                 .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                 .waitSemaphoreCount = 1,
@@ -2071,9 +2081,22 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .swapchainCount = 1,
                 .pSwapchains = &m_vkSwapchain,
                 .pImageIndices = &m_swapchainImageIndices[ m_currentFrameIndex ],
+                .pResults = &swapchainResult,
             };
 
-            HR( vkQueuePresentKHR( m_context->GetQueues().present.vkQueue, &presentInfo ) );
+            const VkResult presentResult = vkQueuePresentKHR( m_context->GetQueues().present.vkQueue, &presentInfo );
+            if( presentResult != VK_SUCCESS )
+            {
+                if( presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR )
+                {
+                }
+                else
+                {
+                    HR( presentResult );
+                }
+            }
+
+            //HR( swapchainResult );
 
             m_currentFrameIndex = ( m_currentFrameIndex + 1 ) % m_maxFramesInFlight;
         }
@@ -2341,6 +2364,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         void VulkanSwapchain::DestroySwapchain()
         {
+            ZP_ASSERT( m_context != nullptr );
+
             for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
             {
                 vkDestroySemaphore( m_context->GetLocalDevice(), m_vkSwapchainAcquireSemaphores[ i ], m_context->GetAllocationCallbacks() );
@@ -2380,10 +2405,13 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         public:
             explicit VulkanGraphicsDevice( MemoryLabel memoryLabel );
 
+            ~VulkanGraphicsDevice();
+
             void Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc );
 
             void Destroy();
 
+        public:
             void BeginFrame();
 
             void EndFrame();
@@ -2401,7 +2429,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
         }
 
-        void VulkanGraphicsDevice::Initialize( const zp::GraphicsDeviceDesc& graphicsDeviceDesc )
+        VulkanGraphicsDevice::~VulkanGraphicsDevice()
+        {
+        }
+
+        void VulkanGraphicsDevice::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
             m_context.Initialize( graphicsDeviceDesc );
 
@@ -2436,14 +2468,19 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
     namespace internal
     {
-        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel )
+        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& desc )
         {
-            return ZP_NEW( memoryLabel, VulkanGraphicsDevice );
+            VulkanGraphicsDevice* vk = ZP_NEW( memoryLabel, VulkanGraphicsDevice );
+            vk->Initialize( desc );
+            return vk;
         }
 
         void DestroyVulkanGraphicsDevice( GraphicsDevice* graphicsDevice )
         {
-            ZP_SAFE_DELETE( VulkanGraphicsDevice, graphicsDevice );
+            VulkanGraphicsDevice* vk = reinterpret_cast<VulkanGraphicsDevice*>( graphicsDevice );
+            vk->Destroy();
+
+            ZP_SAFE_DELETE( VulkanGraphicsDevice, vk );
         }
     }
 

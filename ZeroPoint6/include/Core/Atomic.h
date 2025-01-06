@@ -118,6 +118,73 @@ namespace zp
         //
         //
 
+        ZP_FORCEINLINE zp_uint32_t And( zp_uint32_t* destination, zp_uint32_t value )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedAnd( reinterpret_cast<__LONG32 volatile *>(destination), value );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t Or( zp_uint32_t* destination, zp_uint32_t value )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedOr( reinterpret_cast<__LONG32 volatile *>(destination), value );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t Xor( zp_uint32_t* destination, zp_uint32_t value )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedXor( reinterpret_cast<__LONG32 volatile *>(destination), value );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t Increment( zp_uint32_t* addend )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedIncrement( reinterpret_cast<__LONG32 volatile *>(addend) );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t Decrement( zp_uint32_t* addend )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedDecrement( reinterpret_cast<__LONG32 volatile *>(addend) );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t Add( zp_uint32_t* addend, zp_uint32_t value )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedAdd( reinterpret_cast<__LONG32 volatile *>(addend), value );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t Exchange( zp_uint32_t* target, zp_uint32_t value )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedExchange( reinterpret_cast<__LONG32 volatile *>(target), value );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t ExchangeAdd( zp_uint32_t* target, zp_uint32_t value )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedExchangeAdd( reinterpret_cast<__LONG32 volatile *>(target), value );
+#endif
+        }
+
+        ZP_FORCEINLINE zp_uint32_t CompareExchange( zp_uint32_t* destination, zp_uint32_t exChange, zp_uint32_t comperand )
+        {
+#if ZP_OS_WINDOWS
+            return _InterlockedCompareExchange( reinterpret_cast<__LONG32 volatile *>(destination), exChange, comperand );
+#endif
+        }
+
+        //
+        //
+        //
+
         ZP_FORCEINLINE zp_size_t AddSizeT( zp_size_t* addend, zp_size_t value )
         {
 #if ZP_OS_WINDOWS

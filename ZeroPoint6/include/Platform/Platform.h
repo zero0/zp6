@@ -5,6 +5,7 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/String.h"
+#include "Core/Math.h"
 
 namespace zp
 {
@@ -188,6 +189,7 @@ namespace zp
 
     };
 
+    // Window
     struct WindowHandle
     {
         zp_handle_t handle;
@@ -205,7 +207,6 @@ namespace zp
         Fullscreen,
     };
 
-    // Window
     namespace Platform
     {
         WindowHandle OpenWindow( const OpenWindowDesc& desc );
@@ -223,6 +224,7 @@ namespace zp
         void SetWindowSize( WindowHandle windowHandle, zp_int32_t width, zp_int32_t height, WindowFullscreenType windowFullscreenType = WindowFullscreenType::Window );
     }
 
+    // System Tray
     struct OpenSystemTrayDesc
     {
     };
@@ -239,6 +241,7 @@ namespace zp
         void CloseSystemTray( SystemTrayHandle systemTrayHandle );
     }
 
+    // Console
     struct ConsoleHandle
     {
         zp_handle_t handle;
@@ -249,7 +252,6 @@ namespace zp
         }
     };
 
-    // Console
     namespace Platform
     {
         ConsoleHandle OpenConsole();
@@ -273,6 +275,7 @@ namespace zp
         void DecommitMemoryPage( void* ptr, zp_size_t size );
     }
 
+    // File & Path
     struct FileHandle
     {
         zp_handle_t handle;
@@ -283,7 +286,6 @@ namespace zp
         }
     };
 
-    // File & Path
     namespace Platform
     {
         zp_size_t GetCurrentDir( char* path, zp_size_t maxPathLength );
@@ -354,6 +356,7 @@ namespace zp
         void Exit( zp_int32_t exitCode );
     }
 
+    // Threading
     struct ThreadHandle
     {
         zp_handle_t handle;
@@ -364,7 +367,6 @@ namespace zp
         }
     };
 
-    // Threading
     namespace Platform
     {
         zp_handle_t AllocateThreadPool( zp_uint32_t minThreads, zp_uint32_t maxThreads );
@@ -402,6 +404,7 @@ namespace zp
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
     }
 
+    // Semaphore
     struct Semaphore
     {
         zp_handle_t handle;
@@ -412,7 +415,6 @@ namespace zp
         }
     };
 
-    // Semaphore
     namespace Platform
     {
         enum class AcquireSemaphoreResult
@@ -430,8 +432,9 @@ namespace zp
         zp_int32_t ReleaseSemaphore( Semaphore semaphore, zp_int32_t releaseCount = 1 );
 
         zp_bool_t CloseSemaphore( Semaphore semaphore );
-    }
+    };
 
+    // Mutex
     struct Mutex
     {
         zp_handle_t handle;
@@ -449,7 +452,6 @@ namespace zp
         Failed,
     };
 
-    // Mutex
     namespace Platform
     {
         Mutex CreateMutex( zp_bool_t initialOwner, const char* name = nullptr );
@@ -459,12 +461,46 @@ namespace zp
         zp_bool_t ReleaseMutex( Mutex mutex );
 
         zp_bool_t CloseMutex( Mutex mutex );
-    }
+    };
 
-    namespace
+    // Critical Section
+    struct CriticalSection
     {
-        const char* kDefaultDateTimeFormat = "%Y-%m-%d %H:%M:%S";
-    }
+        zp_uint8_t data[40];
+    };
+
+    namespace Platform
+    {
+        CriticalSection CreateCriticalSection();
+
+        void EnterCriticalSection( CriticalSection& criticalSection );
+
+        void LeaveCriticalSection( CriticalSection& criticalSection );
+
+        void CloseCriticalSection( CriticalSection& criticalSection );
+    };
+
+    // Condition Variable
+    struct ConditionVariable
+    {
+        zp_uint8_t data[8];
+    };
+
+    namespace Platform
+    {
+        ConditionVariable CreateConditionVariable();
+
+        void WaitConditionVariable( ConditionVariable& conditionVariable, CriticalSection& criticalSection, zp_uint32_t timeout = zp_limit<zp_uint32_t>::max() );
+
+        void NotifyOneConditionVariable( ConditionVariable& conditionVariable );
+
+        void NotifyAllConditionVariable( ConditionVariable& conditionVariable );
+
+        void CloseConditionVariable( ConditionVariable& conditionVariable );
+    };
+
+    // Time
+    constexpr const char* kDefaultDateTimeFormat = "%Y-%m-%d %H:%M:%S";
 
     struct DateTime
     {
@@ -480,7 +516,6 @@ namespace zp
         zp_int32_t is_dst;
     };
 
-    // Time
     namespace Platform
     {
         [[nodiscard]] zp_time_t TimeNow();
@@ -500,7 +535,7 @@ namespace zp
         {
             return DateTimeToString( dateTime, str, Size, format );
         }
-    }
+    };
 
     // Util
     namespace Platform
@@ -508,9 +543,10 @@ namespace zp
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
 
         void DebugBreak();
-    }
+    };
 
-    constexpr zp_ptr_t ZP_INVALID_SOCKET = ~0;
+    // Networking
+    constexpr const zp_ptr_t ZP_INVALID_SOCKET = ~0;
 
     struct Socket
     {
@@ -522,7 +558,6 @@ namespace zp
         }
     };
 
-    // Networking
     namespace Platform
     {
         zp_bool_t InitializeNetworking();
@@ -640,6 +675,6 @@ namespace zp
 
 #pragma endregion
 
-}
+};
 
 #endif //ZP_PLATFORM_H

@@ -17,7 +17,7 @@ namespace zp
 {
     namespace internal
     {
-        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel );
+        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& desc );
 
         void DestroyVulkanGraphicsDevice( GraphicsDevice* graphicsDevice );
     }

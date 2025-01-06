@@ -5,83 +5,79 @@
 #ifndef ZP_JOB_H
 #define ZP_JOB_H
 
-#include "Core/Defines.h"
+#include "Core/Common.h"
 #include "Core/Types.h"
 #include "Core/Allocator.h"
+#include "Core/Function.h"
 
 namespace zp
 {
     struct Job;
 
-    typedef void (* JobWorkFunc)( Job* job, Memory data );
-
-    class JobHandle
+    struct JobHandle
     {
-    public:
-        const static JobHandle Null;
-
-        JobHandle();
-
-        void complete();
-
-        [[nodiscard]] zp_bool_t isComplete() const;
-
-    private:
-        explicit JobHandle( Job* job );
-
-        Job* m_job;
-
-        friend class JobData;
-
-        friend class JobSystem;
+        Job* job;
     };
 
-    class JobData
+    struct JobWorkArgs
     {
-    public:
-        JobHandle schedule();
-
-        JobHandle schedule( JobHandle dependency );
-
-    private:
-        explicit JobData( Job* job );
-
-        Job* m_job;
-
-        friend class JobSystem;
+        JobHandle currentJob;
+        JobHandle parentJob;
+        zp_size_t groupId;
+        zp_size_t groupIndex;
+        zp_size_t index;
+        Memory sharedMemory;
     };
 
-    class JobSystem
+    using JobWorkFunc = Function<void(const JobWorkArgs&)>;  //void (*)(Job *, Memory);
+
+    namespace JobSystem
     {
-    ZP_NONCOPYABLE( JobSystem );
+        void Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount );
 
-    public:
-        static void Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount );
+        void Teardown();
 
-        static void Teardown();
+        void InitializeJobThreads();
 
+        void ExitJobThreads();
+
+        void Complete( JobHandle jobHandle );
+
+        zp_bool_t IsComplete( JobHandle jobHandle );
+
+        //
+        JobHandle Execute( JobWorkFunc func );
+
+        JobHandle Prepare( JobWorkFunc func, JobHandle dependency );
+
+        //
+        JobHandle Dispatch( zp_size_t length, zp_size_t batchCount, JobWorkFunc func );
+
+        JobHandle PrepareDispatch( zp_size_t length, zp_size_t batchCount, JobWorkFunc func, JobHandle dependency );
+
+        void ScheduleBatchJobs();
+
+        void ProcessJobs();
+    }
+#if 0
         static void InitializeJobThreads();
 
         static void ExitJobThreads();
 
         static void ProcessJobs();
 
-        static JobData Start();
+        static PrepariedJob Start( JobWorkFunc execFunc );
 
-        static JobData Start( JobHandle parentJob );
+        static PrepariedJob Start( JobWorkFunc execFunc, JobHandle parentJob );
 
-        static JobData Start( JobWorkFunc execFunc );
+        static PrepariedJob Start( JobWorkFunc execFunc, void* data, zp_size_t size );
 
-        static JobData Start( JobWorkFunc execFunc, JobHandle parentJob );
-
-        static JobData Start( JobWorkFunc execFunc, void* data, zp_size_t size );
-
-        static JobData Start( JobWorkFunc execFunc, void* data, zp_size_t size, JobHandle parentJob );
+        static PrepariedJob Start( JobWorkFunc execFunc, void* data, zp_size_t size, JobHandle parentJob );
 
         static void ScheduleBatchJobs();
 
         template<typename T>
-        static JobData Start( const T& jobData )
+        static PrepariedJob Start( const T& jobData )
         {
             using TJob = zp_remove_reference_t<T>;
 
@@ -90,7 +86,7 @@ namespace zp
         }
 
         template<typename T>
-        static JobData Start( const T& jobData, JobHandle parentJob )
+        static PrepariedJob Start( const T& jobData, JobHandle parentJob )
         {
             using TJob = zp_remove_reference_t<T>;
 
@@ -99,7 +95,7 @@ namespace zp
         }
 
         template<typename T>
-        static JobData Start( T&& jobData )
+        static PrepariedJob Start( T&& jobData )
         {
             using TJob = zp_remove_reference_t<T>;
 
@@ -108,7 +104,7 @@ namespace zp
         }
 
         template<typename T>
-        static JobData Start( T&& jobData, JobHandle parentJob )
+        static PrepariedJob Start( T&& jobData, JobHandle parentJob )
         {
             using TJob = zp_remove_reference_t<T>;
 
@@ -117,7 +113,7 @@ namespace zp
         }
 
         template<typename T>
-        static JobData Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData )
+        static PrepariedJob Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData )
         {
             using TJob = zp_remove_reference_t<T>;
 
@@ -126,7 +122,7 @@ namespace zp
         }
 
         template<typename T>
-        static JobData Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData, JobHandle parentJob )
+        static PrepariedJob Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData, JobHandle parentJob )
         {
             using TJob = zp_remove_reference_t<T>;
 
@@ -134,7 +130,6 @@ namespace zp
             return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
         }
 
-    private:
         template<typename T>
         struct Wrapper
         {
@@ -153,6 +148,7 @@ namespace zp
             T data;
         };
     };
+#endif
 }
 
 #endif //ZP_JOB_H

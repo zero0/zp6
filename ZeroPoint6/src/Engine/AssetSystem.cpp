@@ -36,7 +36,6 @@ namespace zp
 
     void AssetSystem::teardown()
     {
-        m_jobSystem = nullptr;
         m_entityComponentManager = nullptr;
     }
 

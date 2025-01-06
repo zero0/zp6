@@ -5,6 +5,7 @@
 #ifndef ZP_LOG_H
 #define ZP_LOG_H
 
+#include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/String.h"
 

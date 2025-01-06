@@ -21,7 +21,7 @@ namespace zp
     };
 
     //typedef JobHandle (* ExecutionGraphProcess)( const JobHandle& parentHandle, const JobHandle& inputHandle );
-    typedef Function<JobHandle, const JobHandle&, const JobHandle&> ExecutionGraphProcess;
+    using ExecutionGraphProcess = Function<JobHandle (const JobHandle &, const JobHandle &)>;
 
     typedef zp_bool_t (* ExecutionGraphCompileTimeCondition)( const ExecutionGraphCompilerContext& context );
 

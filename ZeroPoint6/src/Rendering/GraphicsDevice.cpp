@@ -24,10 +24,10 @@
 
 namespace zp
 {
-    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel )
+    GraphicsDevice* CreateGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& desc )
     {
 #if ZP_RENDERING_API_VULKAN
-        return internal::CreateVulkanGraphicsDevice( memoryLabel );
+        return internal::CreateVulkanGraphicsDevice( memoryLabel, desc );
 #elif ZP_RENDERING_API_D3D12
         ZP_INVALID_CODE_PATH_MSG("Graphics API D3D12 not supported");
         return nullptr;

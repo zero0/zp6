@@ -462,7 +462,7 @@ namespace zp
     {
         s_renderPipeline = {};
 
-        m_graphicsDevice = CreateGraphicsDevice( memoryLabel );
+        //m_graphicsDevice = CreateGraphicsDevice( memoryLabel );
 
         //m_graphicsDevice->createSwapchain( windowHandle, 0, 0, 0, ZP_COLOR_SPACE_SRGB_NONLINEAR );
 
@@ -497,7 +497,7 @@ namespace zp
         m_graphicsDevice = nullptr;
     }
 
-    JobHandle RenderSystem::startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const JobHandle& inputHandle )
+    JobHandle RenderSystem::startSystem( zp_uint64_t frameIndex, void* jobSystem, const JobHandle& inputHandle )
     {
         m_batchModeRenderer->beginFrame( frameIndex );
         m_immediateModeRenderer->beginFrame( frameIndex );
@@ -521,7 +521,7 @@ namespace zp
 #endif
     }
 
-    JobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const JobHandle& inputHandle )
+    JobHandle RenderSystem::processSystem( zp_uint64_t frameIndex, void* jobSystem, EntityComponentManager* entityComponentManager, const JobHandle& inputHandle )
     {
         ZP_PROFILE_CPU_BLOCK();
 

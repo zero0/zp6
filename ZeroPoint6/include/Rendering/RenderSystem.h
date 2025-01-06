@@ -36,9 +36,9 @@ namespace zp
 
         void destroy();
 
-        JobHandle startSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, const JobHandle& inputHandle );
+        JobHandle startSystem( zp_uint64_t frameIndex, void* jobSystem, const JobHandle& inputHandle );
 
-        JobHandle processSystem( zp_uint64_t frameIndex, JobSystem* jobSystem, EntityComponentManager* entityComponentManager, const JobHandle& inputHandle );
+        JobHandle processSystem( zp_uint64_t frameIndex, void* jobSystem, EntityComponentManager* entityComponentManager, const JobHandle& inputHandle );
 
         GraphicsDevice* getGraphicsDevice()
         {

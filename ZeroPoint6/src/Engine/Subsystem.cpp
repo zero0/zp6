@@ -19,7 +19,7 @@ namespace zp
 
     SubsystemManager::~SubsystemManager()
     {
-        for( auto s : m_subsystems )
+        for( auto* s : m_subsystems )
         {
             ZP_ASSERT( s->refCount == 0 );
             ZP_DELETE_LABEL( s->memoryLabel, ISubsystem, s->subsystem );
@@ -33,12 +33,12 @@ namespace zp
     void SubsystemManager::BuildExecutionGraph( zp::ExecutionGraph& executionGraph )
     {
         m_subsystems.sort(
-            []( auto lh, auto rh ) -> zp_int32_t
+            []( auto* lh, auto rh ) -> zp_int32_t
             {
                 return zp_cmp_asc( lh->order, rh->order );
             } );
 
-        for( auto s : m_subsystems )
+        for( auto* s : m_subsystems )
         {
             if( s->refCount > 0 )
             {
@@ -71,6 +71,6 @@ namespace zp
             {
                 return x->id == id;
             } );
-        return index == Vector<SubsystemInstance*>::npos ? nullptr : m_subsystems[ index ];
+        return index == zp::npos ? nullptr : m_subsystems[ index ];
     }
 }

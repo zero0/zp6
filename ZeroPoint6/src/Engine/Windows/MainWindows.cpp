@@ -10,7 +10,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 {
     using namespace zp;
 
-    EntryPointDesc desc;
+    EntryPointDesc desc {};
     int ret = EntryPointMain<Engine>( String::As( lpCmdLine ), desc );
     return ret;
 }

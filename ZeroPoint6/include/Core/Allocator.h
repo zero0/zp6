@@ -9,7 +9,6 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/Common.h"
-#include "Core/Threading.h"
 #include <new>
 
 #define ZP_USE_MEMORY_PROFILER  ZP_USE_PROFILER
@@ -50,12 +49,12 @@
 
 namespace zp
 {
-    typedef zp_uint8_t MemoryLabel;
+    using MemoryLabel = zp_uint8_t;
 
     enum
     {
         kDefaultMemoryAlignment = 16,
-        kMaxMemoryLabels = 16
+        kMaxMemoryLabels = 16,
     };
 
     namespace MemoryLabels
@@ -146,7 +145,7 @@ namespace zp
         {
         }
 
-        MemoryLabelAllocator( MemoryLabel memoryLabel )
+        explicit(false) MemoryLabelAllocator( MemoryLabel memoryLabel )
             : alignment( kDefaultMemoryAlignment )
             , memoryLabel( memoryLabel )
         {
@@ -331,7 +330,7 @@ namespace zp
         void release();
 
     private:
-        CriticalSection m_criticalSection;
+        //CriticalSection m_criticalSection;
     };
 }
 #pragma endregion

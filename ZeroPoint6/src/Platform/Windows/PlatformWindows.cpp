@@ -35,51 +35,6 @@
 
 using namespace zp;
 
-ZP_STATIC_ASSERT( sizeof( CriticalSection ) >= sizeof( CRITICAL_SECTION ) );
-
-CriticalSection::CriticalSection()
-    : m_memory()
-{
-    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
-    ::InitializeCriticalSection( ptr );
-}
-
-CriticalSection::~CriticalSection()
-{
-    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
-    ::DeleteCriticalSection( ptr );
-}
-
-CriticalSection::CriticalSection( const CriticalSection& other )
-    : m_memory()
-{
-    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
-    ::InitializeCriticalSection( ptr );
-}
-
-CriticalSection::CriticalSection( CriticalSection&& other ) noexcept
-    : m_memory()
-{
-    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
-    LPCRITICAL_SECTION otherPtr = reinterpret_cast<LPCRITICAL_SECTION>( other.m_memory );
-
-    *ptr = *otherPtr;
-
-    zp_zero_memory_array( other.m_memory );
-}
-
-void CriticalSection::enter()
-{
-    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
-    ::EnterCriticalSection( ptr );
-}
-
-void CriticalSection::leave()
-{
-    LPCRITICAL_SECTION ptr = reinterpret_cast<LPCRITICAL_SECTION>( m_memory );
-    ::LeaveCriticalSection( ptr );
-}
-
 //
 //
 //
@@ -1552,6 +1507,75 @@ namespace zp
         }
 
         return ok != FALSE;
+    }
+
+    ZP_STATIC_ASSERT( sizeof( CriticalSection ) >= sizeof( CRITICAL_SECTION ) );
+
+    CriticalSection Platform::CreateCriticalSection()
+    {
+        CriticalSection criticalSection {};
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
+
+        ::InitializeCriticalSection( pCriticalSection );
+
+        return criticalSection;
+    }
+
+    void Platform::EnterCriticalSection( CriticalSection& criticalSection )
+    {
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
+        ::EnterCriticalSection( pCriticalSection );
+    }
+
+    void Platform::LeaveCriticalSection( CriticalSection& criticalSection )
+    {
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
+        ::LeaveCriticalSection( pCriticalSection );
+    }
+
+    void Platform::CloseCriticalSection( CriticalSection& criticalSection )
+    {
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
+        ::DeleteCriticalSection( pCriticalSection );
+    }
+
+    ZP_STATIC_ASSERT( sizeof( ConditionVariable ) >= sizeof( CONDITION_VARIABLE ) );
+
+    ConditionVariable Platform::CreateConditionVariable()
+    {
+        ConditionVariable conditionVariable {};
+
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
+        ::InitializeConditionVariable( pConditionVariable );
+
+        return conditionVariable;
+    }
+
+    void Platform::WaitConditionVariable( ConditionVariable& conditionVariable, CriticalSection& criticalSection, zp_uint32_t timeout )
+    {
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
+
+        ::SleepConditionVariableCS( pConditionVariable, pCriticalSection, timeout );
+    }
+
+    void Platform::NotifyOneConditionVariable( ConditionVariable& conditionVariable )
+    {
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
+
+        ::WakeConditionVariable( pConditionVariable );
+    }
+
+    void Platform::NotifyAllConditionVariable( ConditionVariable& conditionVariable )
+    {
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
+
+        ::WakeAllConditionVariable( pConditionVariable );
+    }
+
+    void Platform::CloseConditionVariable( ConditionVariable& conditionVariable )
+    {
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
     }
 
     zp_bool_t Platform::InitializeNetworking()
