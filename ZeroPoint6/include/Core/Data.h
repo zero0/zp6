@@ -7,6 +7,7 @@
 
 #include "Core/Allocator.h"
 #include "Core/Vector.h"
+#include "Core/Memory.h"
 #include "Core/String.h"
 
 namespace zp
@@ -140,7 +141,7 @@ namespace zp
         template<typename T>
         zp_size_t readReverse( MemoryArray<T>& value, zp_size_t count )
         {
-            return readReverse( value.ptr, sizeof( T ) * count );
+            return readReverse( value.data(), sizeof( T ) * count );
         }
 
         zp_size_t readAlignment( zp_size_t alignment );

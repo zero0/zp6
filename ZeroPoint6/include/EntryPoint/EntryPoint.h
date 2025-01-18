@@ -42,7 +42,7 @@ namespace zp
         MemoryConfig defaultAllocator =     { .totalSize = 0 MB,    .pageSize = 16 MB };
         MemoryConfig tempAllocator =        { .totalSize = 32 MB,   .pageSize = 2 MB };
         MemoryConfig threadSafeAllocator =  { .totalSize = 16 MB,   .pageSize = 2 MB };
-        MemoryConfig profilerAllocator =    { .totalSize = 64 MB,   .pageSize = 2 MB };
+        MemoryConfig profilerAllocator =    { .totalSize = 64 MB,   .pageSize = 0 };
         MemoryConfig debugAllocator =       { .totalSize = 16 MB,   .pageSize = 2 MB };
         MemoryConfig graphicsAllocator =    { .totalSize = 0 MB,    .pageSize = 4 MB };
     };
@@ -58,60 +58,66 @@ namespace zp
 #endif
 
         // allocate all memory
-        const zp_size_t totalMemorySize = desc.totalMemorySize;
-        void* systemMemory = Platform::AllocateSystemMemory( baseAddress, totalMemorySize );
+        void* systemMemory = Platform::AllocateSystemMemory( baseAddress, desc.totalMemorySize );
 
         // default allocator
-        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_defaultAllocator(
-            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, 0 ), desc.defaultAllocator.pageSize ),
+        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock, TrackedMemoryProfiler> s_defaultAllocator(
+            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, 0 ), desc.defaultAllocator.pageSize, desc.defaultAllocator.totalSize ),
             TlsfAllocatorPolicy(),
-            NullMemoryLock()
+            NullMemoryLock(),
+            TrackedMemoryProfiler()
         );
 
         // use as offset for other memory pools
-        zp_size_t endMemorySize = totalMemorySize;
+        zp_size_t endMemorySize = desc.totalMemorySize;
 
         endMemorySize -= desc.tempAllocator.totalSize;
-        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_tempAllocator(
-            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.tempAllocator.pageSize ),
+        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock, TrackedMemoryProfiler> s_tempAllocator(
+            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.tempAllocator.pageSize, desc.tempAllocator.totalSize ),
             TlsfAllocatorPolicy(),
-            NullMemoryLock()
+            NullMemoryLock(),
+            TrackedMemoryProfiler()
         );
 
         endMemorySize -= desc.threadSafeAllocator.totalSize;
-        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, CriticalSectionMemoryLock> s_threadSafeAllocator(
-            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.threadSafeAllocator.pageSize ),
+        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, CriticalSectionMemoryLock, TrackedMemoryProfiler> s_threadSafeAllocator(
+            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.threadSafeAllocator.pageSize, desc.threadSafeAllocator.totalSize ),
             TlsfAllocatorPolicy(),
-            CriticalSectionMemoryLock()
+            CriticalSectionMemoryLock(),
+            TrackedMemoryProfiler()
         );
 
 #if ZP_USE_PROFILER
         endMemorySize -= desc.profilerAllocator.totalSize;
-        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_profilingAllocator(
-            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.profilerAllocator.pageSize ),
+        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, CriticalSectionMemoryLock, NullMemoryProfiler> s_profilingAllocator(
+            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.profilerAllocator.pageSize, desc.profilerAllocator.totalSize ),
             TlsfAllocatorPolicy(),
-            NullMemoryLock()
+            CriticalSectionMemoryLock(),
+            NullMemoryProfiler()
         );
 #else
-        MemoryAllocator<NullMemoryStorage, NullAllocationPolicy, NullMemoryLock> s_profilingAllocator(
+        MemoryAllocator<NullMemoryStorage, NullAllocationPolicy, NullMemoryLock, NullMemoryProfiler> s_profilingAllocator(
             NullMemoryStorage,
             NullAllocationPolicy,
-            NullMemoryLock
+            NullMemoryLock,
+            NullMemoryProfiler
         );
 #endif
 
 #if ZP_DEBUG
         endMemorySize -= desc.debugAllocator.totalSize;
-        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock> s_debugAllocator(
-            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.debugAllocator.pageSize ),
+        MemoryAllocator<SystemPageMemoryStorage, TlsfAllocatorPolicy, NullMemoryLock, TrackedMemoryProfiler> s_debugAllocator(
+            SystemPageMemoryStorage( ZP_OFFSET_PTR( systemMemory, endMemorySize ), desc.debugAllocator.pageSize, desc.defaultAllocator.totalSize ),
             TlsfAllocatorPolicy(),
-            NullMemoryLock()
+            NullMemoryLock(),
+            TrackedMemoryProfiler()
         );
 #else
-        MemoryAllocator<NullMemoryStorage, NullAllocationPolicy, NullMemoryLock> s_debugAllocator(
+        MemoryAllocator<NullMemoryStorage, NullAllocationPolicy, NullMemoryLock, NullMemoryProfiler> s_debugAllocator(
             NullMemoryStorage,
             NullAllocationPolicy,
-            NullMemoryLock
+            NullMemoryLock,
+            NullMemoryProfiler
         );
 #endif
 

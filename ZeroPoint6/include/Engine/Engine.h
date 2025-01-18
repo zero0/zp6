@@ -12,12 +12,6 @@
 
 #include "Platform/Platform.h"
 
-#if ZP_USE_PROFILER
-
-#include "Core/Profiler.h"
-
-#endif
-
 #include "Engine/ModuleEntryPointAPI.h"
 #include "Engine/EnginePipeline.h"
 #include "Engine/Entity.h"
@@ -135,10 +129,6 @@ namespace zp
         RenderSystem* m_renderSystem;
         EntityComponentManager* m_entityComponentManager;
         AssetSystem* m_assetSystem;
-
-#if ZP_USE_PROFILER
-        Profiler* m_profiler;
-#endif
 
         zp_uint64_t m_frameCount;
         zp_time_t m_frameStartTime;

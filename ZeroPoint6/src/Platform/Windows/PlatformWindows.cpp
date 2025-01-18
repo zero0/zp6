@@ -15,11 +15,13 @@
 #include <shellapi.h>
 #include <time.h>
 #include <sys/time.h>
+#include <dbghelp.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "dwmapi.dll")
 #pragma comment(lib, "uxtheme.lib")
+#pragma comment(lib, "dbghelp.lib")
 
 #include "Core/Defines.h"
 #include "Core/Macros.h"
@@ -1722,5 +1724,78 @@ namespace zp
         {
             PrintLastWSAErrorMsg( "Failed to close socket" );
         }
+    }
+
+    zp_bool_t Platform::InitializeStackTrace()
+    {
+        zp_bool_t ok;
+
+#if ZP_DEBUG
+        const HANDLE process =::GetCurrentProcess();
+
+        ::SymSetOptions( SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES );
+        const WINBOOL init = ::SymInitialize( process, nullptr, true );
+        ok = init;
+
+        ZP_ASSERT( ok );
+#else
+        ok = true;
+#endif
+
+        return ok;
+    }
+
+    void Platform::ShutdownStackTrace()
+    {
+#if ZP_DEBUG
+        const HANDLE process =::GetCurrentProcess();
+
+        const WINBOOL ok = ::SymCleanup( process );
+        ZP_ASSERT( ok );
+#endif
+    }
+
+    void Platform::GetStackTrace( StackTrace& stackTrace, zp_uint32_t framesToSkip )
+    {
+#if ZP_DEBUG
+        DWORD hash {};
+        const zp_size_t capturedFrames = ::RtlCaptureStackBackTrace( 1 + framesToSkip, kMaxStackTraceDepth, stackTrace.stack, &hash );
+        stackTrace.length = capturedFrames;
+        stackTrace.hash = hash;
+#else
+        stackTrace.stack.reset();
+        stackTrace.hash = 0;
+#endif
+    }
+
+    void Platform::StackTraceToString( const StackTrace& stackTrace, MutableString& string )
+    {
+#if ZP_DEBUG
+        const HANDLE process =::GetCurrentProcess();
+        SYMBOL_INFO info {};
+
+        for( void* addr : stackTrace.stack )
+        {
+            const WINBOOL ok = ::SymFromAddr( process, reinterpret_cast<DWORD64>(addr), 0, &info );
+            if( !ok )
+            {
+                PrintLastErrorMsg( "" );
+                break;
+            }
+
+            string.append( info.Name, info.NameLen );
+            string.append('\n');
+        }
+
+#endif
+    }
+
+    void Platform::DumpStackTrace( MutableString& string )
+    {
+#if ZP_DEBUG
+        StackTrace stackTrace {};
+        GetStackTrace( stackTrace, 1 );
+        StackTraceToString( stackTrace, string );
+#endif
     }
 }

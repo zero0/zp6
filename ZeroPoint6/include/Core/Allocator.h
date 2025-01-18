@@ -9,48 +9,12 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 #include "Core/Common.h"
+#include "Core/Memory.h"
+
 #include <new>
-
-#define ZP_USE_MEMORY_PROFILER  ZP_USE_PROFILER
-
-#define ZP_NEW( l, t )                 new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l))
-#define ZP_NEW_ARGS( l, t, ... )       new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l),__VA_ARGS__)
-
-#define ZP_DELETE( t, p )               do { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = static_cast<t*>(p)->memoryLabel; static_cast<t*>(p)->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } while( false )
-#define ZP_DELETE_LABEL( l, t, p )      do { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(p); p = nullptr; } while( false )
-
-#if ZP_USE_SAFE_DELETE
-#define ZP_SAFE_DELETE( t, p )            do { if( p ) { ZP_DELETE( t, p ); } } while( false )
-#define ZP_SAFE_DELETE_LABEL( l, t, p )   do { if( p ) { ZP_DELETE_LABEL( l, t, p ); } } while( false )
-#else // !ZP_USE_SAFE_DELETE
-#define ZP_SAFE_DELETE( t, p )          ZP_DELETE(t, p)
-#define ZP_SAFE_DELETE_LABEL( l, t, p ) ZP_DELETE_LABEL(l, t, p)
-#endif // ZP_USE_SAFE_DELETE
-
-#define ZP_MALLOC( l, s )               zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), zp::kDefaultMemoryAlignment)
-#define ZP_ALIGNED_MALLOC( l, s, a )    zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), (a))
-
-#define ZP_MALLOC_T( l, t )                 static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment))
-#define ZP_ALIGNED_MALLOC_T( l, t, a )      static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), (a)))
-
-#define ZP_MALLOC_T_ARRAY( l, t, c )                static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), zp::kDefaultMemoryAlignment))
-#define ZP_ALIGNED_MALLOC_T_ARRAY( l, t, c, a )     static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), (a)))
-
-#define ZP_REALLOC( l, p, s )                       zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->reallocate( (p), (s), zp::kDefaultMemoryAlignment)
-#define ZP_ALIGNED_REALLOC( l, p, s, a )            zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->reallocate((p), (s), (a))
-
-#define ZP_FREE( l, p )                 do { zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free((p)); p = nullptr; } while( false )
-
-#if ZP_USE_SAFE_FREE
-#define ZP_SAFE_FREE( l, p )            do { if( p ) { ZP_FREE( l, p ); } } while( false )
-#else // !ZP_USE_SAFE_FREE
-#define ZP_SAFE_FREE( l, p )            ZP_FREE( l, p )
-#endif // ZP_USE_SAFE_FREE
 
 namespace zp
 {
-    using MemoryLabel = zp_uint8_t;
-
     enum
     {
         kDefaultMemoryAlignment = 16,
@@ -78,6 +42,44 @@ namespace zp
     ZP_STATIC_ASSERT( static_cast<MemoryLabel>( MemoryLabels::MemoryLabels_Count ) < kMaxMemoryLabels );
 }
 
+#define ZP_USE_MEMORY_PROFILER          ZP_USE_PROFILER
+
+#define ZP_NEW( l, t )                  new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l))
+#define ZP_NEW_ARGS( l, t, ... )        new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l),__VA_ARGS__)
+
+#define ZP_DELETE( t, p )               do { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = static_cast<t*>(p)->memoryLabel; static_cast<t*>(p)->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } while( false )
+#define ZP_DELETE_LABEL( l, t, p )      do { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(p); p = nullptr; } while( false )
+
+#if ZP_USE_SAFE_DELETE
+#define ZP_SAFE_DELETE( t, p )              do { if( p ) { ZP_DELETE( t, p ); } } while( false )
+#define ZP_SAFE_DELETE_LABEL( l, t, p )     do { if( p ) { ZP_DELETE_LABEL( l, t, p ); } } while( false )
+#else // !ZP_USE_SAFE_DELETE
+#define ZP_SAFE_DELETE( t, p )          ZP_DELETE(t, p)
+#define ZP_SAFE_DELETE_LABEL( l, t, p ) ZP_DELETE_LABEL(l, t, p)
+#endif // ZP_USE_SAFE_DELETE
+
+#define ZP_MALLOC( l, s )               zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), zp::kDefaultMemoryAlignment)
+#define ZP_ALIGNED_MALLOC( l, s, a )    zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), (a))
+
+#define ZP_MALLOC_T( l, t )                 static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment))
+#define ZP_ALIGNED_MALLOC_T( l, t, a )      static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), (a)))
+
+#define ZP_MALLOC_T_ARRAY( l, t, c )                static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), zp::kDefaultMemoryAlignment))
+#define ZP_ALIGNED_MALLOC_T_ARRAY( l, t, c, a )     static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), (a)))
+
+#define ZP_REALLOC( l, p, s )                       zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->reallocate( (p), (s), zp::kDefaultMemoryAlignment)
+#define ZP_ALIGNED_REALLOC( l, p, s, a )            zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->reallocate((p), (s), (a))
+
+#define ZP_FREE( l, p )                 do { zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(static_cast<void*>(p)); } while( false )
+
+#if ZP_USE_SAFE_FREE
+#define ZP_SAFE_FREE( l, p )            do { if( p ) { ZP_FREE( l, p ); } } while( false )
+#else // !ZP_USE_SAFE_FREE
+#define ZP_SAFE_FREE( l, p )            ZP_FREE( l, p )
+#endif // ZP_USE_SAFE_FREE
+
+
+
 namespace zp
 {
     class ZP_DECLSPEC_NOVTABLE IMemoryAllocator
@@ -90,25 +92,28 @@ namespace zp
         virtual void free( void* ptr ) = 0;
     };
 
-    template<typename Storage, typename Policy, typename Locking>
+    template<typename Storage, typename Policy, typename Locking, typename Profiler>
     class MemoryAllocator final : public IMemoryAllocator
     {
-        typedef MemoryAllocator<Storage, Policy, Locking> allocator_type;
+        using allocator_type = MemoryAllocator<Storage, Policy, Locking, Profiler>;
     ZP_NONCOPYABLE( MemoryAllocator );
 
     private:
-        typedef Storage storage_value;
-        typedef const Storage& storage_const_reference;
+        using storage_value = Storage;
+        using storage_const_reference = const Storage&;
 
-        typedef Policy policy_value;
-        typedef Policy& policy_reference;
-        typedef const Policy& policy_const_reference;
+        using policy_value = Policy;
+        using policy_reference = Policy&;
+        using policy_const_reference = const Policy&;
 
-        typedef Locking lock_value;
-        typedef const Locking& lock_const_reference;
+        using lock_value = Locking;
+        using lock_const_reference = const Locking&;
+
+        using profiler_value = Profiler;
+        using profiler_const_reference = const Profiler&;
 
     public:
-        MemoryAllocator( storage_value storage, policy_value policy, lock_value locking );
+        MemoryAllocator( storage_value storage, policy_value policy, lock_value locking, profiler_value profiler );
 
         ~MemoryAllocator() = default;
 
@@ -127,6 +132,8 @@ namespace zp
         storage_value m_storage;
         policy_value m_policy;
         lock_value m_lock;
+        profiler_value m_profiler;
+        MemoryLabel m_memoryLabel;
     };
 
     void RegisterAllocator( MemoryLabel memoryLabel, IMemoryAllocator* memoryAllocator );
@@ -145,7 +152,7 @@ namespace zp
         {
         }
 
-        explicit(false) MemoryLabelAllocator( MemoryLabel memoryLabel )
+        explicit( false ) MemoryLabelAllocator( MemoryLabel memoryLabel )
             : alignment( kDefaultMemoryAlignment )
             , memoryLabel( memoryLabel )
         {
@@ -180,11 +187,12 @@ namespace zp
 
 namespace zp
 {
-    template<typename Storage, typename Policy, typename Locking>
-    MemoryAllocator<Storage, Policy, Locking>::MemoryAllocator( storage_value storage, policy_value policy, lock_value locking )
+    template<typename Storage, typename Policy, typename Locking, typename Profiler>
+    MemoryAllocator<Storage, Policy, Locking, Profiler>::MemoryAllocator( storage_value storage, policy_value policy, lock_value locking, profiler_value profiler )
         : m_storage( zp_move( storage ) )
         , m_policy( zp_move( policy ) )
         , m_lock( zp_move( locking ) )
+        , m_profiler( zp_move( profiler ) )
     {
         if( m_storage.is_fixed() )
         {
@@ -194,60 +202,70 @@ namespace zp
         }
     }
 
-    template<typename Storage, typename Policy, typename Locking>
-    void* MemoryAllocator<Storage, Policy, Locking>::allocate( const zp_size_t size, const zp_size_t alignment )
+    template<typename Storage, typename Policy, typename Locking, typename Profiler>
+    void* MemoryAllocator<Storage, Policy, Locking, Profiler>::allocate( const zp_size_t size, const zp_size_t alignment )
     {
         m_lock.acquire();
         if( !m_storage.is_fixed() )
         {
+            const zp_size_t allocSize = size + m_policy.overhead();
             const zp_size_t allocatedSize = m_policy.allocated();
             const zp_size_t totalSize = m_policy.total();
 
-            if( ( allocatedSize + size ) >= totalSize )
+            if( ( allocatedSize + allocSize ) >= totalSize )
             {
                 zp_size_t requestedSize;
-                void* mem = m_storage.request_memory( size, requestedSize );
+                void* mem = m_storage.request_memory( allocSize, requestedSize );
                 m_policy.add_memory( mem, requestedSize );
             }
         }
 
         void* ptr = m_policy.allocate( size, alignment );
         ZP_ASSERT( ptr );
+
+        m_profiler.track_allocate( ptr, size, alignment, m_memoryLabel );
+
         m_lock.release();
 
         return ptr;
     }
 
-    template<typename Storage, typename Policy, typename Locking>
-    void* MemoryAllocator<Storage, Policy, Locking>::reallocate( void* oldPtr, const zp_size_t size, const zp_size_t alignment )
+    template<typename Storage, typename Policy, typename Locking, typename Profiler>
+    void* MemoryAllocator<Storage, Policy, Locking, Profiler>::reallocate( void* oldPtr, const zp_size_t size, const zp_size_t alignment )
     {
         m_lock.acquire();
         if( !m_storage.is_fixed() )
         {
+            const zp_size_t allocSize = size + m_policy.overhead();
             const zp_size_t allocatedSize = m_policy.allocated();
             const zp_size_t totalSize = m_policy.total();
 
-            if( ( allocatedSize + size ) >= totalSize )
+            if( ( allocatedSize + allocSize ) >= totalSize )
             {
                 zp_size_t requestedSize;
-                void* mem = m_storage.request_memory( size, requestedSize );
+                void* mem = m_storage.request_memory( allocSize, requestedSize );
                 m_policy.add_memory( mem, requestedSize );
             }
         }
 
         void* ptr = m_policy.reallocate( oldPtr, size, alignment );
         ZP_ASSERT( ptr );
+
+        m_profiler.track_reallocate( oldPtr, ptr, size, alignment, m_memoryLabel );
+
         m_lock.release();
 
         return ptr;
     }
 
-    template<typename Storage, typename Policy, typename Locking>
-    void MemoryAllocator<Storage, Policy, Locking>::free( void* ptr )
+    template<typename Storage, typename Policy, typename Locking, typename Profiler>
+    void MemoryAllocator<Storage, Policy, Locking, Profiler>::free( void* ptr )
     {
         m_lock.acquire();
 
         m_policy.free( ptr );
+
+        m_profiler.track_free( ptr, m_memoryLabel );
 
         m_lock.release();
     }
@@ -262,13 +280,13 @@ namespace zp
 {
     struct NullMemoryStorage
     {
-        [[nodiscard]] void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
+        [[nodiscard]] ZP_FORCEINLINE void* request_memory( zp_size_t size, zp_size_t& requestedSize ) const
         {
             requestedSize = size;
             return nullptr;
         }
 
-        [[nodiscard]] zp_bool_t is_fixed() const
+        [[nodiscard]] ZP_FORCEINLINE zp_bool_t is_fixed() const
         {
             return true;
         }
@@ -276,48 +294,80 @@ namespace zp
 
     struct NullAllocationPolicy
     {
-        void add_memory( void* mem, zp_size_t size ) const
+        ZP_FORCEINLINE void add_memory( void* mem, zp_size_t size ) const
         {
         }
 
-        [[nodiscard]] zp_size_t allocated() const
-        {
-            return 0;
-        }
-
-        [[nodiscard]] zp_size_t total() const
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t allocated() const
         {
             return 0;
         }
 
-        [[nodiscard]] void* allocate( zp_size_t size, zp_size_t alignment )
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t total() const
+        {
+            return 0;
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE void* allocate( zp_size_t size, zp_size_t alignment )
         {
             return nullptr;
         }
 
-        [[nodiscard]] void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
+        [[nodiscard]] ZP_FORCEINLINE void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment )
         {
             return nullptr;
         }
 
-        void free( void* ptr )
+        ZP_FORCEINLINE void free( void* ptr )
         {
         }
     };
 
     struct NullMemoryLock
     {
-        void acquire() const
+        ZP_FORCEINLINE void acquire() const
         {
         };
 
-        void release() const
+        ZP_FORCEINLINE void release() const
         {
         };
     };
 
+    struct NullMemoryProfiler
+    {
+        ZP_FORCEINLINE void track_allocate( void* ptr, zp_size_t size, zp_size_t alignment, MemoryLabel memoryLabel )
+        {
+        }
+
+        ZP_FORCEINLINE void track_reallocate( void* oldPtr, void* ptr, zp_size_t size, zp_size_t alignment, MemoryLabel memoryLabel )
+        {
+        }
+
+        ZP_FORCEINLINE void track_free( void* ptr, MemoryLabel memoryLabel )
+        {
+        }
+    };
 }
 #pragma endregion
+
+namespace zp
+{
+    struct TrackedMemoryProfiler
+    {
+        ZP_FORCEINLINE void track_allocate( void* ptr, zp_size_t size, zp_size_t alignment, MemoryLabel memoryLabel )
+        {
+        }
+
+        ZP_FORCEINLINE void track_reallocate( void* oldPtr, void* ptr, zp_size_t size, zp_size_t alignment, MemoryLabel memoryLabel )
+        {
+        }
+
+        ZP_FORCEINLINE void track_free( void* ptr, MemoryLabel memoryLabel )
+        {
+        }
+    };
+};
 
 #pragma region CriticalSectionMemoryLock
 namespace zp
@@ -341,7 +391,7 @@ namespace zp
     class SystemPageMemoryStorage
     {
     public:
-        SystemPageMemoryStorage( void* systemMemory, zp_size_t pageSize );
+        SystemPageMemoryStorage( void* systemMemory, zp_size_t pageSize, zp_size_t totalSize );
 
         void* request_memory( zp_size_t size, zp_size_t& requestedSize );
 
@@ -349,6 +399,7 @@ namespace zp
 
     private:
         zp_size_t m_pageSize;
+        zp_size_t m_totalSize;
         void* m_systemMemory;
         void* m_memory;
     };
@@ -424,6 +475,8 @@ namespace zp
 
         [[nodiscard]] zp_size_t total() const;
 
+        [[nodiscard]] zp_size_t overhead() const;
+
         void* allocate( zp_size_t size, zp_size_t alignment );
 
         void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment );
@@ -488,7 +541,7 @@ namespace zp
         zp_size_t m_size;
     };
 }
-
+#if 1
 namespace zp
 {
     struct AllocMemory
@@ -595,4 +648,6 @@ namespace zp
         }
     };
 }
+#endif
+
 #endif //ZP_ALLOCATOR_H

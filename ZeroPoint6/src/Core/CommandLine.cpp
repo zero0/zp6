@@ -97,10 +97,7 @@ namespace zp
 
                 if( wasInToken && !inToken )
                 {
-                    m_commandLineTokens.pushBack( {
-                        .str = reinterpret_cast<const zp_char8_t*>(cmdLine + tokenStart),
-                        .length = i - tokenStart
-                    } );
+                    m_commandLineTokens.pushBack( String::As( cmdLine + tokenStart, i - tokenStart ) );
                 }
                 else if( !wasInToken && inToken )
                 {
@@ -111,10 +108,7 @@ namespace zp
             if( inToken )
             {
                 inToken = false;
-                m_commandLineTokens.pushBack( {
-                    .str = reinterpret_cast<const zp_char8_t*>(cmdLine + tokenStart),
-                    .length= len - tokenStart
-                } );
+                m_commandLineTokens.pushBack( String::As( cmdLine + tokenStart, len - tokenStart ) );
             }
 
             ok = !inQuote && !inToken;
@@ -304,22 +298,22 @@ namespace zp
     {
         for( const String& t : m_commandLineTokens )
         {
-            zp_printfln( "= %.*s", t.length, t.c_str() );
+            zp_printfln( "= %.*s", t.length(), t.c_str() );
         }
 
         for( const auto& op : m_commandLineOperations )
         {
             if( !op.longName.empty() && op.shortName.empty() )
             {
-                zp_printfln( "%-20.*s%.*s", op.longName.length, op.longName.str, op.description.length, op.description.str );
+                zp_printfln( "%-20.*s%.*s", op.longName.length(), op.longName.str(), op.description.length(), op.description.str() );
             }
             else if( op.longName.empty() && !op.shortName.empty() )
             {
-                zp_printfln( "%-20.*s%.*s", op.shortName.length, op.shortName.str, op.description.length, op.description.str );
+                zp_printfln( "%-20.*s%.*s", op.shortName.length(), op.shortName.str(), op.description.length(), op.description.str() );
             }
             else if( !op.longName.empty() && !op.shortName.empty() )
             {
-                zp_printfln( "%-5.*s,%-14.*s%.*s", op.shortName.length, op.shortName.str, op.longName.length, op.longName.str, op.description.length, op.description.str );
+                zp_printfln( "%-5.*s,%-14.*s%.*s", op.shortName.length(), op.shortName.str(), op.longName.length(), op.longName.str(), op.description.length(), op.description.str() );
             }
         }
     }

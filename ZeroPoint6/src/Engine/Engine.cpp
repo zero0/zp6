@@ -10,6 +10,7 @@
 #include "Core/Log.h"
 #include "Core/Job.h"
 #include "Core/Function.h"
+#include "Core/Profiler.h"
 
 #include "Platform/Platform.h"
 
@@ -81,9 +82,6 @@ namespace zp
         , m_renderSystem( nullptr )
         , m_entityComponentManager( nullptr )
         , m_assetSystem( nullptr )
-#if ZP_USE_PROFILER
-        , m_profiler( nullptr )
-#endif
         , m_frameCount( 0 )
         , m_frameStartTime( 0 )
         , m_timeFrequencyS( Platform::TimeFrequency() )
@@ -146,6 +144,10 @@ namespace zp
         zp_int32_t maxJobThreads = 2;
         cmd.tryGetParameterAsInt32( maxJobThreadParam, maxJobThreads );
 
+        Platform::InitializeNetworking();
+
+        Platform::InitializeStackTrace();
+
         const ThreadHandle mainThreadHandle = Platform::GetCurrentThread();
         Platform::SetThreadName( mainThreadHandle, String::As( "MainThread" ) );
         Platform::SetThreadIdealProcessor( mainThreadHandle, 0 );
@@ -153,7 +155,7 @@ namespace zp
         const zp_uint32_t numJobThreads = 2; // Platform::GetProcessorCount() - 1;
 
 #if ZP_USE_PROFILER
-        m_profiler = ZP_NEW_ARGS( MemoryLabels::Profiling, Profiler, {
+        Profiler::CreateProfiler( MemoryLabels::Profiling, {
             .maxThreadCount = numJobThreads + 1,
             .maxCPUEventsPerThread = 128,
             .maxMemoryEventsPerThread = 128,
@@ -217,7 +219,6 @@ namespace zp
         if( !headless )
         {
             ZP_PROFILE_CPU_BLOCK_E( Create Graphics Device );
-
 
             const GraphicsDeviceDesc dd {
                 .appName = String::As( "AppName" ),
@@ -387,10 +388,20 @@ namespace zp
             JobSystem::ScheduleBatchJobs();
         }
 
-        void InitialEngineJob( Engine* engine )
+        void InitialEngineJobFunc( Engine* engine )
         {
             Log::info() << "Init Engine" << Log::endl;
         }
+
+        struct InitialEngineJob
+        {
+            Engine* engine;
+
+            static void Execute( const JobWorkArgs& args )
+            {
+                Log::info() << "Init job exec" << Log::endl;
+            }
+        };
     }
 
 
@@ -403,19 +414,25 @@ namespace zp
             m_moduleAPI->onEngineStarted( this );
         }
 
-        int a = 0 ,b = 1;zp_size_t d = 1;
+        int a = 0, b = 1;
+        zp_size_t d = 1;
         Engine* engine = this;
-        auto fffff = [&]( const JobWorkArgs& args ) -> void
+        auto lambdaFunction = [ & ]( const JobWorkArgs& args ) -> void
         {
-            if(a + b == d)
+            if( a + b == d )
             {
 
             }
+
+            m_graphicsDevice->BeginFrame();
+
             m_moduleAPI->onEnginePostInitialize( engine );
-            InitialEngineJob( engine );
+            InitialEngineJobFunc( engine );
         };
 
-        JobWorkFunc eee = JobWorkFunc::from_lambda( fffff );
+        JobSystem::Start( InitialEngineJob { .engine = this } );
+
+        //JobWorkFunc eee = JobWorkFunc::from_lambda( lambdaFunction );
 
         //JobSystem::Execute( eee );
     }
@@ -482,10 +499,14 @@ namespace zp
 #if ZP_USE_PROFILER
         Profiler::DestroyProfilerThread();
 
-        ZP_SAFE_DELETE( Profiler, m_profiler );
+        Profiler::DestroyProfiler();
 #endif
 
         JobSystem::Teardown();
+
+        Platform::ShutdownNetworking();
+
+        Platform::ShutdownStackTrace();
     }
 
     void Engine::reload()

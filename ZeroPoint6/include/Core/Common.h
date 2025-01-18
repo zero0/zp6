@@ -20,125 +20,6 @@ namespace zp
     constexpr zp_size_t npos = -1;
 }
 
-#if ZP_USE_PRINTF
-
-zp_int32_t zp_printf( const char* format, ... );
-
-zp_int32_t zp_printfln( const char* format, ... );
-
-zp_int32_t zp_error_printf( const char* format, ... );
-
-zp_int32_t zp_error_printfln( const char* format, ... );
-
-#else
-#define zp_printf(...)     (void)0
-
-#define zp_printfln(...)   (void)0
-
-#define zp_error_printf(...)    (void)0
-
-#define zp_error_printfln(...)  (void)0
-#endif
-
-zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... );
-
-template<zp_size_t Size, typename ... Args>
-zp_int32_t zp_snprintf( char (& dest)[Size], const char* format, Args ... args )
-{
-    return zp_snprintf( static_cast<char*>(dest), Size, format, args... );
-}
-
-template<typename ... Args>
-zp_int32_t zp_snprintf( zp_char8_t* dest, zp_size_t destSize, const char* format, Args ... args )
-{
-    return zp_snprintf( reinterpret_cast<char*>(dest), destSize, format, args... );
-}
-
-template<zp_size_t Size, typename ... Args>
-zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... args )
-{
-    return zp_snprintf( reinterpret_cast<char*>(dest), Size, format, args... );
-}
-
-#define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
-
-#if ZP_USE_ASSERTIONS
-template<typename ... Args>
-void zp_assert( const char* msg, const char* file, zp_size_t line, Args... args)
-{
-    char assertMsg[ 512 ];
-    zp_snprintf(assertMsg, msg, args...);
-
-    zp_error_printfln( "Assertion failed %s:%d - %s", file, line, assertMsg );
-}
-
-#define ZP_ASSERT( t )                                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return; }} while( false )
-#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return v; }} while( false )
-#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
-#define ZP_INVALID_CODE_PATH()                              do { zp_assert( "Invalid Code Path", __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); } while( false )
-#else // !ZP_USE_ASSERTIONS
-#define ZP_ASSERT(...)                      (void)0
-#define ZP_ASSERT_RETURN(...)               (void)0
-#define ZP_ASSERT_RETURN_VALUE(...)         (void)0
-#define ZP_ASSERT_MSG(...)                  (void)0
-#define ZP_ASSERT_MSG_ARGS(...)             (void)0
-#define ZP_INVALID_CODE_PATH()              (void)0
-#define ZP_INVALID_CODE_PATH_MSG(...)       (void)0
-#define ZP_INVALID_CODE_PATH_MSG_ARGS(...)  (void)0
-#endif // ZP_USE_ASSERTIONS
-
-zp_int32_t zp_atoi32( const char* str, zp_int32_t base = 10 );
-
-zp_int64_t zp_atoi64( const char* str, zp_int32_t base = 10 );
-
-zp_float32_t zp_atof32( const char* str );
-
-template<typename T, int CountLog2>
-constexpr T zp_upper_pow2_generic( T val )
-{
-    --val;
-    for( int i = 0; i < CountLog2; ++i )
-    {
-        val |= val >> ( 1 << i );
-    }
-    ++val;
-    return val;
-}
-
-#define zp_upper_pow2_8( x )      zp_upper_pow2_generic<zp_uint8_t, 3>( x )
-#define zp_upper_pow2_16( x )     zp_upper_pow2_generic<zp_uint16_t, 4>( x )
-#define zp_upper_pow2_32( x )     zp_upper_pow2_generic<zp_uint32_t, 5>( x )
-#define zp_upper_pow2_64( x )     zp_upper_pow2_generic<zp_uint64_t, 6>( x )
-
-#if ZP_ARCH64
-#define zp_upper_pow2_size( x )   zp_upper_pow2_generic<zp_size_t, 6>( x )
-#else
-#define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 5>( x )
-#endif
-
-template<typename T, zp_size_t Size>
-constexpr zp_size_t zp_array_size( T(&)[Size] )
-{
-    return Size;
-}
-
-constexpr zp_bool_t zp_is_pow2( zp_uint32_t x )
-{
-    return ( x & ( x - 1 ) ) == 0;
-}
-
-constexpr zp_size_t zp_align_size( zp_size_t size, zp_size_t alignment )
-{
-    return ( size + ( alignment - 1 ) ) & -alignment;
-}
-
-void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength );
-
-void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value );
 
 template<typename T>
 struct zp_remove_reference
@@ -199,6 +80,130 @@ constexpr zp_remove_reference_t<T>&& zp_move( T&& val )
 {
     return static_cast<zp_remove_reference_t<T>&&>( val );
 }
+
+
+#if ZP_USE_PRINTF
+
+zp_int32_t zp_printf( const char* format, ... );
+
+zp_int32_t zp_printfln( const char* format, ... );
+
+zp_int32_t zp_error_printf( const char* format, ... );
+
+zp_int32_t zp_error_printfln( const char* format, ... );
+
+#else
+#define zp_printf(...)     (void)0
+
+#define zp_printfln(...)   (void)0
+
+#define zp_error_printf(...)    (void)0
+
+#define zp_error_printfln(...)  (void)0
+#endif
+
+zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... );
+
+template<zp_size_t Size, typename ... Args>
+zp_int32_t zp_snprintf( char (& dest)[Size], const char* format, Args ... args )
+{
+    return zp_snprintf( static_cast<char*>(dest), Size, format,  args... );
+}
+
+template<typename ... Args>
+zp_int32_t zp_snprintf( zp_char8_t* dest, zp_size_t destSize, const char* format, Args ... args )
+{
+    return zp_snprintf( reinterpret_cast<char*>(dest), destSize, format, args... );
+}
+
+template<zp_size_t Size, typename ... Args>
+zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... args )
+{
+    return zp_snprintf( reinterpret_cast<char*>(dest), Size, format, args... );
+}
+
+
+zp_int32_t zp_atoi32( const char* str, zp_int32_t base = 10 );
+
+zp_int64_t zp_atoi64( const char* str, zp_int32_t base = 10 );
+
+zp_float32_t zp_atof32( const char* str );
+
+template<typename T, int CountLog2>
+constexpr T zp_upper_pow2_generic( T val )
+{
+    --val;
+    for( int i = 0; i < CountLog2; ++i )
+    {
+        val |= val >> ( 1 << i );
+    }
+    ++val;
+    return val;
+}
+
+#define zp_upper_pow2_8( x )      zp_upper_pow2_generic<zp_uint8_t, 3>( x )
+#define zp_upper_pow2_16( x )     zp_upper_pow2_generic<zp_uint16_t, 4>( x )
+#define zp_upper_pow2_32( x )     zp_upper_pow2_generic<zp_uint32_t, 5>( x )
+#define zp_upper_pow2_64( x )     zp_upper_pow2_generic<zp_uint64_t, 6>( x )
+
+#if ZP_ARCH64
+#define zp_upper_pow2_size( x )   zp_upper_pow2_generic<zp_size_t, 6>( x )
+#else
+#define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 5>( x )
+#endif
+
+template<typename T, zp_size_t Size>
+constexpr zp_size_t zp_array_size( T(&)[Size] )
+{
+    return Size;
+}
+
+constexpr zp_bool_t zp_is_pow2( zp_uint32_t x )
+{
+    return ( x & ( x - 1 ) ) == 0;
+}
+
+constexpr zp_size_t zp_align_size( zp_size_t size, zp_size_t alignment )
+{
+    return ( size + ( alignment - 1 ) ) & -alignment;
+}
+
+void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength );
+
+void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value );
+
+
+#define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
+
+#if ZP_USE_ASSERTIONS
+
+template<typename ... Args>
+void zp_assert( const char* msg, const char* file, zp_size_t line, Args... args )
+{
+    char assertMsg[512];
+    zp_snprintf( assertMsg, msg, args... );
+
+    zp_error_printfln( "Assertion failed %s:%d - %s", file, line, assertMsg );
+}
+
+#define ZP_ASSERT( t )                                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return; }} while( false )
+#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return v; }} while( false )
+#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
+#define ZP_INVALID_CODE_PATH()                              do { zp_assert( "Invalid Code Path", __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__ ); } while( false )
+#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); } while( false )
+#else // !ZP_USE_ASSERTIONS
+#define ZP_ASSERT(...)                      (void)0
+#define ZP_ASSERT_RETURN(...)               (void)0
+#define ZP_ASSERT_RETURN_VALUE(...)         (void)0
+#define ZP_ASSERT_MSG(...)                  (void)0
+#define ZP_ASSERT_MSG_ARGS(...)             (void)0
+#define ZP_INVALID_CODE_PATH()              (void)0
+#define ZP_INVALID_CODE_PATH_MSG(...)       (void)0
+#define ZP_INVALID_CODE_PATH_MSG_ARGS(...)  (void)0
+#endif // ZP_USE_ASSERTIONS
 
 template<typename T>
 constexpr void zp_swap( T& a, T& b )
@@ -376,7 +381,8 @@ constexpr const T* zp_find( const T* begin, const T* end, const T& value, Eq eq 
 template<typename T>
 constexpr const T* zp_find( const T* begin, const T* end, const T& value )
 {
-    const T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t { return lh == rh; } );
+    const T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t
+    { return lh == rh; } );
     return found;
 }
 
@@ -517,47 +523,6 @@ constexpr void zp_qsort3( T* begin, T* end, Cmp cmp )
 //
 //
 
-
-
-//
-//
-//
-
-namespace zp
-{
-    struct Memory
-    {
-        void* ptr;
-        zp_size_t size;
-
-        template<typename T>
-        ZP_FORCEINLINE T* as()
-        {
-            ZP_ASSERT( sizeof( T ) <= size );
-            return static_cast<T*>( ptr );
-        }
-
-        template<typename T>
-        ZP_FORCEINLINE const T* as() const
-        {
-            ZP_ASSERT( sizeof( T ) <= size );
-            return static_cast<const T*>( ptr );
-        }
-
-        [[nodiscard]] ZP_FORCEINLINE Memory slice( zp_ptrdiff_t offset, zp_size_t sz ) const
-        {
-            return {
-                .ptr = ZP_OFFSET_PTR( ptr, offset ),
-                .size = sz
-            };
-        }
-    };
-}
-
-//
-//
-//
-
 namespace zp
 {
     struct SizeInfo
@@ -572,62 +537,62 @@ namespace zp
 
         if( asBits )
         {
-            info.mem[1] = 'b';
+            info.mem[ 1 ] = 'b';
             if( bytes > 1 tb )
             {
                 info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 tb ) );
-                info.mem[0] = 't';
+                info.mem[ 0 ] = 't';
             }
             else if( bytes > 1 gb )
             {
                 info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 gb );
-                info.mem[0] = 'g';
+                info.mem[ 0 ] = 'g';
             }
             else if( bytes > 1 mb )
             {
                 info.size = (zp_float32_t)bytes / ( 1 mb );
-                info.mem[0] = 'm';
+                info.mem[ 0 ] = 'm';
             }
             else if( bytes > 1 kb )
             {
                 info.size = (zp_float32_t)bytes / ( 1 kb );
-                info.mem[0] = 'k';
+                info.mem[ 0 ] = 'k';
             }
             else
             {
                 info.size = (zp_float32_t)bytes;
-                info.mem[0] = 'b';
-                info.mem[1] = '\0';
+                info.mem[ 0 ] = 'b';
+                info.mem[ 1 ] = '\0';
             }
         }
         else
         {
-            info.mem[1] = 'B';
+            info.mem[ 1 ] = 'B';
             if( bytes > 1 TB )
             {
                 info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 TB ) );
-                info.mem[0] = 'T';
+                info.mem[ 0 ] = 'T';
             }
             else if( bytes > 1 GB )
             {
                 info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 GB );
-                info.mem[0] = 'G';
+                info.mem[ 0 ] = 'G';
             }
             else if( bytes > 1 MB )
             {
                 info.size = (zp_float32_t)bytes / ( 1 MB );
-                info.mem[0] = 'M';
+                info.mem[ 0 ] = 'M';
             }
             else if( bytes > 1 KB )
             {
                 info.size = (zp_float32_t)bytes / ( 1 KB );
-                info.mem[0] = 'K';
+                info.mem[ 0 ] = 'K';
             }
             else
             {
                 info.size = (zp_float32_t)bytes;
-                info.mem[0] = 'B';
-                info.mem[1] = '\0';
+                info.mem[ 0 ] = 'B';
+                info.mem[ 1 ] = '\0';
             }
         }
 

@@ -35,8 +35,9 @@ namespace zp
 
 namespace zp
 {
-    SystemPageMemoryStorage::SystemPageMemoryStorage( void* systemMemory, zp_size_t pageSize )
+    SystemPageMemoryStorage::SystemPageMemoryStorage( void* systemMemory, zp_size_t pageSize, zp_size_t totalSize )
         : m_pageSize( pageSize )
+        , m_totalSize( totalSize )
         , m_systemMemory( systemMemory )
         , m_memory( systemMemory )
     {
@@ -45,9 +46,17 @@ namespace zp
     void* SystemPageMemoryStorage::request_memory( zp_size_t size, zp_size_t& requestedSize )
     {
         requestedSize = 0;
-        while( requestedSize < size )
+
+        if( m_pageSize == 0 )
         {
-            requestedSize += m_pageSize;
+            requestedSize = m_totalSize;
+        }
+        else
+        {
+            while( requestedSize < size )
+            {
+                requestedSize += m_pageSize;
+            }
         }
 
         void* mem = Platform::CommitMemoryPage( &m_memory, requestedSize );
@@ -243,6 +252,11 @@ namespace zp
     zp_size_t TlsfAllocatorPolicy::total() const
     {
         return m_size;
+    }
+
+    zp_size_t TlsfAllocatorPolicy::overhead() const
+    {
+        return m_tlsf == nullptr ? tlsf_size() + tlsf_pool_overhead() : tlsf_pool_overhead();
     }
 
     void* TlsfAllocatorPolicy::allocate( zp_size_t size, zp_size_t alignment )

@@ -8,14 +8,86 @@
 #include "Core/Defines.h"
 #include "Core/Macros.h"
 #include "Core/Types.h"
+#include "Core/Allocator.h"
 #include "Core/Common.h"
 #include "Core/Hash.h"
 #include "Core/Math.h"
-#include "Core/Allocator.h"
+
+constexpr zp_bool_t zp_strempty( const char* str );
+
+constexpr zp_bool_t zp_strempty( const char* str, zp_size_t length );
 
 constexpr zp_size_t zp_strlen( const char* str );
 
+constexpr zp_int32_t zp_strcmp( const char* lh, const char* rh );
+
+constexpr zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char* rh, zp_size_t rhSize );
+
+//
+
+constexpr zp_bool_t zp_strempty( const zp_char8_t* str );
+
+constexpr zp_bool_t zp_strempty( const zp_char8_t* str, zp_size_t length );
+
 constexpr zp_size_t zp_strlen( const zp_char8_t* str );
+
+constexpr zp_int32_t zp_strcmp( const zp_char8_t* lh, const zp_char8_t* rh );
+
+constexpr zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp_char8_t* rh, zp_size_t rhSize );
+
+//
+//
+//
+
+constexpr zp_bool_t zp_strempty( const char* str )
+{
+    return !( str != nullptr && str[ 0 ] != '\0' );
+}
+
+constexpr zp_bool_t zp_strempty( const char* str, zp_size_t length )
+{
+    return !( length != 0 && str != nullptr && str[ 0 ] != '\0' );
+}
+
+constexpr zp_size_t zp_strlen( const char* str )
+{
+    const char* iter = str;
+    if( iter != nullptr )
+    {
+        while( *iter != '\0' )
+        {
+            ++iter;
+        }
+    }
+
+    const zp_size_t length = iter - str;
+    return length;
+}
+
+constexpr zp_bool_t zp_strempty( const zp_char8_t* str )
+{
+    return !( str != nullptr && str[ 0 ] != '\0' );
+}
+
+constexpr zp_bool_t zp_strempty( const zp_char8_t* str, zp_size_t length )
+{
+    return !( length != 0 && str != nullptr && str[ 0 ] != '\0' );
+}
+
+constexpr zp_size_t zp_strlen( const char8_t* str )
+{
+    const char8_t* iter = str;
+    if( iter != nullptr )
+    {
+        while( *iter != '\0' )
+        {
+            ++iter;
+        }
+    }
+
+    const zp_size_t length = iter - str;
+    return length;
+}
 
 //
 //
@@ -143,42 +215,7 @@ constexpr void zp_strncpy( zp_char8_t (& dstStr)[Size], const char* srcStr, zp_s
     zp_strncpy( dstStr, Size, reinterpret_cast<const zp_char8_t*>(srcStr), srcLen );
 }
 
-constexpr zp_bool_t zp_strempty( const char* str )
-{
-    return !( str != nullptr && str[ 0 ] != '\0' );
-}
-
 constexpr zp_bool_t zp_strempty( const zp_char8_t* str );
-
-constexpr zp_size_t zp_strlen( const char* str )
-{
-    const char* s = str;
-    if( s )
-    {
-        while( *s )
-        {
-            ++s;
-        }
-    }
-
-    const zp_size_t length = s - str;
-    return length;
-}
-
-constexpr zp_size_t zp_strlen( const char8_t* str )
-{
-    zp_size_t length = 0;
-    if( str )
-    {
-        while( *str )
-        {
-            ++str;
-            ++length;
-        }
-    }
-
-    return length;
-}
 
 constexpr zp_size_t zp_strnlen( const char* str, zp_size_t maxSize )
 {
@@ -739,75 +776,131 @@ constexpr zp_bool_t zp_try_guid128_to_string( const zp_guid128_t& guid, char* st
 
 namespace zp
 {
-    struct String
+    class String
     {
-        const zp_char8_t* str;
-        zp_size_t length;
+    public:
+        using char_type = zp_char8_t;
+        using const_str_pointer = const char_type*;
+        using const_iterator = const_str_pointer;
 
-        ZP_FORCEINLINE static String As( const char* c_str )
-        {
-            return {
-                .str = reinterpret_cast<const zp_char8_t*>(c_str),
-                .length = zp_strlen( c_str )
-            };
-        }
+        String() = default;
 
-        ZP_FORCEINLINE static String As( const char* c_str, zp_size_t length )
-        {
-            return {
-                .str = reinterpret_cast<const zp_char8_t*>(c_str),
-                .length = length
-            };
-        }
+        explicit String( const_str_pointer str );
 
-        [[nodiscard]] zp_char8_t operator[]( zp_size_t index ) const
-        {
-            return str && index < length ? str[ index ] : '\0';
-        }
+        String( const_str_pointer str, zp_size_t length );
 
-        [[nodiscard]] zp_bool_t empty() const
-        {
-            return !( str && length );
-        }
+        ~String() = default;
 
-        [[nodiscard]] const char* c_str() const
-        {
-            return reinterpret_cast<const char*>(str);
-        }
+        [[nodiscard]] char_type operator[]( zp_size_t index ) const;
+
+        [[nodiscard]] zp_bool_t empty() const;
+
+        [[nodiscard]] zp_size_t length() const;
+
+        [[nodiscard]] const char* c_str() const;
+
+        [[nodiscard]] const_str_pointer str() const;
+
+        [[nodiscard]] const_str_pointer data() const;
+
+        [[nodiscard]] const_iterator begin() const;
+
+        [[nodiscard]] const_iterator end() const;
+
+        static String As( const char* c_str );
+
+        static String As( const char* c_str, zp_size_t length );
+
+        zp_bool_t operator=( const String& other ) const;
+
+    private:
+        const_str_pointer m_str;
+        zp_size_t m_length;
     };
+}
 
-    constexpr zp_bool_t operator==( const String& lh, const String& rh )
+namespace zp
+{
+    class MutableString
     {
-        return lh.str == rh.str || zp_strcmp( lh.str, lh.length, rh.str, rh.length ) == 0;
-    }
+    public:
+        using char_type = zp_char8_t;
+        using str_pointer = char_type*;
+        using const_str_pointer = const char_type*;
+        using iterator = str_pointer;
+        using const_iterator = const_str_pointer;
 
-    template<typename H>
-    struct DefaultHash<String, H>
-    {
-        H operator()( const String& val ) const
+        MutableString() = default;
+
+        MutableString( str_pointer str, zp_size_t capacity );
+
+        ~MutableString() = default;
+
+        [[nodiscard]] char_type& operator[]( zp_size_t index );
+
+        [[nodiscard]] zp_bool_t empty() const;
+
+        [[nodiscard]] zp_size_t length() const;
+
+        [[nodiscard]] zp_size_t capacity() const;
+
+        [[nodiscard]] const char* c_str() const;
+
+        [[nodiscard]] str_pointer str();
+
+        [[nodiscard]] str_pointer data();
+
+        [[nodiscard]] const_str_pointer data() const;
+
+        [[nodiscard]] iterator begin();
+
+        [[nodiscard]] iterator end();
+
+        [[nodiscard]] const_iterator begin() const;
+
+        [[nodiscard]] const_iterator end() const;
+
+        void clear();
+
+        void append( char_type ch );
+
+        void append( const char* str );
+
+        void append( const char* str, zp_size_t length );
+
+        void append( const String& str );
+
+        template<class ... Args>
+        void format( const char* format, Args ... args )
         {
-            return zp_fnv_1a<H>( val.str, val.length );
+            const zp_int32_t len = zp_snprintf( m_str, m_capacity, format, zp_forward( args... ) );
+            m_length = len;
         }
-    };
 
-
-    struct MutableString
-    {
-        zp_char8_t* const str;
-        zp_size_t length;
-        const zp_size_t capacity;
-
-        [[nodiscard]] zp_bool_t empty() const
+        template<class ... Args>
+        void appendFormat( const char* format, Args ... args )
         {
-            return !( str && length );
+            const zp_int32_t len = zp_snprintf( m_str + m_length, m_capacity - m_length, format, zp_forward( args... ) );
+            m_length += len;
         }
+
+        [[nodiscard]] zp_bool_t operator=( const MutableString& other ) const;
+
+        [[nodiscard]] zp_bool_t operator=( const String& other ) const;
+
+    private:
+        str_pointer m_str;
+        zp_size_t m_length;
+        zp_size_t m_capacity;
     };
+}
 
     //
     //
     //
 #pragma region Alloc String
-
+namespace zp
+{
     class AllocString
     {
     public:
@@ -946,7 +1039,7 @@ namespace zp
 
         [[nodiscard]] String asString() const
         {
-            return { .str = m_str, .length = m_length };
+            return { m_str, m_length };
         }
 
         void set( MemoryLabel memoryLabel, zp_char8_t* str, zp_size_t length )
@@ -1224,7 +1317,7 @@ namespace zp
 
         void append( const String& str )
         {
-            append( str.c_str(), str.length );
+            append( str.c_str(), str.length() );
         }
 
         template<class ... Args>
@@ -1243,7 +1336,7 @@ namespace zp
 
         [[nodiscard]] operator String() const
         {
-            return { .str = m_str, .length = m_length };
+            return { m_str, m_length };
         }
 //
         //explicit operator MutableString()
@@ -1293,86 +1386,13 @@ namespace zp
     class Tokenizer
     {
     public:
-        Tokenizer( const String& str, const char* delim )
-            : m_str( str )
-            , m_delim( String::As( delim ) )
-            , m_next( 0 )
-        {
-        }
+        Tokenizer( const String& str, const char* delim );
 
-        Tokenizer( const char* str, zp_size_t length, const char* delim )
-            : m_str( String::As( str, length ) )
-            , m_delim( String::As( delim ) )
-            , m_next( 0 )
-        {
-        }
+        Tokenizer( const char* str, zp_size_t length, const char* delim );
 
-        zp_bool_t next( String& token )
-        {
-            token.str = nullptr;
-            token.length = 0;
+        zp_bool_t next( String& token );
 
-            zp_bool_t hasNext = false;
-            if( m_next < m_str.length )
-            {
-                const zp_char8_t* front = m_str.str + m_next;
-                const zp_char8_t* end = m_str.str + m_next;
-
-                zp_size_t idx = front - m_str.str;
-
-                while( *end && idx < m_str.length )
-                {
-                    zp_bool_t isDelim = false;
-                    for( zp_size_t i = 0; i < m_delim.length && !isDelim; ++i )
-                    {
-                        isDelim = m_delim.str[ i ] == *end;
-                    }
-
-                    if( isDelim )
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        ++end;
-                        ++idx;
-                    }
-                }
-
-                token.str = front;
-                token.length = end - front;
-
-                hasNext = ( end - m_str.str ) <= m_str.length;
-
-                while( *end && idx < m_str.length )
-                {
-                    zp_bool_t isDelim = false;
-                    for( zp_size_t i = 0; i < m_delim.length && !isDelim; ++i )
-                    {
-                        isDelim = m_delim.str[ i ] == *end;
-                    }
-
-                    if( isDelim )
-                    {
-                        ++end;
-                        ++idx;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                m_next = end - m_str.str;
-            }
-
-            return hasNext;
-        }
-
-        void reset()
-        {
-            m_next = 0;
-        }
+        void reset();
 
     private:
         String m_str;
@@ -1386,21 +1406,20 @@ namespace zp
 //
 //
 
+zp_int32_t zp_strcmp( const zp::String& lh, const zp::String& rh );
+
 template<zp_size_t RHSize>
-constexpr zp_int32_t zp_strcmp( const zp::String& str, const char (& rh)[RHSize] )
+zp_int32_t zp_strcmp( const zp::String& str, const char (& rh)[RHSize] )
 {
-    return zp_strcmp( str.c_str(), str.length, rh, zp_strlen( rh ) );
+    return zp_strcmp( str, zp::String::As( rh, zp_strlen( rh ) ) );
 }
 
-constexpr zp_int32_t zp_strcmp( const zp::String& lh, const zp::String& rh )
-{
-    return zp_strcmp( lh.str, lh.length, rh.str, rh.length );
-}
+const char* zp_strnstr( const zp::String& str, const zp::String& find );
 
 template<zp_size_t Size>
-constexpr const char* zp_strnstr( const zp::String& str, const char (& find)[Size] )
+const char* zp_strnstr( const zp::String& str, const char (& find)[Size] )
 {
-    return zp_strnstr( str.c_str(), str.length, find, zp_strlen( find ) );
+    return zp_strnstr( str, zp::String::As( find, zp_strlen( find ) ) );
 }
 
 #endif //ZP_STRING_H

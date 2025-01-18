@@ -8,6 +8,7 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/Memory.h"
 
 //
 //

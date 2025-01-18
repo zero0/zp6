@@ -26,10 +26,13 @@ namespace zp
         zp_size_t groupId;
         zp_size_t groupIndex;
         zp_size_t index;
+        Memory jobMemory;
         Memory sharedMemory;
     };
 
-    using JobWorkFunc = Function<void(const JobWorkArgs&)>;  //void (*)(Job *, Memory);
+    using JobCallback = void ( * )( const JobWorkArgs& );
+
+    using JobWorkFunc = Function<void( const JobWorkArgs& )>;
 
     namespace JobSystem
     {
@@ -55,99 +58,109 @@ namespace zp
 
         JobHandle PrepareDispatch( zp_size_t length, zp_size_t batchCount, JobWorkFunc func, JobHandle dependency );
 
+        //
+        JobHandle Start( Memory jobData, JobCallback jobCallback );
+
+        template<typename T>
+        JobHandle Start( T&& jobData )
+        {
+            using TJob = zp_remove_reference_t<T>;
+            return Start( Memory { .ptr = &jobData, .size = sizeof( TJob ) }, TJob::Execute );
+        }
+
         void ScheduleBatchJobs();
 
         void ProcessJobs();
     }
 #if 0
-        static void InitializeJobThreads();
+    static void InitializeJobThreads();
 
-        static void ExitJobThreads();
+    static void ExitJobThreads();
 
-        static void ProcessJobs();
+    static void ProcessJobs();
 
-        static PrepariedJob Start( JobWorkFunc execFunc );
+    static PrepariedJob Start( JobWorkFunc execFunc );
 
-        static PrepariedJob Start( JobWorkFunc execFunc, JobHandle parentJob );
+    static PrepariedJob Start( JobWorkFunc execFunc, JobHandle parentJob );
 
-        static PrepariedJob Start( JobWorkFunc execFunc, void* data, zp_size_t size );
+    static PrepariedJob Start( JobWorkFunc execFunc, void* data, zp_size_t size );
 
-        static PrepariedJob Start( JobWorkFunc execFunc, void* data, zp_size_t size, JobHandle parentJob );
+    static PrepariedJob Start( JobWorkFunc execFunc, void* data, zp_size_t size, JobHandle parentJob );
 
-        static void ScheduleBatchJobs();
+    static void ScheduleBatchJobs();
 
-        template<typename T>
-        static PrepariedJob Start( const T& jobData )
+    template<typename T>
+    static PrepariedJob Start( const T& jobData )
+    {
+        using TJob = zp_remove_reference_t<T>;
+
+        Wrapper <TJob> wrapper { .func = TJob::Execute, .data = jobData };
+        return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
+    }
+
+    template<typename T>
+    static PrepariedJob Start( const T& jobData, JobHandle parentJob )
+    {
+        using TJob = zp_remove_reference_t<T>;
+
+        Wrapper <TJob> wrapper { .func = TJob::Execute, .data = jobData };
+        return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
+    }
+
+    template<typename T>
+    static PrepariedJob Start( T&& jobData )
+    {
+        using TJob = zp_remove_reference_t<T>;
+
+        Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
+        return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
+    }
+
+    template<typename T>
+    static PrepariedJob Start( T&& jobData, JobHandle parentJob )
+    {
+        using TJob = zp_remove_reference_t<T>;
+
+        Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
+        return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
+    }
+
+    template<typename T>
+    static PrepariedJob Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData )
+    {
+        using TJob = zp_remove_reference_t<T>;
+
+        Wrapper <TJob> wrapper { .func = func, .data = jobData };
+        return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
+    }
+
+    template<typename T>
+    static PrepariedJob Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData, JobHandle parentJob )
+    {
+        using TJob = zp_remove_reference_t<T>;
+
+        Wrapper <TJob> wrapper { .func = func, .data = jobData };
+        return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
+    }
+
+    template<typename T>
+    struct Wrapper
+    {
+        typedef void (* WrapperFunc)( const JobHandle& parentJobHandle, T* ptr );
+
+        static void Execute( Job* job, Memory memory )
         {
-            using TJob = zp_remove_reference_t<T>;
-
-            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = jobData };
-            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
-        }
-
-        template<typename T>
-        static PrepariedJob Start( const T& jobData, JobHandle parentJob )
-        {
-            using TJob = zp_remove_reference_t<T>;
-
-            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = jobData };
-            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
-        }
-
-        template<typename T>
-        static PrepariedJob Start( T&& jobData )
-        {
-            using TJob = zp_remove_reference_t<T>;
-
-            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
-            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
-        }
-
-        template<typename T>
-        static PrepariedJob Start( T&& jobData, JobHandle parentJob )
-        {
-            using TJob = zp_remove_reference_t<T>;
-
-            Wrapper <TJob> wrapper { .func = TJob::Execute, .data = zp_move( jobData ) };
-            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
-        }
-
-        template<typename T>
-        static PrepariedJob Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData )
-        {
-            using TJob = zp_remove_reference_t<T>;
-
-            Wrapper <TJob> wrapper { .func = func, .data = jobData };
-            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ) );
-        }
-
-        template<typename T>
-        static PrepariedJob Start( void (* func)( const JobHandle& parentJobHandle, T* data ), const T& jobData, JobHandle parentJob )
-        {
-            using TJob = zp_remove_reference_t<T>;
-
-            Wrapper <TJob> wrapper { .func = func, .data = jobData };
-            return Start( Wrapper<TJob>::Execute, &wrapper, sizeof( Wrapper < TJob > ), parentJob );
-        }
-
-        template<typename T>
-        struct Wrapper
-        {
-            typedef void (* WrapperFunc)( const JobHandle& parentJobHandle, T* ptr );
-
-            static void Execute( Job* job, Memory memory )
+            Wrapper<T>* ptr = static_cast<Wrapper<T>*>( memory.ptr );
+            if( ptr && ptr->func )
             {
-                Wrapper<T>* ptr = static_cast<Wrapper<T>*>( memory.ptr );
-                if( ptr && ptr->func )
-                {
-                    ptr->func( JobHandle( job ), &ptr->data );
-                }
+                ptr->func( JobHandle( job ), &ptr->data );
             }
+        }
 
-            WrapperFunc func;
-            T data;
-        };
+        WrapperFunc func;
+        T data;
     };
+};
 #endif
 }
 

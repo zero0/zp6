@@ -15,14 +15,15 @@
 #define ZP_NAMEOF(x)                    #x
 #define ZP_NAMEOF_T(x)                  ZP_T( #x )
 
-#define ZP_STR_T(x)                     { .str = ZP_T(x),  .length = zp_strlen( ZP_T(x) ) }
-#define ZP_STR_NAMEOF(x)                { .str = ZP_T(#x), .length = zp_strlen( ZP_T(#x) ) }
+#define ZP_STR_T(x)                     { ZP_T(x),  zp_strlen( ZP_T(x) ) }
+#define ZP_STR_NAMEOF(x)                { ZP_T(#x), zp_strlen( ZP_T(#x) ) }
 
 #define ZP_ARRAY_SIZE(a)                zp_array_size( a )
 
 #define ZP_ALIGN_SIZE(s,a)              zp_align_size( s, a )
 
 #define ZP_OFFSET_PTR(ptr, offset)      static_cast<void*>( static_cast<zp_uint8_t*>(ptr) + static_cast<zp_ptrdiff_t>(offset) )
+#define ZP_PTR_DIFF(ptr0, ptr1)         static_cast<zp_ptrdiff_t>( static_cast<zp_uint8_t*>(ptr0) - static_cast<zp_uint8_t*>(ptr1) )
 
 #define ZP_FG_BLACK     "30"
 #define ZP_FG_RED       "31"

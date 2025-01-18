@@ -48,7 +48,7 @@ namespace zp
         }
 
         //
-        //
+        // Int32
         //
 
         ZP_FORCEINLINE zp_int32_t And( zp_int32_t* destination, zp_int32_t value )
@@ -115,7 +115,7 @@ namespace zp
         }
 
         //
-        //
+        // UInt32
         //
 
         ZP_FORCEINLINE zp_uint32_t And( zp_uint32_t* destination, zp_uint32_t value )
@@ -182,7 +182,7 @@ namespace zp
         }
 
         //
-        //
+        // SizeT
         //
 
         ZP_FORCEINLINE zp_size_t AddSizeT( zp_size_t* addend, zp_size_t value )
@@ -251,7 +251,7 @@ namespace zp
 #endif
         }
         //
-        //
+        // Int64
         //
 
         ZP_FORCEINLINE zp_int64_t And( zp_int64_t* destination, zp_int64_t value )
@@ -318,7 +318,7 @@ namespace zp
         }
 
         //
-        //
+        // UInt64
         //
 
         ZP_FORCEINLINE zp_uint64_t Exchange( zp_uint64_t* target, zp_uint64_t value )

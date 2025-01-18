@@ -6,12 +6,14 @@
 #define ZP_FUNCTION_H
 
 #include "Core/Types.h"
-#include "Core/Vector.h"
+#include "Core/Memory.h"
 
 namespace zp
 {
     template<typename TSignature>
-    class Function{};
+    class Function
+    {
+    };
 
     template<typename R, typename ... P>
     class Function<R( P... )>
@@ -32,7 +34,7 @@ namespace zp
         }
 
         Function( const Function& func )
-            : m_data(  )
+            : m_data()
             , m_stub( func.m_stub )
         {
         }
@@ -46,8 +48,8 @@ namespace zp
 
         template<typename TFunc>
         Function( TFunc&& func )
-            : m_data(  )
-            , m_stub(  )
+            : m_data()
+            , m_stub()
         {
             *this = from_lambda( func );
         }
@@ -73,6 +75,14 @@ namespace zp
             m_stub = func.m_stub;
 
             func.m_stub = {};
+
+            return *this;
+        }
+
+        Function& operator=( func_t func )
+        {
+            callable()->m_functionPtr = func;
+            m_stub = &stub_function;
 
             return *this;
         }
@@ -117,28 +127,28 @@ namespace zp
         {
             Function function {};
             TLambda* ptr = function.as<TLambda>();
-            //*ptr = ( lambda );
+            *ptr = ( lambda );
             function.m_stub = &stub_lambda<TLambda>;
 
             return function;
         }
 
-        operator zp_bool_t() const
+        explicit operator zp_bool_t() const
         {
             return m_stub != nullptr;
         }
 
-        R operator()( P ... args )
+        auto operator()( P ... args ) -> R
         {
             return m_stub( callable(), args... );
         }
 
-        R operator()( P ... args ) const
+        auto operator()( P ... args ) const -> R
         {
             return m_stub( callable(), args... );
         }
 
-        zp_bool_t operator==( const Function& func ) const
+        auto operator==( const Function& func ) const -> zp_bool_t
         {
             const Callable* thisCallable = callable();
             const Callable* otherCallable = func.callable();
@@ -146,9 +156,14 @@ namespace zp
             return m_stub == func.m_stub && thisCallable->m_functionPtr == otherCallable->m_functionPtr;
         }
 
-        zp_bool_t operator==( zp_nullptr_t ) const
+        auto operator==( zp_nullptr_t ) const -> zp_bool_t
         {
             return m_stub == nullptr;
+        }
+
+        auto operator!=( zp_nullptr_t ) const -> zp_bool_t
+        {
+            return m_stub != nullptr;
         }
 
     private:
@@ -159,7 +174,7 @@ namespace zp
             void* m_objPtr;
             const void* m_constObjPtr;
             void (_UndefinedClass::*m_memberPtr)();
-            void (*m_functionPtr)();
+            func_t m_functionPtr;
         };
 
         using StubFunc = R ( * )( const Callable*, P... );
@@ -180,7 +195,7 @@ namespace zp
             return reinterpret_cast<TLambda*>( m_data.data() );
         }
 
-        FixedArray<zp_uint8_t, sizeof(Callable)> m_data;
+        FixedArray<zp_uint8_t, sizeof( Callable )> m_data;
         StubFunc m_stub;
 
         static R stub_function( const Callable* callable, P... args )
@@ -207,7 +222,7 @@ namespace zp
         {
             using TLambda = zp_remove_reference_t<T>;
             TLambda* func = reinterpret_cast<TLambda*>( callable->m_functionPtr );
-            return (*func)( args... );
+            return ( *func )( args... );
         }
     };
 
@@ -227,12 +242,12 @@ namespace zp
 
     // deduction guides
     template<typename R, typename ...Args>
-    Function(R( * )(Args...))
+    Function( R( * )( Args... ) )
     ->
     Function<R( Args... )>;
 
     template<typename TFunc, typename TSignature = _function_guide_t<TFunc, decltype( &TFunc::operator() )>>
-    Function(TFunc)
+    Function( TFunc )
     ->
     Function<TSignature>;
 }

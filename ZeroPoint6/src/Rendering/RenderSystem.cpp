@@ -603,11 +603,10 @@ namespace zp
             }
         };
         //gpuHandle = jobSystem->PrepareJobData( processRenderPipeline, gpuHandle );
-
+#if 0
         struct RenderProfilerData
         {
-            Profiler* profiler;
-            ProfilerFrameRange range;
+            //ProfilerFrameRange range;
             ImmediateModeRenderer* immediateModeRenderer;
 
             static void Execute( const JobHandle& parentJobHandle, const RenderProfilerData* renderProfilerData )
@@ -616,7 +615,7 @@ namespace zp
 
                 int count = 0;
 
-                ProfilerFrameEnumerator enumerator = renderProfilerData->profiler->captureFrames( renderProfilerData->range );
+                //ProfilerFrameEnumerator enumerator = renderProfilerData->profiler->captureFrames( renderProfilerData->range );
 
 
                 Rect2Df orthoRect { .offset { .x = 0, .y = 0 }, .size { .width = 800, .height = 600 } };
@@ -720,7 +719,7 @@ namespace zp
             .immediateModeRenderer = m_immediateModeRenderer,
         };
         //gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );
-
+#endif
         struct FinalizeBatchRenderingJob
         {
             RenderSystem* renderSystem;

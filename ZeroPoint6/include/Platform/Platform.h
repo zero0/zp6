@@ -3,7 +3,7 @@
 
 #include "Core/Defines.h"
 #include "Core/Types.h"
-#include "Core/Macros.h"
+#include "Core/Memory.h"
 #include "Core/String.h"
 #include "Core/Math.h"
 
@@ -573,6 +573,20 @@ namespace zp
         zp_size_t SendSocket( Socket socket, const void* src, zp_size_t srcSize );
 
         void CloseSocket( Socket socket );
+    };
+
+    // Stack Trace
+    namespace Platform
+    {
+        zp_bool_t InitializeStackTrace();
+
+        void ShutdownStackTrace();
+
+        void GetStackTrace( StackTrace& stackTrace, zp_uint32_t framesToSkip = 0 );
+
+        void StackTraceToString( const StackTrace& stackTrace, MutableString& string );
+
+        void DumpStackTrace( MutableString& string );
     };
 
 #pragma region Path

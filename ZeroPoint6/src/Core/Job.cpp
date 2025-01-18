@@ -14,22 +14,11 @@
 #include "Core/Profiler.h"
 #include "Core/Log.h"
 #include "Core/String.h"
+#include "Core/Function.h"
 
 #include "Platform/Platform.h"
 
 #define USE_JOB_STATE_TRACKING  ZP_DEBUG
-
-enum
-{
-    kJobsPerThread = 512,
-    kJobsPerThreadMask = kJobsPerThread - 1,
-
-    kJobQueueCount = 256,
-    kJobQueueCountMask = kJobQueueCount - 1,
-};
-
-ZP_STATIC_ASSERT( zp_is_pow2( kJobQueueCount ) );
-ZP_STATIC_ASSERT( zp_is_pow2( kJobsPerThread ) );
 
 namespace zp
 {
@@ -45,16 +34,27 @@ namespace zp
             Finished,
         };
 
-        using JobFunc = void ( * )( Job* job );
+        enum
+        {
+            kJobDataSize = 64,
 
-        constexpr zp_size_t kJobDataSize = 64;
+            kJobsPerThread = 128,
+            kJobsPerThreadMask = kJobsPerThread - 1,
+
+            kJobQueueCount = 64,
+            kJobQueueCountMask = kJobQueueCount - 1,
+        };
+
+        ZP_STATIC_ASSERT( zp_is_pow2( kJobQueueCount ) );
+        ZP_STATIC_ASSERT( zp_is_pow2( kJobsPerThread ) );
     };
 
     struct Job
     {
         Job* parentJob;
         Job* nextJob;
-        JobFunc func;
+        JobWorkFunc callback;
+        zp_size_t jobSharedMemorySize;
         zp_uint32_t uncompletedJobs;
         zp_uint32_t batchId;
         zp_uint32_t jobStart;
@@ -65,6 +65,7 @@ namespace zp
         FixedArray<zp_uint8_t, kJobDataSize> data;
     };
 
+#pragma region JobQueue
     namespace
     {
         class JobQueue
@@ -165,6 +166,7 @@ namespace zp
             m_back = 0;
         }
     }
+#pragma endregion
 
     namespace
     {
@@ -251,6 +253,8 @@ namespace zp
             Job* job = &t_threadInfo.jobs[ index & kJobsPerThreadMask ];
             job->parentJob = nullptr;
             job->nextJob = nullptr;
+            job->callback = nullptr;
+            job->jobSharedMemorySize = 0;
             job->uncompletedJobs = 1;
             job->batchId = 0;
             job->jobStart = 0;
@@ -258,6 +262,7 @@ namespace zp
 #if USE_JOB_STATE_TRACKING
             job->state = JobState::Allocated;
 #endif // USE_JOB_STATE_TRACKING
+            zp_zero_memory_array( job->data.data(), job->data.length() );
 
             return job;
         }
@@ -278,7 +283,7 @@ namespace zp
             GetLocalJobQueue()->pushBack( job );
         }
 
-        void QueueJob( Job* job )
+        void QueueNextJob( Job* job )
         {
 #if USE_JOB_STATE_TRACKING
             job->state = JobState::Queued;
@@ -324,7 +329,7 @@ namespace zp
                     Job* dep = job->nextJob;
                     while( dep != nullptr )
                     {
-                        QueueJob( dep );
+                        QueueNextJob( dep );
 
                         dep = dep->nextJob;
                     }
@@ -340,30 +345,33 @@ namespace zp
             job->state = JobState::Executing;
 #endif // USE_JOB_STATE_TRACKING
 
-            if( job->func )
+            if( job->callback )
             {
-                job->func( job );
-            }
-
-#if 0
-            if( job->func )
-            {
-                // TODO: allocate group shared memory
-                const Memory sharedMemory = {};
+                Memory sharedMemory {
+                    .ptr = job->jobSharedMemorySize == 0 ? nullptr : ZP_MALLOC( MemoryLabels::ThreadSafe, job->jobSharedMemorySize ),
+                    .size = job->jobSharedMemorySize
+                };
 
                 JobWorkArgs args {
-                    .job = job,
+                    .currentJob { .job = job },
+                    .parentJob { .job = job->parentJob },
                     .groupId = job->batchId,
+                    .jobMemory { .ptr = job->data.data(), .size = job->data.length() },
                     .sharedMemory = sharedMemory,
                 };
 
                 for( zp_size_t offset = job->jobStart, end = job->jobEnd; offset < end; ++offset )
                 {
                     args.index = offset;
-                    job->func( args );
+                    job->callback( args );
+                }
+
+                if( sharedMemory.ptr != nullptr )
+                {
+                    ZP_FREE( MemoryLabels::ThreadSafe, sharedMemory.ptr );
                 }
             }
-#endif
+
             FinishJob( job );
         }
 
@@ -387,7 +395,6 @@ namespace zp
 
             if( job == nullptr )
             {
-                Platform::YieldCurrentThread();
             }
 #if USE_JOB_STATE_TRACKING
             else
@@ -406,7 +413,7 @@ namespace zp
             while( !batchQueue->empty() )
             {
                 Job* job = batchQueue->popBack();
-                QueueJob( job );
+                QueueNextJob( job );
             }
         }
 
@@ -423,7 +430,7 @@ namespace zp
 
         zp_bool_t IsJobComplete( Job* job )
         {
-            return !( job != nullptr && job->uncompletedJobs != 0 );
+            return job == nullptr || job->uncompletedJobs == 0;
         }
 
         void WaitForJobComplete( Job* job )
@@ -454,9 +461,11 @@ namespace zp
             {
                 Job* job = RequestQueuedJob();
 
-                if( job != nullptr )
+                while( job != nullptr )
                 {
                     ExecuteJob( job );
+
+                    job = RequestQueuedJob();
                 }
 
                 Platform::EnterCriticalSection( t_threadInfo.lock );
@@ -469,48 +478,6 @@ namespace zp
             DestroyLocalThreadInfo();
 
             return 0;
-        }
-
-
-        template<typename Func>
-        Func* JobDataAsPtr( Job* job )
-        {
-            ZP_STATIC_ASSERT( sizeof( Func ) <= kJobDataSize );
-            Func* ptrFunc = reinterpret_cast<Func*>( job->data.data() );
-            return ptrFunc;
-        }
-
-        template<typename Func>
-        Func& JobDataAs( Job* job )
-        {
-            ZP_STATIC_ASSERT( sizeof( Func ) <= kJobDataSize );
-            Func* ptrFunc = reinterpret_cast<Func*>( job->data.data() );
-            return *ptrFunc;
-        }
-
-        template<typename Func>
-        void WrapperJobFunc( Job* job )
-        {
-            Func& ptrFunc = JobDataAs<Func>( job );
-
-            //if( ptrFunc )
-            {
-                // TODO: allocate group shared memory
-                const Memory sharedMemory = {};
-
-                JobWorkArgs args {
-                    .currentJob = { .job = job },
-                    .parentJob = { .job = job->parentJob },
-                    .groupId = job->batchId,
-                    .sharedMemory = sharedMemory,
-                };
-
-                for( zp_size_t offset = job->jobStart, end = job->jobEnd; offset < end; ++offset )
-                {
-                    args.index = offset;
-                    ptrFunc( args );
-                }
-            }
         }
     };
 
@@ -525,7 +492,7 @@ namespace zp
         g_context.nextJobQueueIndex = 0;
         g_context.wakeCondition = Platform::CreateConditionVariable();
         g_context.threadCount = threadCount;
-        g_context.isRunning = 1;
+        g_context.isRunning = 0;
     }
 
     void JobSystem::Teardown()
@@ -610,10 +577,9 @@ namespace zp
     {
         Job* job = AllocateJob();
 
-        job->func = WrapperJobFunc<JobWorkFunc>;
-        JobDataAs<JobWorkFunc>( job ) = func;
+        job->callback = func;
 
-        QueueJob( job );
+        QueueNextJob( job );
 
         Platform::NotifyOneConditionVariable( g_context.wakeCondition );
 
@@ -624,8 +590,7 @@ namespace zp
     {
         Job* job = AllocateJob();
 
-        job->func = WrapperJobFunc<JobWorkFunc>;
-        JobDataAs<JobWorkFunc>( job ) = func;
+        job->callback = func;
 
         if( dependency.job == nullptr )
         {
@@ -656,8 +621,7 @@ namespace zp
         {
             Job* job = AllocateJob();
 
-            job->func = WrapperJobFunc<JobWorkFunc>;
-            JobDataAs<JobWorkFunc>( job ) = func;
+            job->callback = func;
 
             job->batchId = batch;
             job->jobStart = offset;
@@ -668,10 +632,10 @@ namespace zp
 
             SetParentJob( job, parentJob );
 
-            QueueJob( job );
+            QueueNextJob( job );
         }
 
-        QueueJob( parentJob );
+        QueueNextJob( parentJob );
 
         Platform::NotifyAllConditionVariable( g_context.wakeCondition );
 
@@ -685,8 +649,26 @@ namespace zp
 
         const zp_size_t jobCount = zp_divide_round_up( length, batchCount );
 
-        JobQueue* batchQueue = GetLocalBatchJobQueue();
         Job* parentJob = AllocateJob();
+
+        zp_size_t offset = 0;
+        for( zp_size_t batch = 0; batch < jobCount; ++batch )
+        {
+            Job* job = AllocateJob();
+
+            job->callback = func;
+
+            job->batchId = batch;
+            job->jobStart = offset;
+
+            offset = zp_min( length, offset + batchCount );
+
+            job->jobEnd = offset;
+
+            SetParentJob( job, parentJob );
+
+            PrepareLocalJob( job );
+        }
 
         if( dependency.job == nullptr )
         {
@@ -700,34 +682,21 @@ namespace zp
             AddJobDependency( parentJob, dependency.job );
         }
 
-        zp_size_t offset = 0;
-        for( zp_size_t batch = 0; batch < jobCount; ++batch )
-        {
-            Job* job = AllocateJob();
-
-            job->func = WrapperJobFunc<JobWorkFunc>;
-            JobDataAs<JobWorkFunc>( job ) = func;
-
-            job->batchId = batch;
-            job->jobStart = offset;
-
-            offset = zp_min( length, offset + batchCount );
-
-            job->jobEnd = offset;
-
-            SetParentJob( job, parentJob );
-
-            if( dependency.job != nullptr )
-            {
-                AddJobDependency( job, dependency.job );
-            }
-            else
-            {
-                PrepareLocalJob( job );
-            }
-        }
-
         return { .job = parentJob };
+    }
+
+    JobHandle JobSystem::Start( Memory jobData, JobCallback jobCallback )
+    {
+        Job* job = AllocateJob();
+
+        job->callback = jobCallback;
+        zp_memcpy( job->data.data(), job->data.length(), jobData.ptr, jobData.size );
+
+        QueueNextJob( job );
+
+        Platform::NotifyOneConditionVariable( g_context.wakeCondition );
+
+        return { .job = job };
     }
 
     void JobSystem::ScheduleBatchJobs()
@@ -740,9 +709,12 @@ namespace zp
     void JobSystem::ProcessJobs()
     {
         Job* job = RequestQueuedJob();
-        if( job != nullptr )
+
+        while( job != nullptr )
         {
             ExecuteJob( job );
+
+            job = RequestQueuedJob();
         }
     }
 };

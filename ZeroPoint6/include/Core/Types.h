@@ -61,7 +61,7 @@ using zp_nullptr_t = decltype(nullptr);
 //
 //
 
-typedef zp_uint64_t zp_hash64_t;
+using zp_hash64_t = zp_uint64_t;
 
 struct zp_hash128_t
 {
@@ -133,8 +133,33 @@ ZP_FORCEINLINE zp_bool_t operator>( const zp_guid128_t& lh, const zp_guid128_t& 
 //
 //
 
-typedef zp_uint64_t zp_time_t;
+using zp_time_t = zp_uint64_t;
 
 #define ZP_TIME_INFINITE    static_cast<zp_time_t>( ~0 )
+
+//
+//
+//
+
+namespace zp
+{
+    using MemoryLabel = zp_uint8_t;
+}
+
+namespace zp
+{
+    enum
+    {
+        kMaxStackTraceDepth = 30,
+    };
+
+    struct StackTrace
+    {
+        //FixedArray<void*, kMaxStackTraceDepth> stack;
+        void* stack[kMaxStackTraceDepth];
+        zp_size_t length;
+        zp_hash64_t hash;
+    };
+}
 
 #endif //ZP_TYPES_H

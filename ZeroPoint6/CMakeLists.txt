@@ -87,6 +87,7 @@ set(ZP_CORE_HEADERS
     "include/Core/Macros.h"
     "include/Core/Map.h"
     "include/Core/Math.h"
+    "include/Core/Memory.h"
     "include/Core/Profiler.h"
     "include/Core/Queue.h"
     "include/Core/Set.h"
@@ -285,6 +286,7 @@ target_link_libraries(${ZP_TARGET} PRIVATE
     rpcrt4
     dwmapi
     Ws2_32
+    dbghelp
 )
 #endif ()
 

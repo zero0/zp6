@@ -436,7 +436,7 @@ void DataBuilderElement::set( const char* value )
     String strValue = String::As( value );
 
     ensureDataType( ZP_DATA_BUILDER_ELEMENT_TYPE_STRING );
-    asRef<AllocString>() = AllocString( memoryLabel, strValue.str, strValue.length );
+    asRef<AllocString>() = AllocString( memoryLabel, strValue.str(), strValue.length() );
 }
 
 void DataBuilderElement::set( Memory value )
@@ -665,7 +665,7 @@ ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
 
 zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
 {
-    const zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
+    const zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length() );
     const zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
     {
         return v.id == id;
@@ -695,7 +695,7 @@ zp_hash64_t ArchiveBuilder::addBlock( String name, Memory data )
 
 zp_hash64_t ArchiveBuilder::addBlock( String name, Memory header, Memory data )
 {
-    const zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length );
+    const zp_hash64_t id = zp_fnv64_1a( name.c_str(), name.length() );
     const zp_size_t index = m_blocks.findIndexOf( [ &id ]( const ArchiveBuilderBlock& v ) -> zp_bool_t
     {
         return v.id == id;
