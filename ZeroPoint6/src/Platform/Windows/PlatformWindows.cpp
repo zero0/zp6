@@ -43,8 +43,8 @@ using namespace zp;
 #define USE_CUSTOM_TOOLBAR_HEADER   0
 namespace
 {
-    const char* kZeroPointClassName = "ZeroPoint::WindowClass";
-    const char* kZeroPointSystemTrayClassName = "ZeroPoint::SystemTrayClass";
+    const char* const kZeroPointClassName = "ZeroPoint::WindowClass";
+    const char* const kZeroPointSystemTrayClassName = "ZeroPoint::SystemTrayClass";
 
     enum
     {
@@ -120,25 +120,25 @@ namespace
                 break;
 
 #if USE_CUSTOM_TOOLBAR_HEADER
-                case WM_NCCALCSIZE:
+            case WM_NCCALCSIZE:
+            {
+                if( !wParam )
                 {
-                    if( !wParam )
-                    {
-                        return ::DefWindowProc( hWnd, uMessage, wParam, lParam );
-                    }
-
-                    zp_uint32_t dpi = ::GetDpiForWindow(hWnd);
-
-                    zp_int32_t frameX = ::GetSystemMetricsForDpi(SM_CXFRAME, dpi);
-                    zp_int32_t frameY = ::GetSystemMetricsForDpi(SM_CYFRAME, dpi);
-                    zp_int32_t padding = ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-
-                    auto lpNCCalcSizeParams = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
-                    lpNCCalcSizeParams->rgrc[0].right -= frameX + padding;
-                    lpNCCalcSizeParams->rgrc[0].left += frameX + padding;
-                    lpNCCalcSizeParams->rgrc[0].bottom -= frameY + padding;
+                    return ::DefWindowProc( hWnd, uMessage, wParam, lParam );
                 }
-                    break;
+
+                zp_uint32_t dpi = ::GetDpiForWindow(hWnd);
+
+                zp_int32_t frameX = ::GetSystemMetricsForDpi(SM_CXFRAME, dpi);
+                zp_int32_t frameY = ::GetSystemMetricsForDpi(SM_CYFRAME, dpi);
+                zp_int32_t padding = ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+
+                auto lpNCCalcSizeParams = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
+                lpNCCalcSizeParams->rgrc[0].right -= frameX + padding;
+                lpNCCalcSizeParams->rgrc[0].left += frameX + padding;
+                lpNCCalcSizeParams->rgrc[0].bottom -= frameY + padding;
+            }
+                break;
 #endif
             case WM_GETMINMAXINFO:
             {
@@ -1735,7 +1735,7 @@ namespace zp
 
         ::SymSetOptions( SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES );
         const WINBOOL init = ::SymInitialize( process, nullptr, true );
-        ok = init;
+        ok = init == TRUE;
 
         ZP_ASSERT( ok );
 #else
@@ -1763,8 +1763,7 @@ namespace zp
         stackTrace.length = capturedFrames;
         stackTrace.hash = hash;
 #else
-        stackTrace.stack.reset();
-        stackTrace.hash = 0;
+        stackTrace = {};
 #endif
     }
 

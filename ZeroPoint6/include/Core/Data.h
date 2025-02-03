@@ -110,6 +110,8 @@ namespace zp
 
         [[nodiscard]] zp_size_t position() const;
 
+        [[nodiscard]] zp_bool_t end() const;
+
         zp_size_t seek( zp_ptrdiff_t offset, DataStreamSeekOrigin origin );
 
         void reset();

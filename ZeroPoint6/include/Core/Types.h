@@ -61,6 +61,8 @@ using zp_nullptr_t = decltype(nullptr);
 //
 //
 
+using zp_hash32_t = zp_uint32_t;
+
 using zp_hash64_t = zp_uint64_t;
 
 struct zp_hash128_t

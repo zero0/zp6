@@ -9,13 +9,15 @@
 #include "Core/Defines.h"
 #include "Core/Macros.h"
 #include "Core/Allocator.h"
+#include "Core/Data.h"
 
-#include "Rendering/GraphicsBuffer.h"
-#include "Rendering/RenderPass.h"
-#include "Rendering/GraphicsResource.h"
-#include "Rendering/Sampler.h"
-#include "Rendering/Shader.h"
-#include "Rendering/Texture.h"
+#include "GraphicsCommandBuffer.h"
+#include "GraphicsBuffer.h"
+#include "RenderPass.h"
+#include "GraphicsResource.h"
+#include "Sampler.h"
+#include "Shader.h"
+#include "Texture.h"
 
 #include "Platform/Platform.h"
 
@@ -193,6 +195,8 @@ namespace zp
         WindowHandle windowHandle;
 
         zp_size_t stagingBufferSize;
+        zp_size_t commandBufferPageSize;
+
         zp_uint32_t threadCount;
         zp_uint32_t bufferedFrameCount;
 
@@ -213,10 +217,12 @@ namespace zp
     ZP_DECLSPEC_NOVTABLE class GraphicsDevice
     {
     public:
-        virtual void BeginFrame() = 0;
-
-        virtual void EndFrame() = 0;
+        virtual GraphicsCommandBuffer* SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) = 0;
     };
+
+    //
+    //
+    //
 
     ZP_DECLSPEC_NOVTABLE class GraphicsDeviceOld
     {
@@ -228,11 +234,13 @@ namespace zp
         ~GraphicsDeviceOld() = default;
 
 #pragma region Swapchain
+
         virtual void createSwapchain( zp_handle_t windowHandle, zp_uint32_t width, zp_uint32_t height, int displayFormat, ColorSpace colorSpace ) = 0;
 
         virtual void resizeSwapchain( zp_uint32_t width, zp_uint32_t height ) = 0;
 
         virtual void destroySwapchain() = 0;
+
 #pragma endregion
 
         virtual void createPerFrameData() = 0;

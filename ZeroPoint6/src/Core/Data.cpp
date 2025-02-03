@@ -29,7 +29,7 @@ DataStreamWriter::DataStreamWriter( MemoryLabel memoryLabel, zp_size_t blockSize
     : m_buffer( nullptr )
     , m_position( 0 )
     , m_capacity( 0 )
-    , m_blockSize( blockSize ? blockSize : kDefaultDataStreamWriterBlockSize )
+    , m_blockSize( blockSize > 0 ? blockSize : kDefaultDataStreamWriterBlockSize )
     , memoryLabel( memoryLabel )
 {
 }
@@ -242,6 +242,11 @@ zp_size_t DataStreamReader::position() const
     return m_position;
 }
 
+zp_bool_t DataStreamReader::end() const
+{
+    return m_position >= m_memory.size;
+}
+
 zp_size_t DataStreamReader::seek( zp_ptrdiff_t offset, DataStreamSeekOrigin origin )
 {
     const zp_size_t oldPosition = m_position;
@@ -307,8 +312,8 @@ zp_size_t DataStreamReader::read( void* ptr, zp_size_t size )
     if( newPosition < m_memory.size )
     {
         zp_memcpy( ptr, size, ZP_OFFSET_PTR( m_memory.ptr, m_position ), m_memory.size - m_position );
-        m_position = newPosition;
     }
+    m_position = newPosition;
 
     return oldPosition;
 }
@@ -322,6 +327,10 @@ zp_size_t DataStreamReader::readReverse( void* ptr, zp_size_t size )
         const zp_size_t newPosition = m_position - size;
         zp_memcpy( ptr, size, ZP_OFFSET_PTR( m_memory.ptr, newPosition ), m_memory.size - newPosition );
         m_position = newPosition;
+    }
+    else
+    {
+        m_position = 0;
     }
 
     return oldPosition;

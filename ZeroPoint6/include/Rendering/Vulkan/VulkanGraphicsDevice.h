@@ -5,11 +5,8 @@
 #ifndef ZP_VULKANGRAPHICSDEVICE_H
 #define ZP_VULKANGRAPHICSDEVICE_H
 
-#include "Core/Defines.h"
 #include "Core/Types.h"
-#include "Core/Macros.h"
-#include "Core/Vector.h"
-#include "Core/Map.h"
+#include "Core/Common.h"
 
 #include "Rendering/GraphicsDevice.h"
 
@@ -122,11 +119,11 @@ namespace zp
 
         void draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
 
-        void drawIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) final;
+        void drawIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) final;
 
         void drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue ) final;
 
-        void drawIndexedIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) final;
+        void drawIndexedIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue ) final;
 
 #pragma endregion
 
@@ -134,7 +131,7 @@ namespace zp
 
         void dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue ) final;
 
-        void dispatchIndirect( const GraphicsBuffer& buffer, CommandQueue* commandQueue ) final;
+        void dispatchIndirect( const GraphicsBuffer& dstbuffer, CommandQueue* commandQueue ) final;
 
 #pragma endregion
 
@@ -210,7 +207,7 @@ namespace zp
 
         const PerFrameData& getCurrentFrameData() const;
 
-        PerFrameData& getFrameData( zp_uint64_t frameIndex );
+        PerFrameData& getFrameData( zp_uint64_t frameCount );
 
         PerFrameData m_perFrameData[kBufferedFrameCount];
 

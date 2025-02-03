@@ -33,6 +33,7 @@ set(ZP_PLATFORM_SRC
 set(ZP_RENDERING_SRC
     "src/Rendering/BatchModeRenderer.cpp"
     "src/Rendering/GraphicsDevice.cpp"
+    "src/Rendering/GraphicsCommandBuffer.cpp"
     "src/Rendering/GraphicsResource.cpp"
     "src/Rendering/ImmediateModeRenderer.cpp"
     #    "src/Rendering/RenderGraph.cpp"
@@ -127,8 +128,10 @@ set(ZP_RENDERING_HEADERS
     "include/Rendering/BatchModeRenderer.h"
     "include/Rendering/Camera.h"
     "include/Rendering/GraphicsBuffer.h"
+    "include/Rendering/GraphicsCommandBuffer.h"
     "include/Rendering/GraphicsDevice.h"
     "include/Rendering/GraphicsResource.h"
+    "include/Rendering/GraphicsTypes.h"
     "include/Rendering/ImmediateModeRenderer.h"
     "include/Rendering/Material.h"
     #    "include/Rendering/RenderGraph.h"

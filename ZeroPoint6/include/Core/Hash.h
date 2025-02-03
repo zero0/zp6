@@ -14,6 +14,50 @@
 //
 //
 
+constexpr zp_hash32_t zp_fnv32_1a( const void* ptr, const zp_size_t size, zp_hash32_t h = 2166136261u )
+{
+    if( ptr )
+    {
+        auto data = static_cast<const zp_uint8_t*>( ptr );
+
+        const zp_hash32_t prime { 16777619u };
+        for( zp_size_t i = 0; i != size; ++i )
+        {
+            h ^= static_cast<zp_uint32_t>(data[ i ]);
+            h *= prime;
+        }
+    }
+
+    return h;
+}
+
+template<typename T>
+constexpr zp_hash32_t zp_fnv32_1a( const T& value, zp_hash32_t h = 2166136261u )
+{
+    return zp_fnv32_1a( static_cast<const void*>(&value), sizeof( T ), h );
+}
+
+template<typename T>
+constexpr zp_hash32_t zp_fnv32_1a( const T* value, zp_size_t length, zp_hash32_t h = 2166136261u )
+{
+    return zp_fnv32_1a( static_cast<const void*>(value), sizeof( T ) * length, h );
+}
+
+template<typename T, zp_size_t Size>
+constexpr zp_hash32_t zp_fnv32_1a( const T (& value)[Size], zp_hash32_t h = 2166136261u )
+{
+    return zp_fnv32_1a( static_cast<const void*>(&value), sizeof( T ) * Size, h );
+}
+
+constexpr zp_hash32_t zp_fnv32_1a( const zp::Memory& memory, zp_hash32_t h = 2166136261u )
+{
+    return zp_fnv32_1a( memory.ptr, memory.size, h );
+}
+
+//
+//
+//
+
 constexpr zp_hash64_t zp_fnv64_1a( const void* ptr, const zp_size_t size, zp_hash64_t h = 0xcbf29ce484222325 )
 {
     if( ptr )
@@ -179,6 +223,12 @@ constexpr zp_hash128_t zp_fnv128_1a( const zp::Memory& memory, zp_hash128_t h = 
 
 template<typename H>
 H zp_fnv_1a( const void* ptr, zp_size_t size );
+
+template<>
+constexpr zp_hash32_t zp_fnv_1a<zp_hash32_t>( const void* ptr, zp_size_t size )
+{
+    return zp_fnv32_1a( ptr, size );
+}
 
 template<>
 constexpr zp_hash64_t zp_fnv_1a<zp_hash64_t>( const void* ptr, zp_size_t size )

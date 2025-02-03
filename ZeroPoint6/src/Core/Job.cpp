@@ -176,6 +176,7 @@ namespace zp
             zp_size_t allocatedJobCount;
             JobQueue* localJobQueue;
             JobQueue* localBatchJobQueue;
+            zp_uint32_t threadId;
             CriticalSection lock;
         };
 
@@ -206,11 +207,12 @@ namespace zp
         void InitializeLocalThreadInfo( zp_size_t index )
         {
             JobThreadInfo& info = t_threadInfo;
-            zp_zero_memory_array( info.jobs.data(), info.jobs.length() );
+            info = {};
 
             info.allocatedJobCount = 0;
             info.localJobQueue = &g_context.allJobQueues[ index ];
             info.localBatchJobQueue = &g_context.allBatchJobQueues[ index ];
+            info.threadId = Platform::GetCurrentThreadId();
             info.lock = Platform::CreateCriticalSection();
         }
 
@@ -248,9 +250,20 @@ namespace zp
 
         Job* AllocateJob()
         {
-            const zp_size_t index = ++t_threadInfo.allocatedJobCount;
+            Job* job {};
 
-            Job* job = &t_threadInfo.jobs[ index & kJobsPerThreadMask ];
+            auto* info = &t_threadInfo;
+
+            const zp_size_t index = t_threadInfo.allocatedJobCount % kJobsPerThread;
+            ++t_threadInfo.allocatedJobCount;
+
+            job = &t_threadInfo.jobs[ index ];
+
+#if USE_JOB_STATE_TRACKING
+            ZP_ASSERT( job->state == JobState::Idle );
+            job->state = JobState::Allocated;
+#endif // USE_JOB_STATE_TRACKING
+
             job->parentJob = nullptr;
             job->nextJob = nullptr;
             job->callback = nullptr;
@@ -259,12 +272,17 @@ namespace zp
             job->batchId = 0;
             job->jobStart = 0;
             job->jobEnd = 1;
-#if USE_JOB_STATE_TRACKING
-            job->state = JobState::Allocated;
-#endif // USE_JOB_STATE_TRACKING
             zp_zero_memory_array( job->data.data(), job->data.length() );
 
             return job;
+        }
+
+        void FreeJob( Job* job )
+        {
+#if USE_JOB_STATE_TRACKING
+            ZP_ASSERT( job->state == JobState::Finished );
+            job->state = JobState::Idle;
+#endif // USE_JOB_STATE_TRACKING
         }
 
         void PrepareLocalJob( Job* job )
@@ -336,6 +354,8 @@ namespace zp
 
                     Platform::NotifyAllConditionVariable( g_context.wakeCondition );
                 }
+
+                FreeJob( job );
             }
         }
 
@@ -586,6 +606,15 @@ namespace zp
         return { .job = job };
     }
 
+    JobHandle JobSystem::PrepareEmpty()
+    {
+        Job* job = AllocateJob();
+
+        PrepareLocalJob( job );
+
+        return { .job = job };
+    }
+
     JobHandle JobSystem::Prepare( JobWorkFunc func, JobHandle dependency )
     {
         Job* job = AllocateJob();
@@ -697,6 +726,19 @@ namespace zp
         Platform::NotifyOneConditionVariable( g_context.wakeCondition );
 
         return { .job = job };
+    }
+
+
+    JobHandle JobSystem::Run( Memory jobData, JobCallback jobCallback )
+    {
+        Job* job = AllocateJob();
+
+        job->callback = jobCallback;
+        zp_memcpy( job->data.data(), job->data.length(), jobData.ptr, jobData.size );
+
+        ExecuteJob( job );
+
+        return {};
     }
 
     void JobSystem::ScheduleBatchJobs()

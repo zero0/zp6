@@ -78,6 +78,7 @@ namespace zp
         , m_compiledExecutionGraph( memoryLabel )
         , m_subsystemManager( memoryLabel )
         , m_previousFrameEnginePipelineHandle {}
+        , m_graphicsDeviceCommandBuffer( nullptr )
         , m_graphicsDevice( nullptr )
         , m_renderSystem( nullptr )
         , m_entityComponentManager( nullptr )
@@ -343,54 +344,66 @@ namespace zp
 
     namespace
     {
-        struct EngineJobData
+        struct BeginEngineJob
         {
             Engine* engine;
+
+            static void Execute( const JobWorkArgs& args );
         };
 
-        void UpdateEngineJob( const JobHandle& parentHandle, EngineJobData* e );
-
-        void AdvanceFrameJob( const JobHandle& parentHandle, EngineJobData* e )
+        struct AdvanceFrameJob
         {
-            if( e->engine->isRunning() )
+            Engine* engine;
+
+            static void Execute( const JobWorkArgs& args )
             {
-                e->engine->advanceFrame();
+                Engine* engine = args.jobMemory.as<AdvanceFrameJob>()->engine;
 
-                JobSystem::ScheduleBatchJobs();
+                engine->advanceFrame();
+
+                JobSystem::Start( BeginEngineJob { .engine = engine } );
             }
-        }
+        };
 
-        void WaitForGPUJob( const JobHandle& parentHandle, EngineJobData* e )
+        struct SyncGPUEngineJob
         {
-            //e->engine->getGraphicsDevice()->waitForGPU();
+            Engine* engine;
 
-            JobSystem::ScheduleBatchJobs();
-        }
+            static void Execute( const JobWorkArgs& args )
+            {
+                ZP_PROFILE_CPU_BLOCK();
 
-        void EndFrameJob( const JobHandle& parentHandle, EngineJobData* e )
+                Engine* engine = args.jobMemory.as<SyncGPUEngineJob>()->engine;
+
+                engine->submitToGPU();
+
+                JobSystem::Start( AdvanceFrameJob { .engine = engine } );
+            }
+        };
+
+        struct UpdateEngineJob
         {
-            e->engine->getGraphicsDevice()->EndFrame();
+            Engine* engine;
 
-            JobSystem::ScheduleBatchJobs();
-        }
+            static void Execute( const JobWorkArgs& args )
+            {
+                ZP_PROFILE_CPU_BLOCK();
 
-        void StartFrameJob( const JobHandle& parentHandle, EngineJobData* e )
+                Engine* engine = args.jobMemory.as<UpdateEngineJob>()->engine;
+
+                engine->update();
+
+                JobSystem::Start( SyncGPUEngineJob { .engine = engine } );
+            }
+        };
+
+        void BeginEngineJob::Execute( const zp::JobWorkArgs& args )
         {
-            e->engine->getGraphicsDevice()->BeginFrame();
+            ZP_PROFILE_CPU_BLOCK();
 
-            JobSystem::ScheduleBatchJobs();
-        }
+            Engine* engine = args.jobMemory.as<BeginEngineJob>()->engine;
 
-        void UpdateEngineJob( const JobHandle& parentHandle, EngineJobData* e )
-        {
-            e->engine->update();
-
-            JobSystem::ScheduleBatchJobs();
-        }
-
-        void InitialEngineJobFunc( Engine* engine )
-        {
-            Log::info() << "Init Engine" << Log::endl;
+            JobSystem::Start( UpdateEngineJob { .engine = engine } );
         }
 
         struct InitialEngineJob
@@ -399,7 +412,13 @@ namespace zp
 
             static void Execute( const JobWorkArgs& args )
             {
+                ZP_PROFILE_CPU_BLOCK();
+
                 Log::info() << "Init job exec" << Log::endl;
+
+                Engine* engine = args.jobMemory.as<InitialEngineJob>()->engine;
+
+                JobSystem::Start( BeginEngineJob { .engine = engine } );
             }
         };
     }
@@ -413,22 +432,6 @@ namespace zp
         {
             m_moduleAPI->onEngineStarted( this );
         }
-
-        int a = 0, b = 1;
-        zp_size_t d = 1;
-        Engine* engine = this;
-        auto lambdaFunction = [ & ]( const JobWorkArgs& args ) -> void
-        {
-            if( a + b == d )
-            {
-
-            }
-
-            m_graphicsDevice->BeginFrame();
-
-            m_moduleAPI->onEnginePostInitialize( engine );
-            InitialEngineJobFunc( engine );
-        };
 
         JobSystem::Start( InitialEngineJob { .engine = this } );
 
@@ -645,14 +648,17 @@ namespace zp
 
     void Engine::processWindowEvents()
     {
-        //if( m_windowHandle )
+        zp_int32_t exitCode;
+
+        if( m_windowHandle )
         {
-            zp_int32_t exitCode;
-            const zp_bool_t isRunning = Platform::DispatchMessages( exitCode );
-            if( !isRunning )
-            {
-                exit( exitCode );
-            }
+            Platform::DispatchWindowMessages( m_windowHandle, exitCode );
+        }
+
+        const zp_bool_t isRunning = Platform::DispatchMessages( exitCode );
+        if( !isRunning )
+        {
+            exit( exitCode );
         }
     }
 
@@ -785,11 +791,11 @@ namespace zp
                     struct AdvanceProfilerFrameJob
                     {
                         Profiler* profiler;
-                        zp_size_t frameIndex;
+                        zp_size_t frameCount;
 
                         static void Execute( const AdvanceProfilerFrameJob* data )
                         {
-                            data->profiler->advanceFrame( data->frameIndex );
+                            data->profiler->advanceFrame( data->frameCount );
                         }
                     } advanceProfilerFrame { m_profiler, m_frameCount };
 
@@ -799,11 +805,11 @@ namespace zp
 
                 struct TestJob
                 {
-                    zp_size_t frameIndex;
+                    zp_size_t frameCount;
 
                     static void Execute( const TestJob* data )
                     {
-                        zp_printfln( "frame %d thread %d", data->frameIndex, zp_current_thread_id());
+                        zp_printfln( "frame %d thread %d", data->frameCount, zp_current_thread_id());
                     }
                 } testJob { m_frameCount };
 
@@ -867,7 +873,7 @@ namespace zp
 
     void Engine::update()
     {
-        zp_bool_t requiresRebuild = true;
+        zp_bool_t requiresRebuild = false;
         if( requiresRebuild )
         {
             m_executionGraph.BeginRecording();
@@ -881,5 +887,10 @@ namespace zp
             requiresRebuild = false;
         }
 
+    }
+
+    void Engine::submitToGPU()
+    {
+        m_graphicsDeviceCommandBuffer = m_graphicsDevice->SubmitAndRequestNewCommandBuffer( m_graphicsDeviceCommandBuffer );
     }
 }

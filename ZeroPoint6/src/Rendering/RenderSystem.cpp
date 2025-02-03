@@ -506,17 +506,17 @@ namespace zp
 #if 0
         struct StartFrameJob
         {
-            zp_uint64_t frameIndex;
+            zp_uint64_t frameCount;
             RenderSystem* renderSystem;
 
             static void Execute( const JobHandle& jobHandle, const StartFrameJob* data )
             {
                 RenderSystem* renderSystem = data->renderSystem;
 
-                renderSystem->m_batchModeRenderer->beginFrame( data->frameIndex );
-                renderSystem->m_immediateModeRenderer->beginFrame( data->frameIndex );
+                renderSystem->m_batchModeRenderer->beginFrame( data->frameCount );
+                renderSystem->m_immediateModeRenderer->beginFrame( data->frameCount );
             }
-        } startFrameJob { frameIndex, this };
+        } startFrameJob { frameCount, this };
         return jobSystem->PrepareJobData( startFrameJob, inputHandle );
 #endif
     }
@@ -715,7 +715,7 @@ namespace zp
             }
         } renderProfilerDataJob {
             .profiler = GetProfiler(),
-            .range = ProfilerFrameRange::Last( frameIndex, 1 ),
+            .range = ProfilerFrameRange::Last( frameCount, 1 ),
             .immediateModeRenderer = m_immediateModeRenderer,
         };
         //gpuHandle = jobSystem->PrepareJobData( renderProfilerDataJob, gpuHandle );

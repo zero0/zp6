@@ -109,6 +109,7 @@ namespace zp
         {
             zp_uint64_t currentFrame;
 
+            zp_size_t framesToCapture;
             zp_size_t maxProfilerThreads;
             zp_size_t maxCpuEventsPerThread;
             zp_size_t maxGpuEventsPerThread;
@@ -117,8 +118,6 @@ namespace zp
             MemoryArray<CPUProfilerEvent> cpuProfilerData;
             MemoryArray<MemoryProfilerEvent> memProfilerData;
             MemoryArray<GPUProfilerEvent> gpuProfilerData;
-
-            zp_size_t framesToCapture;
 
             zp_size_t profilerThreadDataCount;
             MemoryArray<ProfilerThreadData*> profilerThreadData;
@@ -203,6 +202,7 @@ namespace zp
 
         g_context = {
             .currentFrame = 0,
+            .framesToCapture = profilerCreateDesc.maxFramesToCapture,
             .maxProfilerThreads = profilerCreateDesc.maxThreadCount,
             .maxCpuEventsPerThread = profilerCreateDesc.maxCPUEventsPerThread,
             .maxGpuEventsPerThread =  profilerCreateDesc.maxGPUEventsPerThread,
@@ -210,7 +210,6 @@ namespace zp
             .cpuProfilerData = { ZP_MALLOC_T_ARRAY( memoryLabel, CPUProfilerEvent, cpuEventCount ), cpuEventCount },
             .memProfilerData = { ZP_MALLOC_T_ARRAY( memoryLabel, MemoryProfilerEvent, memEventCount ), memEventCount },
             .gpuProfilerData = { ZP_MALLOC_T_ARRAY( memoryLabel, GPUProfilerEvent, gpuEventCount ), gpuEventCount },
-            .framesToCapture = profilerCreateDesc.maxFramesToCapture,
             .profilerThreadDataCount = 0,
             .profilerThreadData = { ZP_MALLOC_T_ARRAY( memoryLabel, ProfilerThreadData*, profilerCreateDesc.maxThreadCount ), profilerCreateDesc.maxThreadCount },
             .memoryLabel = memoryLabel
@@ -395,10 +394,10 @@ namespace zp
         {
             *( static_cast<zp_size_t*>( m_profilerFrameBuffers ) + idx ) = profilerFrameBuffer - static_cast<zp_uint8_t*>( m_profilerFrameBuffers );
 
-            const zp_size_t frameIndex = range.startFrame + idx;
+            const zp_size_t frameCount = range.startFrame + idx;
 
             auto* header = reinterpret_cast<ProfilerFrameHeader*>( profilerFrameBuffer );
-            header->frameIndex = frameIndex;
+            header->frameCount = frameCount;
             header->cpuEvents = 0;
             header->memoryEvents = 0;
             header->gpuEvents = 0;
@@ -416,7 +415,7 @@ namespace zp
                     auto* e = threadData->cpuProfilerData + threadData->cpuProfilerEventCount;
                     for( ; b != e; ++b )
                     {
-                        if( b->frameIndex == frameIndex )
+                        if( b->frameCount == frameCount )
                         {
                             zp_memcpy( profilerFrameBuffer, sizeof( CPUProfilerEvent ), b, sizeof( CPUProfilerEvent ) );
                             profilerFrameBuffer += sizeof( CPUProfilerEvent );

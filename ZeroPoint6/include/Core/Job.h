@@ -51,6 +51,8 @@ namespace zp
         //
         JobHandle Execute( JobWorkFunc func );
 
+        JobHandle PrepareEmpty();
+
         JobHandle Prepare( JobWorkFunc func, JobHandle dependency );
 
         //
@@ -66,6 +68,16 @@ namespace zp
         {
             using TJob = zp_remove_reference_t<T>;
             return Start( Memory { .ptr = &jobData, .size = sizeof( TJob ) }, TJob::Execute );
+        }
+
+        //
+        JobHandle Run( Memory jobData, JobCallback jobCallback );
+
+        template<typename T>
+        JobHandle Run( T&& jobData )
+        {
+            using TJob = zp_remove_reference_t<T>;
+            return Run( Memory { .ptr = &jobData, .size = sizeof( TJob ) }, TJob::Execute );
         }
 
         void ScheduleBatchJobs();

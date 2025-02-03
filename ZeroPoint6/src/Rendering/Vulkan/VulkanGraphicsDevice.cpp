@@ -5,12 +5,17 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/Memory.h"
+#include "Core/Allocator.h"
 #include "Core/Vector.h"
 #include "Core/Set.h"
 #include "Core/Math.h"
 #include "Core/Profiler.h"
 #include "Core/String.h"
 #include "Core/Log.h"
+#include "Core/Job.h"
+#include "Core/Data.h"
+#include "Core/Hash.h"
 
 #include "Platform/Platform.h"
 
@@ -1098,7 +1103,7 @@ namespace zp
 
         struct DelayedDestroyInfo
         {
-            zp_uint64_t frameIndex;
+            zp_uint64_t frame;
             VkInstance vkInstance;
             VkDevice vkLocalDevice;
             const VkAllocationCallbacks* vkAllocatorCallbacks;
@@ -1320,10 +1325,50 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             QueueInfo present;
         };
 
+        struct VulkanBuffer
+        {
+            VkBuffer vkBuffer;
+            VkDeviceMemory vkDeviceMemory;
+
+            zp_size_t offset;
+            zp_size_t alignment;
+            zp_size_t size;
+
+            zp_hash32_t hash;
+        };
+
+        struct VulkanTexture
+        {
+        };
+
+        struct VulkanCommandQueue
+        {
+
+        };
+
+        struct StagingBuffer
+        {
+            VkBuffer vkBuffer;
+            VkDeviceMemory vkDeviceMemory;
+
+            zp_size_t position;
+            zp_size_t alignment;
+            zp_size_t size;
+        };
+
+        struct StagingBufferAllocation
+        {
+            VkBuffer vkBuffer;
+            VkDeviceMemory vkDeviceMemory;
+
+            zp_size_t offset;
+            zp_size_t size;
+        };
+
         class VulkanContext
         {
         public:
-            VulkanContext() = default;
+            VulkanContext();
 
             ~VulkanContext();
 
@@ -1331,7 +1376,19 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void Destroy();
 
+            void BeginFrame( zp_uint64_t frame, zp_size_t frameIndex );
+
             void EndFrame( VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence );
+
+            void FlushDestroyQueue();
+
+            const StagingBufferAllocation Allocate( zp_size_t size );
+
+            BufferHandle RequestBuffer( zp_size_t size );
+
+            void ReleaseBuffer( BufferHandle buffer );
+
+            void UpdateBufferData( CommandQueueHandle commandQueue, BufferHandle dstBuffer, zp_size_t dstOffset, Memory srcData );
 
             template<typename T>
             void QueueDestroy( T handle )
@@ -1383,6 +1440,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
 
         private:
+            void ForceFlushDestroyQueue();
+
             VkInstance m_vkInstance;
             VkPhysicalDevice m_vkPhysicalDevice;
             VkDevice m_vkLocalDevice;
@@ -1392,6 +1451,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             VkDescriptorPool m_vkDescriptorPool;
             VkCommandPool m_vkTransientCommandPool;
             FixedArray<VkCommandPool, kBufferedFrameCount> m_vkCommandPools;
+            FixedArray<StagingBuffer, kBufferedFrameCount> m_stagingBuffers;
 
 #if ZP_DEBUG
             VkDebugUtilsMessengerEXT m_vkDebugMessenger;
@@ -1404,16 +1464,35 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             Vector<DelayedDestroyInfo> m_delayedDestroyed;
 
-            zp_uint64_t m_frameIndex;
+            Vector<VulkanCommandQueue> m_vkCommandQueues;
+            Vector<zp_size_t> m_vkFreeCommandQueues;
+
+            Vector<VulkanBuffer> m_vkBuffers;
+            Vector<zp_size_t> m_vkFreeBuffers;
+
+            zp_uint64_t m_frame;
+            zp_size_t m_frameIndex;
         };
+
+        VulkanContext::VulkanContext()
+            : m_delayedDestroyed( 8, MemoryLabels::Graphics )
+            , m_vkCommandQueues( 4, MemoryLabels::Graphics )
+            , m_vkFreeCommandQueues( 4, MemoryLabels::Graphics )
+            , m_vkBuffers( 16, MemoryLabels::Graphics )
+            , m_vkFreeBuffers( 16, MemoryLabels::Graphics )
+        {
+        }
 
         VulkanContext::~VulkanContext()
         {
             ZP_ASSERT( m_vkInstance == VK_NULL_HANDLE );
+            ZP_ASSERT( m_vkBuffers.isEmpty() );
         }
 
         void VulkanContext::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
+            ZP_PROFILE_CPU_BLOCK();
+
             m_vkAllocationCallbacks = {
                 .pUserData = GetAllocator( MemoryLabels::Graphics ),
                 .pfnAllocation = AllocationCallback,
@@ -1460,7 +1539,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 #endif
             };
 
-            const char* kDeviceExtensions[] {
+            constexpr const char* kDeviceExtensions[] {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                 VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
                 VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
@@ -1569,6 +1648,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 }
 
                 ZP_ASSERT( m_vkPhysicalDevice );
+
+                vkGetPhysicalDeviceMemoryProperties( m_vkPhysicalDevice, &m_vkPhysicalDeviceMemoryProperties );
             }
 
             // create local device and queue families
@@ -1865,13 +1946,77 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, m_vkTransientCommandPool, "Transient Command Pool" );
             }
+
+            // create per frame command pools
+            {
+                const VkCommandPoolCreateInfo poolCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                    .queueFamilyIndex = m_queues.graphics.familyIndex,
+                };
+
+                for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+                {
+                    HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfo, &m_vkAllocationCallbacks, &m_vkCommandPools[ i ] ) );
+
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, m_vkCommandPools[ i ], "Command Pool %d", i );
+                }
+            }
+
+            // create staging buffers
+            {
+                const VkBufferCreateInfo stagingBufferCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                    .flags = 0,
+                    .size = graphicsDeviceDesc.stagingBufferSize,
+                    .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                    .queueFamilyIndexCount = 0,
+                    .pQueueFamilyIndices = nullptr,
+                };
+
+                for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+                {
+                    VkBuffer vkBuffer {};
+                    HR( vkCreateBuffer( m_vkLocalDevice, &stagingBufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
+
+                    VkMemoryRequirements memoryRequirements {};
+                    vkGetBufferMemoryRequirements( m_vkLocalDevice, vkBuffer, &memoryRequirements );
+
+                    const VkMemoryAllocateInfo memoryAllocateInfo {
+                        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                        .allocationSize = memoryRequirements.size,
+                        .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
+                    };
+
+                    // TODO: allocate single block of memory for all staging buffers to use?
+                    VkDeviceMemory vkDeviceMemory {};
+                    HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+
+                    HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
+
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_BUFFER, vkBuffer, "Staging Buffer %d", i );
+
+                    m_stagingBuffers[ i ] = StagingBuffer {
+                        .vkBuffer = vkBuffer,
+                        .vkDeviceMemory = vkDeviceMemory,
+                        .position = 0,
+                        .alignment = memoryRequirements.alignment,
+                        .size = memoryAllocateInfo.allocationSize,
+                    };
+                };
+            }
         }
 
         void VulkanContext::Destroy()
         {
+            ZP_PROFILE_CPU_BLOCK();
+
             ZP_ASSERT( m_vkLocalDevice );
 
             HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
+
+            ForceFlushDestroyQueue();
 
             vkDestroySurfaceKHR( m_vkInstance, m_vkSurface, &m_vkAllocationCallbacks );
 
@@ -1880,11 +2025,20 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, &m_vkAllocationCallbacks );
 
+            // destroy command pools
             vkDestroyCommandPool( m_vkLocalDevice, m_vkTransientCommandPool, &m_vkAllocationCallbacks );
 
-            for( auto pool : m_vkCommandPools )
+            for( VkCommandPool pool : m_vkCommandPools )
             {
                 vkDestroyCommandPool( m_vkLocalDevice, pool, &m_vkAllocationCallbacks );
+            }
+
+            // destroy staging buffer
+            for( auto& stagingBuffer : m_stagingBuffers )
+            {
+                vkDestroyBuffer( m_vkLocalDevice, stagingBuffer.vkBuffer, &m_vkAllocationCallbacks );
+
+                vkFreeMemory( m_vkLocalDevice, stagingBuffer.vkDeviceMemory, &m_vkAllocationCallbacks );
             }
 
 #if ZP_DEBUG
@@ -1900,25 +2054,39 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             m_vkLocalDevice = nullptr;
 
 #if ZP_DEBUG
-            zp_zero_memory( &m_vkAllocationCallbacks );
+            m_vkAllocationCallbacks = {};
 #endif // ZP_DEBUG
 
             m_vkDescriptorPool = nullptr;
             m_vkPipelineCache = nullptr;
         }
 
+        void VulkanContext::BeginFrame( zp_uint64_t frame, zp_size_t frameIndex )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            m_frame = frame;
+            m_frameIndex = frameIndex;
+
+            m_stagingBuffers[ frameIndex ].position = 0;
+
+            FlushDestroyQueue();
+        }
+
         void VulkanContext::EndFrame( VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence )
         {
-            VkSemaphoreSubmitInfo waitSemaphores {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VkSemaphoreSubmitInfo waitSemaphores {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                 .semaphore = waitSemaphore,
                 .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             };
-            VkCommandBufferSubmitInfo commandBuffers {
+            const VkCommandBufferSubmitInfo commandBuffers {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
                 .commandBuffer = nullptr,
             };
-            VkSemaphoreSubmitInfo signalSemaphores {
+            const VkSemaphoreSubmitInfo signalSemaphores {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                 .semaphore = signalSemaphore,
                 .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -1937,11 +2105,307 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
         }
 
+        void VulkanContext::FlushDestroyQueue()
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const zp_size_t kMaxFrameDistance = 3;
+            if( !m_delayedDestroyed.isEmpty() )
+            {
+                Vector<DelayedDestroyInfo> handlesToDestroy( m_delayedDestroyed.size(), MemoryLabels::Temp );
+
+                // get delayed destroy handles that are too old
+                for( zp_size_t i = 0; i < m_delayedDestroyed.size(); ++i )
+                {
+                    const auto& destroyInfo = m_delayedDestroyed[ i ];
+                    if( destroyInfo.vkHandle == nullptr )
+                    {
+                        m_delayedDestroyed.eraseAtSwapBack( i );
+                        --i;
+                    }
+                    else if( m_frame < destroyInfo.frame || ( m_frame - destroyInfo.frame ) >= kMaxFrameDistance )
+                    {
+                        handlesToDestroy.pushBack( destroyInfo );
+
+                        m_delayedDestroyed.eraseAtSwapBack( i );
+                        --i;
+                    }
+                }
+
+                // destroy old handles
+                if( !handlesToDestroy.isEmpty() )
+                {
+                    // sort delayed destroy handles by how they were allocated
+                    handlesToDestroy.sort( []( const auto& a, const auto& b )
+                    {
+                        return zp_cmp( a.order, b.order );
+                    } );
+
+                    // destroy each delayed destroy handle
+                    for( const auto& delayedDestroy : handlesToDestroy )
+                    {
+                        ProcessDelayedDestroy( delayedDestroy );
+                    }
+                }
+            }
+        }
+
+        void VulkanContext::ForceFlushDestroyQueue()
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            for( auto& delayedDestroy : m_delayedDestroyed )
+            {
+                ProcessDelayedDestroy( delayedDestroy );
+            }
+
+            m_delayedDestroyed.clear();
+        }
+
+        const StagingBufferAllocation VulkanContext::Allocate( zp_size_t size )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            StagingBuffer& stagingBuffer = m_stagingBuffers[ m_frameIndex ];
+            const zp_size_t allocationSize = ZP_ALIGN_SIZE( size, stagingBuffer.alignment );
+
+            ZP_ASSERT( ( stagingBuffer.position + allocationSize ) < stagingBuffer.size );
+
+            const StagingBufferAllocation allocation {
+                .vkBuffer = stagingBuffer.vkBuffer,
+                .vkDeviceMemory = stagingBuffer.vkDeviceMemory,
+                .offset = stagingBuffer.position,
+                .size = allocationSize
+            };
+
+            stagingBuffer.position += allocationSize;
+
+            return allocation;
+        };
+
+        BufferHandle VulkanContext::RequestBuffer( zp_size_t size )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const zp_size_t alignedSize = ZP_ALIGN_SIZE( size, 16 );
+
+            const VkBufferCreateInfo bufferCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .flags = 0,
+                .size = alignedSize,
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices = nullptr,
+            };
+
+            VkBuffer vkBuffer {};
+            HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
+
+            VkMemoryRequirements memoryRequirements {};
+            vkGetBufferMemoryRequirements( m_vkLocalDevice, vkBuffer, &memoryRequirements );
+
+            const VkMemoryAllocateInfo memoryAllocateInfo {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memoryRequirements.size,
+                .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
+            };
+
+            VkDeviceMemory vkDeviceMemory {};
+            HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+
+            HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
+
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_BUFFER, vkBuffer, "Buffer (%d)", memoryAllocateInfo.allocationSize );
+
+            zp_size_t index;
+            if( m_vkFreeBuffers.isEmpty() )
+            {
+                index = m_vkBuffers.size();
+                m_vkBuffers.pushBackEmpty();
+            }
+            else
+            {
+                index = m_vkFreeBuffers[ 0 ];
+                m_vkFreeBuffers.eraseAtSwapBack( 0 );
+            }
+
+            zp_hash32_t hash = zp_fnv32_1a( m_frame );
+            hash = zp_fnv32_1a( index, hash );
+            hash = zp_fnv32_1a( memoryAllocateInfo.allocationSize, hash );
+
+            m_vkBuffers[ index ] = VulkanBuffer {
+                .vkBuffer = vkBuffer,
+                .vkDeviceMemory = vkDeviceMemory,
+                .offset = 0,
+                .alignment = memoryRequirements.alignment,
+                .size = memoryAllocateInfo.allocationSize,
+                .hash = hash,
+            };
+
+            const BufferHandle bufferHandle { .index = static_cast<zp_uint32_t>( index ), .hash = hash };
+            return bufferHandle;
+        }
+
+        void VulkanContext::ReleaseBuffer( BufferHandle buffer )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            // remove buffer and clear out data
+            const VulkanBuffer vkBuffer = m_vkBuffers[ buffer.index ];
+            m_vkBuffers[ buffer.index ] = {};
+
+            // add to free list
+            m_vkFreeBuffers.pushBack( buffer.index );
+
+            // destroy underlying data
+            QueueDestroy( vkBuffer.vkDeviceMemory );
+
+            QueueDestroy( vkBuffer.vkBuffer );
+        }
+
+        void VulkanContext::UpdateBufferData( CommandQueueHandle commandQueue, BufferHandle dstBufferHandle, zp_size_t dstOffset, Memory srcData )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const StagingBufferAllocation allocation = Allocate( srcData.size );
+
+            const VulkanBuffer& vkDstBuffer = m_vkBuffers[ dstBufferHandle.index ];
+            ZP_ASSERT( vkDstBuffer.hash == dstBufferHandle.hash );
+
+            VkCommandBuffer vkCommandBuffer;
+
+            zp_size_t dstBufferOffset;
+
+            // copy srcData to staging vkBuffer
+            {
+                void* dstMemory {};
+                HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+
+                zp_memcpy( dstMemory, allocation.size, srcData.ptr, srcData.size );
+
+                const VkMappedMemoryRange flushMemoryRange {
+                    .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+                    .memory = allocation.vkDeviceMemory,
+                    .offset = allocation.offset,
+                    .size = allocation.size,
+                };
+                HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+
+                vkUnmapMemory( m_vkLocalDevice, allocation.vkDeviceMemory );
+            }
+
+#if 0
+            // transfer from CPU to GPU memory
+            if constexpr( false )
+            {
+                VkBufferMemoryBarrier memoryBarrier[2] {
+                    {
+                        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                        .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
+                        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                        .dstbuffer = static_cast<VkBuffer>( allocation.dstbuffer ),
+                        .offset = allocation.offset,
+                        .size = allocation.size,
+                    },
+                    {
+                        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                        .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
+                        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                        .dstbuffer = static_cast<VkBuffer>( dstGraphicsBuffer->dstbuffer ),
+                        .offset = dstGraphicsBuffer->offset,
+                        .size = allocation.size,
+
+                    }
+                };
+
+                vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    0,
+                    0,
+                    nullptr,
+                    ZP_ARRAY_SIZE( memoryBarrier ),
+                    memoryBarrier,
+                    0,
+                    nullptr
+                );
+            }
+#endif
+
+            // copy staging vkBuffer to dst vkBuffer
+            {
+                const VkBufferCopy bufferCopy {
+                    .srcOffset = allocation.offset,
+                    .dstOffset = vkDstBuffer.offset + dstBufferOffset,
+                    .size = allocation.size,
+                };
+
+                vkCmdCopyBuffer(
+                    vkCommandBuffer,
+                    allocation.vkBuffer,
+                    vkDstBuffer.vkBuffer,
+                    1,
+                    &bufferCopy
+                );
+            }
+
+            // finalize dstbuffer upload
+            {
+#if 0
+                const VkBufferMemoryBarrier memoryBarrier {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .buffer = vkDstBuffer,
+                    .offset = dstBufferOffset,
+                    .size = allocation.size,
+                };
+
+                vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0,
+                    0,
+                    nullptr,
+                    1,
+                    &memoryBarrier,
+                    0,
+                    nullptr
+                );
+#endif
+                const VkBufferMemoryBarrier2 memoryBarrier {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                    .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .buffer = vkDstBuffer.vkBuffer,
+                    .offset = vkDstBuffer.offset + dstBufferOffset,
+                    .size = allocation.size,
+                };
+
+                const VkDependencyInfo dependencyInfo {
+                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                    .bufferMemoryBarrierCount = 1,
+                    .pBufferMemoryBarriers = &memoryBarrier,
+                };
+
+                vkCmdPipelineBarrier2( vkCommandBuffer, &dependencyInfo );
+            }
+        }
+
         void VulkanContext::QueueDestroy( void* handle, VkObjectType objectType )
         {
+            ZP_PROFILE_CPU_BLOCK();
+
             const zp_size_t index = m_delayedDestroyed.pushBackEmptyRangeAtomic( 1, false );
             m_delayedDestroyed[ index ] = {
-                .frameIndex = m_frameIndex,
+                .frame = m_frame,
                 .vkInstance = m_vkInstance,
                 .vkLocalDevice = m_vkLocalDevice,
                 .vkAllocatorCallbacks = &m_vkAllocationCallbacks,
@@ -1966,25 +2430,25 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void Destroy();
 
-            void AcquireNextImage();
+            void AcquireNextImage( zp_size_t frameIndex );
 
-            void Present();
+            void Present( zp_size_t frameIndex );
 
             void Rebuild();
 
-            VkSemaphore GetWaitSemaphore() const
+            VkSemaphore GetWaitSemaphore( zp_size_t frameIndex ) const
             {
-                return m_vkSwapchainAcquireSemaphores[ m_currentFrameIndex ];
+                return m_vkSwapchainAcquireSemaphores[ frameIndex ];
             }
 
-            VkSemaphore GetSignalSemaphore() const
+            VkSemaphore GetSignalSemaphore( zp_size_t frameIndex ) const
             {
-                return m_vkRenderFinishedSemaphores[ m_currentFrameIndex ];
+                return m_vkRenderFinishedSemaphores[ frameIndex ];
             }
 
-            VkFence GetFrameInFlightFence() const
+            VkFence GetFrameInFlightFence( zp_size_t frameIndex ) const
             {
-                return m_vkFrameInFlightFences[ m_currentFrameIndex ];
+                return m_vkFrameInFlightFences[ frameIndex ];
             }
 
         private:
@@ -2013,8 +2477,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             FixedArray<VkFence, kBufferedFrameCount> m_vkSwapchainImageAcquiredFences;
             FixedArray<zp_uint32_t, kBufferedFrameCount> m_swapchainImageIndices;
 
-            zp_size_t m_currentFrameIndex;
-            zp_uint32_t m_maxFramesInFlight;
+            zp_size_t m_maxFramesInFlight;
 
             zp_bool_t m_requiresRebuild;
             zp_bool_t m_vSync;
@@ -2036,40 +2499,39 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             m_windowHandle = {};
         }
 
-        void VulkanSwapchain::AcquireNextImage()
+        void VulkanSwapchain::AcquireNextImage( zp_size_t frameIndex )
         {
             ZP_PROFILE_CPU_BLOCK();
 
             if( m_requiresRebuild )
             {
-                HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
-
                 DestroySwapchain();
                 CreateSwapchain();
 
                 m_requiresRebuild = false;
             }
 
-            HR( vkWaitForFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ m_currentFrameIndex ], VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
+            HR( vkWaitForFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ], VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
 
-            const VkResult acquireNextImageResult = vkAcquireNextImageKHR( m_context->GetLocalDevice(), m_vkSwapchain, zp_limit<zp_uint64_t>::max(), m_vkSwapchainAcquireSemaphores[ m_currentFrameIndex ], VK_NULL_HANDLE, &m_swapchainImageIndices[ m_currentFrameIndex ] );
-
+            const VkResult acquireNextImageResult = vkAcquireNextImageKHR( m_context->GetLocalDevice(), m_vkSwapchain, zp_limit<zp_uint64_t>::max(), m_vkSwapchainAcquireSemaphores[ frameIndex ], VK_NULL_HANDLE, &m_swapchainImageIndices[ frameIndex ] );
             if( acquireNextImageResult != VK_SUCCESS )
             {
-                if( acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR || acquireNextImageResult == VK_SUBOPTIMAL_KHR )
+                switch( acquireNextImageResult )
                 {
-                    m_requiresRebuild = true;
-                }
-                else
-                {
-                    HR( acquireNextImageResult );
+                    case VK_ERROR_OUT_OF_DATE_KHR:
+                    case VK_SUBOPTIMAL_KHR:
+                        m_requiresRebuild = true;
+                        break;
+                    default:
+                        HR( acquireNextImageResult );
+                        break;
                 }
             }
 
-            HR( vkResetFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ m_currentFrameIndex ] ) );
+            HR( vkResetFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ] ) );
         }
 
-        void VulkanSwapchain::Present()
+        void VulkanSwapchain::Present( zp_size_t frameIndex )
         {
             ZP_PROFILE_CPU_BLOCK();
 
@@ -2077,10 +2539,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const VkPresentInfoKHR presentInfo {
                 .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &m_vkRenderFinishedSemaphores[ m_currentFrameIndex ],
+                .pWaitSemaphores = &m_vkRenderFinishedSemaphores[ frameIndex ],
                 .swapchainCount = 1,
                 .pSwapchains = &m_vkSwapchain,
-                .pImageIndices = &m_swapchainImageIndices[ m_currentFrameIndex ],
+                .pImageIndices = &m_swapchainImageIndices[ frameIndex ],
                 .pResults = &swapchainResult,
             };
 
@@ -2089,16 +2551,13 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             {
                 if( presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR )
                 {
+                    // rebuild swapchain
                 }
                 else
                 {
                     HR( presentResult );
                 }
             }
-
-            //HR( swapchainResult );
-
-            m_currentFrameIndex = ( m_currentFrameIndex + 1 ) % m_maxFramesInFlight;
         }
 
         void VulkanSwapchain::Rebuild()
@@ -2148,7 +2607,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             //
             // TODO: make this configurable?
-            const zp_uint32_t preferredImageCount = 3;
+            const zp_uint32_t preferredImageCount = kBufferedFrameCount;
             uint32_t imageCount = zp_max( preferredImageCount, surfaceCapabilities.minImageCount );
             if( surfaceCapabilities.maxImageCount > 0 )
             {
@@ -2167,7 +2626,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const VkSwapchainCreateInfoKHR swapChainCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
                 .surface = m_context->GetSurface(),
-                .minImageCount = m_maxFramesInFlight,
+                .minImageCount = static_cast<zp_uint32_t>( m_maxFramesInFlight ),
                 .imageFormat = m_vkSwapChainFormat.format,
                 .imageColorSpace = m_vkSwapChainFormat.colorSpace,
                 .imageExtent = m_vkSwapchainExtent,
@@ -2208,7 +2667,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                     m_delayedDestroy[ index ] = {
-                        .frameIndex = m_currentFrameIndex,
+                        .frameCount = m_currentFrameIndex,
                         .handle = m_swapchainData.vkSwapchainDefaultRenderPass,
                         .allocator = &m_vkAllocationCallbacks,
                         .localDevice = m_vkLocalDevice,
@@ -2366,6 +2825,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_ASSERT( m_context != nullptr );
 
+            HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
+
             for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
             {
                 vkDestroySemaphore( m_context->GetLocalDevice(), m_vkSwapchainAcquireSemaphores[ i ], m_context->GetAllocationCallbacks() );
@@ -2411,14 +2872,28 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void Destroy();
 
-        public:
-            void BeginFrame();
+            TextureHandle RequestTexture();
+
+            BufferHandle RequestBuffer( zp_size_t size );
+
+            GraphicsCommandBuffer* SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) final;
+
+            void BeginFrame( zp_size_t frameIndex );
+
+            void ExecuteCommandBuffer( GraphicsCommandBuffer* cmdBuffer, JobHandle parentJob );
 
             void EndFrame();
 
         private:
             VulkanContext m_context;
             VulkanSwapchain m_swapchain;
+
+            JobHandle m_frameJob;
+            FixedArray<GraphicsCommandBuffer*, kBufferedFrameCount> m_frameCommandBuffers;
+            FixedVector<GraphicsCommandBuffer*, kBufferedFrameCount> m_submitQueue;
+
+            zp_uint64_t m_frame;
+            zp_size_t m_frameIndex;
 
         public:
             MemoryLabel memoryLabel;
@@ -2435,6 +2910,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         void VulkanGraphicsDevice::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
+            for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+            {
+                m_frameCommandBuffers[ i ] = ZP_NEW_ARGS( memoryLabel, GraphicsCommandBuffer, graphicsDeviceDesc.commandBufferPageSize );
+            }
+
             m_context.Initialize( graphicsDeviceDesc );
 
             m_swapchain.Initialize( &m_context, graphicsDeviceDesc.windowHandle );
@@ -2445,20 +2925,127 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             m_swapchain.Destroy();
 
             m_context.Destroy();
+
+            for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+            {
+                ZP_DELETE( GraphicsCommandBuffer, m_frameCommandBuffers[ i ] );
+            }
         }
 
-        void VulkanGraphicsDevice::BeginFrame()
+        BufferHandle VulkanGraphicsDevice::RequestBuffer( zp_size_t size )
         {
-            m_swapchain.AcquireNextImage();
+            return m_context.RequestBuffer( size );
+        }
 
+        struct SubmitCommandBufferJob
+        {
+            GraphicsCommandBuffer* cmdBuffer;
+            VulkanGraphicsDevice* graphicsDevice;
+            zp_uint64_t frame;
 
+            static void Execute( const JobWorkArgs& args )
+            {
+                const auto* job = args.jobMemory.as<SubmitCommandBufferJob>();
+
+                Log::info() << "Render Frame: " << job->frame << Log::endl;
+
+                job->graphicsDevice->BeginFrame( job->frame );
+                {
+                    const JobHandle parentJob = JobSystem::PrepareEmpty();
+
+                    job->graphicsDevice->ExecuteCommandBuffer( job->cmdBuffer, parentJob );
+
+                    JobSystem::ScheduleBatchJobs();
+
+                    JobSystem::Complete( parentJob );
+                }
+                job->graphicsDevice->EndFrame();
+            }
+        };
+
+        GraphicsCommandBuffer* VulkanGraphicsDevice::SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer )
+        {
+            zp_size_t frameIndex = 0;
+            zp_uint64_t nextFrame = 0;
+            zp_size_t nextFrameIndex = 0;
+
+            JobSystem::Complete( m_frameJob );
+
+            if( cmdBuffer != nullptr )
+            {
+                frameIndex = cmdBuffer->frame % kBufferedFrameCount;
+                nextFrame = cmdBuffer->frame + 1;
+                nextFrameIndex = nextFrame % kBufferedFrameCount;
+
+                m_frameJob = JobSystem::Run( SubmitCommandBufferJob { .cmdBuffer = cmdBuffer, .graphicsDevice = this, .frame = cmdBuffer->frame } );
+            }
+
+            //const VkFence frameInFlightFence = m_swapchain.GetFrameInFlightFence( nextFrameIndex );
+            //HR( vkWaitForFences( m_context.GetLocalDevice(), 1, &frameInFlightFence, VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
+
+            GraphicsCommandBuffer* nextCmdBuffer = m_frameCommandBuffers[ nextFrameIndex ];
+            nextCmdBuffer->frame = nextFrame;
+
+            return nextCmdBuffer;
+        }
+
+        void VulkanGraphicsDevice::BeginFrame( zp_uint64_t frame )
+        {
+            m_frame = frame;
+            m_frameIndex = frame % kBufferedFrameCount;
+
+            m_context.BeginFrame( m_frame, m_frameIndex );
+
+            m_swapchain.AcquireNextImage( m_frameIndex );
+        }
+
+        void VulkanGraphicsDevice::ExecuteCommandBuffer( GraphicsCommandBuffer* cmdBuffer, JobHandle parentJob )
+        {
+            DataStreamReader dataStreamReader( cmdBuffer->Data() );
+
+            while( !dataStreamReader.end() )
+            {
+                CommandHeader header {};
+                dataStreamReader.read( header );
+
+                switch( header.type )
+                {
+                    case CommandType::None:
+                        break;
+
+                    case CommandType::UpdateBufferData:
+                    {
+                        CommandUpdateBufferData updateBufferData {};
+                        dataStreamReader.read( updateBufferData );
+
+                        const Memory srcData = dataStreamReader.readMemory( updateBufferData.srcLength );
+                        dataStreamReader.readAlignment( 8 );
+
+                        m_context.UpdateBufferData( updateBufferData.cmdQueue, updateBufferData.dstBuffer, updateBufferData.dstOffset, srcData );
+                    }
+                        break;
+
+                    case CommandType::UpdateBufferDataExternal:
+                    {
+                        CommandUpdateBufferDataExternal updateBufferDataExternal {};
+                        dataStreamReader.read( updateBufferDataExternal );
+
+                        m_context.UpdateBufferData( updateBufferDataExternal.cmdQueue, updateBufferDataExternal.dstBuffer, updateBufferDataExternal.dstOffset, updateBufferDataExternal.srcData );
+                    }
+                        break;
+
+                    default:
+                        ZP_INVALID_CODE_PATH_MSG( "Unknown CommandType" );
+                        break;
+                }
+            }
         }
 
         void VulkanGraphicsDevice::EndFrame()
         {
-            m_context.EndFrame( m_swapchain.GetWaitSemaphore(), m_swapchain.GetSignalSemaphore(), m_swapchain.GetFrameInFlightFence() );
+            m_context.EndFrame( m_swapchain.GetWaitSemaphore( m_frameIndex ), m_swapchain.GetSignalSemaphore( m_frameIndex ), m_swapchain.GetFrameInFlightFence( m_frameIndex ) );
 
-            m_swapchain.Present();
+            m_swapchain.Present( m_frameIndex );
         }
     };
 
@@ -2800,7 +3387,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             //    HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, nullptr, &m_vkComputeCommandPool ) );
         }
 
-        // create staging buffer
+        // create staging dstbuffer
         {
             GraphicsBufferDesc stagingBufferDesc {
                 .name = "Staging Buffer",
@@ -2996,7 +3583,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                 m_delayedDestroy[ index ] = {
-                    .frameIndex = m_currentFrameIndex,
+                    .frameCount = m_currentFrameIndex,
                     .handle = m_swapchainData.vkSwapchainDefaultRenderPass,
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
@@ -3089,7 +3676,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                 m_delayedDestroy[ index ] = {
-                    .frameIndex = m_currentFrameIndex,
+                    .frameCount = m_currentFrameIndex,
                     .handle = m_swapchainData.swapchainImageViews[ i ],
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
@@ -3122,7 +3709,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
                 m_delayedDestroy[ index ] = {
-                    .frameIndex = m_currentFrameIndex,
+                    .frameCount = m_currentFrameIndex,
                     .handle = m_swapchainData.swapchainFrameBuffers[ i ],
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
@@ -3352,11 +3939,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             releaseCommandQueue( currentFrameData.commandQueues + preCommandQueueIndex );
 
 #if ZP_USE_PROFILER
-            //vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, currentFrameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
-            //vkCmdEndQuery( buffer, currentFrameData.vkPipelineStatisticsQueryPool, 0 );
+            //vkCmdWriteTimestamp( dstbuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, currentFrameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
+            //vkCmdEndQuery( dstbuffer, currentFrameData.vkPipelineStatisticsQueryPool, 0 );
             //vkCmdResetQueryPool( static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ preCommandQueueIndex ].commandBuffer ), currentFrameData.vkTimestampQueryPool, commandQueueCount * 2 + 2, 16 - (commandQueueCount * 2 + 2));
 #endif
-            //HR( vkEndCommandBuffer( buffer ) );
+            //HR( vkEndCommandBuffer( dstbuffer ) );
         }
 
         const VkPipelineStageFlags waitStages[] { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -3487,7 +4074,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
         m_delayedDestroy[ index ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = renderPass->internalRenderPass,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -3745,7 +4332,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
         m_delayedDestroy[ index ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = graphicsPipelineState->pipelineState,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -3824,7 +4411,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
         m_delayedDestroy[ index ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = pipelineLayout->layout,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -3848,11 +4435,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .pQueueFamilyIndices = nullptr,
         };
 
-        VkBuffer buffer;
-        HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &buffer ) );
+        VkBuffer dstbuffer;
+        HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &dstbuffer ) );
 
         VkMemoryRequirements memoryRequirements;
-        vkGetBufferMemoryRequirements( m_vkLocalDevice, buffer, &memoryRequirements );
+        vkGetBufferMemoryRequirements( m_vkLocalDevice, dstbuffer, &memoryRequirements );
 
         VkMemoryAllocateInfo memoryAllocateInfo {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -3860,14 +4447,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( graphicsBufferDesc.memoryPropertyFlags ) ),
         };
 
-        VkDeviceMemory deviceMemory;
-        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &deviceMemory ) );
+        VkDeviceMemory vkDeviceMemory;
+        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
-        HR( vkBindBufferMemory( m_vkLocalDevice, buffer, deviceMemory, 0 ) );
+        HR( vkBindBufferMemory( m_vkLocalDevice, dstbuffer, vkDeviceMemory, 0 ) );
 
         *graphicsBuffer = {
-            .buffer = buffer,
-            .deviceMemory = deviceMemory,
+            .dstbuffer = dstbuffer,
+            .vkDeviceMemory = vkDeviceMemory,
             .offset = 0,
             .size = memoryRequirements.size,
             .alignment = memoryRequirements.alignment,
@@ -3875,7 +4462,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .isVirtualBuffer = false,
         };
 
-        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, graphicsBufferDesc.name, VK_OBJECT_TYPE_BUFFER, buffer );
+        SetDebugObjectName( m_vkInstance, m_vkLocalDevice, graphicsBufferDesc.name, VK_OBJECT_TYPE_BUFFER, dstbuffer );
     }
 
     void VulkanGraphicsDevice::destroyBuffer( GraphicsBuffer* graphicsBuffer )
@@ -3885,8 +4472,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 2, false );
 
             m_delayedDestroy[ index + 0 ] = {
-                .frameIndex = m_currentFrameIndex,
-                .handle = graphicsBuffer->buffer,
+                .frameCount = m_currentFrameIndex,
+                .handle = graphicsBuffer->dstbuffer,
                 .allocator = &m_vkAllocationCallbacks,
                 .localDevice = m_vkLocalDevice,
                 .instance = m_vkInstance,
@@ -3895,8 +4482,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             };
 
             m_delayedDestroy[ index + 1 ] = {
-                .frameIndex = m_currentFrameIndex,
-                .handle = graphicsBuffer->deviceMemory,
+                .frameCount = m_currentFrameIndex,
+                .handle = graphicsBuffer->vkDeviceMemory,
                 .allocator = &m_vkAllocationCallbacks,
                 .localDevice = m_vkLocalDevice,
                 .instance = m_vkInstance,
@@ -3931,7 +4518,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
 
         m_delayedDestroy[ index ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = shader->shaderHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -3979,10 +4566,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( textureCreateDesc->memoryPropertyFlags ) ),
         };
 
-        VkDeviceMemory deviceMemory;
-        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &deviceMemory ) );
+        VkDeviceMemory vkDeviceMemory;
+        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
-        HR( vkBindImageMemory( m_vkLocalDevice, image, deviceMemory, 0 ) );
+        HR( vkBindImageMemory( m_vkLocalDevice, image, vkDeviceMemory, 0 ) );
 
         VkImageViewCreateInfo imageViewCreateInfo {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -4014,7 +4601,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .size = textureCreateDesc->size,
             .textureHandle = image,
             .textureViewHandle = imageView,
-            .textureMemoryHandle = deviceMemory,
+            .textureMemoryHandle = vkDeviceMemory,
         };
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "Image View", VK_OBJECT_TYPE_IMAGE_VIEW, imageView );
@@ -4025,7 +4612,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 3, false );
 
         m_delayedDestroy[ index + 0 ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = texture->textureViewHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -4034,7 +4621,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .type = DelayedDestroyType::ImageView,
         };
         m_delayedDestroy[ index + 1 ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = texture->textureMemoryHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -4043,7 +4630,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .type = DelayedDestroyType::Memory,
         };
         m_delayedDestroy[ index + 2 ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = texture->textureHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -4090,7 +4677,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
     {
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
         m_delayedDestroy[ index ] = {
-            .frameIndex = m_currentFrameIndex,
+            .frameCount = m_currentFrameIndex,
             .handle = sampler->samplerHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
@@ -4104,14 +4691,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
     void VulkanGraphicsDevice::mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory )
     {
-        VkDeviceMemory deviceMemory = static_cast<VkDeviceMemory>( graphicsBuffer.deviceMemory );
-        HR( vkMapMemory( m_vkLocalDevice, deviceMemory, offset + graphicsBuffer.offset, size, 0, memory ) );
+        VkDeviceMemory vkDeviceMemory = static_cast<VkDeviceMemory>( graphicsBuffer.vkDeviceMemory );
+        HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, offset + graphicsBuffer.offset, size, 0, memory ) );
     }
 
     void VulkanGraphicsDevice::unmapBuffer( const GraphicsBuffer& graphicsBuffer )
     {
-        VkDeviceMemory deviceMemory = static_cast<VkDeviceMemory>( graphicsBuffer.deviceMemory );
-        vkUnmapMemory( m_vkLocalDevice, deviceMemory );
+        VkDeviceMemory vkDeviceMemory = static_cast<VkDeviceMemory>( graphicsBuffer.vkDeviceMemory );
+        vkUnmapMemory( m_vkLocalDevice, vkDeviceMemory );
     }
 
     CommandQueue* VulkanGraphicsDevice::requestCommandQueue( RenderQueue queue )
@@ -4175,7 +4762,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         }
 
         commandQueue->queue = queue;
-        commandQueue->frameIndex = m_currentFrameIndex;
+        commandQueue->frameCount = m_currentFrameIndex;
 
         if( commandQueue->commandBuffer == nullptr )
         {
@@ -4211,17 +4798,17 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .pInheritanceInfo = nullptr,
         };
 
-        VkCommandBuffer buffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
-        HR( vkBeginCommandBuffer( buffer, &commandBufferBeginInfo ) );
+        VkCommandBuffer dstbuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
+        HR( vkBeginCommandBuffer( dstbuffer, &commandBufferBeginInfo ) );
 
 #if ZP_USE_PROFILER
         if( queue != ZP_RENDER_QUEUE_TRANSFER )
         {
-            //vkCmdResetQueryPool( buffer, frameData.vkTimestampQueryPool, commandQueueIndex * 2, 2 );
-            //vkCmdWriteTimestamp( buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, frameData.vkTimestampQueryPool, commandQueueIndex * 2 );
+            //vkCmdResetQueryPool( dstbuffer, frameData.vkTimestampQueryPool, commandQueueIndex * 2, 2 );
+            //vkCmdWriteTimestamp( dstbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, frameData.vkTimestampQueryPool, commandQueueIndex * 2 );
         }
 
-        //vkCmdBeginQuery( buffer, frameData.vkPipelineStatisticsQueryPool, 0, 0 );
+        //vkCmdBeginQuery( dstbuffer, frameData.vkPipelineStatisticsQueryPool, 0, 0 );
 #endif
 
         return commandQueue;
@@ -4249,7 +4836,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
         };
 
-        PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
+        PerFrameData& frameData = getFrameData( commandQueue->frameCount );
         VkRenderPassBeginInfo renderPassBeginInfo {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_swapchainData.vkSwapchainDefaultRenderPass,
@@ -4286,7 +4873,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         const VkIndexType indexType = Convert( indexBufferFormat );
         const VkDeviceSize bufferOffset = graphicsBuffer->offset + offset;
-        vkCmdBindIndexBuffer( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), static_cast<VkBuffer>( graphicsBuffer->buffer), bufferOffset, indexType );
+        vkCmdBindIndexBuffer( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), static_cast<VkBuffer>( graphicsBuffer->dstbuffer), bufferOffset, indexType );
     }
 
     void VulkanGraphicsDevice::bindVertexBuffers( zp_uint32_t firstBinding, zp_uint32_t bindingCount, const GraphicsBuffer** graphicsBuffers, zp_size_t* offsets, CommandQueue* commandQueue )
@@ -4296,7 +4883,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         for( zp_uint32_t i = 0; i < bindingCount; ++i )
         {
-            vertexBuffers[ i ] = static_cast<VkBuffer>( graphicsBuffers[ i ]->buffer );
+            vertexBuffers[ i ] = static_cast<VkBuffer>( graphicsBuffers[ i ]->dstbuffer );
             vertexBufferOffsets[ i ] = graphicsBuffers[ i ]->offset + ( offsets == nullptr ? 0 : offsets[ i ] );
         }
 
@@ -4305,22 +4892,22 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
     void VulkanGraphicsDevice::updateTexture( const TextureUpdateDesc* textureUpdateDesc, const Texture* dstTexture, CommandQueue* commandQueue )
     {
-        PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
+        PerFrameData& frameData = getFrameData( commandQueue->frameCount );
         GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( textureUpdateDesc->textureDataSize );
 
         auto commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
         const zp_uint32_t mipCount = textureUpdateDesc->maxMipLevel - textureUpdateDesc->minMipLevel;
 
-        // copy data to staging buffer
+        // copy data to staging dstbuffer
         {
-            auto deviceMemory = static_cast<VkDeviceMemory>( allocation.deviceMemory );
+            auto vkDeviceMemory = static_cast<VkDeviceMemory>( allocation.vkDeviceMemory );
 
             void* dstMemory {};
-            HR( vkMapMemory( m_vkLocalDevice, deviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+            HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
             zp_memcpy( dstMemory, allocation.size, textureUpdateDesc->textureData, textureUpdateDesc->textureDataSize );
 
-            vkUnmapMemory( m_vkLocalDevice, deviceMemory );
+            vkUnmapMemory( m_vkLocalDevice, vkDeviceMemory );
         }
 
         // transfer from CPU to GPU memory
@@ -4329,7 +4916,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                 .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
                 .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .buffer = static_cast<VkBuffer>( allocation.buffer ),
+                .dstbuffer = static_cast<VkBuffer>( allocation.dstbuffer ),
                 .offset = allocation.offset,
                 .size = allocation.size,
             };
@@ -4364,7 +4951,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             );
         }
 
-        // copy buffer to texture
+        // copy dstbuffer to texture
         {
             zp_uint32_t mip = textureUpdateDesc->minMipLevel;
 
@@ -4389,7 +4976,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             vkCmdCopyBufferToImage(
                 commandBuffer,
-                static_cast<VkBuffer>( allocation.buffer ),
+                static_cast<VkBuffer>( allocation.dstbuffer ),
                 static_cast<VkImage>( dstTexture->textureHandle ),
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 mipCount,
@@ -4432,29 +5019,29 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
     void VulkanGraphicsDevice::updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc, const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue )
     {
-        PerFrameData& frameData = getFrameData( commandQueue->frameIndex );
+        PerFrameData& frameData = getFrameData( commandQueue->frameCount );
         GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->size );
 
         VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
 
-        // copy data to staging buffer
+        // copy data to staging dstbuffer
         {
-            VkDeviceMemory deviceMemory = static_cast<VkDeviceMemory>( allocation.deviceMemory );
+            VkDeviceMemory vkDeviceMemory = static_cast<VkDeviceMemory>( allocation.vkDeviceMemory );
 
             void* dstMemory {};
-            HR( vkMapMemory( m_vkLocalDevice, deviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+            HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
             zp_memcpy( dstMemory, allocation.size, graphicsBufferUpdateDesc->data, graphicsBufferUpdateDesc->size );
 
             VkMappedMemoryRange flushMemoryRange {
                 .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-                .memory = static_cast<VkDeviceMemory>(allocation.deviceMemory),
+                .memory = static_cast<VkDeviceMemory>(allocation.vkDeviceMemory),
                 .offset = allocation.offset,
                 .size = allocation.size,
             };
             vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange );
 
-            vkUnmapMemory( m_vkLocalDevice, deviceMemory );
+            vkUnmapMemory( m_vkLocalDevice, vkDeviceMemory );
         }
 
         // transfer from CPU to GPU memory
@@ -4465,7 +5052,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                     .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
                     .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                    .buffer = static_cast<VkBuffer>( allocation.buffer ),
+                    .dstbuffer = static_cast<VkBuffer>( allocation.dstbuffer ),
                     .offset = allocation.offset,
                     .size = allocation.size,
                 },
@@ -4473,7 +5060,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                     .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
                     .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                    .buffer = static_cast<VkBuffer>( dstGraphicsBuffer->buffer ),
+                    .dstbuffer = static_cast<VkBuffer>( dstGraphicsBuffer->dstbuffer ),
                     .offset = dstGraphicsBuffer->offset,
                     .size = allocation.size,
 
@@ -4494,7 +5081,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             );
         }
 
-        // copy staging buffer to dst buffer
+        // copy staging dstbuffer to dst dstbuffer
         {
             VkBufferCopy bufferCopy {
                 .srcOffset = allocation.offset,
@@ -4504,14 +5091,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             vkCmdCopyBuffer(
                 commandBuffer,
-                static_cast<VkBuffer>( allocation.buffer ),
-                static_cast<VkBuffer>( dstGraphicsBuffer->buffer ),
+                static_cast<VkBuffer>( allocation.dstbuffer ),
+                static_cast<VkBuffer>( dstGraphicsBuffer->dstbuffer ),
                 1,
                 &bufferCopy
             );
         }
 
-        // finalize buffer upload
+        // finalize dstbuffer upload
         {
             VkBufferMemoryBarrier memoryBarrier {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -4519,7 +5106,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = static_cast<VkBuffer>( dstGraphicsBuffer->buffer ),
+                .dstbuffer = static_cast<VkBuffer>( dstGraphicsBuffer->dstbuffer ),
                 .offset = dstGraphicsBuffer->offset,
                 .size = allocation.size,
             };
@@ -4545,11 +5132,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         vkCmdDraw( commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance );
     }
 
-    void VulkanGraphicsDevice::drawIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::drawIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue )
     {
         VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
-        VkBuffer indirectBuffer = static_cast<VkBuffer>(buffer.buffer);
-        vkCmdDrawIndirect( commandBuffer, indirectBuffer, buffer.offset, drawCount, stride );
+        VkBuffer indirectBuffer = static_cast<VkBuffer>(dstbuffer.dstbuffer);
+        vkCmdDrawIndirect( commandBuffer, indirectBuffer, dstbuffer.offset, drawCount, stride );
     }
 
     void VulkanGraphicsDevice::drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue )
@@ -4558,11 +5145,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         vkCmdDrawIndexed( commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance );
     }
 
-    void VulkanGraphicsDevice::drawIndexedIndirect( const GraphicsBuffer& buffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::drawIndexedIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue )
     {
         VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
-        VkBuffer indirectBuffer = static_cast<VkBuffer>(buffer.buffer);
-        vkCmdDrawIndexedIndirect( commandBuffer, indirectBuffer, buffer.offset, drawCount, stride );
+        VkBuffer indirectBuffer = static_cast<VkBuffer>(dstbuffer.dstbuffer);
+        vkCmdDrawIndexedIndirect( commandBuffer, indirectBuffer, dstbuffer.offset, drawCount, stride );
     }
 
     void VulkanGraphicsDevice::dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue )
@@ -4571,11 +5158,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         vkCmdDispatch( commandBuffer, groupCountX, groupCountY, groupCountZ );
     }
 
-    void VulkanGraphicsDevice::dispatchIndirect( const GraphicsBuffer& buffer, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::dispatchIndirect( const GraphicsBuffer& dstbuffer, CommandQueue* commandQueue )
     {
         VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
-        VkBuffer indirectBuffer = static_cast<VkBuffer>(buffer.buffer);
-        vkCmdDispatchIndirect( commandBuffer, indirectBuffer, buffer.offset );
+        VkBuffer indirectBuffer = static_cast<VkBuffer>(dstbuffer.dstbuffer);
+        vkCmdDispatchIndirect( commandBuffer, indirectBuffer, dstbuffer.offset );
     }
 
     void VulkanGraphicsDevice::beginEventLabel( const char* eventLabel, const Color& color, CommandQueue* commandQueue )
@@ -4711,7 +5298,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     m_delayedDestroy.eraseAtSwapBack( i );
                     --i;
                 }
-                else if( m_currentFrameIndex < delayedDestroy.frameIndex || ( m_currentFrameIndex - delayedDestroy.frameIndex ) >= kMaxFrameDistance )
+                else if( m_currentFrameIndex < delayedDestroy.frameCount || ( m_currentFrameIndex - delayedDestroy.frameCount ) >= kMaxFrameDistance )
                 {
                     handlesToDestroy.pushBack( delayedDestroy );
 
@@ -4775,9 +5362,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         return m_perFrameData[ frame ];
     }
 
-    VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getFrameData( zp_uint64_t frameIndex )
+    VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getFrameData( zp_uint64_t frameCount )
     {
-        const zp_uint64_t frame = frameIndex & ( kBufferedFrameCount - 1 );
+        const zp_uint64_t frame = frameCount & ( kBufferedFrameCount - 1 );
         return m_perFrameData[ frame ];
     }
 #endif

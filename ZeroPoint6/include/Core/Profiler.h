@@ -84,10 +84,10 @@ namespace zp
         zp_uint64_t startFrame;
         zp_uint64_t endFrame;
 
-        static ProfilerFrameRange Last( zp_uint64_t frameIndex, zp_uint64_t count )
+        static ProfilerFrameRange Last( zp_uint64_t frameCount, zp_uint64_t count )
         {
-            zp_uint64_t startFrame = frameIndex < count ? 0 : frameIndex - count;
-            zp_uint64_t endFrame = frameIndex;
+            zp_uint64_t startFrame = frameCount < count ? 0 : frameCount - count;
+            zp_uint64_t endFrame = frameCount;
 
             return { .startFrame = startFrame, .endFrame = endFrame };
         }
@@ -97,7 +97,7 @@ namespace zp
     public:
         struct Frame
         {
-            const zp_size_t frameIndex;
+            const zp_size_t frameCount;
             const CPUProfilerEvent* cpuProfilerEvents;
             const MemoryProfilerEvent* memoryProfilerEvents;
             const GPUProfilerEvent* gpuProfilerEvents;
@@ -144,7 +144,7 @@ namespace zp
             }
 
             Frame frame {
-                .frameIndex = index + m_baseFrameIndex,
+                .frameCount = index + m_baseFrameIndex,
                 .cpuProfilerEvents = cpuProfilerEvents,
                 .memoryProfilerEvents = memoryProfilerEvents,
                 .gpuProfilerEvents = gpuProfilerEvents,

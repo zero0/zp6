@@ -93,6 +93,8 @@ namespace zp
             return m_assetSystem;
         }
 
+        void submitToGPU();
+
     private:
         enum class EngineState : zp_uint32_t
         {
@@ -125,6 +127,7 @@ namespace zp
 
         JobHandle m_previousFrameEnginePipelineHandle;
 
+        GraphicsCommandBuffer* m_graphicsDeviceCommandBuffer;
         GraphicsDevice* m_graphicsDevice;
         RenderSystem* m_renderSystem;
         EntityComponentManager* m_entityComponentManager;
