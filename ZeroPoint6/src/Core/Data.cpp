@@ -350,6 +350,34 @@ Memory DataStreamReader::readMemory( zp_size_t size )
     return memory;
 }
 
+void* DataStreamReader::readPtr( zp_size_t size )
+{
+    void* ptr {};
+
+    const zp_size_t newPosition = m_position + size;
+    if( newPosition < m_memory.size )
+    {
+        ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position );
+        m_position = newPosition;
+    }
+
+    return ptr;
+}
+
+void* DataStreamReader::readPtrArray( zp_size_t size, zp_size_t length )
+{
+    void* ptr {};
+
+    const zp_size_t newPosition = m_position + ( size * length );
+    if( newPosition < m_memory.size )
+    {
+        ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position );
+        m_position = newPosition;
+    }
+
+    return ptr;
+}
+
 zp_size_t DataStreamReader::readAlignment( zp_size_t alignment )
 {
     ZP_ASSERT( zp_is_pow2( alignment ) );
@@ -459,7 +487,7 @@ DataBuilderElement& DataBuilderElement::operator[]( zp_size_t index )
     ensureDataType( ZP_DATA_BUILDER_ELEMENT_TYPE_ARRAY );
     DataBuilderElementArray& array = asRef<DataBuilderElementArray>();
 
-    while( index >= array.size() )
+    while( index >= array.length() )
     {
         array.pushBackEmptyRange( 1 );
     }
@@ -771,7 +799,7 @@ void ArchiveBuilder::getBlockIDs( Vector<zp_hash64_t>& outBlockIDs )
 
 ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions options, DataStreamWriter& outCompiledData ) const
 {
-    const zp_size_t blockCount = m_blocks.size();
+    const zp_size_t blockCount = m_blocks.length();
 
     // sort data blocks by id
     struct BlockSortKey
@@ -792,7 +820,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
         }
     }
 
-    const zp_size_t sortedBlockCount = blockSort.size();
+    const zp_size_t sortedBlockCount = blockSort.length();
 
     blockSort.sort( []( const BlockSortKey& x, const BlockSortKey& y )
     {

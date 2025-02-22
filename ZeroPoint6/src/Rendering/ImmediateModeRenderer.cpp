@@ -105,7 +105,7 @@ namespace zp
 
     zp_uint32_t ImmediateModeRenderer::registerMaterial( const MaterialResourceHandle& materialResourceHandle )
     {
-        const zp_uint32_t materialIndex = m_registeredMaterials.size();
+        const zp_uint32_t materialIndex = m_registeredMaterials.length();
         m_registeredMaterials.pushBack( materialResourceHandle );
 
         return materialIndex;

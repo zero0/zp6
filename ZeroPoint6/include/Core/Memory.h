@@ -65,6 +65,8 @@ namespace zp
 
         [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
 
+        [[nodiscard]] ZP_FORCEINLINE zp_size_t size() const;
+
         [[nodiscard]] ZP_FORCEINLINE zp_bool_t empty() const;
 
         [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
@@ -72,6 +74,8 @@ namespace zp
         [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
 
         [[nodiscard]] ZP_FORCEINLINE pointer data();
+
+        [[nodiscard]] ZP_FORCEINLINE const_pointer data() const;
 
         [[nodiscard]] ZP_FORCEINLINE iterator begin();
 
@@ -149,13 +153,13 @@ namespace zp
         explicit FixedArray( value_type (& ptr)[Size] );
 
         template<typename ... Args>
-        FixedArray( Args ... m );
+        explicit FixedArray( Args ... args );
 
         FixedArray( pointer ptr, zp_size_t length );
 
-        [[nodiscard]] ZP_FORCEINLINE zp_size_t length() const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE zp_size_t length() const;
 
-        [[nodiscard]] ZP_FORCEINLINE zp_bool_t empty() const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE zp_bool_t empty() const;
 
         [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
 
@@ -182,6 +186,9 @@ namespace zp
     private:
         value_type m_ptr[Size];
     };
+
+    template<typename T, typename ... U>
+    FixedArray( T, U... ) -> FixedArray<T, 1 + sizeof...(U)>;
 }
 
 
@@ -202,6 +209,12 @@ namespace zp
     zp_size_t MemoryArray<T>::length() const
     {
         return m_length;
+    }
+
+    template<typename T>
+    zp_size_t MemoryArray<T>::size() const
+    {
+        return m_length * sizeof( T );
     }
 
     template<typename T>
@@ -226,6 +239,12 @@ namespace zp
 
     template<typename T>
     MemoryArray<T>::pointer MemoryArray<T>::data()
+    {
+        return m_ptr;
+    }
+
+    template<typename T>
+    MemoryArray<T>::const_pointer MemoryArray<T>::data() const
     {
         return m_ptr;
     }
@@ -285,8 +304,8 @@ namespace zp
 
     template<typename T, zp_size_t Size>
     template<typename ... Args>
-    FixedArray<T, Size>::FixedArray( Args ... m )
-        : m_ptr { zp_forward<T>( m )... }
+    FixedArray<T, Size>::FixedArray( Args ... args )
+        : m_ptr { zp_forward<T>( args )... }
     {
     }
 
@@ -301,13 +320,13 @@ namespace zp
     }
 
     template<typename T, zp_size_t Size>
-    zp_size_t FixedArray<T, Size>::length() const
+    constexpr zp_size_t FixedArray<T, Size>::length() const
     {
         return Size;
     }
 
     template<typename T, zp_size_t Size>
-    zp_bool_t FixedArray<T, Size>::empty() const
+    constexpr zp_bool_t FixedArray<T, Size>::empty() const
     {
         return Size == 0;
     }

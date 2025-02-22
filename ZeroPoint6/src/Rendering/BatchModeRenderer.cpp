@@ -205,12 +205,12 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_uint32_t index = m_persistentBatchRenderCommands.size();
+        const zp_uint32_t index = m_persistentBatchRenderCommands.length();
 
         BatchModeRenderCommand& command = m_persistentBatchRenderCommands.pushBackEmpty();
         command.id = index;
 
-        while( m_persistentBatchRenderIDToIndex.size() <= index )
+        while( m_persistentBatchRenderIDToIndex.length() <= index )
         {
             m_persistentBatchRenderIDToIndex.pushBack( -1 );
         }
@@ -227,7 +227,7 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        if( handle.m_id != -1 && handle.m_id < m_persistentBatchRenderIDToIndex.size() )
+        if( handle.m_id != -1 && handle.m_id < m_persistentBatchRenderIDToIndex.length() )
         {
             const zp_size_t index = m_persistentBatchRenderIDToIndex[ handle.m_id ];
             m_persistentBatchRenderIDToIndex[ handle.m_id ] = -1;
@@ -246,7 +246,7 @@ namespace zp
 
         BatchModeRenderCommand* batchModeRenderCommand = nullptr;
 
-        if( handle.m_id != -1 && handle.m_id < m_persistentBatchRenderIDToIndex.size() )
+        if( handle.m_id != -1 && handle.m_id < m_persistentBatchRenderIDToIndex.length() )
         {
             const zp_size_t index = m_persistentBatchRenderIDToIndex[ handle.m_id ];
             if( index != -1 )
@@ -262,7 +262,7 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        const zp_uint32_t id = m_tempBatchRenderCommands.size();
+        const zp_uint32_t id = m_tempBatchRenderCommands.length();
 
         BatchModeRenderCommand& batchModeRenderCommand = m_tempBatchRenderCommands.pushBackEmpty();
         batchModeRenderCommand.id = 100000 + id;

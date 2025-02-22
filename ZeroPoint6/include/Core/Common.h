@@ -325,8 +325,9 @@ constexpr zp_int32_t zp_cmp_dsc( const T& lh, const T& rh )
 //
 //
 
-ZP_FORCEINLINE constexpr auto zp_flag32_is_set( zp_uint32_t flag, zp_uint32_t test ) -> zp_bool_t
+ZP_FORCEINLINE constexpr auto zp_flag32_is_bit_set( zp_uint32_t flag, zp_uint32_t bit ) -> zp_bool_t
 {
+    const zp_uint32_t test = 1 << bit;
     return ( flag & test ) == test;
 }
 

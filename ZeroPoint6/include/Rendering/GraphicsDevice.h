@@ -214,9 +214,24 @@ namespace zp
     //
     //
 
+    struct RequestTextureDesc
+    {
+        TextureDimension textureDimension;
+        TextureFormat textureFormat;
+        SampleCount samples;
+        TextureUsage usage;
+        MemoryPropertyFlags memoryPropertyFlags;
+
+        Size3Du size;
+        zp_uint32_t mipCount;
+        zp_uint32_t arrayLayers;
+    };
+
     ZP_DECLSPEC_NOVTABLE class GraphicsDevice
     {
     public:
+
+
         virtual GraphicsCommandBuffer* SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) = 0;
     };
 

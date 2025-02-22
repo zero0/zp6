@@ -50,7 +50,7 @@ namespace zp
 
     void SubsystemManager::RegisterSubsystem( const SubsystemManager::RegisterSubsystemDesc& desc )
     {
-        const zp_int32_t order = zp_int32_t( m_subsystems.size() ) * 100;
+        const zp_int32_t order = zp_int32_t( m_subsystems.length() ) * 100;
 
         auto subsystem = ZP_MALLOC_T( memoryLabel, SubsystemInstance );
         *subsystem = {

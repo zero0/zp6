@@ -239,13 +239,13 @@ namespace zp
         JobQueue* GetStealJobQueue()
         {
             const zp_size_t index = Atomic::IncrementSizeT( &g_context.stealJobQueueIndex ) - 1;
-            return &g_context.allJobQueues[ index % g_context.allJobQueues.size() ];
+            return &g_context.allJobQueues[ index % g_context.allJobQueues.length() ];
         }
 
         JobQueue* GetNextJobQueue()
         {
             const zp_size_t index = Atomic::IncrementSizeT( &g_context.nextJobQueueIndex ) - 1;
-            return &g_context.allJobQueues[ index % g_context.allJobQueues.size() ];
+            return &g_context.allJobQueues[ index % g_context.allJobQueues.length() ];
         }
 
         Job* AllocateJob()
@@ -571,7 +571,7 @@ namespace zp
         Platform::NotifyAllConditionVariable( g_context.wakeCondition );
 
         // wait for all threads to finish
-        Platform::JoinThreads( g_context.allWorkerThreadHandles.data(), g_context.allWorkerThreadHandles.size() );
+        Platform::JoinThreads( g_context.allWorkerThreadHandles.data(), g_context.allWorkerThreadHandles.length() );
 
         // close threads
         for( auto thread : g_context.allWorkerThreadHandles )

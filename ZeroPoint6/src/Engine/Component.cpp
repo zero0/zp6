@@ -210,7 +210,7 @@ namespace zp
     zp_size_t ComponentArchetypeManager::getEntityIndex( const Entity entity ) const
     {
         zp_size_t index = zp::npos;
-        for( zp_size_t i = 0; i < m_entities.size(); ++i )
+        for( zp_size_t i = 0; i < m_entities.length(); ++i )
         {
             if( m_entities[ i ] == entity )
             {

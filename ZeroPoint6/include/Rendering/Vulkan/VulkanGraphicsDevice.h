@@ -19,11 +19,6 @@ namespace zp
         void DestroyVulkanGraphicsDevice( GraphicsDevice* graphicsDevice );
     }
 
-    enum
-    {
-        kBufferedFrameCount = 4,
-    };
-    ZP_STATIC_ASSERT( zp_is_pow2( kBufferedFrameCount ) );
 
 #if 0
     class VulkanGraphicsDevice final : public GraphicsDevice
@@ -198,9 +193,9 @@ namespace zp
             VkExtent2D m_vkSwapchainExtent;
 
             zp_uint32_t swapchainImageCount;
-            FixedArray<VkImage, kBufferedFrameCount> swapchainImages;
-            FixedArray<VkImageView, kBufferedFrameCount> swapchainImageViews;
-            FixedArray<VkFramebuffer, kBufferedFrameCount> swapchainFrameBuffers;
+            FixedArray<VkImage, kMaxBufferedFrameCount> swapchainImages;
+            FixedArray<VkImageView, kMaxBufferedFrameCount> swapchainImageViews;
+            FixedArray<VkFramebuffer, kMaxBufferedFrameCount> swapchainFrameBuffers;
         };
 
         PerFrameData& getCurrentFrameData();
@@ -209,7 +204,7 @@ namespace zp
 
         PerFrameData& getFrameData( zp_uint64_t frameCount );
 
-        PerFrameData m_perFrameData[kBufferedFrameCount];
+        PerFrameData m_perFrameData[kMaxBufferedFrameCount];
 
         SwapchainData m_swapchainData;
 

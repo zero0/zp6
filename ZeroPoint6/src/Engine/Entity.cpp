@@ -34,7 +34,7 @@ namespace zp
         }
         else
         {
-            entity = m_componentSignatures.size();
+            entity = m_componentSignatures.length();
             m_componentSignatures.pushBackEmpty();
         }
 
@@ -72,13 +72,13 @@ namespace zp
         Entity entity = entityQueryIterator->m_current == ZP_NULL_ENTITY ? 0 : entityQueryIterator->m_current + 1;
         zp_bool_t found = false;
 
-        for( ; entity < m_componentSignatures.size(); ++entity )
+        for( ; entity < m_componentSignatures.length(); ++entity )
         {
             const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
             if( componentSignature.tagSignature != 0 && componentSignature.structuralSignature != 0 )
             {
                 EntityQuery& entityQuery = entityQueryIterator->m_query;
-                
+
                 zp_bool_t pass = ( componentSignature.tagSignature & entityQuery.requiredTags ) == entityQuery.requiredTags;
                 pass &= pass && ( componentSignature.tagSignature | ~entityQuery.notIncludedStructures ) == ~entityQuery.requiredTags;
                 pass &= pass && ( entityQuery.anyTags == 0 || ( componentSignature.tagSignature & entityQuery.anyTags ) != 0 );

@@ -11,7 +11,7 @@ namespace zp
     {
         constexpr CommandLineOperation IndexToCommandLineOperation( zp_size_t index )
         {
-            return { .id = index + 1 }; // NOTE: 0 is null handle;
+            return { .id = index + 1 }; // NOTE: 0 is null m_handle;
         }
 
         constexpr zp_size_t CommandLineOperationToIndex( const CommandLineOperation& operation )
@@ -29,7 +29,7 @@ namespace zp
 
     CommandLineOperation CommandLine::addOperation( const CommandLineOperationDesc& desc )
     {
-        CommandLineOperation op = IndexToCommandLineOperation( m_commandLineOperations.size() );
+        CommandLineOperation op = IndexToCommandLineOperation( m_commandLineOperations.length() );
         m_commandLineOperations.pushBack( desc );
 
         return op;
@@ -164,7 +164,7 @@ namespace zp
             {
                 zp_size_t parameterIndex = 0;
 
-                for( zp_size_t i = 0; i < m_commandLineTokens.size(); ++i )
+                for( zp_size_t i = 0; i < m_commandLineTokens.length(); ++i )
                 {
                     const String& token = m_commandLineTokens[ i ];
 
@@ -187,7 +187,7 @@ namespace zp
                     found = false;
 
                     zp_size_t i, idx;
-                    for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.size(); ++i, ++idx )
+                    for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.length(); ++i, ++idx )
                     {
                         const String& token = m_commandLineTokens[ idx ];
                         if( token[ 0 ] == '-' )
@@ -249,7 +249,7 @@ namespace zp
         {
             zp_size_t parameterIndex = 0;
 
-            for( zp_size_t i = 0; i < m_commandLineTokens.size(); ++i )
+            for( zp_size_t i = 0; i < m_commandLineTokens.length(); ++i )
             {
                 const String& token = m_commandLineTokens[ i ];
 
@@ -273,7 +273,7 @@ namespace zp
 
                 zp_size_t i;
                 zp_size_t idx;
-                for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.size(); ++i, ++idx )
+                for( i = 0, idx = parameterIndex; i < desc.maxParameterCount && idx < m_commandLineTokens.length(); ++i, ++idx )
                 {
                     const String& token = m_commandLineTokens[ idx ];
                     if( token[ 0 ] == '-' )

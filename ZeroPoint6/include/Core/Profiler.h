@@ -39,6 +39,10 @@
 //#define ZP_PROFILE_GPU_END( d, dc, t, c )   do { zp::Profiler::GPUDesc ZP_CONCAT(__desc_,__LINE__) { d, dc, t, c }; zp::Profiler::EndGPU( __gpuProfilerIndex, &ZP_CONCAT(__desc_,__LINE__) ); } while( false )
 #define ZP_PROFILE_GPU_MARK( d )            zp::Profiler::MarkGPU( { .duration = (d), .numDrawCalls = 0, .numTriangles = 0, .numCommands = 0, } )
 
+#define ZP_PROFILE_GPU_STATS_DISPATCH( c )          (void)0
+#define ZP_PROFILE_GPU_STATS_DRAW( v, i )           (void)0
+#define ZP_PROFILE_GPU_STATS_DRAW_INDEXED( v, i )   (void)0
+
 #define ZP_PROFILE_ADVANCE_FRAME( f )       zp::Profiler::AdvanceFrame( (f) )
 
 #else // !ZP_USE_PROFILER
@@ -205,10 +209,13 @@ namespace zp
 
         struct GPUDesc
         {
-            zp_time_t duration;
-            zp_uint64_t numDrawCalls;
-            zp_uint64_t numTriangles;
-            zp_uint64_t numCommands;
+            zp_uint32_t numDrawCalls;
+            zp_uint32_t numDrawIndirectCalls;
+            zp_uint32_t numVertices;
+            zp_uint32_t numInstances;
+            zp_uint32_t numRenderPasses;
+            zp_uint32_t numDispatchCalls;
+            zp_uint32_t numDispatchIndirectCalls;
         };
 
         void CreateProfiler( MemoryLabel memoryLabel, const ProfilerCreateDesc& profilerCreateDesc );

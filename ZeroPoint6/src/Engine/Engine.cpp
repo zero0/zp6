@@ -230,7 +230,7 @@ namespace zp
             };
 
             m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, dd );
-            //m_graphicsDevice->createSwapchain( m_windowHandle.handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
+            //m_graphicsDevice->createSwapchain( m_windowHandle.m_handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
 
         // show window when graphics device is created
@@ -887,6 +887,122 @@ namespace zp
             requiresRebuild = false;
         }
 
+
+#if 0
+        RenderGraph graph;
+
+        auto buff = graph.CreateBuffer();
+
+        auto backBufferColor = graph.GetBackBufferColor();
+
+        auto gbAlbedo = graph.CreateRenderTarget();
+        auto rt0 = graph.CreateRenderTarget();
+        auto rtd = graph.CreateRenderTarget();
+
+        auto cb0 = graph.CreateBuffe( { .size = 1024 } );
+
+        struct ConstantData
+        {
+            Matrix4f view;
+            Vector4f projZ;
+        } cdata;
+
+        {
+            ExecPassData* passData;
+            auto builder = graph.AddExecutionPass<ExecPassData>( &passData );
+            passData->buffer = builder.UseBuffer( buff, Write );
+            passData->data = Memory { .ptr = &cdata, .size = sizeof(ConstantData) };
+            builder.SetRenderFunc( []( ExecutionContext ctx, const ExecPassData* passData ){
+                ctx.SetBufferData( passData->buffer, passData->data );
+            } );
+        }
+
+        {
+            ExecPassData* passData;
+            auto builder = graph.AddComputePass<ExecPassData>( &passData );
+            passData->buffer = builder.UseBuffer( buff, ReadWrite );
+            passData->pipeline = builder.UseComputePipeline( cpipe );
+            builder.SetRenderFunc( []( ExecutionContext ctx, const ExecPassData* passData ){
+                ctx.SetPipeline( passData->pipeline );
+                ctx.PushConstant( "push-name", {} );
+                ctx.Dispatch( 8, 0, 0 );
+
+                ctx.SetPipeline( passData->pipeline2 );
+                ctx.PushConstant( "push-name", {} );
+                ctx.Dispatch( 8, 0, 0 );
+            } );
+        }
+
+        {
+            PassData* passData;
+            auto builder = graph.AddRasterPass<PassData>( &passData );
+            passData->buffer = builder.UseBuffer( buff, Read );
+            passData->renderList = builder.UseRenderList( {} );
+            builder.SetColorAttachment( 0, gbAlbedo );
+            builder.SetDepthAttachment( rtd );
+            builder.SetRenderFunc( []( RasterContext ctx, const PassData* passData ){
+                ctx.DrawRenderList( passData->renderList );
+            } );
+        }
+
+        {
+            OtherPassData* passData;
+            auto builder = graph.AddRasterPass<OtherPassData>( &passData );
+            passData->buffer = builder.UseBuffer( buff, Read );
+            passData->pipeline = builder.UseRasterPipeline( pipeline );
+            builder.SetInputAttachment( 0, gbAlbedo );
+            builder.SetColorAttachment( 0, rt0 );
+            builder.SetRenderFunc( []( RasterContext ctx, const OtherPassData* passData ){
+                ctx.SetPipeline( passData->pipeline );
+                ctx.Draw( 3, 1 );
+            } );
+        }
+
+        {
+            auto builder = graph.AddBlitPass();
+            builder.SetSrcTexture( rt0, mip: 0, face: CubemapFace::None, srcUV: {0, 0, 1, 1} );
+            builder.SetDstTexture( backBufferColor, mip: 0, face: CubemapFace::None, dstUV: {0, 0, 1, 1} );
+        }
+
+        RenderGraphCache renderGraphCache;
+
+        CompiledRenderGraph compiledRenderGraph;
+        if( !renderGraphCache.TryGet( graph, compiledRenderGraph ) )
+        {
+            bool compiled = graph.Compile( CompilerFlags::None, compiledRenderGraph );
+            renderGraphCache.Add( graph, compiledRenderGraph );
+        }
+
+
+        if( compiledRenderGraph.valid() )
+        {
+            compiledRenderGraph.Execute( graphicsCommandBuffer );
+        }
+        else
+        {
+            renderGraph.Execute( graphicsCommandBuffer );
+        }
+
+        //
+        //
+        //
+
+        struct ConstantBufferData {
+            Matrix4x4f view;
+            Vector4f pos;
+        } cb;
+
+        BufferHandle buff{};
+        buff = m_graphicsDeviceCommandBuffer->RequestBuffer( buff, { .size = 1024 } );
+
+        auto cmdQueue = m_graphicsDeviceCommandBuffer->BeginCommandQueue();
+
+        m_graphicsDeviceCommandBuffer->UpdateBuffer( cmdQueue, buff, 0, cb );
+
+        m_graphicsDeviceCommandBuffer->Draw( cmdQueue, 3, 1, 0, 0 );
+
+        m_graphicsDeviceCommandBuffer->SubmitCommandQueue( cmdQueue );
+#endif
     }
 
     void Engine::submitToGPU()

@@ -137,7 +137,7 @@ namespace zp
 
     zp_size_t ExecutionGraph::BeginPass()
     {
-        const zp_size_t index = m_executionNodes.size();
+        const zp_size_t index = m_executionNodes.length();
 
         m_executionNodes.pushBackEmpty();
 

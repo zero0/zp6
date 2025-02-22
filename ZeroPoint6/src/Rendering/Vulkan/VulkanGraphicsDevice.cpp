@@ -16,14 +16,15 @@
 #include "Core/Job.h"
 #include "Core/Data.h"
 #include "Core/Hash.h"
+#include "Core/Queue.h"
 
 #include "Platform/Platform.h"
 
 #include "Engine/MemoryLabels.h"
 
 #include "Rendering/GraphicsDevice.h"
+#include "Rendering/GraphicsTypes.h"
 #include "Rendering/Vulkan/VulkanGraphicsDevice.h"
-
 #include "Volk/volk.h"
 
 // ZP_CONCAT(_vkResult_,__LINE__)
@@ -33,7 +34,7 @@ do                                                          \
 {                                                           \
     if( const VkResult result = (r); result != VK_SUCCESS ) \
     {                                                       \
-        Log::error() << #r << Log::endl;      \
+        Log::error() << #r << Log::endl;                    \
         Platform::DebugBreak();                             \
     }                                                       \
 }                                                           \
@@ -43,11 +44,189 @@ while( false )
 #endif
 
 #define FlagBits( f, z, t, v )         f |= ( (z) & (t) ) ? (v) : 0
+#define USE_DYNAMIC_RENDERING   1
 
 namespace zp
 {
     namespace
     {
+        enum
+        {
+            kMaxBufferedFrameCount = 4,
+            kMaxMipLevels = 16,
+        };
+
+        struct QueueFamilyIndices
+        {
+            zp_uint32_t graphicsFamily;
+            zp_uint32_t transferFamily;
+            zp_uint32_t computeFamily;
+            zp_uint32_t presentFamily;
+        };
+
+        struct QueueInfo
+        {
+            zp_uint32_t familyIndex;
+            zp_uint32_t queueIndex;
+            VkQueue vkQueue;
+        };
+
+        struct Queues
+        {
+            QueueInfo graphics;
+            QueueInfo transfer;
+            QueueInfo compute;
+            QueueInfo present;
+        };
+
+        struct VulkanBuffer
+        {
+            VkBuffer vkBuffer;
+            VkDeviceMemory vkDeviceMemory;
+            VkBufferUsageFlags vkBufferUsage;
+            VkAccessFlags2 vkAccess;
+
+            zp_size_t offset;
+            zp_size_t alignment;
+            zp_size_t size;
+
+            zp_hash32_t hash;
+        };
+
+        struct VulkanTexture
+        {
+            VkImage vkImage;
+            FixedArray<VkImageView, kMaxMipLevels> vkImageViews;
+            FixedArray<VkImageLayout, kMaxMipLevels> vkImageLayouts;
+            VkDeviceMemory vkDeviceMemory;
+            VkImageUsageFlags vkImageUsage;
+            VkImageAspectFlags vkImageAspect;
+            VkFormat vkFormat;
+
+            Size3Du size;
+            zp_uint32_t mipCount;
+            zp_uint32_t loadedMipFlag;
+
+            zp_hash32_t hash;
+        };
+
+        struct VulkanRenderTarget
+        {
+            VkImage vkImage;
+            FixedArray<VkImageView, kMaxBufferedFrameCount> vkImageViews;
+            FixedArray<VkImageLayout, kMaxBufferedFrameCount> vkImageLayouts;
+            VkDeviceMemory vkDeviceMemory;
+            VkImageUsageFlags vkImageUsage;
+            VkImageAspectFlags vkImageAspect;
+            VkFormat vkFormat;
+
+            Size3Du size;
+            zp_uint32_t sampleCount;
+
+            zp_hash32_t hash;
+        };
+
+        struct VulkanSampler
+        {
+            VkSampler vkSampler;
+
+            zp_hash32_t hash;
+        };
+
+        struct VulkanCommandQueue
+        {
+            VkCommandBuffer vkCommandBuffer;
+
+            VkCommandBufferUsageFlags usage;
+            zp_hash32_t hash;
+        };
+
+        struct StagingBuffer
+        {
+            VkBuffer vkBuffer;
+            VkDeviceMemory vkDeviceMemory;
+
+            zp_size_t position;
+            zp_size_t alignment;
+            zp_size_t size;
+        };
+
+        struct StagingBufferAllocation
+        {
+            VkBuffer vkBuffer;
+            VkDeviceMemory vkDeviceMemory;
+            VkAccessFlags2 vkAccess;
+
+            zp_size_t offset;
+            zp_size_t size;
+        };
+
+        struct FrameResources
+        {
+            StagingBuffer stagingBuffer;
+
+            VkCommandPool vkCommandPool;
+            VkDescriptorSet vkBindlessDescriptorSet;
+        };
+
+
+#pragma region GetObjectType
+
+        template<typename T>
+        constexpr auto GetObjectType( T /*unused*/ ) -> VkObjectType
+        {
+            ZP_ASSERT_MSG_ARGS( false, "Unknown Object Type: %s", zp_type_name<T>() );
+            return VK_OBJECT_TYPE_UNKNOWN;
+        }
+
+        // @formatter:off
+#define MAKE_OBJECT_TYPE( vk, ot )                              \
+template<>                                                      \
+constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
+{                                                               \
+    return ot;                                                  \
+}
+        // @formatter:on
+
+        MAKE_OBJECT_TYPE( VkInstance, VK_OBJECT_TYPE_INSTANCE );
+
+        MAKE_OBJECT_TYPE( VkPhysicalDevice, VK_OBJECT_TYPE_PHYSICAL_DEVICE );
+
+        MAKE_OBJECT_TYPE( VkPipelineCache, VK_OBJECT_TYPE_PIPELINE_CACHE );
+
+        MAKE_OBJECT_TYPE( VkDevice, VK_OBJECT_TYPE_DEVICE );
+
+        MAKE_OBJECT_TYPE( VkQueue, VK_OBJECT_TYPE_QUEUE );
+
+        MAKE_OBJECT_TYPE( VkSemaphore, VK_OBJECT_TYPE_SEMAPHORE );
+
+        MAKE_OBJECT_TYPE( VkCommandPool, VK_OBJECT_TYPE_COMMAND_POOL );
+
+        MAKE_OBJECT_TYPE( VkCommandBuffer, VK_OBJECT_TYPE_COMMAND_BUFFER );
+
+        MAKE_OBJECT_TYPE( VkFence, VK_OBJECT_TYPE_FENCE );
+
+        MAKE_OBJECT_TYPE( VkDeviceMemory, VK_OBJECT_TYPE_DEVICE_MEMORY );
+
+        MAKE_OBJECT_TYPE( VkBuffer, VK_OBJECT_TYPE_BUFFER );
+
+        MAKE_OBJECT_TYPE( VkBufferView, VK_OBJECT_TYPE_BUFFER_VIEW );
+
+        MAKE_OBJECT_TYPE( VkImage, VK_OBJECT_TYPE_IMAGE );
+
+        MAKE_OBJECT_TYPE( VkImageView, VK_OBJECT_TYPE_IMAGE_VIEW );
+
+        MAKE_OBJECT_TYPE( VkSwapchainKHR, VK_OBJECT_TYPE_SWAPCHAIN_KHR );
+
+        MAKE_OBJECT_TYPE( VkDescriptorPool, VK_OBJECT_TYPE_DESCRIPTOR_POOL );
+
+        MAKE_OBJECT_TYPE( VkDescriptorSet, VK_OBJECT_TYPE_DESCRIPTOR_SET );
+
+        MAKE_OBJECT_TYPE( VkDescriptorSetLayout, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT );
+
+#undef MAKE_OBJECT_TYPE
+
+#pragma endregion
 
 #pragma region Convert Functions
 
@@ -683,20 +862,20 @@ namespace zp
 
             if( zp_flag32_any_set( messageSeverity, messageMask ) )
             {
-                if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT ) )
+                if( zp_flag32_all_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT ) )
                 {
                     Log::info() << pCallbackData->pMessage << Log::endl;
                 }
-                else if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) )
+                else if( zp_flag32_all_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) )
                 {
                     Log::warning() << pCallbackData->pMessage << Log::endl;
                 }
-                else if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) )
+                else if( zp_flag32_all_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) )
                 {
                     Log::error() << pCallbackData->pMessage << Log::endl;
                 }
 
-                if( zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) )
+                if( zp_flag32_all_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) )
                 {
                     const MessageBoxResult result = Platform::ShowMessageBox( nullptr, "Vulkan Error", pCallbackData->pMessage, ZP_MESSAGE_BOX_TYPE_ERROR, ZP_MESSAGE_BOX_BUTTON_ABORT_RETRY_IGNORE );
                     if( result == ZP_MESSAGE_BOX_RESULT_ABORT )
@@ -710,7 +889,7 @@ namespace zp
                 }
             }
 
-            const VkBool32 shouldAbort = zp_flag32_is_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) ? VK_TRUE : VK_FALSE;
+            const VkBool32 shouldAbort = zp_flag32_all_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) ? VK_TRUE : VK_FALSE;
             return shouldAbort;
         }
 
@@ -742,12 +921,22 @@ namespace zp
             SetDebugObjectName( vkInstance, vkDevice, objectType, objectHandle, name.c_str() );
         }
 
+        template<typename T, typename ... Args>
+        void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, T objectHandle, const char* format, Args... args )
+        {
+            MutableFixedString512 name;
+            name.appendFormat( format, args... );
+
+            SetDebugObjectName( vkInstance, vkDevice, GetObjectType( objectHandle ), objectHandle, name.c_str() );
+        }
+
 #else // !ZP_DEBUG
 #define SetDebugObjectName(...) (void)0
 #endif // ZP_DEBUG
 
 #pragma endregion
 
+#pragma region Physical Device Utils
         enum VenderIDs
         {
             kNVidiaVenderID = 4318,
@@ -852,6 +1041,8 @@ namespace zp
             return isSuitable;
         }
 
+#pragma endregion
+
 #pragma region Swapchain
 
         VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat( const Vector<VkSurfaceFormatKHR>& supportedSurfaceFormats, const ReadonlyMemoryArray<VkSurfaceFormatKHR>& preferredSurfaceFormats )
@@ -923,6 +1114,9 @@ namespace zp
             return chosenExtents;
         }
 
+#pragma endregion
+
+#pragma region Pipeline Transition
         struct PipelineStateAccess
         {
             VkPipelineStageFlags2 stage;
@@ -957,6 +1151,12 @@ namespace zp
                         .access = VK_ACCESS_2_TRANSFER_WRITE_BIT
                     };
 
+                case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+                    return {
+                        .stage = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                        .access = VK_ACCESS_2_TRANSFER_READ_BIT
+                    };
+
                 case VK_IMAGE_LAYOUT_GENERAL:
                     return {
                         .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
@@ -977,18 +1177,91 @@ namespace zp
             }
         }
 
-        void CmdTransitionImageLayout( VkCommandBuffer cmd, VkImage image, VkImageLayout srcLayout, VkImageLayout dstLayout, VkImageSubresourceRange subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1 } )
+        VkPipelineStageFlags2 MakePipelineStageAccess( VkAccessFlags2 access )
+        {
+            if( access == VK_ACCESS_2_HOST_WRITE_BIT )
+            {
+                return VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            }
+            else
+            {
+                return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            }
+        }
+
+        void CmdTransitionBufferAccess( VkCommandBuffer cmd, VkBuffer buffer, zp_size_t offset, zp_size_t size, VkAccessFlags2& srcAccess, VkAccessFlags2 dstAccess )
+        {
+            const VkPipelineStageFlags2 srcStage = MakePipelineStageAccess( srcAccess );
+            const VkPipelineStageFlags2 dstStage = MakePipelineStageAccess( dstAccess );
+
+            const VkBufferMemoryBarrier2 memoryBarrier {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask = srcStage,
+                .srcAccessMask = srcAccess,
+                .dstStageMask = dstStage,
+                .dstAccessMask = dstAccess,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .buffer = buffer,
+                .offset = offset,
+                .size = size,
+            };
+
+            const VkDependencyInfo dependencyInfo {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .bufferMemoryBarrierCount = 1,
+                .pBufferMemoryBarriers = &memoryBarrier,
+            };
+
+            vkCmdPipelineBarrier2( cmd, &dependencyInfo );
+
+            srcAccess = dstAccess;
+        }
+
+        void CmdTransitionBufferAccess( VkCommandBuffer cmd, VulkanBuffer& buffer, zp_size_t offset, zp_size_t size, VkAccessFlags2 dstAccess )
+        {
+            if( buffer.vkAccess != dstAccess )
+            {
+                const VkPipelineStageFlags2 srcStage = MakePipelineStageAccess( buffer.vkAccess );
+                const VkPipelineStageFlags2 dstStage = MakePipelineStageAccess( dstAccess );
+
+                const VkBufferMemoryBarrier2 memoryBarrier {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                    .srcStageMask = srcStage,
+                    .srcAccessMask = buffer.vkAccess,
+                    .dstStageMask = dstStage,
+                    .dstAccessMask = dstAccess,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .buffer = buffer.vkBuffer,
+                    .offset = buffer.offset + offset,
+                    .size = size,
+                };
+
+                const VkDependencyInfo dependencyInfo {
+                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                    .bufferMemoryBarrierCount = 1,
+                    .pBufferMemoryBarriers = &memoryBarrier,
+                };
+
+                vkCmdPipelineBarrier2( cmd, &dependencyInfo );
+
+                buffer.vkAccess = dstAccess;
+            }
+        }
+
+        void CmdTransitionBufferAccess( VkCommandBuffer cmd, VulkanBuffer& buffer, VkAccessFlags2 dstAccess )
+        {
+            CmdTransitionBufferAccess( cmd, buffer, 0, buffer.size, dstAccess );
+        }
+
+        void CmdTransitionImageLayout( VkCommandBuffer cmd, VkImage image, VkImageLayout& srcLayout, VkImageLayout dstLayout, const VkImageSubresourceRange& subresourceRange )
         {
             const auto [srcStage, srcAccess] = MakePipelineStageAccess( srcLayout );
             const auto [dstStage, dstAccess] = MakePipelineStageAccess( dstLayout );
 
             const VkImageMemoryBarrier2 imageMemoryBarrier {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .srcStageMask        = srcStage,
                 .srcAccessMask       = srcAccess,
                 .dstStageMask        = dstStage,
@@ -1002,13 +1275,138 @@ namespace zp
             };
 
             const VkDependencyInfo dependencyInfo {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                 .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &imageMemoryBarrier,
+                .pImageMemoryBarriers    = &imageMemoryBarrier,
             };
 
             vkCmdPipelineBarrier2( cmd, &dependencyInfo );
+
+            srcLayout = dstLayout;
         }
+
+        void CmdTransitionImageLayout( VkCommandBuffer cmd, VulkanTexture& texture, VkImageLayout dstLayout, const VkImageSubresourceRange& subresourceRange )
+        {
+            const auto [dstStage, dstAccess] = MakePipelineStageAccess( dstLayout );
+
+            const zp_uint32_t maxMip = subresourceRange.baseMipLevel + subresourceRange.levelCount;
+
+            FixedVector<VkImageMemoryBarrier2, kMaxMipLevels> imageMemoryBarriers;
+
+#if 1
+            // brute force transition each loaded mip level
+            for( zp_uint32_t mip = subresourceRange.baseMipLevel; mip < maxMip; ++mip )
+            {
+                const VkImageLayout currentLayout = texture.vkImageLayouts[ mip ];
+                if( zp_flag32_is_bit_set( texture.loadedMipFlag, mip ) && currentLayout != dstLayout )
+                {
+                    const auto [srcStage, srcAccess] = MakePipelineStageAccess( currentLayout );
+
+                    imageMemoryBarriers.pushBack( {
+                        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                        .srcStageMask        = srcStage,
+                        .srcAccessMask       = srcAccess,
+                        .dstStageMask        = dstStage,
+                        .dstAccessMask       = dstAccess,
+                        .oldLayout           = currentLayout,
+                        .newLayout           = dstLayout,
+                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .image               = texture.vkImage,
+                        .subresourceRange {
+                            .aspectMask = subresourceRange.aspectMask,
+                            .baseMipLevel = mip,
+                            .levelCount = maxMip - mip,
+                            .baseArrayLayer = subresourceRange.baseArrayLayer,
+                            .layerCount = subresourceRange.layerCount,
+                        },
+                    } );
+                }
+            }
+#else
+            VkImageLayout currentLayout = texture.vkImageLayouts[ 0 ];
+            zp_uint32_t currentMip = subresourceRange.baseMipLevel;
+
+            // group mip updates based on when the layout changes
+            for( zp_uint32_t mip = subresourceRange.baseMipLevel; mip < maxMip; ++mip )
+            {
+                if( currentLayout != texture.vkImageLayouts[ mip ] )
+                {
+                    const auto [srcStage, srcAccess] = MakePipelineStageAccess( currentLayout );
+
+                    imageMemoryBarriers.pushBack( {
+                        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                        .srcStageMask        = srcStage,
+                        .srcAccessMask       = srcAccess,
+                        .dstStageMask        = dstStage,
+                        .dstAccessMask       = dstAccess,
+                        .oldLayout           = currentLayout,
+                        .newLayout           = dstLayout,
+                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .image               = texture.vkImage,
+                        .subresourceRange {
+                            .aspectMask = subresourceRange.aspectMask,
+                            .baseMipLevel = currentMip,
+                            .levelCount = mip - currentMip,
+                            .baseArrayLayer = subresourceRange.baseArrayLayer,
+                            .layerCount = subresourceRange.layerCount,
+                        },
+                    } );
+
+                    currentLayout = texture.vkImageLayouts[ mip ];
+                    currentMip = mip;
+                }
+            }
+
+            // if there are any remaining mips
+            if( currentMip < maxMip )
+            {
+                const auto [srcStage, srcAccess] = MakePipelineStageAccess( currentLayout );
+
+                imageMemoryBarriers.pushBack( {
+                    .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                    .srcStageMask        = srcStage,
+                    .srcAccessMask       = srcAccess,
+                    .dstStageMask        = dstStage,
+                    .dstAccessMask       = dstAccess,
+                    .oldLayout           = currentLayout,
+                    .newLayout           = dstLayout,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image               = texture.vkImage,
+                    .subresourceRange {
+                        .aspectMask = subresourceRange.aspectMask,
+                        .baseMipLevel = currentMip,
+                        .levelCount = maxMip - currentMip,
+                        .baseArrayLayer = subresourceRange.baseArrayLayer,
+                        .layerCount = subresourceRange.layerCount,
+                    },
+                } );
+            }
+#endif
+
+            if( !imageMemoryBarriers.isEmpty() )
+            {
+                const VkDependencyInfo dependencyInfo {
+                    .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                    .imageMemoryBarrierCount = static_cast<zp_uint32_t>( imageMemoryBarriers.length() ),
+                    .pImageMemoryBarriers    = imageMemoryBarriers.data(),
+                };
+
+                vkCmdPipelineBarrier2( cmd, &dependencyInfo );
+            }
+
+            // update layouts
+            for( zp_uint32_t mip = subresourceRange.baseMipLevel; mip < maxMip; ++mip )
+            {
+                texture.vkImageLayouts[ mip ] = dstLayout;
+            }
+        }
+
+#pragma endregion
+
+#pragma region Single Use CommandBuffer
 
         VkCommandBuffer RequestSingleUseCommandBuffer( VkDevice device, VkCommandPool cmdPool )
         {
@@ -1068,7 +1466,7 @@ namespace zp
             for( uint32_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++ )
             {
                 const VkMemoryPropertyFlags flags = physicalDeviceMemoryProperties.memoryTypes[ i ].propertyFlags;
-                if( zp_flag32_is_set( typeFilter, ( 1 << i ) ) && zp_flag32_all_set( flags, memoryPropertyFlags ) )
+                if( zp_flag32_is_bit_set( typeFilter, i ) && zp_flag32_all_set( flags, memoryPropertyFlags ) )
                 {
                     return i;
                 }
@@ -1100,7 +1498,7 @@ namespace zp
 
 #pragma endregion
 
-
+#pragma region Delayed Destroy
         struct DelayedDestroyInfo
         {
             zp_uint64_t frame;
@@ -1167,63 +1565,7 @@ namespace zp
             }
         }
 
-        void DestroyDelayedDestroyHandle( const DelayedDestroy& delayedDestroy )
-        {
-            auto vkAllocatorCallbacks = static_cast<const VkAllocationCallbacks*>( delayedDestroy.allocator );
-            auto vkLocalDevice = static_cast<VkDevice>( delayedDestroy.localDevice );
-            auto vkInstance = static_cast<VkInstance>( delayedDestroy.instance );
-            switch( delayedDestroy.type )
-            {
-                case DelayedDestroyType::Buffer:
-                    vkDestroyBuffer( vkLocalDevice, static_cast<VkBuffer>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::BufferView:
-                    vkDestroyBufferView( vkLocalDevice, static_cast<VkBufferView>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Image:
-                    vkDestroyImage( vkLocalDevice, static_cast<VkImage>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::ImageView:
-                    vkDestroyImageView( vkLocalDevice, static_cast<VkImageView>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::FrameBuffer:
-                    vkDestroyFramebuffer( vkLocalDevice, static_cast<VkFramebuffer>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Swapchain:
-                    vkDestroySwapchainKHR( vkLocalDevice, static_cast<VkSwapchainKHR>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Surface:
-                    vkDestroySurfaceKHR( vkInstance, static_cast<VkSurfaceKHR>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Shader:
-                    vkDestroyShaderModule( vkLocalDevice, static_cast<VkShaderModule>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::RenderPass:
-                    vkDestroyRenderPass( vkLocalDevice, static_cast<VkRenderPass>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Sampler:
-                    vkDestroySampler( vkLocalDevice, static_cast<VkSampler>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Fence:
-                    vkDestroyFence( vkLocalDevice, static_cast<VkFence>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Semaphore:
-                    vkDestroySemaphore( vkLocalDevice, static_cast<VkSemaphore>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Pipeline:
-                    vkDestroyPipeline( vkLocalDevice, static_cast<VkPipeline>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::PipelineLayout:
-                    vkDestroyPipelineLayout( vkLocalDevice, static_cast<VkPipelineLayout>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                case DelayedDestroyType::Memory:
-                    vkFreeMemory( vkLocalDevice, static_cast<VkDeviceMemory>(delayedDestroy.handle), vkAllocatorCallbacks );
-                    break;
-                default:
-                    ZP_INVALID_CODE_PATH_MSG( "DelayedDestroyType not defined" );
-                    break;
-            }
-        }
+#pragma endregion
 
         template<typename T0, typename T1>
         constexpr void pNextPushFront( T0& mainInfo, T1& nextInfo )
@@ -1257,114 +1599,10 @@ namespace zp
 
             return index != zp::npos;
         }
-
-
-#pragma region GetObjectType
-
-        template<typename T>
-        constexpr auto GetObjectType( T /*unused*/ ) -> VkObjectType
-        {
-            return VK_OBJECT_TYPE_UNKNOWN;
-        }
-
-        // @formatter:off
-#define MAKE_OBJECT_TYPE( vk, ot )                              \
-template<>                                                      \
-constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
-{                                                               \
-    return ot;                                                  \
-}
-        // @formatter:on
-
-        MAKE_OBJECT_TYPE( VkInstance, VK_OBJECT_TYPE_INSTANCE );
-
-        MAKE_OBJECT_TYPE( VkPhysicalDevice, VK_OBJECT_TYPE_PHYSICAL_DEVICE );
-
-        MAKE_OBJECT_TYPE( VkDevice, VK_OBJECT_TYPE_DEVICE );
-
-        MAKE_OBJECT_TYPE( VkQueue, VK_OBJECT_TYPE_QUEUE );
-
-        MAKE_OBJECT_TYPE( VkSemaphore, VK_OBJECT_TYPE_SEMAPHORE );
-
-        MAKE_OBJECT_TYPE( VkCommandBuffer, VK_OBJECT_TYPE_COMMAND_BUFFER );
-
-        MAKE_OBJECT_TYPE( VkFence, VK_OBJECT_TYPE_FENCE );
-
-        MAKE_OBJECT_TYPE( VkDeviceMemory, VK_OBJECT_TYPE_DEVICE_MEMORY );
-
-        MAKE_OBJECT_TYPE( VkBuffer, VK_OBJECT_TYPE_BUFFER );
-
-#undef MAKE_OBJECT_TYPE
-
-#pragma endregion
     }
 
     namespace
     {
-
-        struct QueueFamilyIndices
-        {
-            zp_uint32_t graphicsFamily;
-            zp_uint32_t transferFamily;
-            zp_uint32_t computeFamily;
-            zp_uint32_t presentFamily;
-        };
-
-        struct QueueInfo
-        {
-            zp_uint32_t familyIndex;
-            zp_uint32_t queueIndex;
-            VkQueue vkQueue;
-        };
-
-        struct Queues
-        {
-            QueueInfo graphics;
-            QueueInfo transfer;
-            QueueInfo compute;
-            QueueInfo present;
-        };
-
-        struct VulkanBuffer
-        {
-            VkBuffer vkBuffer;
-            VkDeviceMemory vkDeviceMemory;
-
-            zp_size_t offset;
-            zp_size_t alignment;
-            zp_size_t size;
-
-            zp_hash32_t hash;
-        };
-
-        struct VulkanTexture
-        {
-        };
-
-        struct VulkanCommandQueue
-        {
-
-        };
-
-        struct StagingBuffer
-        {
-            VkBuffer vkBuffer;
-            VkDeviceMemory vkDeviceMemory;
-
-            zp_size_t position;
-            zp_size_t alignment;
-            zp_size_t size;
-        };
-
-        struct StagingBufferAllocation
-        {
-            VkBuffer vkBuffer;
-            VkDeviceMemory vkDeviceMemory;
-
-            zp_size_t offset;
-            zp_size_t size;
-        };
-
         class VulkanContext
         {
         public:
@@ -1382,13 +1620,63 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void FlushDestroyQueue();
 
-            const StagingBufferAllocation Allocate( zp_size_t size );
+            StagingBufferAllocation Allocate( zp_size_t size );
+
+#pragma region Buffer
 
             BufferHandle RequestBuffer( zp_size_t size );
 
-            void ReleaseBuffer( BufferHandle buffer );
+            void ReleaseBuffer( BufferHandle bufferHandle );
 
-            void UpdateBufferData( CommandQueueHandle commandQueue, BufferHandle dstBuffer, zp_size_t dstOffset, Memory srcData );
+            void UpdateBufferData( CommandQueueHandle commandQueueHandle, BufferHandle dstBuffer, zp_size_t dstOffset, Memory srcData );
+
+#pragma endregion
+
+#pragma region Texture
+
+            TextureHandle RequestTexture();
+
+            void ReleaseTexture( TextureHandle texture );
+
+            void UpdateTextureMipData( CommandQueueHandle commandQueue, TextureHandle dstTexture, zp_uint32_t mipLevel, Memory srcData );
+
+            void GenerateTextureMipLevels( CommandQueueHandle commandQueue, TextureHandle texture, zp_uint32_t mipLevelFlagsToGenerate );
+
+#pragma endregion
+
+#pragma region Shader
+
+            ShaderHandle RequestShader();
+
+            void ReleaseShader( ShaderHandle shader );
+
+#pragma endregion
+
+#pragma region RenderPass
+
+            RenderPassHandle RequestRenderPass();
+
+            void ReleaseRenderPass( RenderPassHandle rendrPass );
+
+#pragma endregion
+
+            void BeginRenderPass( const CommandBeginRenderPass& cmd, MemoryArray<CommandBeginRenderPass::ColorAttachment> colorAttachments );
+
+            void NextSubpass( const CommandNextSubpass& cmd );
+
+            void EndRenderPass( const CommandEndRenderPass& cmd );
+
+            void Dispatch( const CommandDispatch& cmd );
+
+            void DispatchIndirect( const CommandDispatchIndirect& cmd );
+
+            void Draw( const CommandDraw& cmd );
+
+            void Blit( const CommandBlit& cmd );
+
+            void UseBuffer( BufferHandle bufferHandle );
+
+            void UseTexture( TextureHandle textureHandle );
 
             template<typename T>
             void QueueDestroy( T handle )
@@ -1450,8 +1738,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             VkPipelineCache m_vkPipelineCache;
             VkDescriptorPool m_vkDescriptorPool;
             VkCommandPool m_vkTransientCommandPool;
-            FixedArray<VkCommandPool, kBufferedFrameCount> m_vkCommandPools;
-            FixedArray<StagingBuffer, kBufferedFrameCount> m_stagingBuffers;
+
+            VkDescriptorSetLayout m_vkBindlessLayout;
+            VkDescriptorPool m_vkBindlessDescriptorPool;
+
+            FixedArray<FrameResources, kMaxBufferedFrameCount> m_frameResources;
+
+            FixedArray<VkCommandPool, kMaxBufferedFrameCount> m_vkCommandPools;
+            FixedArray<StagingBuffer, kMaxBufferedFrameCount> m_stagingBuffers;
+            FixedArray<VkDescriptorSet, kMaxBufferedFrameCount> m_vkBindlessDescriptorSets;
 
 #if ZP_DEBUG
             VkDebugUtilsMessengerEXT m_vkDebugMessenger;
@@ -1465,10 +1760,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             Vector<DelayedDestroyInfo> m_delayedDestroyed;
 
             Vector<VulkanCommandQueue> m_vkCommandQueues;
-            Vector<zp_size_t> m_vkFreeCommandQueues;
+            Queue<zp_uint32_t> m_vkFreeCommandQueues;
 
             Vector<VulkanBuffer> m_vkBuffers;
-            Vector<zp_size_t> m_vkFreeBuffers;
+            Queue<zp_uint32_t> m_vkFreeBuffers;
+
+            Vector<VulkanTexture> m_vkTextures;
+            Queue<zp_uint32_t> m_vkFreeTextures;
+
+            Vector<VulkanRenderTarget> m_vkRenderTargets;
+            Queue<zp_uint32_t> m_vkFreeRenderTargets;
 
             zp_uint64_t m_frame;
             zp_size_t m_frameIndex;
@@ -1548,6 +1849,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
                 VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
                 VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+                VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
+                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
             };
 
             // app info
@@ -1683,7 +1987,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     }
 
                     if( m_queues.graphics.familyIndex == VK_QUEUE_FAMILY_IGNORED &&
-                        zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT ) )
+                        zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT ) )
                     {
                         m_queues.graphics.familyIndex = i;
 
@@ -1697,13 +2001,13 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     }
 
                     if( m_queues.transfer.familyIndex == VK_QUEUE_FAMILY_IGNORED &&
-                        zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_TRANSFER_BIT ) )
+                        zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_TRANSFER_BIT ) )
                     {
                         m_queues.transfer.familyIndex = i;
                     }
 
                     if( m_queues.compute.familyIndex == VK_QUEUE_FAMILY_IGNORED &&
-                        zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_COMPUTE_BIT ) )
+                        zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_COMPUTE_BIT ) )
                     {
                         m_queues.compute.familyIndex = i;
                     }
@@ -1718,14 +2022,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         continue;
                     }
 
-                    if( zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_TRANSFER_BIT ) &&
+                    if( zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_TRANSFER_BIT ) &&
                         !zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT ) )
                     {
                         m_queues.transfer.familyIndex = i;
                     }
 
-                    if( zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_COMPUTE_BIT ) &&
-                        !zp_flag32_is_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT ) )
+                    if( zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_COMPUTE_BIT ) &&
+                        !zp_flag32_any_set( queueFamilyProperty.queueFlags, VK_QUEUE_GRAPHICS_BIT ) )
                     {
                         m_queues.compute.familyIndex = i;
                     }
@@ -1737,7 +2041,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 uniqueFamilyIndices.add( m_queues.compute.familyIndex );
                 uniqueFamilyIndices.add( m_queues.present.familyIndex );
 
-                Vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos( 4, MemoryLabels::Temp );
+                FixedVector<VkDeviceQueueCreateInfo, 4> deviceQueueCreateInfos;
 
                 const zp_float32_t queuePriority = 1.0F;
                 for( const zp_uint32_t& queueFamily : uniqueFamilyIndices )
@@ -1860,11 +2164,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 //
                 VkDeviceCreateInfo localDeviceCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-                    .queueCreateInfoCount = static_cast<uint32_t>( deviceQueueCreateInfos.size() ),
+                    .queueCreateInfoCount = static_cast<uint32_t>( deviceQueueCreateInfos.length() ),
                     .pQueueCreateInfos = deviceQueueCreateInfos.data(),
                     .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
                     .ppEnabledLayerNames = kValidationLayers,
-                    .enabledExtensionCount = static_cast<zp_uint32_t>( supportedExtensions.size() ),
+                    .enabledExtensionCount = static_cast<zp_uint32_t>( supportedExtensions.length() ),
                     .ppEnabledExtensionNames = supportedExtensions.data(),
                 };
                 pNext( localDeviceCreateInfo, deviceFeatures );
@@ -1879,10 +2183,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 vkGetDeviceQueue( m_vkLocalDevice, m_queues.compute.familyIndex, m_queues.compute.queueIndex, &m_queues.compute.vkQueue );
                 vkGetDeviceQueue( m_vkLocalDevice, m_queues.present.familyIndex, m_queues.present.queueIndex, &m_queues.present.vkQueue );
 
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.graphics.vkQueue, "Graphics Queue" );
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.transfer.vkQueue, "Transfer Queue" );
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.compute.vkQueue, "Compute Queue" );
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_QUEUE, m_queues.present.vkQueue, "Present Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_queues.graphics.vkQueue, "Graphics Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_queues.transfer.vkQueue, "Transfer Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_queues.compute.vkQueue, "Compute Queue" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_queues.present.vkQueue, "Present Queue" );
             }
 
             // create pipeline cache
@@ -1898,7 +2202,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
 
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_PIPELINE_CACHE, m_vkPipelineCache, "Pipeline Cache" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkPipelineCache, "Pipeline Cache" );
             }
 
             // create descriptor pool
@@ -1931,7 +2235,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
 
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_vkDescriptorPool, "Descriptor Pool" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkDescriptorPool, "Descriptor Pool" );
             }
 
             // create transient command pool
@@ -1944,7 +2248,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 HR( vkCreateCommandPool( m_vkLocalDevice, &transientCommandPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkTransientCommandPool ) );
 
-                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, m_vkTransientCommandPool, "Transient Command Pool" );
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkTransientCommandPool, "Transient Command Pool" );
             }
 
             // create per frame command pools
@@ -1955,11 +2259,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .queueFamilyIndex = m_queues.graphics.familyIndex,
                 };
 
-                for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+                for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
                 {
                     HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfo, &m_vkAllocationCallbacks, &m_vkCommandPools[ i ] ) );
 
-                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_POOL, m_vkCommandPools[ i ], "Command Pool %d", i );
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkCommandPools[ i ], "Command Pool %d", i );
                 }
             }
 
@@ -1975,7 +2279,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .pQueueFamilyIndices = nullptr,
                 };
 
-                for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+                for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
                 {
                     VkBuffer vkBuffer {};
                     HR( vkCreateBuffer( m_vkLocalDevice, &stagingBufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
@@ -1995,7 +2299,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                     HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
 
-                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_BUFFER, vkBuffer, "Staging Buffer %d", i );
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Staging Buffer %d", i );
 
                     m_stagingBuffers[ i ] = StagingBuffer {
                         .vkBuffer = vkBuffer,
@@ -2006,6 +2310,79 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     };
                 };
             }
+
+            // create bindless setup
+            {
+                const FixedArray<VkDescriptorSetLayoutBinding, 3> bindings {
+                    VkDescriptorSetLayoutBinding {
+                        .binding = 0,
+                        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        .descriptorCount = 1024,
+                        .stageFlags = VK_SHADER_STAGE_ALL,
+                    },
+                    VkDescriptorSetLayoutBinding {
+                        .binding = 1,
+                        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        .descriptorCount = 1024,
+                        .stageFlags = VK_SHADER_STAGE_ALL,
+                    },
+                    VkDescriptorSetLayoutBinding {
+                        .binding = 2,
+                        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        .descriptorCount = 1024,
+                        .stageFlags = VK_SHADER_STAGE_ALL,
+                    },
+                };
+
+                const FixedArray<VkDescriptorBindingFlags, 3> flags {
+                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+                };
+                ZP_ASSERT( bindings.length() == flags.length() );
+
+                const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+                    .bindingCount = static_cast<uint32_t>( flags.length() ),
+                    .pBindingFlags = flags.data(),
+                };
+
+                const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                    .pNext = &bindingFlagsCreateInfo,
+                    .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+                    .bindingCount = static_cast<uint32_t>( bindings.length() ),
+                    .pBindings = bindings.data(),
+                };
+
+                HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &descriptorSetLayoutCreateInfo, &m_vkAllocationCallbacks, &m_vkBindlessLayout ) );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkBindlessLayout, "Bindless Layout" );
+
+                const VkDescriptorPoolCreateInfo poolInfo {
+                    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                    .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
+                    .maxSets = 16,
+                };
+
+                HR( vkCreateDescriptorPool( m_vkLocalDevice, &poolInfo, &m_vkAllocationCallbacks, &m_vkBindlessDescriptorPool ) );
+
+                SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkBindlessDescriptorPool, "Bindless Descriptor Pool" );
+
+                const VkDescriptorSetAllocateInfo descriptorSetAllocateInfo {
+                    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                    .descriptorPool = m_vkBindlessDescriptorPool,
+                    .descriptorSetCount = 1,
+                    .pSetLayouts = &m_vkBindlessLayout,
+                };
+
+                for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
+                {
+                    HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &m_vkBindlessDescriptorSets[ i ] ) );
+
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkBindlessDescriptorSets[ i ], "Bindless Descriptor Set %d", i );
+                }
+            };
         }
 
         void VulkanContext::Destroy()
@@ -2024,6 +2401,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             vkDestroyPipelineCache( m_vkLocalDevice, m_vkPipelineCache, &m_vkAllocationCallbacks );
 
             vkDestroyDescriptorPool( m_vkLocalDevice, m_vkDescriptorPool, &m_vkAllocationCallbacks );
+
+            vkDestroyDescriptorPool( m_vkLocalDevice, m_vkBindlessDescriptorPool, &m_vkAllocationCallbacks );
+
+            vkDestroyDescriptorSetLayout( m_vkLocalDevice, m_vkBindlessLayout, &m_vkAllocationCallbacks );
 
             // destroy command pools
             vkDestroyCommandPool( m_vkLocalDevice, m_vkTransientCommandPool, &m_vkAllocationCallbacks );
@@ -2112,10 +2493,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const zp_size_t kMaxFrameDistance = 3;
             if( !m_delayedDestroyed.isEmpty() )
             {
-                Vector<DelayedDestroyInfo> handlesToDestroy( m_delayedDestroyed.size(), MemoryLabels::Temp );
+                Vector<DelayedDestroyInfo> handlesToDestroy( m_delayedDestroyed.length(), MemoryLabels::Temp );
 
                 // get delayed destroy handles that are too old
-                for( zp_size_t i = 0; i < m_delayedDestroyed.size(); ++i )
+                for( zp_size_t i = 0; i < m_delayedDestroyed.length(); ++i )
                 {
                     const auto& destroyInfo = m_delayedDestroyed[ i ];
                     if( destroyInfo.vkHandle == nullptr )
@@ -2141,7 +2522,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         return zp_cmp( a.order, b.order );
                     } );
 
-                    // destroy each delayed destroy handle
+                    // destroy each delayed destroy m_handle
                     for( const auto& delayedDestroy : handlesToDestroy )
                     {
                         ProcessDelayedDestroy( delayedDestroy );
@@ -2162,7 +2543,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             m_delayedDestroyed.clear();
         }
 
-        const StagingBufferAllocation VulkanContext::Allocate( zp_size_t size )
+        StagingBufferAllocation VulkanContext::Allocate( zp_size_t size )
         {
             ZP_PROFILE_CPU_BLOCK();
 
@@ -2174,6 +2555,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const StagingBufferAllocation allocation {
                 .vkBuffer = stagingBuffer.vkBuffer,
                 .vkDeviceMemory = stagingBuffer.vkDeviceMemory,
+                .vkAccess = VK_ACCESS_2_HOST_WRITE_BIT,
                 .offset = stagingBuffer.position,
                 .size = allocationSize
             };
@@ -2187,21 +2569,51 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const zp_size_t alignedSize = ZP_ALIGN_SIZE( size, 16 );
+            const zp_bool_t allowTransferFrom = true;
+            const zp_bool_t uniformBuffer = false;
+
+            VkBufferUsageFlags vkBufferUsage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+            if( allowTransferFrom )
+            {
+                vkBufferUsage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            }
+
+            if( uniformBuffer )
+            {
+                vkBufferUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            }
+
+            switch( 0 )
+            {
+                case 0:
+                    vkBufferUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+                    break;
+
+                case 1:
+                    vkBufferUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+                    break;
+
+                case 2:
+                    vkBufferUsage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+                    break;
+
+            };
+
+            const zp_size_t alignment = uniformBuffer ? 16 : 4;
+            const zp_size_t alignedSize = ZP_ALIGN_SIZE( size, alignment );
 
             const VkBufferCreateInfo bufferCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                .flags = 0,
                 .size = alignedSize,
-                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                .usage = vkBufferUsage,
                 .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices = nullptr,
             };
 
             VkBuffer vkBuffer {};
             HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
 
+            // allocate memory
             VkMemoryRequirements memoryRequirements {};
             vkGetBufferMemoryRequirements( m_vkLocalDevice, vkBuffer, &memoryRequirements );
 
@@ -2216,66 +2628,67 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
 
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_BUFFER, vkBuffer, "Buffer (%d)", memoryAllocateInfo.allocationSize );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Buffer (%d)", memoryAllocateInfo.allocationSize );
 
-            zp_size_t index;
+            zp_uint32_t index;
             if( m_vkFreeBuffers.isEmpty() )
             {
-                index = m_vkBuffers.size();
+                index = m_vkBuffers.length();
                 m_vkBuffers.pushBackEmpty();
             }
             else
             {
-                index = m_vkFreeBuffers[ 0 ];
-                m_vkFreeBuffers.eraseAtSwapBack( 0 );
+                index = m_vkFreeBuffers.dequeue();
             }
 
             zp_hash32_t hash = zp_fnv32_1a( m_frame );
             hash = zp_fnv32_1a( index, hash );
             hash = zp_fnv32_1a( memoryAllocateInfo.allocationSize, hash );
+            hash = zp_fnv32_1a( vkBufferUsage, hash );
 
             m_vkBuffers[ index ] = VulkanBuffer {
                 .vkBuffer = vkBuffer,
                 .vkDeviceMemory = vkDeviceMemory,
+                .vkBufferUsage = vkBufferUsage,
+                .vkAccess = VK_ACCESS_2_NONE,
                 .offset = 0,
                 .alignment = memoryRequirements.alignment,
                 .size = memoryAllocateInfo.allocationSize,
                 .hash = hash,
             };
 
-            const BufferHandle bufferHandle { .index = static_cast<zp_uint32_t>( index ), .hash = hash };
-            return bufferHandle;
+            return { .index = index, .hash = hash };
         }
 
-        void VulkanContext::ReleaseBuffer( BufferHandle buffer )
+        void VulkanContext::ReleaseBuffer( BufferHandle bufferHandle )
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            // remove buffer and clear out data
-            const VulkanBuffer vkBuffer = m_vkBuffers[ buffer.index ];
-            m_vkBuffers[ buffer.index ] = {};
+            // remove bufferHandle and clear out data
+            const VulkanBuffer buffer = m_vkBuffers[ bufferHandle.index ];
+            ZP_ASSERT( buffer.hash == bufferHandle.hash );
+            m_vkBuffers[ bufferHandle.index ] = {};
 
             // add to free list
-            m_vkFreeBuffers.pushBack( buffer.index );
+            m_vkFreeBuffers.enqueue( bufferHandle.index );
 
             // destroy underlying data
-            QueueDestroy( vkBuffer.vkDeviceMemory );
+            QueueDestroy( buffer.vkDeviceMemory );
 
-            QueueDestroy( vkBuffer.vkBuffer );
+            QueueDestroy( buffer.vkBuffer );
         }
 
-        void VulkanContext::UpdateBufferData( CommandQueueHandle commandQueue, BufferHandle dstBufferHandle, zp_size_t dstOffset, Memory srcData )
+        void VulkanContext::UpdateBufferData( CommandQueueHandle commandQueueHandle, BufferHandle dstBufferHandle, zp_size_t dstOffset, Memory srcData )
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const StagingBufferAllocation allocation = Allocate( srcData.size );
+            StagingBufferAllocation allocation = Allocate( srcData.size );
 
-            const VulkanBuffer& vkDstBuffer = m_vkBuffers[ dstBufferHandle.index ];
-            ZP_ASSERT( vkDstBuffer.hash == dstBufferHandle.hash );
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
+            ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
 
-            VkCommandBuffer vkCommandBuffer;
-
-            zp_size_t dstBufferOffset;
+            VulkanBuffer& dstBuffer = m_vkBuffers[ dstBufferHandle.index ];
+            ZP_ASSERT( dstBuffer.hash == dstBufferHandle.hash );
 
             // copy srcData to staging vkBuffer
             {
@@ -2283,6 +2696,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
                 zp_memcpy( dstMemory, allocation.size, srcData.ptr, srcData.size );
+
+                vkUnmapMemory( m_vkLocalDevice, allocation.vkDeviceMemory );
 
                 const VkMappedMemoryRange flushMemoryRange {
                     .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
@@ -2292,19 +2707,18 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 };
                 HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
 
-                vkUnmapMemory( m_vkLocalDevice, allocation.vkDeviceMemory );
+                HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
             }
 
-#if 0
             // transfer from CPU to GPU memory
-            if constexpr( false )
             {
+#if 0
                 VkBufferMemoryBarrier memoryBarrier[2] {
                     {
                         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                         .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
                         .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                        .dstbuffer = static_cast<VkBuffer>( allocation.dstbuffer ),
+                        .buffer = allocation.vkBuffer,
                         .offset = allocation.offset,
                         .size = allocation.size,
                     },
@@ -2312,15 +2726,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                         .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
                         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                        .dstbuffer = static_cast<VkBuffer>( dstGraphicsBuffer->dstbuffer ),
-                        .offset = dstGraphicsBuffer->offset,
+                        .buffer = dstBuffer.vkBuffer,
+                        .offset = dstBuffer.offset,
                         .size = allocation.size,
 
                     }
                 };
 
                 vkCmdPipelineBarrier(
-                    commandBuffer,
+                    commandQueue.vkCommandBuffer,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                     0,
@@ -2331,72 +2745,1205 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     0,
                     nullptr
                 );
-            }
 #endif
+
+                //CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
+                //CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer.vkBuffer, dstBuffer.offset, allocation.size, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, 0, allocation.size, VK_ACCESS_2_TRANSFER_WRITE_BIT );
+            }
 
             // copy staging vkBuffer to dst vkBuffer
             {
-                const VkBufferCopy bufferCopy {
+                const VkBufferCopy2 region {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
                     .srcOffset = allocation.offset,
-                    .dstOffset = vkDstBuffer.offset + dstBufferOffset,
+                    .dstOffset = dstBuffer.offset,
                     .size = allocation.size,
                 };
 
-                vkCmdCopyBuffer(
-                    vkCommandBuffer,
-                    allocation.vkBuffer,
-                    vkDstBuffer.vkBuffer,
-                    1,
-                    &bufferCopy
-                );
+                const VkCopyBufferInfo2 copyBufferInfo {
+                    .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+                    .srcBuffer = allocation.vkBuffer,
+                    .dstBuffer = dstBuffer.vkBuffer,
+                    .regionCount = 1,
+                    .pRegions = &region,
+                };
+
+                vkCmdCopyBuffer2( commandQueue.vkCommandBuffer, &copyBufferInfo );
             }
 
             // finalize dstbuffer upload
             {
-#if 0
-                const VkBufferMemoryBarrier memoryBarrier {
-                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .buffer = vkDstBuffer,
-                    .offset = dstBufferOffset,
-                    .size = allocation.size,
-                };
-
-                vkCmdPipelineBarrier(
-                    commandBuffer,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    0,
-                    0,
-                    nullptr,
-                    1,
-                    &memoryBarrier,
-                    0,
-                    nullptr
-                );
-#endif
-                const VkBufferMemoryBarrier2 memoryBarrier {
-                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-                    .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                    .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .buffer = vkDstBuffer.vkBuffer,
-                    .offset = vkDstBuffer.offset + dstBufferOffset,
-                    .size = allocation.size,
-                };
-
-                const VkDependencyInfo dependencyInfo {
-                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                    .bufferMemoryBarrierCount = 1,
-                    .pBufferMemoryBarriers = &memoryBarrier,
-                };
-
-                vkCmdPipelineBarrier2( vkCommandBuffer, &dependencyInfo );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, 0, allocation.size, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
             }
+        }
+
+        TextureHandle VulkanContext::RequestTexture()
+        {
+            const VkFormat vkFormat = VK_FORMAT_R8G8B8A8_SRGB;
+            const VkImageType vkImageType = VK_IMAGE_TYPE_2D;
+            const VkImageViewType vkImageViewType = VK_IMAGE_VIEW_TYPE_2D;
+            const Size3Du size { .width = 64, .height = 64, .depth = 1 };
+            const uint32_t mipLevels = 1;
+            const zp_bool_t allowAutoMipGen = true;
+            const zp_bool_t allowBlit = true;
+            const VkImageAspectFlagBits vkImageAspect = VK_IMAGE_ASPECT_COLOR_BIT;
+            const VkImageTiling vkImageTiling = VK_IMAGE_TILING_OPTIMAL;
+            const VkImageLayout vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+            VkImageUsageFlags vkImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+            if( allowAutoMipGen )
+            {
+                vkImageUsageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            }
+
+            if( allowBlit )
+            {
+                vkImageUsageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            }
+
+#if ZP_DEBUG
+            // make sure format is supported properly
+            VkFormatProperties formatProperties {};
+            vkGetPhysicalDeviceFormatProperties( m_vkPhysicalDevice, vkFormat, &formatProperties );
+
+            const VkFormatFeatureFlags formatFeatures = vkImageTiling == VK_IMAGE_TILING_OPTIMAL ? formatProperties.optimalTilingFeatures : formatProperties.linearTilingFeatures;
+
+            if( zp_flag32_all_set( vkImageUsageFlags, VK_IMAGE_USAGE_SAMPLED_BIT ) )
+            {
+                ZP_ASSERT( zp_flag32_all_set( formatFeatures, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT ) );
+            }
+#endif // ZP_DEBUG
+
+            const VkImageCreateInfo imageCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .flags = 0,
+                .imageType = vkImageType,
+                .format = vkFormat,
+                .extent {
+                    .width = size.width,
+                    .height = size.height,
+                    .depth = size.depth,
+                },
+                .mipLevels = mipLevels,
+                .arrayLayers = 1,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .tiling = vkImageTiling,
+                .usage = vkImageUsageFlags,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .initialLayout = vkImageLayout,
+            };
+
+            VkImage vkImage;
+            HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, &m_vkAllocationCallbacks, &vkImage ) );
+
+            // allocate memory
+            VkMemoryRequirements memoryRequirements {};
+            vkGetImageMemoryRequirements( m_vkLocalDevice, vkImage, &memoryRequirements );
+
+            const VkMemoryAllocateInfo memoryAllocateInfo {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memoryRequirements.size,
+                .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( ZP_MEMORY_PROPERTY_DEVICE_LOCAL ) ),
+            };
+
+            VkDeviceMemory vkDeviceMemory;
+            HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+
+            HR( vkBindImageMemory( m_vkLocalDevice, vkImage, vkDeviceMemory, 0 ) );
+
+            // create image views for reach mip level
+            FixedArray<VkImageView, kMaxMipLevels> vkImageViews;
+            FixedArray<VkImageLayout, kMaxMipLevels> vkImageLayouts;
+            for( zp_uint32_t i = 0; i < mipLevels; ++i )
+            {
+                const VkImageViewCreateInfo imageViewCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .image = vkImage,
+                    .viewType = vkImageViewType,
+                    .format = vkFormat,
+                    .components {
+                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    },
+                    .subresourceRange {
+                        .aspectMask = vkImageAspect,
+                        .baseMipLevel = i,
+                        .levelCount = mipLevels - i,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    },
+                };
+
+                HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &vkImageViews[ i ] ) );
+                vkImageLayouts[ i ] = vkImageLayout;
+            }
+
+            zp_uint32_t index;
+            if( m_vkFreeTextures.isEmpty() )
+            {
+                index = m_vkTextures.length();
+                m_vkTextures.pushBackEmpty();
+            }
+            else
+            {
+                index = m_vkFreeTextures.dequeue();
+            }
+
+            zp_hash32_t hash = zp_fnv32_1a( m_frame );
+            hash = zp_fnv32_1a( index, hash );
+            hash = zp_fnv32_1a( memoryAllocateInfo.allocationSize, hash );
+            hash = zp_fnv32_1a( size, hash );
+
+            m_vkTextures[ index ] = VulkanTexture {
+                .vkImage = vkImage,
+                .vkImageViews = vkImageViews,
+                .vkImageLayouts = vkImageLayouts,
+                .vkDeviceMemory = vkDeviceMemory,
+                .vkImageUsage = vkImageUsageFlags,
+                .vkImageAspect = vkImageAspect,
+                .vkFormat = vkFormat,
+                .size = size,
+                .mipCount = mipLevels,
+                .loadedMipFlag = 0,
+                .hash = hash,
+            };
+
+            return { .index = index, .hash = hash };
+        }
+
+        void VulkanContext::ReleaseTexture( TextureHandle textureHandle )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            // clear texture
+            const VulkanTexture texture = m_vkTextures[ textureHandle.index ];
+            ZP_ASSERT( textureHandle.hash == texture.hash );
+            m_vkTextures[ textureHandle.index ] = {};
+
+            // queue freed index
+            m_vkFreeTextures.enqueue( textureHandle.index );
+
+            // destroy VK resources
+            QueueDestroy( texture.vkDeviceMemory );
+
+            for( zp_uint32_t i = 0; i < texture.mipCount; i++ )
+            {
+                QueueDestroy( texture.vkImageViews[ i ] );
+            }
+
+            QueueDestroy( texture.vkImage );
+        }
+
+        Size2Du CalculateMipSize( zp_uint32_t mipLevel, const Size2Du& size )
+        {
+            Size2Du mipSize = size;
+
+            for( zp_uint32_t i = 0; i < mipLevel; ++i )
+            {
+                mipSize.width = zp_max( 1u, mipSize.width >> 1 );
+                mipSize.height = zp_max( 1u, mipSize.height >> 1 );
+            }
+
+            return mipSize;
+        }
+
+        void VulkanContext::UpdateTextureMipData( CommandQueueHandle commandQueueHandle, TextureHandle dstTextureHandle, zp_uint32_t mipLevel, Memory srcData )
+        {
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
+            ZP_ASSERT( commandQueue.hash == commandQueue.hash );
+
+            VulkanTexture& texture = m_vkTextures[ dstTextureHandle.index ];
+            ZP_ASSERT( dstTextureHandle.hash == texture.hash );
+
+            StagingBufferAllocation allocation = Allocate( srcData.size );
+
+            // copy srcData to staging vkBuffer
+            {
+                void* dstMemory {};
+                HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+
+                zp_memcpy( dstMemory, allocation.size, srcData.ptr, srcData.size );
+
+                vkUnmapMemory( m_vkLocalDevice, allocation.vkDeviceMemory );
+
+                const VkMappedMemoryRange flushMemoryRange {
+                    .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+                    .memory = allocation.vkDeviceMemory,
+                    .offset = allocation.offset,
+                    .size = allocation.size,
+                };
+                HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+
+                HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+            }
+
+            // tranfer staging buffer
+            {
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
+            }
+
+            const VkImageSubresourceRange subresourceRange {
+                .aspectMask = texture.vkImageAspect,
+                .baseMipLevel = mipLevel,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            };
+
+            // transition image to DST_OPT
+            {
+                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange );
+            }
+
+            // copy buffer to texture
+            {
+                const Size2Du mipSize = CalculateMipSize( mipLevel, Size3Dto2D( texture.size ) );
+
+                const VkBufferImageCopy2 region {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+                    .bufferOffset = allocation.offset,
+                    .bufferRowLength = 0,
+                    .bufferImageHeight = 0,
+                    .imageSubresource {
+                        .aspectMask = subresourceRange.aspectMask,
+                        .mipLevel = mipLevel,
+                        .baseArrayLayer = subresourceRange.baseArrayLayer,
+                        .layerCount = subresourceRange.layerCount,
+                    },
+                    .imageOffset {
+                        .x = 0,
+                        .y = 0,
+                        .z = 0,
+                    },
+                    .imageExtent {
+                        .width = mipSize.width,
+                        .height = mipSize.height,
+                        .depth = 1,
+                    },
+                };
+
+                const VkCopyBufferToImageInfo2 copyBufferToImageInfo {
+                    .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+                    .srcBuffer = allocation.vkBuffer,
+                    .dstImage = texture.vkImage,
+                    .dstImageLayout = texture.vkImageLayouts[ mipLevel ],
+                    .regionCount = 1,
+                    .pRegions = &region,
+                };
+
+                vkCmdCopyBufferToImage2( commandQueue.vkCommandBuffer, &copyBufferToImageInfo );
+            }
+
+            // transition to READ_ONLY_OPT
+            {
+                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
+            }
+        }
+
+        void VulkanContext::GenerateTextureMipLevels( CommandQueueHandle commandQueueHandle, TextureHandle textureHandle, zp_uint32_t mipLevelFlagsToGenerate )
+        {
+            VulkanTexture& texture = m_vkTextures[ textureHandle.index ];
+            ZP_ASSERT( textureHandle.hash == texture.hash );
+
+            // if there is no mips needed, or no mips loaded, or they are all loaded, return
+            if( texture.mipCount == 1 || texture.loadedMipFlag == 0 || zp_flag32_all_set( texture.loadedMipFlag, mipLevelFlagsToGenerate ) )
+            {
+                return;
+            }
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
+            ZP_ASSERT( commandQueueHandle.hash == commandQueue.hash );
+
+            // transition all mips to DST_OPT
+            CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {
+                .aspectMask = texture.vkImageAspect,
+                .baseMipLevel = 0,
+                .levelCount = texture.mipCount,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            } );
+
+            zp_int32_t width = static_cast<zp_int32_t>( texture.size.width );
+            zp_int32_t height = static_cast<zp_int32_t>( texture.size.height );
+            zp_int32_t mipWidth;
+            zp_int32_t mipHeight;
+
+            // generate each non-loaded mip
+            for( zp_uint32_t i = 1; i < texture.mipCount; ++i )
+            {
+                mipWidth = zp_max( width >> 1, 1 );
+                mipHeight = zp_max( height >> 1, 1 );
+
+                const zp_uint32_t srcMip = i - 1;
+                const zp_uint32_t dstMip = i;
+
+                // if the src mip is loaded, then the dst can be loaded
+                if( !zp_flag32_is_bit_set( texture.loadedMipFlag, srcMip ) )
+                {
+                    // mark mip as loaded
+                    texture.loadedMipFlag |= 1 << dstMip;
+
+                    // transition previous mip to SRC_OPT
+                    CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, {
+                        .aspectMask = texture.vkImageAspect,
+                        .baseMipLevel = srcMip,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    } );
+
+                    // blip previous mip to current mip
+                    const VkImageBlit2 region {
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+                        .srcSubresource {
+                            .aspectMask = texture.vkImageAspect,
+                            .mipLevel = srcMip,
+                            .baseArrayLayer = 0,
+                            .layerCount = 1,
+                        },
+                        .srcOffsets {
+                            { 0,     0,      0 },
+                            { width, height, 1 },
+                        },
+                        .dstSubresource {
+                            .aspectMask = texture.vkImageAspect,
+                            .mipLevel = dstMip,
+                            .baseArrayLayer = 0,
+                            .layerCount = 1,
+                        },
+                        .dstOffsets {
+                            { 0,        0,         0 },
+                            { mipWidth, mipHeight, 1 },
+                        },
+                    };
+
+                    const VkBlitImageInfo2 blitImageInfo {
+                        .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+                        .srcImage = texture.vkImage,
+                        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        .dstImage = texture.vkImage,
+                        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        .regionCount = 1,
+                        .pRegions = &region,
+                        .filter = VK_FILTER_LINEAR,
+                    };
+
+                    vkCmdBlitImage2( commandQueue.vkCommandBuffer, &blitImageInfo );
+
+                    // transition previous mip to READ_ONLY_OPT
+                    CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, {
+                        .aspectMask = texture.vkImageAspect,
+                        .baseMipLevel = srcMip,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    } );
+                }
+
+                width = mipWidth;
+                height = mipHeight;
+            }
+
+            // transition all mips to READ_ONLY_OPT
+            CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, {
+                .aspectMask = texture.vkImageAspect,
+                .baseMipLevel = 0,
+                .levelCount = texture.mipCount,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            } );
+        }
+
+        ShaderHandle VulkanContext::RequestShader()
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const MemoryArray<zp_uint32_t> shaderData {};
+
+            const VkShaderModuleCreateInfo shaderModuleCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = shaderData.size(),
+                .pCode = shaderData.data(),
+            };
+
+            VkShaderModule shaderModule;
+            HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
+
+            //
+            //
+            //
+
+            const Memory specializationData {};
+
+            FixedVector<VkSpecializationMapEntry, 4> specializationMapEntries;
+            specializationMapEntries.pushBack( {
+                .constantID = 0,
+                .offset = 0,
+                .size = 0,
+            } );
+
+            const VkSpecializationInfo specializationInfo {
+                .mapEntryCount = static_cast<zp_uint32_t>( specializationMapEntries.length() ),
+                .pMapEntries = specializationMapEntries.data(),
+                .dataSize = specializationData.size,
+                .pData = specializationData.ptr,
+            };
+
+            constexpr const char* kDefaultShaderStageName[] {
+                "vs_main",
+                "tc_main",
+                "te_main",
+                "gs_main",
+                "fs_main",
+                "cs_main",
+                "tm_main",
+                "mm_main",
+            };
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( kDefaultShaderStageName ) == ShaderStage_Count );
+
+            zp_uint32_t shaderStageLoadedFlags = 1 << ZP_SHADER_STAGE_VERTEX | 1 << ZP_SHADER_STAGE_FRAGMENT;
+
+            FixedVector<VkPipelineShaderStageCreateInfo, ShaderStage_Count> pipelineShaderStageCreateInfos;
+            FixedVector<VkPushConstantRange, ShaderStage_Count> pushConstantRanges;
+            for( zp_uint32_t i = 0; i < ShaderStage_Count; ++i )
+            {
+                if( zp_flag32_is_bit_set( shaderStageLoadedFlags, i ) )
+                {
+                    const VkShaderStageFlagBits stage = Convert( static_cast<ShaderStage>( i ) );
+
+                    pipelineShaderStageCreateInfos.pushBack( {
+                        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                        .stage = stage,
+                        .module = shaderModule,
+                        .pName = kDefaultShaderStageName[ i ],
+                        .pSpecializationInfo = &specializationInfo,
+                    } );
+
+                    pushConstantRanges.pushBack( {
+                        .stageFlags = stage,
+                        .offset = 0,
+                        .size = 0,
+                    } );
+                }
+            }
+
+            VkDescriptorSetLayoutBinding bings {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                .descriptorCount = 1,
+                .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            };
+
+            VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
+            };
+
+            const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                .setLayoutCount = 1,
+                .pSetLayouts = &m_vkBindlessLayout,
+                .pushConstantRangeCount = static_cast<zp_uint32_t>( pushConstantRanges.length() ),
+                .pPushConstantRanges = pushConstantRanges.data(),
+            };
+
+            VkPipelineLayout vkPipelineLayout;
+            HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, &m_vkAllocationCallbacks, &vkPipelineLayout ) );
+
+            VkRenderPass vkRenderPass {};
+
+#if USE_DYNAMIC_RENDERING
+#else
+            // collect all attachments
+            FixedVector<VkAttachmentDescription2, 8> attachmentDescriptions;
+            attachmentDescriptions.pushBack( {
+                .sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2,
+                .format = VK_FORMAT_R8G8B8A8_SRGB,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_LOAD,
+                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+                .finalLayout    = VK_IMAGE_LAYOUT_UNDEFINED,
+            } );
+
+            // build subpasses
+            FixedVector<VkAttachmentReference2, 8> colorAttachmentReferences;
+            colorAttachmentReferences.pushBack( {
+                .sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2,
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            } );
+
+            FixedVector<VkAttachmentReference2, 8> inputAttachmentReferences {};
+
+            VkAttachmentReference2 depthStencilAttachmentReference {
+                .sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2,
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+            };
+
+            FixedVector<VkSubpassDescription2, 8> subpassDescriptions;
+            subpassDescriptions.pushBack( {
+                .sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2,
+                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+                .inputAttachmentCount = static_cast<zp_uint32_t>( inputAttachmentReferences.length() ),
+                .pInputAttachments = inputAttachmentReferences.data(),
+                .colorAttachmentCount = static_cast<zp_uint32_t>( colorAttachmentReferences.length() ),
+                .pColorAttachments = colorAttachmentReferences.data(),
+                .pDepthStencilAttachment = &depthStencilAttachmentReference,
+            } );
+
+            FixedVector<VkSubpassDependency2, 8> subpassDependencies;
+            subpassDependencies.pushBack( {
+                .sType = VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2,
+                .srcSubpass = 0,
+                .dstSubpass = 0,
+                .srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+                .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            } );
+
+            const VkRenderPassCreateInfo2 renderPassCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2,
+                .attachmentCount = static_cast<zp_uint32_t>( attachmentDescriptions.length() ),
+                .pAttachments = attachmentDescriptions.data(),
+                .subpassCount = static_cast<zp_uint32_t>( subpassDescriptions.length() ),
+                .pSubpasses = subpassDescriptions.data(),
+                .dependencyCount = static_cast<zp_uint32_t>( subpassDependencies.length() ),
+                .pDependencies = subpassDependencies.data(),
+            };
+
+            HR( vkCreateRenderPass2( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
+#endif
+
+            VkPipeline vkBasePipeline {};
+
+#if USE_DYNAMIC_RENDERING
+            FixedVector<VkFormat, 8> colorAttachmentFormats;
+            colorAttachmentFormats.pushBack( VK_FORMAT_UNDEFINED );
+            VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+            VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
+
+            const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                .viewMask = 0,
+                .colorAttachmentCount = static_cast<zp_uint32_t>( colorAttachmentFormats.length() ),
+                .pColorAttachmentFormats = colorAttachmentFormats.data(),
+                .depthAttachmentFormat = depthFormat,
+                .stencilAttachmentFormat = stencilFormat,
+            };
+#endif
+
+            // TODO: load from shader file
+            FixedArray vertexInputBindingDescriptions {
+                VkVertexInputBindingDescription {
+                    .binding = 0,
+                    .stride = sizeof( Vector3f ),
+                    .inputRate  = VK_VERTEX_INPUT_RATE_VERTEX,
+                },
+                VkVertexInputBindingDescription {
+                    .binding = 1,
+                    .stride = sizeof( Vector2f ),
+                    .inputRate  = VK_VERTEX_INPUT_RATE_VERTEX,
+                },
+            };
+            FixedArray vertexInputAttributeDescriptions {
+                VkVertexInputAttributeDescription {
+                    .location = 0,
+                    .binding = 0,
+                    .format = VK_FORMAT_R32G32B32_SFLOAT,
+                    .offset = 0,
+                },
+                VkVertexInputAttributeDescription {
+                    .location = 0,
+                    .binding = 1,
+                    .format = VK_FORMAT_R32G32_SFLOAT,
+                    .offset = 0,
+                },
+            };
+
+            const VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+                .vertexBindingDescriptionCount = vertexInputBindingDescriptions.length(),
+                .pVertexBindingDescriptions = vertexInputBindingDescriptions.data(),
+                .vertexAttributeDescriptionCount = vertexInputAttributeDescriptions.length(),
+                .pVertexAttributeDescriptions = vertexInputAttributeDescriptions.data(),
+            };
+
+            const VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                .primitiveRestartEnable = false,
+            };
+
+            const VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                .rasterizerDiscardEnable = true,
+                .polygonMode = VK_POLYGON_MODE_FILL,
+                .cullMode = VK_CULL_MODE_BACK_BIT,
+                .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            };
+
+            const VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+            };
+
+            const VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                .depthTestEnable = true,
+                .depthWriteEnable = true,
+                .depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL,
+                .depthBoundsTestEnable = false,
+                .stencilTestEnable = false,
+                .front {},
+                .back {},
+            };
+
+            const FixedArray blendStates {
+                VkPipelineColorBlendAttachmentState {
+                    .blendEnable = false,
+                    .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+                },
+            };
+            const VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+                .logicOpEnable = false,
+                .logicOp = VK_LOGIC_OP_SET,
+                .attachmentCount = static_cast<zp_uint32_t>( blendStates.length() ),
+                .pAttachments = blendStates.data(),
+                .blendConstants {
+                    1, 1, 1, 1
+                },
+            };
+
+            const FixedArray dynamicStates {
+                VK_DYNAMIC_STATE_VIEWPORT,
+                VK_DYNAMIC_STATE_SCISSOR,
+            };
+
+            const VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                .dynamicStateCount = static_cast<zp_uint32_t>( dynamicStates.length() ),
+                .pDynamicStates = dynamicStates.data(),
+            };
+
+            const VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+#if USE_DYNAMIC_RENDERING
+                .pNext = &pipelineRenderingCreateInfo,
+#endif
+                .stageCount = static_cast<zp_uint32_t>( pipelineShaderStageCreateInfos.length() ),
+                .pStages = pipelineShaderStageCreateInfos.data(),
+                .pVertexInputState = &pipelineVertexInputStateCreateInfo,
+                .pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo,
+                .pRasterizationState = &pipelineRasterizationStateCreateInfo,
+                .pMultisampleState = &pipelineMultisampleStateCreateInfo,
+                .pDepthStencilState = &pipelineDepthStencilStateCreateInfo,
+                .pColorBlendState = &pipelineColorBlendStateCreateInfo,
+                .pDynamicState = &pipelineDynamicStateCreateInfo,
+                .layout = vkPipelineLayout,
+                .renderPass = vkRenderPass,
+                .subpass = 0,
+                .basePipelineHandle = vkBasePipeline,
+                .basePipelineIndex = -1,
+            };
+
+            VkPipeline vkPipeline;
+            HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
+
+            vkDestroyShaderModule( m_vkLocalDevice, shaderModule, &m_vkAllocationCallbacks );
+
+            zp_uint32_t index {};
+
+            zp_hash32_t hash = zp_fnv32_1a( m_frame );
+            hash = zp_fnv32_1a( index, hash );
+
+            return { .index = index, .hash = hash };
+        }
+
+        void VulkanContext::ReleaseShader( ShaderHandle shader )
+        {
+
+        }
+
+        RenderPassHandle VulkanContext::RequestRenderPass()
+        {
+            zp_uint32_t index {};
+
+            zp_hash32_t hash = zp_fnv32_1a( m_frame );
+            hash = zp_fnv32_1a( index, hash );
+
+            return { .index = index, .hash = hash };
+        }
+
+        void VulkanContext::ReleaseRenderPass( RenderPassHandle rendrPassHandle )
+        {
+        }
+
+        void VulkanContext::BeginRenderPass( const CommandBeginRenderPass& cmd, MemoryArray<CommandBeginRenderPass::ColorAttachment> colorAttachments )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+            // get size of target based on attachments
+            Size2Du targetSize;
+            if( !colorAttachments.empty() )
+            {
+                const VulkanRenderTarget& rt = m_vkRenderTargets[ colorAttachments[ 0 ].attachment.index ];
+                ZP_ASSERT( rt.hash == colorAttachments[ 0 ].attachment.hash );
+
+                targetSize = Size3Dto2D( rt.size );
+            }
+            else if( cmd.depthAttachment.attachment.valid() )
+            {
+                const VulkanRenderTarget& rt = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
+                ZP_ASSERT( rt.hash == cmd.depthAttachment.attachment.hash );
+
+                targetSize = Size3Dto2D( rt.size );
+            }
+            else if( cmd.stencilAttachment.attachment.valid() )
+            {
+                const VulkanRenderTarget& rt = m_vkRenderTargets[ cmd.stencilAttachment.attachment.index ];
+                ZP_ASSERT( rt.hash == cmd.stencilAttachment.attachment.hash );
+
+                targetSize = Size3Dto2D( rt.size );
+            }
+            else
+            {
+                ZP_INVALID_CODE_PATH();
+            }
+
+            Rect2Du renderArea = cmd.renderArea;
+            if( renderArea.size.width == 0 )
+            {
+                renderArea.size.width = targetSize.width;
+            }
+            if( renderArea.size.height == 0 )
+            {
+                renderArea.size.height = targetSize.height;
+            }
+
+#if USE_DYNAMIC_RENDERING
+            FixedVector<VkRenderingAttachmentInfo, 8> colorAttachmentInfos;
+            for( const auto& colorAttachment : colorAttachments )
+            {
+                const VulkanRenderTarget& colorRT = m_vkRenderTargets[ colorAttachment.attachment.index ];
+                ZP_ASSERT( colorRT.hash == colorAttachment.attachment.hash );
+
+                colorAttachmentInfos.pushBack( {
+                    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                    .imageView = colorRT.vkImageViews[ m_frameIndex ],
+                    .imageLayout = colorRT.vkImageLayouts[ m_frameIndex ],
+                    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                    .clearValue {
+                        .color {
+                            .float32 {
+                                colorAttachment.clearColor.r,
+                                colorAttachment.clearColor.g,
+                                colorAttachment.clearColor.b,
+                                colorAttachment.clearColor.a
+                            }
+                        }
+                    },
+                } );
+            }
+
+            const VulkanRenderTarget& depthStencilRT = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
+            ZP_ASSERT( depthStencilRT.hash == cmd.depthAttachment.attachment.hash );
+
+            const VkRenderingAttachmentInfo depthStencilAttachment {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                .imageView = depthStencilRT.vkImageViews[ m_frameIndex ],
+                .imageLayout = depthStencilRT.vkImageLayouts[ m_frameIndex ],
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .clearValue {
+                    .depthStencil {
+                        .depth = cmd.depthAttachment.clearDepth,
+                        .stencil = cmd.stencilAttachment.clearStencil,
+                    }
+                },
+            };
+
+            const VulkanRenderTarget& depthRT = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
+            ZP_ASSERT( depthRT.hash == cmd.depthAttachment.attachment.hash );
+
+            const VkRenderingAttachmentInfo depthAttachment {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                .imageView = depthRT.vkImageViews[ m_frameIndex ],
+                .imageLayout = depthRT.vkImageLayouts[ m_frameIndex ],
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .clearValue {
+                    .depthStencil {
+                        .depth = cmd.depthAttachment.clearDepth,
+                    }
+                },
+            };
+
+            const VulkanRenderTarget& stencilRT = m_vkRenderTargets[ cmd.stencilAttachment.attachment.index ];
+            ZP_ASSERT( stencilRT.hash == cmd.stencilAttachment.attachment.hash );
+
+            const VkRenderingAttachmentInfo stencilAttachment {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                .imageView = stencilRT.vkImageViews[ m_frameIndex ],
+                .imageLayout = stencilRT.vkImageLayouts[ m_frameIndex ],
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .clearValue {
+                    .depthStencil {
+                        .stencil = cmd.stencilAttachment.clearStencil,
+                    }
+                },
+            };
+
+            const zp_bool_t useDepthStencil = cmd.depthAttachment.attachment == cmd.stencilAttachment.attachment;
+
+            const VkRenderingInfo renderingInfo {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+                .renderArea {
+                    .offset {
+                        .x = static_cast<zp_int32_t>( renderArea.offset.x ),
+                        .y = static_cast<zp_int32_t>( renderArea.offset.y ),
+                    },
+                    .extent {
+                        .width = renderArea.size.width,
+                        .height = renderArea.size.height,
+                    },
+                },
+                .layerCount = 1,
+                .viewMask = 0,
+                .colorAttachmentCount = static_cast<zp_uint32_t>( colorAttachmentInfos.length() ),
+                .pColorAttachments = colorAttachmentInfos.data(),
+                .pDepthAttachment = useDepthStencil ? &depthStencilAttachment : &depthAttachment,
+                .pStencilAttachment = useDepthStencil ? nullptr : &stencilAttachment,
+            };
+
+            vkCmdBeginRendering( commandQueue.vkCommandBuffer, &renderingInfo );
+#else
+            FixedVector<VkClearValue, 8> clearValues;
+            clearValues.pushBack( {
+                .color { 0, 0, 0, 0 }
+            } );
+
+            const VkRenderPassBeginInfo renderPassBeginInfo {
+                .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+                .renderPass = renderPass.vkRenderPass,
+                .framebuffer = renderPass.vkFramebuffer,
+                .renderArea {
+                    .offset {
+                        .x = renderArea.offset.x,
+                        .y = renderArea.offset.y,
+                    },
+                    .extent {
+                        .width = renderArea.size.width,
+                        .height = renderArea.size.height,
+                    },
+                },
+                .clearValueCount = static_cast<zp_uint32_t>( clearValues.length() ),
+                .pClearValues = clearValues.data(),
+            };
+
+            const VkSubpassBeginInfo subpassBeginInfo {
+                .sType = VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO,
+                .contents = VK_SUBPASS_CONTENTS_INLINE,
+            };
+
+            vkCmdBeginRenderPass2( commandQueue.vkCommandBuffer, &renderPassBeginInfo, &subpassBeginInfo );
+#endif
+        }
+
+        void VulkanContext::NextSubpass( const CommandNextSubpass& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+#if USE_DYNAMIC_RENDERING
+            const VkMemoryBarrier2 memoryBarrier {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT,
+            };
+
+            const VkDependencyInfo dependencyInfo {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+                .memoryBarrierCount = 1,
+                .pMemoryBarriers = &memoryBarrier,
+            };
+
+            vkCmdPipelineBarrier2( commandQueue.vkCommandBuffer, &dependencyInfo );
+#else
+            const VkSubpassBeginInfo subpassBeginInfo {
+                .sType = VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO,
+                .contents = VK_SUBPASS_CONTENTS_INLINE,
+            };
+
+            const VkSubpassEndInfo subpassEndInfo {
+                .sType = VK_STRUCTURE_TYPE_SUBPASS_END_INFO,
+            };
+
+            vkCmdNextSubpass2( commandQueue.vkCommandBuffer, &subpassBeginInfo, &subpassEndInfo );
+#endif
+        }
+
+        void VulkanContext::EndRenderPass( const CommandEndRenderPass& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+#if USE_DYNAMIC_RENDERING
+            vkCmdEndRendering( commandQueue.vkCommandBuffer );
+#else
+            const VkSubpassEndInfo subpassEndInfo {
+                .sType = VK_STRUCTURE_TYPE_SUBPASS_END_INFO,
+            };
+
+            vkCmdEndRenderPass2( commandQueue.vkCommandBuffer, &subpassEndInfo );
+#endif
+        }
+
+        void VulkanContext::Dispatch( const CommandDispatch& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+            ZP_PROFILE_GPU_STATS_DISPATCH( 1 );
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+            vkCmdDispatch( commandQueue.vkCommandBuffer, cmd.groupCountX, cmd.groupCountY, cmd.groupCountZ );
+        }
+
+        void VulkanContext::DispatchIndirect( const CommandDispatchIndirect& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+            ZP_PROFILE_GPU_STATS_DISPATCH( 1 );
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+            const VulkanBuffer& indirectBuffer = m_vkBuffers[ cmd.buffer.index ];
+            ZP_ASSERT( indirectBuffer.hash == cmd.buffer.hash );
+
+            vkCmdDispatchIndirect( commandQueue.vkCommandBuffer, indirectBuffer.vkBuffer, indirectBuffer.offset + cmd.offset );
+        }
+
+        void VulkanContext::Draw( const CommandDraw& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+            ZP_PROFILE_GPU_STATS_DRAW( vertexCount, instanceCount );
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+            vkCmdDraw( commandQueue.vkCommandBuffer, cmd.vertexCount, cmd.instanceCount, cmd.firstVertex, cmd.firstInstance );
+        }
+
+        void VulkanContext::Blit( const CommandBlit& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+            VulkanTexture& srcTexture = m_vkTextures[ cmd.srcTexture.index ];
+            ZP_ASSERT( srcTexture.hash == cmd.srcTexture.hash );
+
+            VulkanTexture& dstTexture = m_vkTextures[ cmd.dstTexture.index ];
+            ZP_ASSERT( dstTexture.hash == cmd.dstTexture.hash );
+
+            // original image layouts
+            const VkImageLayout srcLayout = srcTexture.vkImageLayouts[ cmd.srcMip ];
+            const VkImageLayout dstLayout = dstTexture.vkImageLayouts[ cmd.dstMip ];
+
+            // blit subregions
+            const VkImageSubresourceRange srcImageSubresourceRange {
+                .aspectMask = srcTexture.vkImageAspect,
+                .baseMipLevel = cmd.srcMip,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            };
+            const VkImageSubresourceRange dstImageSubresourceRange {
+                .aspectMask = dstTexture.vkImageAspect,
+                .baseMipLevel = cmd.dstMip,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            };
+
+            // transition images to proper transition layouts for blit
+            {
+                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, srcTexture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcImageSubresourceRange );
+                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, dstTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstImageSubresourceRange );
+            }
+
+            // blit
+            {
+                Rect2Di srcRegion = cmd.srcRegion;
+                Rect2Di dstRegion = cmd.dstRegion;
+
+                // if src region size is -1, set to size of texture
+                if( srcRegion.size.width < 0 )
+                {
+                    srcRegion.size.width = srcTexture.size.width;
+                }
+                if( srcRegion.size.height < 0 )
+                {
+                    srcRegion.size.height = srcTexture.size.height;
+                }
+
+                // if dst region size is -1, set to size of texture
+                if( dstRegion.size.width < 0 )
+                {
+                    dstRegion.size.width = dstTexture.size.width;
+                }
+                if( dstRegion.size.height < 0 )
+                {
+                    dstRegion.size.height = dstTexture.size.height;
+                }
+
+                const VkImageBlit2 region {
+                    .srcSubresource {
+                        .aspectMask = srcTexture.vkImageAspect,
+                        .mipLevel = cmd.srcMip,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    },
+                    .srcOffsets {
+                        { .x = srcRegion.min().x, .y = srcRegion.min().y, .z = 1 },
+                        { .x = srcRegion.max().x, .y = srcRegion.max().y, .z = 1 },
+                    },
+                    .dstSubresource {
+                        .aspectMask = srcTexture.vkImageAspect,
+                        .mipLevel = cmd.dstMip,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    },
+                    .dstOffsets {
+                        { .x = dstRegion.min().x, .y = dstRegion.min().y, .z = 1 },
+                        { .x = dstRegion.max().x, .y = dstRegion.max().y, .z = 1 },
+                    },
+                };
+
+                const VkBlitImageInfo2 blitImageInfo {
+                    .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+                    .srcImage = srcTexture.vkImage,
+                    .srcImageLayout = srcTexture.vkImageLayouts[ cmd.srcMip ],
+                    .dstImage = dstTexture.vkImage,
+                    .dstImageLayout = dstTexture.vkImageLayouts[ cmd.dstMip ],
+                    .regionCount = 1,
+                    .pRegions = &region,
+                    .filter = VK_FILTER_LINEAR,
+                };
+
+                vkCmdBlitImage2( commandQueue.vkCommandBuffer, &blitImageInfo );
+            }
+
+            // transition images back to what layout they were
+            {
+                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, srcTexture, srcLayout, srcImageSubresourceRange );
+                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, dstTexture, dstLayout, dstImageSubresourceRange );
+            }
+        }
+
+        void VulkanContext::UseBuffer( BufferHandle bufferHandle )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanBuffer& buffer = m_vkBuffers[ bufferHandle.index ];
+            ZP_ASSERT( buffer.hash == bufferHandle.hash );
+
+            VkDescriptorSet vkDescriptorSet = m_vkBindlessDescriptorSets[ m_frameIndex ];
+
+            const VkDescriptorBufferInfo bufferInfo {
+                .buffer = buffer.vkBuffer,
+                .offset = buffer.offset,
+                .range = buffer.size,
+            };
+
+            zp_size_t writeUpdates = 0;
+            FixedArray<VkWriteDescriptorSet, 2> descriptorSetWrites {};
+
+            if( ( buffer.vkBufferUsage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT ) == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )
+            {
+                descriptorSetWrites[ writeUpdates ] = {
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = vkDescriptorSet,
+                    .dstArrayElement = bufferHandle.index,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .pBufferInfo = &bufferInfo,
+                };
+                ++writeUpdates;
+            }
+
+            if( ( buffer.vkBufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT ) == VK_BUFFER_USAGE_STORAGE_BUFFER_BIT )
+            {
+                descriptorSetWrites[ writeUpdates ] = {
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = vkDescriptorSet,
+                    .dstArrayElement = bufferHandle.index,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    .pBufferInfo = &bufferInfo,
+                };
+                ++writeUpdates;
+            }
+
+            vkUpdateDescriptorSets( m_vkLocalDevice, writeUpdates, descriptorSetWrites.data(), 0, nullptr );
+        }
+
+        void VulkanContext::UseTexture( TextureHandle textureHandle )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanTexture& texture = m_vkTextures[ textureHandle.index ];
+            ZP_ASSERT( texture.hash == textureHandle.hash );
+
+            const VulkanSampler sampler {};
+
+            VkDescriptorSet vkDescriptorSet = m_vkBindlessDescriptorSets[ m_frameIndex ];
+
+            // get the lowest loaded mip
+            const zp_uint32_t lowestLoadedMip = zp_bitscan_forward( texture.loadedMipFlag );
+
+            const VkDescriptorImageInfo imageInfo {
+                .sampler = sampler.vkSampler,
+                .imageView = texture.vkImageViews[ lowestLoadedMip ],
+                .imageLayout = texture.vkImageLayouts[ lowestLoadedMip ],
+            };
+
+            const VkWriteDescriptorSet descriptorSetWrite {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = vkDescriptorSet,
+                .dstArrayElement = textureHandle.index,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = &imageInfo,
+            };
+
+            vkUpdateDescriptorSets( m_vkLocalDevice, 1, &descriptorSetWrite, 0, nullptr );
         }
 
         void VulkanContext::QueueDestroy( void* handle, VkObjectType objectType )
@@ -2467,15 +4014,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             VkExtent2D m_vkSwapchainExtent;
             VkRenderPass m_vkSwapchainDefaultRenderPass;
 
-            FixedArray<VkImage, kBufferedFrameCount> m_vkSwapchainImages;
-            FixedArray<VkImageView, kBufferedFrameCount> m_vkSwapchainImageViews;
-            FixedArray<VkFramebuffer, kBufferedFrameCount> m_vkSwapchainFrameBuffers;
+            FixedArray<VkImage, kMaxBufferedFrameCount> m_vkSwapchainImages;
+            FixedArray<VkImageView, kMaxBufferedFrameCount> m_vkSwapchainImageViews;
+            FixedArray<VkFramebuffer, kMaxBufferedFrameCount> m_vkSwapchainFrameBuffers;
 
-            FixedArray<VkSemaphore, kBufferedFrameCount> m_vkSwapchainAcquireSemaphores;
-            FixedArray<VkSemaphore, kBufferedFrameCount> m_vkRenderFinishedSemaphores;
-            FixedArray<VkFence, kBufferedFrameCount> m_vkFrameInFlightFences;
-            FixedArray<VkFence, kBufferedFrameCount> m_vkSwapchainImageAcquiredFences;
-            FixedArray<zp_uint32_t, kBufferedFrameCount> m_swapchainImageIndices;
+            FixedArray<VkSemaphore, kMaxBufferedFrameCount> m_vkSwapchainAcquireSemaphores;
+            FixedArray<VkSemaphore, kMaxBufferedFrameCount> m_vkRenderFinishedSemaphores;
+            FixedArray<VkFence, kMaxBufferedFrameCount> m_vkFrameInFlightFences;
+            FixedArray<VkFence, kMaxBufferedFrameCount> m_vkSwapchainImageAcquiredFences;
+            FixedArray<zp_uint32_t, kMaxBufferedFrameCount> m_swapchainImageIndices;
 
             zp_size_t m_maxFramesInFlight;
 
@@ -2598,7 +4145,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const VkPresentModeKHR presentMode = ChooseSwapChainPresentMode( presentModes, m_vSync );
 
             // TODO: make configurable?
-            const FixedArray<VkSurfaceFormatKHR, 2> preferredSurfaceFormats = {
+            const FixedArray<VkSurfaceFormatKHR, 2> preferredSurfaceFormats {
                 VkSurfaceFormatKHR { .format = VK_FORMAT_B8G8R8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
                 VkSurfaceFormatKHR { .format = VK_FORMAT_R8G8B8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
             };
@@ -2607,7 +4154,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             //
             // TODO: make this configurable?
-            const zp_uint32_t preferredImageCount = kBufferedFrameCount;
+            const zp_uint32_t preferredImageCount = kMaxBufferedFrameCount;
             uint32_t imageCount = zp_max( preferredImageCount, surfaceCapabilities.minImageCount );
             if( surfaceCapabilities.maxImageCount > 0 )
             {
@@ -2615,13 +4162,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
 
             m_maxFramesInFlight = imageCount;
-            ZP_ASSERT_MSG_ARGS( m_maxFramesInFlight < kBufferedFrameCount, "Increase buffered frames %d < %d", m_maxFramesInFlight, kBufferedFrameCount );
+            ZP_ASSERT_MSG_ARGS( m_maxFramesInFlight <= kMaxBufferedFrameCount, "Increase buffered frames %d <= %d", m_maxFramesInFlight, kMaxBufferedFrameCount );
 
             //
             const Queues& queues = m_context->GetQueues();
             const bool useConcurrentSharingMode = queues.graphics.familyIndex != queues.present.familyIndex;
 
-            const FixedArray<zp_uint32_t, 2> indices = { queues.graphics.familyIndex, queues.present.familyIndex };
+            const FixedArray<zp_uint32_t, 2> indices {
+                queues.graphics.familyIndex,
+                queues.present.familyIndex,
+            };
 
             const VkSwapchainCreateInfoKHR swapChainCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -2639,18 +4189,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 .presentMode = presentMode,
                 .clipped = VK_TRUE,
-                .oldSwapchain = m_vkSwapchain
+                .oldSwapchain = m_vkSwapchain,
             };
 
             HR( vkCreateSwapchainKHR( m_context->GetLocalDevice(), &swapChainCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchain ) );
 
-            SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_SWAPCHAIN_KHR, m_vkSwapchain, "Swapchain" );
+            SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchain, "Swapchain" );
 
             if( swapChainCreateInfo.oldSwapchain != VK_NULL_HANDLE )
             {
-                // TODO: delayed destroy?
                 m_context->QueueDestroy( swapChainCreateInfo.oldSwapchain );
-                //vkDestroySwapchainKHR( m_context->GetLocalDevice(), swapChainCreateInfo.oldSwapchain, m_context->GetAllocationCallbacks() );
             }
 
             //
@@ -2668,7 +4216,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                     m_delayedDestroy[ index ] = {
                         .frameCount = m_currentFrameIndex,
-                        .handle = m_swapchainData.vkSwapchainDefaultRenderPass,
+                        .m_handle = m_swapchainData.vkSwapchainDefaultRenderPass,
                         .allocator = &m_vkAllocationCallbacks,
                         .localDevice = m_vkLocalDevice,
                         .instance = m_vkInstance,
@@ -2763,15 +4311,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 HR( vkCreateImageView( m_context->GetLocalDevice(), &imageViewCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageViews[ i ] ) );
 
-                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, m_vkSwapchainImageViews[ i ], "Swapchain Image View %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainImageViews[ i ], "Swapchain Image View %d", i );
 
+#if !USE_DYNAMIC_RENDERING
                 //
                 VkImageView attachments[] { m_vkSwapchainImageViews[ i ] };
 
                 const VkFramebufferCreateInfo framebufferCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                     .renderPass = nullptr, //m_swapchainData.vkSwapchainDefaultRenderPass,
-                    .attachmentCount = 0, //ZP_ARRAY_SIZE( attachments ),
+                    .attachmentCount = ZP_ARRAY_SIZE( attachments ),
                     .pAttachments = attachments,
                     .width = m_vkSwapchainExtent.width,
                     .height = m_vkSwapchainExtent.height,
@@ -2787,6 +4336,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 //HR( vkCreateFramebuffer( m_context->GetLocalDevice(), &framebufferCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainFrameBuffers[ i ] ) );
 
                 //SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, m_vkSwapchainFrameBuffers[ i ], "Swapchain Framebuffer %d", i );
+#endif
             }
 
             //
@@ -2806,17 +4356,24 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkFrameInFlightFences[ i ] ) );
                 HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageAcquiredFences[ i ] ) );
 
-                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_SEMAPHORE, m_vkSwapchainAcquireSemaphores[ i ], "Swapchain Acquire Semaphore %d", i );
-                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_SEMAPHORE, m_vkRenderFinishedSemaphores[ i ], "Render Finished Semaphore %d", i );
-                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_FENCE, m_vkFrameInFlightFences[ i ], "In Flight Fence %d", i );
-                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), VK_OBJECT_TYPE_FENCE, m_vkSwapchainImageAcquiredFences[ i ], "Swapchain Image Acquire Fence %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainAcquireSemaphores[ i ], "Swapchain Acquire Semaphore %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkRenderFinishedSemaphores[ i ], "Render Finished Semaphore %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkFrameInFlightFences[ i ], "In Flight Fence %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainImageAcquiredFences[ i ], "Swapchain Image Acquire Fence %d", i );
             }
 
             // transition swapchain images to present layout
             VkCommandBuffer cmdBuffer = RequestSingleUseCommandBuffer( m_context->GetLocalDevice(), m_context->GetTransientCommandPool() );
             for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
             {
-                CmdTransitionImageLayout( cmdBuffer, m_vkSwapchainImages[ i ], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
+                VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                CmdTransitionImageLayout( cmdBuffer, m_vkSwapchainImages[ i ], imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                } );
             }
             ReleaseSingleUseCommandBuffer( m_context->GetLocalDevice(), m_context->GetTransientCommandPool(), cmdBuffer, m_context->GetQueues().graphics.vkQueue, m_context->GetAllocationCallbacks() );
         }
@@ -2876,21 +4433,22 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             BufferHandle RequestBuffer( zp_size_t size );
 
-            GraphicsCommandBuffer* SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) final;
-
             void BeginFrame( zp_size_t frameIndex );
 
             void ExecuteCommandBuffer( GraphicsCommandBuffer* cmdBuffer, JobHandle parentJob );
 
             void EndFrame();
 
+            GraphicsCommandBuffer* SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) final;
+
         private:
             VulkanContext m_context;
             VulkanSwapchain m_swapchain;
 
             JobHandle m_frameJob;
-            FixedArray<GraphicsCommandBuffer*, kBufferedFrameCount> m_frameCommandBuffers;
-            FixedVector<GraphicsCommandBuffer*, kBufferedFrameCount> m_submitQueue;
+            FixedArray<GraphicsCommandBuffer*, kMaxBufferedFrameCount> m_frameCommandBuffers;
+            FixedQueue<GraphicsCommandBuffer*, kMaxBufferedFrameCount> m_submitQueue;
+
 
             zp_uint64_t m_frame;
             zp_size_t m_frameIndex;
@@ -2910,7 +4468,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         void VulkanGraphicsDevice::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
-            for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+            for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
             {
                 m_frameCommandBuffers[ i ] = ZP_NEW_ARGS( memoryLabel, GraphicsCommandBuffer, graphicsDeviceDesc.commandBufferPageSize );
             }
@@ -2926,7 +4484,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             m_context.Destroy();
 
-            for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+            for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
             {
                 ZP_DELETE( GraphicsCommandBuffer, m_frameCommandBuffers[ i ] );
             }
@@ -2945,7 +4503,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             static void Execute( const JobWorkArgs& args )
             {
-                const auto* job = args.jobMemory.as<SubmitCommandBufferJob>();
+                const SubmitCommandBufferJob* job = args.jobMemory.as<SubmitCommandBufferJob>();
 
                 Log::info() << "Render Frame: " << job->frame << Log::endl;
 
@@ -2973,9 +4531,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             if( cmdBuffer != nullptr )
             {
-                frameIndex = cmdBuffer->frame % kBufferedFrameCount;
+                frameIndex = cmdBuffer->frame % kMaxBufferedFrameCount;
                 nextFrame = cmdBuffer->frame + 1;
-                nextFrameIndex = nextFrame % kBufferedFrameCount;
+                nextFrameIndex = nextFrame % kMaxBufferedFrameCount;
 
                 m_frameJob = JobSystem::Run( SubmitCommandBufferJob { .cmdBuffer = cmdBuffer, .graphicsDevice = this, .frame = cmdBuffer->frame } );
             }
@@ -2992,7 +4550,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         void VulkanGraphicsDevice::BeginFrame( zp_uint64_t frame )
         {
             m_frame = frame;
-            m_frameIndex = frame % kBufferedFrameCount;
+            m_frameIndex = frame % kMaxBufferedFrameCount;
 
             m_context.BeginFrame( m_frame, m_frameIndex );
 
@@ -3005,10 +4563,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             while( !dataStreamReader.end() )
             {
-                CommandHeader header {};
-                dataStreamReader.read( header );
+                const CommandHeader* header = dataStreamReader.readPtr<CommandHeader>();
 
-                switch( header.type )
+                switch( header->type )
                 {
                     case CommandType::None:
                         break;
@@ -3031,6 +4588,38 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         dataStreamReader.read( updateBufferDataExternal );
 
                         m_context.UpdateBufferData( updateBufferDataExternal.cmdQueue, updateBufferDataExternal.dstBuffer, updateBufferDataExternal.dstOffset, updateBufferDataExternal.srcData );
+                    }
+                        break;
+
+                    case CommandType::BeginRenderPass:
+                    {
+                        const CommandBeginRenderPass* beginRenderPass = dataStreamReader.readPtr<CommandBeginRenderPass>();
+                        MemoryArray<CommandBeginRenderPass::ColorAttachment> colorAttachments = dataStreamReader.readMemoryArray<CommandBeginRenderPass::ColorAttachment>( beginRenderPass->colorAttachmentCount );
+
+                        m_context.BeginRenderPass( *beginRenderPass, colorAttachments );
+                    }
+                        break;
+
+                    case CommandType::Dispatch:
+                    {
+                        const CommandDispatch* dispatch = dataStreamReader.readPtr<CommandDispatch>();
+
+                        m_context.Dispatch( *dispatch );
+                    }
+                        break;
+
+                    case CommandType::Draw:
+                    {
+                        const CommandDraw* draw = dataStreamReader.readPtr<CommandDraw>();
+
+                        m_context.Draw( *draw );
+                    }
+
+                    case CommandType::Blit:
+                    {
+                        const CommandBlit* blit = dataStreamReader.readPtr<CommandBlit>();
+
+                        m_context.Blit( *blit );
                     }
                         break;
 
@@ -3584,7 +5173,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 m_delayedDestroy[ index ] = {
                     .frameCount = m_currentFrameIndex,
-                    .handle = m_swapchainData.vkSwapchainDefaultRenderPass,
+                    .m_handle = m_swapchainData.vkSwapchainDefaultRenderPass,
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
                     .instance = m_vkInstance,
@@ -3677,7 +5266,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 m_delayedDestroy[ index ] = {
                     .frameCount = m_currentFrameIndex,
-                    .handle = m_swapchainData.swapchainImageViews[ i ],
+                    .m_handle = m_swapchainData.swapchainImageViews[ i ],
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
                     .instance = m_vkInstance,
@@ -3710,7 +5299,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 m_delayedDestroy[ index ] = {
                     .frameCount = m_currentFrameIndex,
-                    .handle = m_swapchainData.swapchainFrameBuffers[ i ],
+                    .m_handle = m_swapchainData.swapchainFrameBuffers[ i ],
                     .allocator = &m_vkAllocationCallbacks,
                     .localDevice = m_vkLocalDevice,
                     .instance = m_vkInstance,
@@ -3786,9 +5375,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 #endif
 
         zp_size_t perFrameStagingBufferOffset = 0;
-        const zp_size_t perFrameStagingBufferSize = m_stagingBuffer.size / kBufferedFrameCount;
+        const zp_size_t perFrameStagingBufferSize = m_stagingBuffer.size / kMaxBufferedFrameCount;
 
-        for( zp_size_t i = 0; i < kBufferedFrameCount; ++i )
+        for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
         {
             PerFrameData& perFrameData = m_perFrameData[ i ];
             HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainAcquireSemaphore ) );
@@ -4075,7 +5664,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         m_delayedDestroy[ index ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = renderPass->internalRenderPass,
+            .m_handle = renderPass->internalRenderPass,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4333,7 +5922,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         m_delayedDestroy[ index ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = graphicsPipelineState->pipelineState,
+            .m_handle = graphicsPipelineState->pipelineState,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4412,7 +6001,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         m_delayedDestroy[ index ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = pipelineLayout->layout,
+            .m_handle = pipelineLayout->layout,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4429,7 +6018,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .flags = 0,
             .size = graphicsBufferDesc.size,
-            .usage = Convert( graphicsBufferDesc.usageFlags ),
+            .vkBufferUsage = Convert( graphicsBufferDesc.usageFlags ),
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 0,
             .pQueueFamilyIndices = nullptr,
@@ -4473,7 +6062,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             m_delayedDestroy[ index + 0 ] = {
                 .frameCount = m_currentFrameIndex,
-                .handle = graphicsBuffer->dstbuffer,
+                .m_handle = graphicsBuffer->dstbuffer,
                 .allocator = &m_vkAllocationCallbacks,
                 .localDevice = m_vkLocalDevice,
                 .instance = m_vkInstance,
@@ -4483,7 +6072,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             m_delayedDestroy[ index + 1 ] = {
                 .frameCount = m_currentFrameIndex,
-                .handle = graphicsBuffer->vkDeviceMemory,
+                .m_handle = graphicsBuffer->vkDeviceMemory,
                 .allocator = &m_vkAllocationCallbacks,
                 .localDevice = m_vkLocalDevice,
                 .instance = m_vkInstance,
@@ -4519,7 +6108,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         m_delayedDestroy[ index ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = shader->shaderHandle,
+            .m_handle = shader->shaderHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4545,7 +6134,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .arrayLayers = textureCreateDesc->arrayLayers,
             .samples = Convert( textureCreateDesc->samples ),
             .tiling = VK_IMAGE_TILING_OPTIMAL,
-            .usage = Convert( textureCreateDesc->usage ),
+            .vkBufferUsage = Convert( textureCreateDesc->vkBufferUsage ),
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 0,
             .pQueueFamilyIndices = nullptr,
@@ -4583,7 +6172,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .a = VK_COMPONENT_SWIZZLE_IDENTITY
             },
             .subresourceRange {
-                .aspectMask = ConvertAspect( textureCreateDesc->usage ),
+                .aspectMask = ConvertAspect( textureCreateDesc->vkBufferUsage ),
                 .baseMipLevel = 0,
                 .levelCount = textureCreateDesc->mipCount,
                 .baseArrayLayer = 0,
@@ -4597,7 +6186,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         *texture = {
             .textureDimension = textureCreateDesc->textureDimension,
             .textureFormat = textureCreateDesc->textureFormat,
-            .usage = textureCreateDesc->usage,
+            .vkBufferUsage = textureCreateDesc->vkBufferUsage,
             .size = textureCreateDesc->size,
             .textureHandle = image,
             .textureViewHandle = imageView,
@@ -4613,7 +6202,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         m_delayedDestroy[ index + 0 ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = texture->textureViewHandle,
+            .m_handle = texture->textureViewHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4622,7 +6211,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         };
         m_delayedDestroy[ index + 1 ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = texture->textureMemoryHandle,
+            .m_handle = texture->textureMemoryHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4631,7 +6220,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         };
         m_delayedDestroy[ index + 2 ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = texture->textureHandle,
+            .m_handle = texture->textureHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4678,7 +6267,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const zp_size_t index = m_delayedDestroy.pushBackEmptyRangeAtomic( 1, false );
         m_delayedDestroy[ index ] = {
             .frameCount = m_currentFrameIndex,
-            .handle = sampler->samplerHandle,
+            .m_handle = sampler->samplerHandle,
             .allocator = &m_vkAllocationCallbacks,
             .localDevice = m_vkLocalDevice,
             .instance = m_vkInstance,
@@ -4929,7 +6518,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .image = static_cast<VkImage>( dstTexture->textureHandle ),
                 .subresourceRange {
-                    .aspectMask = ConvertAspect( dstTexture->usage ),
+                    .aspectMask = ConvertAspect( dstTexture->vkBufferUsage ),
                     .baseMipLevel = textureUpdateDesc->minMipLevel,
                     .levelCount = mipCount,
                     .baseArrayLayer = 0,
@@ -4965,7 +6554,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 imageCopy.bufferRowLength = textureMip.width;
                 imageCopy.bufferImageHeight = textureMip.height;
                 imageCopy.imageSubresource = {
-                    .aspectMask = ConvertAspect( dstTexture->usage ),
+                    .aspectMask = ConvertAspect( dstTexture->vkBufferUsage ),
                     .mipLevel = mip,
                     .baseArrayLayer = 0,
                     .layerCount = 1
@@ -4994,7 +6583,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .image = static_cast<VkImage>( dstTexture->textureHandle ),
                 .subresourceRange {
-                    .aspectMask = ConvertAspect( dstTexture->usage ),
+                    .aspectMask = ConvertAspect( dstTexture->vkBufferUsage ),
                     .baseMipLevel = textureUpdateDesc->minMipLevel,
                     .levelCount = mipCount,
                     .baseArrayLayer = 0,
@@ -5293,7 +6882,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             for( zp_size_t i = 0; i < m_delayedDestroy.size(); ++i )
             {
                 const DelayedDestroy& delayedDestroy = m_delayedDestroy[ i ];
-                if( delayedDestroy.handle == nullptr )
+                if( delayedDestroy.m_handle == nullptr )
                 {
                     m_delayedDestroy.eraseAtSwapBack( i );
                     --i;
@@ -5315,7 +6904,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     return zp_cmp( a.order, b.order );
                 } );
 
-                // destroy each delayed destroy handle
+                // destroy each delayed destroy m_handle
                 for( const DelayedDestroy& delayedDestroy : handlesToDestroy )
                 {
                     DestroyDelayedDestroyHandle( delayedDestroy );
@@ -5326,7 +6915,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
     void VulkanGraphicsDevice::destroyAllDelayedDestroy()
     {
-        // destroy each delayed destroy handle
+        // destroy each delayed destroy m_handle
         for( const DelayedDestroy& delayedDestroy : m_delayedDestroy )
         {
             DestroyDelayedDestroyHandle( delayedDestroy );
@@ -5345,26 +6934,26 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const ColorSpace colorSpace = ZP_COLOR_SPACE_REC_709_LINEAR;
         const VkSwapchainKHR oldSwapchain = m_swapchainData.vkSwapchain;
 
-        // TODO: handle minimize properly
+        // TODO: m_handle minimize properly
         // recreate new swapchain using old values
         createSwapchain( windowHandle, width, height, displayFormat, colorSpace );
     }
 
     VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getCurrentFrameData()
     {
-        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
+        const zp_uint64_t frame = m_currentFrameIndex & ( kMaxBufferedFrameCount - 1 );
         return m_perFrameData[ frame ];
     }
 
     const VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getCurrentFrameData() const
     {
-        const zp_uint64_t frame = m_currentFrameIndex & ( kBufferedFrameCount - 1 );
+        const zp_uint64_t frame = m_currentFrameIndex & ( kMaxBufferedFrameCount - 1 );
         return m_perFrameData[ frame ];
     }
 
     VulkanGraphicsDevice::PerFrameData& VulkanGraphicsDevice::getFrameData( zp_uint64_t frameCount )
     {
-        const zp_uint64_t frame = frameCount & ( kBufferedFrameCount - 1 );
+        const zp_uint64_t frame = frameCount & ( kMaxBufferedFrameCount - 1 );
         return m_perFrameData[ frame ];
     }
 #endif

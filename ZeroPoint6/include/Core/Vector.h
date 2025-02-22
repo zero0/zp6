@@ -28,19 +28,19 @@ namespace zp
         }
     };
 
-    template<zp_size_t Size>
+    template<zp_size_t Length, zp_size_t Size>
     struct FixedMemoryVectorAllocator
     {
-        [[nodiscard]] void* allocate( zp_size_t size ) const
+        [[nodiscard]] void* allocate( zp_size_t size )
         {
-            return m_data;
+            return static_cast<void*>( m_data );
         }
 
         void free( void* ptr ) const
         {
         }
 
-        zp_uint8_t m_data[Size];
+        zp_uint8_t m_data[Length * Size];
     };
 }
 
@@ -76,6 +76,12 @@ namespace zp
 
         Vector( zp_size_t capacity, allocator_const_reference allocator );
 
+        //template<typename ... Args>
+        //explicit Vector( Args ... args );
+
+        template<zp_size_t Size>
+        Vector( value_type (&array)[Size] );
+
         ~Vector();
 
         self_type& operator=( const self_type& other );
@@ -89,7 +95,7 @@ namespace zp
         const_reference at( zp_size_t index ) const;
 
 
-        [[nodiscard]] zp_size_t size() const;
+        [[nodiscard]] zp_size_t length() const;
 
         [[nodiscard]] zp_size_t sizeAtomic() const;
 
@@ -161,7 +167,7 @@ namespace zp
         template<typename Cmp>
         void sort( Cmp cmp )
         {
-            if( m_size > 1 )
+            if( m_length > 1 )
             {
                 zp_qsort3( begin(), end() - 1, cmp );
             }
@@ -202,7 +208,7 @@ namespace zp
         static zp_bool_t defaultEqualityComparerFunc( const T& lh, const T& rh );
 
         pointer m_data;
-        zp_size_t m_size;
+        zp_size_t m_length;
         zp_size_t m_capacity;
 
         allocator_value m_allocator;
@@ -212,7 +218,7 @@ namespace zp
 namespace zp
 {
     template<typename T, zp_size_t Size>
-    using FixedVector = Vector<T, FixedMemoryVectorAllocator<Size>>;
+    using FixedVector = Vector<T, FixedMemoryVectorAllocator<Size, sizeof(T)>>;
 
 }
 
@@ -225,7 +231,7 @@ namespace zp
     template<typename T, typename Allocator>
     Vector<T, Allocator>::Vector()
         : m_data( nullptr )
-        , m_size( 0 )
+        , m_length( 0 )
         , m_capacity( 0 )
         , m_allocator( allocator_value() )
     {
@@ -234,7 +240,7 @@ namespace zp
     template<typename T, typename Allocator>
     Vector<T, Allocator>::Vector( allocator_const_reference allocator )
         : m_data( nullptr )
-        , m_size( 0 )
+        , m_length( 0 )
         , m_capacity( 0 )
         , m_allocator( allocator )
     {
@@ -243,7 +249,7 @@ namespace zp
     template<typename T, typename Allocator>
     Vector<T, Allocator>::Vector( zp_size_t capacity )
         : m_data( nullptr )
-        , m_size( 0 )
+        , m_length( 0 )
         , m_capacity( 0 )
         , m_allocator( allocator_value() )
     {
@@ -253,11 +259,38 @@ namespace zp
     template<typename T, typename Allocator>
     Vector<T, Allocator>::Vector( zp_size_t capacity, allocator_const_reference allocator )
         : m_data( nullptr )
-        , m_size( 0 )
+        , m_length( 0 )
         , m_capacity( 0 )
         , m_allocator( allocator )
     {
         ensureCapacity( capacity );
+    }
+
+    //template<typename T, typename Allocator>
+    //template<typename ... Args>
+    //Vector<T, Allocator>::Vector( Args ... args )
+    //    : m_data( nullptr )
+    //    , m_length( 0 )
+    //    , m_capacity( 0 )
+    //    , m_allocator( allocator_value() )
+    //{
+    //    ensureCapacity( sizeof...(args) );
+    //    pushBack( zp_forward<T>( args... ) );
+    //}
+
+    template<typename T, typename Allocator>
+    template<zp_size_t Size>
+    Vector<T, Allocator>::Vector( value_type (&array)[Size] )
+        : m_data( nullptr )
+        , m_length( 0 )
+        , m_capacity( 0 )
+        , m_allocator( allocator_value() )
+    {
+        ensureCapacity( Size );
+        for( auto& arg : array )
+        {
+            pushBack( arg );
+        }
     }
 
     template<typename T, typename Allocator>
@@ -271,11 +304,11 @@ namespace zp
     {
         clear();
 
-        ensureCapacity( other.size() );
+        ensureCapacity( other.length() );
 
-        m_size = other.m_size;
+        m_length = other.m_length;
 
-        for( zp_size_t i = 0; i != m_size; ++i )
+        for( zp_size_t i = 0; i != m_length; ++i )
         {
             m_data[ i ] = zp_move( other.m_data[ i ] );
         }
@@ -289,11 +322,11 @@ namespace zp
         destroy();
 
         m_data  = other.m_data;
-        m_size = other.m_size;
+        m_length = other.m_length;
         m_capacity = other.m_capacity;
 
         other.m_data = nullptr;
-        other.m_size = 0;
+        other.m_length = 0;
         other.m_capacity = 0;
 
         return *this;
@@ -318,27 +351,27 @@ namespace zp
     }
 
     template<typename T, typename Allocator>
-    zp_size_t Vector<T, Allocator>::size() const
+    zp_size_t Vector<T, Allocator>::length() const
     {
-        return m_size;
+        return m_length;
     }
 
     template<typename T, typename Allocator>
     zp_size_t Vector<T, Allocator>::sizeAtomic() const
     {
-        return Atomic::AddSizeT( m_size, 0 );
+        return Atomic::AddSizeT( m_length, 0 );
     }
 
     template<typename T, typename Allocator>
     zp_bool_t Vector<T, Allocator>::isEmpty() const
     {
-        return m_size == 0;
+        return m_length == 0;
     }
 
     template<typename T, typename Allocator>
     zp_bool_t Vector<T, Allocator>::isEmptyAtomic() const
     {
-        return Atomic::AddSizeT( m_size, 0 ) == 0;
+        return Atomic::AddSizeT( m_length, 0 ) == 0;
     }
 
     template<typename T, typename Allocator>
@@ -350,71 +383,71 @@ namespace zp
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBack( const_reference val )
     {
-        if( m_size == m_capacity )
+        if( m_length == m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
-        m_data[ m_size++ ] = val;
+        m_data[ m_length++ ] = val;
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBack( move_reference val )
     {
-        if( m_size == m_capacity )
+        if( m_length == m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
-        m_data[ m_size++ ] = zp_move( val );
+        m_data[ m_length++ ] = zp_move( val );
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBackUnsafe( const_reference val )
     {
-        m_data[ m_size++ ] = val;
+        m_data[ m_length++ ] = val;
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBackUnsafe( move_reference val )
     {
-        m_data[ m_size++ ] = zp_move( val );
+        m_data[ m_length++ ] = zp_move( val );
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBackAtomic( const_reference val )
     {
-        const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
+        const zp_size_t index = Atomic::IncrementSizeT( &m_length ) - 1;
         m_data[ index ] = val;
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushBackAtomic( move_reference val )
     {
-        const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
+        const zp_size_t index = Atomic::IncrementSizeT( &m_length ) - 1;
         m_data[ index ] = zp_move( val );
     }
 
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmpty()
     {
-        if( m_size == m_capacity )
+        if( m_length == m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
-        new( m_data + m_size ) T();
-        return m_data[ m_size++ ];
+        new( m_data + m_length ) T();
+        return m_data[ m_length++ ];
     }
 
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmptyUnsafe()
     {
-        new( m_data + m_size ) T();
-        return m_data[ m_size++ ];
+        new( m_data + m_length ) T();
+        return m_data[ m_length++ ];
     }
 
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushBackEmptyAtomic()
     {
-        const zp_size_t index = Atomic::IncrementSizeT( &m_size ) - 1;
+        const zp_size_t index = Atomic::IncrementSizeT( &m_length ) - 1;
 
         new( m_data + index ) T();
         return m_data[ index ];
@@ -423,10 +456,10 @@ namespace zp
     template<typename T, typename Allocator>
     zp_size_t Vector<T, Allocator>::pushBackEmptyRange( zp_size_t count, zp_bool_t initialize )
     {
-        const zp_size_t index = m_size;
-        m_size += count;
+        const zp_size_t index = m_length;
+        m_length += count;
 
-        if( m_size >= m_capacity )
+        if( m_length >= m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
@@ -445,7 +478,7 @@ namespace zp
     template<typename T, typename Allocator>
     zp_size_t Vector<T, Allocator>::pushBackEmptyRangeAtomic( zp_size_t count, zp_bool_t initialize )
     {
-        const zp_size_t index = Atomic::AddSizeT( &m_size, count ) - count;
+        const zp_size_t index = Atomic::AddSizeT( &m_length, count ) - count;
 
         if( initialize )
         {
@@ -461,17 +494,17 @@ namespace zp
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::pushFront( const_reference val )
     {
-        if( m_size == m_capacity )
+        if( m_length == m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
 
-        for( zp_size_t i = m_size + 1; i >= 1; --i )
+        for( zp_size_t i = m_length + 1; i >= 1; --i )
         {
             m_data[ i ] = zp_move( m_data[ i - 1 ] );
         }
 
-        ++m_size;
+        ++m_length;
 
         m_data[ 0 ] = val;
     }
@@ -479,17 +512,17 @@ namespace zp
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::reference Vector<T, Allocator>::pushFrontEmpty()
     {
-        if( m_size == m_capacity )
+        if( m_length == m_capacity )
         {
             ensureCapacity( m_capacity * 2 );
         }
 
-        for( zp_size_t i = m_size + 1; i >= 1; --i )
+        for( zp_size_t i = m_length + 1; i >= 1; --i )
         {
             m_data[ i ] = zp_move( m_data[ i - 1 ] );
         }
 
-        ++m_size;
+        ++m_length;
 
         new( m_data ) T();
         return m_data[ 0 ];
@@ -498,25 +531,25 @@ namespace zp
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::popBack()
     {
-        if( m_size )
+        if( m_length )
         {
-            ( m_data + --m_size )->~T();
+            ( m_data + --m_length )->~T();
         }
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::popFront()
     {
-        if( m_size )
+        if( m_length )
         {
             m_data->~T();
 
-            for( zp_size_t i = 1; i < m_size; ++i )
+            for( zp_size_t i = 1; i < m_length; ++i )
             {
                 m_data[ i - 1 ] = zp_move( m_data[ i ] );
             }
 
-            --m_size;
+            --m_length;
         }
     }
 
@@ -525,20 +558,20 @@ namespace zp
     {
         ( m_data + index )->~T();
 
-        for( zp_size_t i = index + 1; i < m_size; ++i )
+        for( zp_size_t i = index + 1; i < m_length; ++i )
         {
             m_data[ i - 1 ] = zp_move( m_data[ i ] );
         }
 
-        --m_size;
+        --m_length;
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::eraseAtSwapBack( zp_size_t index )
     {
         ( m_data + index )->~T();
-        m_data[ index ] = zp_move( m_data[ m_size - 1 ] );
-        --m_size;
+        m_data[ index ] = zp_move( m_data[ m_length - 1 ] );
+        --m_length;
     }
 
     template<typename T, typename Allocator>
@@ -576,7 +609,7 @@ namespace zp
 
         EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
 
-        for( zp_size_t i = 0; i < m_size; ++i )
+        for( zp_size_t i = 0; i < m_length; ++i )
         {
             T* t = m_data + i;
             if( cmp( *t, val ) )
@@ -585,8 +618,8 @@ namespace zp
 
                 t->~T();
 
-                m_data[ i ] = zp_move( m_data[ m_size - 1 ] );
-                --m_size;
+                m_data[ i ] = zp_move( m_data[ m_length - 1 ] );
+                --m_length;
                 --i;
             }
 
@@ -605,20 +638,20 @@ namespace zp
             b->~T();
         }
 
-        m_size = 0;
+        m_length = 0;
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::reset()
     {
-        m_size = 0;
+        m_length = 0;
     }
 
     template<typename T, typename Allocator>
     void Vector<T, Allocator>::resize_unsafe( zp_size_t size )
     {
         ZP_ASSERT( size <= m_capacity );
-        m_size = size;
+        m_length = size;
     }
 
     template<typename T, typename Allocator>
@@ -649,12 +682,12 @@ namespace zp
     {
         zp_size_t index = npos;
 
-        if( m_size > 0 )
+        if( m_length > 0 )
         {
             EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
 
             const_iterator b = m_data;
-            const_iterator e = m_data + m_size;
+            const_iterator e = m_data + m_length;
             for( ; b != e; ++b )
             {
                 if( cmp( *b, val ) )
@@ -673,7 +706,7 @@ namespace zp
     {
         zp_size_t index = npos;
 
-        if( m_size > 0 )
+        if( m_length > 0 )
         {
             EqualityComparerFunc cmp = comparer ? comparer : defaultEqualityComparerFunc;
 
@@ -699,10 +732,10 @@ namespace zp
     {
         zp_size_t index = npos;
 
-        if( m_size > 0 )
+        if( m_length > 0 )
         {
             const_iterator b = m_data;
-            const_iterator e = m_data + m_size;
+            const_iterator e = m_data + m_length;
             for( ; b != e; ++b )
             {
                 if( cmp( *b ) )
@@ -721,7 +754,7 @@ namespace zp
     {
         zp_size_t index = npos;
 
-        if( m_size > 0 )
+        if( m_length > 0 )
         {
             const_iterator b = begin();
             const_iterator e = end();
@@ -760,7 +793,7 @@ namespace zp
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::reference Vector<T, Allocator>::back()
     {
-        return m_data[ m_size - 1 ];
+        return m_data[ m_length - 1 ];
     }
 
     template<typename T, typename Allocator>
@@ -772,7 +805,7 @@ namespace zp
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::const_reference Vector<T, Allocator>::back() const
     {
-        return m_data[ m_size - 1 ];
+        return m_data[ m_length - 1 ];
     }
 
     template<typename T, typename Allocator>
@@ -784,7 +817,7 @@ namespace zp
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::iterator Vector<T, Allocator>::end()
     {
-        return m_data + m_size;
+        return m_data + m_length;
     }
 
     template<typename T, typename Allocator>
@@ -796,7 +829,7 @@ namespace zp
     template<typename T, typename Allocator>
     typename Vector<T, Allocator>::const_iterator Vector<T, Allocator>::end() const
     {
-        return m_data + m_size;
+        return m_data + m_length;
     }
 
     template<typename T, typename Allocator>
@@ -809,7 +842,7 @@ namespace zp
 
         if( m_data != nullptr )
         {
-            for( zp_size_t i = 0; i != m_size; ++i )
+            for( zp_size_t i = 0; i != m_length; ++i )
             {
                 newArray[ i ] = zp_move( m_data[ i ] );
             }

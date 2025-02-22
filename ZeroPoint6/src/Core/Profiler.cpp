@@ -61,14 +61,13 @@ namespace zp
             zp_time_t time;
 
             zp_uint32_t numDrawCalls;
-            zp_uint32_t numTriangles;
+            zp_uint32_t numDrawIndirectCalls;
+            zp_uint32_t numVertices;
+            zp_uint32_t numInstances;
+            zp_uint32_t numRenderPasses;
+            zp_uint32_t numDispatchCalls;
+            zp_uint32_t numDispatchIndirectCalls;
             zp_uint32_t numCommands;
-
-            zp_uint32_t numRenderTargets;
-            zp_uint32_t numTextures;
-            zp_uint32_t numShaders;
-            zp_uint32_t numMaterials;
-            zp_uint32_t numMeshes;
 
             zp_uint32_t threadId;
         };
@@ -133,12 +132,14 @@ namespace zp
         void AdvanceProfilerFrame( zp_uint64_t frameIndex )
         {
             g_context.currentFrame = frameIndex;
+
             for( zp_size_t i = 0; i < g_context.profilerThreadDataCount; ++i )
             {
                 ProfilerThreadData* threadData = g_context.profilerThreadData[ i ];
                 if( threadData != nullptr )
                 {
                     Atomic::Exchange( &threadData->currentFrame, frameIndex );
+                    Atomic::IncrementSizeT( &threadData->currentGPUProfilerEvent );
                 }
             }
         }
@@ -358,16 +359,16 @@ namespace zp
 
     void Profiler::MarkGPU( const Profiler::GPUDesc& gpuDesc )
     {
-        const zp_size_t eventIndex = t_profilerData.currentGPUProfilerEvent++ % t_profilerData.gpuProfilerData.length();
+        //const zp_size_t eventIndex = t_profilerData.currentGPUProfilerEvent % t_profilerData.gpuProfilerData.length();
 
-        GPUProfilerEvent* event = t_profilerData.gpuProfilerData.data() + eventIndex;
-        event->frameIndex = t_profilerData.currentFrame;
-        event->gpuDuration = gpuDesc.duration;
-        event->time = Platform::TimeNow();
-        event->numDrawCalls = gpuDesc.numDrawCalls;
-        event->numTriangles = gpuDesc.numTriangles;
-        event->numCommands = gpuDesc.numCommands;
-        event->threadId = t_profilerData.threadID;
+        //GPUProfilerEvent* event = t_profilerData.gpuProfilerData.data() + eventIndex;
+        //event->frameIndex = t_profilerData.currentFrame;
+        //event->gpuDuration = gpuDesc.duration;
+        //event->time = Platform::TimeNow();
+        //event->numDrawCalls = gpuDesc.numDrawCalls;
+        //event->numVertices = gpuDesc.numVertices;
+        //event->numCommands = gpuDesc.numCommands;
+        //event->threadId = t_profilerData.threadID;
     }
 
     void Profiler::AdvanceFrame( zp_uint64_t frameIndex )

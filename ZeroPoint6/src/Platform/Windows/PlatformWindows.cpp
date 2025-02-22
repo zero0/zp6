@@ -731,7 +731,7 @@ namespace zp
     {
         if( systemTrayHandle.handle )
         {
-            //PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.handle );
+            //PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.m_handle );
 //
             //::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
 //
@@ -1273,7 +1273,7 @@ namespace zp
 
         zp_size_t end;
 
-        // handle special case of %S. to append milliseconds to the seconds
+        // m_handle special case of %S. to append milliseconds to the seconds
         if( const char* milli = zp_strstr( format, "%S." ) )
         {
             milli += zp_strlen( "%S." );

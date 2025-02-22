@@ -227,6 +227,8 @@ namespace zp
 
     typedef Offset2D<zp_int32_t> Offset2Di;
 
+    typedef Offset2D<zp_uint32_t> Offset2Du;
+
     typedef Offset2D<zp_float32_t> Offset2Df;
 
     template<typename T>
@@ -236,6 +238,8 @@ namespace zp
     };
 
     typedef Size2D<zp_int32_t> Size2Di;
+
+    typedef Size2D<zp_uint32_t> Size2Du;
 
     typedef Size2D<zp_float32_t> Size2Df;
 
@@ -370,6 +374,8 @@ namespace zp
 
     typedef Rect2D<zp_int32_t> Rect2Di;
 
+    typedef Rect2D<zp_uint32_t> Rect2Du;
+
     typedef Rect2D<zp_float32_t> Rect2Df;
 
     template<typename T>
@@ -383,6 +389,12 @@ namespace zp
     typedef Size3D<zp_uint32_t> Size3Du;
 
     typedef Size3D<zp_float32_t> Size3Df;
+
+    template<typename T>
+    Size2D<T> Size3Dto2D( const Size3D<T>& size )
+    {
+        return { .width = size.width, .height = size.height };
+    }
 
     template<typename T>
     struct Offset3D

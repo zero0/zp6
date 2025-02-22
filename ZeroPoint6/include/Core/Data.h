@@ -128,6 +128,10 @@ namespace zp
 
         Memory readMemory( zp_size_t size );
 
+        void* readPtr( zp_size_t size );
+
+        void* readPtrArray( zp_size_t size, zp_size_t length );
+
         template<typename T>
         zp_size_t read( T& value )
         {
@@ -144,6 +148,24 @@ namespace zp
         zp_size_t readReverse( MemoryArray<T>& value, zp_size_t count )
         {
             return readReverse( value.data(), sizeof( T ) * count );
+        }
+
+        template<typename T>
+        T* readPtr()
+        {
+            return static_cast<T*>( readPtr( sizeof(T) ) );
+        }
+
+        template<typename T>
+        T* readPtrArray( zp_size_t length )
+        {
+            return static_cast<T*>( readPtrArray( sizeof(T), length ) );
+        }
+
+        template<typename T>
+        MemoryArray<T> readMemoryArray( zp_size_t length )
+        {
+            return { readPtrArray<T>( length ), length };
         }
 
         zp_size_t readAlignment( zp_size_t alignment );
