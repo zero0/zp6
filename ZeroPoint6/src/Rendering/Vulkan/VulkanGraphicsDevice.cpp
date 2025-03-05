@@ -50,6 +50,24 @@ namespace zp
 {
     namespace
     {
+        enum class DebugLabelColor
+        {
+            None,
+
+            RenderPass,
+
+            Count,
+        };
+
+#if ZP_DEBUG
+        const FixedArray kDebugLabelColors {
+            Color::clear,
+            Color::blue,
+        };
+
+        ZP_STATIC_ASSERT( kDebugLabelColors.length() == (zp_size_t)DebugLabelColor::Count );
+#endif
+
         enum
         {
             kMaxBufferedFrameCount = 4,
@@ -136,8 +154,8 @@ namespace zp
         struct VulkanCommandQueue
         {
             VkCommandBuffer vkCommandBuffer;
+            int queue;
 
-            VkCommandBufferUsageFlags usage;
             zp_hash32_t hash;
         };
 
@@ -163,9 +181,12 @@ namespace zp
 
         struct FrameResources
         {
+            Vector<CommandQueueHandle> cachedCommandQueues;
+
             StagingBuffer stagingBuffer;
 
-            VkCommandPool vkCommandPool;
+            FixedArray<VkCommandPool, 4> vkCommandPools;
+
             VkDescriptorSet vkBindlessDescriptorSet;
         };
 
@@ -248,7 +269,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             VkBufferUsageFlags bufferUsageFlagBits {};
 
             FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
-            FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST, VK_BUFFER_USAGE_TRANSFER_DST_BIT );
+            FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DST, VK_BUFFER_USAGE_TRANSFER_DST_BIT );
             FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
             FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER, VK_BUFFER_USAGE_INDEX_BUFFER_BIT );
             FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_INDIRECT_ARGS, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT );
@@ -730,6 +751,31 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             return colorSpaceMap[ colorSpace ];
         }
 
+        constexpr VkAttachmentLoadOp Convert( AttachmentLoadOp loadOp )
+        {
+            constexpr VkAttachmentLoadOp loadOpMap[]
+            {
+                VK_ATTACHMENT_LOAD_OP_LOAD,
+                VK_ATTACHMENT_LOAD_OP_CLEAR,
+                VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            };
+
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( loadOpMap ) == AttachmentLoadOp_Count );
+            return loadOpMap[ loadOp ];
+        }
+
+        constexpr VkAttachmentStoreOp Convert( AttachmentStoreOp storeOp )
+        {
+            constexpr VkAttachmentStoreOp storeOpMap[]
+            {
+                VK_ATTACHMENT_STORE_OP_STORE,
+                VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            };
+
+            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( storeOpMap ) == AttachmentStoreOp_Count );
+            return storeOpMap[ storeOp ];
+        }
+
 #pragma endregion
 
 #pragma region Create Hash Functions
@@ -897,6 +943,43 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
 #if ZP_DEBUG
 
+        void CmdBeginDebugLabel( VkCommandBuffer vkCommandBuffer, const char* name, const Color& color )
+        {
+            const VkDebugUtilsLabelEXT debugUtilsLabel {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+                .pLabelName = name,
+                .color { color.r, color.g, color.b, color.a },
+            };
+            vkCmdBeginDebugUtilsLabelEXT( vkCommandBuffer, &debugUtilsLabel );
+        }
+
+        void CmdBeginDebugLabel( VkCommandBuffer vkCommandBuffer, const char* name, DebugLabelColor labelColor )
+        {
+            const Color& color = kDebugLabelColors[ static_cast<zp_size_t>( labelColor ) ];
+            CmdBeginDebugLabel( vkCommandBuffer, name, color );
+        }
+
+        void CmdEndDebugLabel( VkCommandBuffer vkCommandBuffer )
+        {
+            vkCmdEndDebugUtilsLabelEXT( vkCommandBuffer );
+        }
+
+        void CmdMarkDebugLabel( VkCommandBuffer vkCommandBuffer, const char* name, const Color& color )
+        {
+            const VkDebugUtilsLabelEXT debugUtilsLabel {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+                .pLabelName = name,
+                .color { color.r, color.g, color.b, color.a },
+            };
+            vkCmdInsertDebugUtilsLabelEXT( vkCommandBuffer, &debugUtilsLabel );
+        }
+
+        void CmdMarkDebugLabel( VkCommandBuffer vkCommandBuffer, const char* name, DebugLabelColor labelColor )
+        {
+            const Color& color = kDebugLabelColors[ static_cast<zp_size_t>( labelColor ) ];
+            CmdMarkDebugLabel( vkCommandBuffer, name, color );
+        }
+
         void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, VkObjectType objectType, void* objectHandle, const char* name )
         {
             if( name != nullptr )
@@ -932,6 +1015,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
 #else // !ZP_DEBUG
 #define SetDebugObjectName(...) (void)0
+#define CmdBeginDebugLabel(...) (void)0
+#define CmdEndDebugLabel(...)   (void)0
+#define CmdMarkDebugLabel(...)  (void)0
 #endif // ZP_DEBUG
 
 #pragma endregion
@@ -1574,13 +1660,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             mainInfo.pNext = &nextInfo;
         }
 
-        template<typename T0, typename T1>
-        constexpr void pNext( T0& mainInfo, T1& nextInfo )
-        {
-            mainInfo.pNext = &nextInfo;
-        }
-
-        zp_bool_t IsExtensionPropertySupported( const char* extension, const Vector<VkExtensionProperties>& availableExtensions )
+        zp_bool_t IsExtensionSupported( const char* extension, const Vector<VkExtensionProperties>& availableExtensions )
         {
             const zp_size_t index = availableExtensions.findIndexOf( [ &extension ]( const VkExtensionProperties& ext ) -> zp_bool_t
             {
@@ -1590,11 +1670,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             return index != zp::npos;
         }
 
-        zp_bool_t IsExtensionSupported( const char* extension, const Vector<VkExtensionProperties>& availableExtensions )
+        zp_bool_t IsExtensionSupported( const char* extension, zp_uint32_t spec, const Vector<VkExtensionProperties>& availableExtensions )
         {
-            const zp_size_t index = availableExtensions.findIndexOf( [ &extension ]( const VkExtensionProperties& ext ) -> zp_bool_t
+            const zp_size_t index = availableExtensions.findIndexOf( [ &extension, &spec ]( const VkExtensionProperties& ext ) -> zp_bool_t
             {
-                return zp_strcmp( extension, ext.extensionName ) == 0;
+                return spec == ext.specVersion && zp_strcmp( extension, ext.extensionName ) == 0;
             } );
 
             return index != zp::npos;
@@ -1622,6 +1702,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             StagingBufferAllocation Allocate( zp_size_t size );
 
+#pragma region Command Queue
+
+            CommandQueueHandle BeginCommandQueue( RenderQueue queue );
+
+            void EndCommandQueue( CommandQueueHandle commandQueueHandle );
+
+#pragma endregion
+
 #pragma region Buffer
 
             BufferHandle RequestBuffer( zp_size_t size );
@@ -1629,6 +1717,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             void ReleaseBuffer( BufferHandle bufferHandle );
 
             void UpdateBufferData( CommandQueueHandle commandQueueHandle, BufferHandle dstBuffer, zp_size_t dstOffset, Memory srcData );
+
+            void CopyBufferToBuffer( const CommandCopyBuffer& cmd );
 
 #pragma endregion
 
@@ -1646,7 +1736,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
 #pragma region Shader
 
-            ShaderHandle RequestShader();
+            ShaderHandle RequestGraphicsShader();
+
+            ShaderHandle RequestComputeShader();
 
             void ReleaseShader( ShaderHandle shader );
 
@@ -1744,9 +1836,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             FixedArray<FrameResources, kMaxBufferedFrameCount> m_frameResources;
 
-            FixedArray<VkCommandPool, kMaxBufferedFrameCount> m_vkCommandPools;
-            FixedArray<StagingBuffer, kMaxBufferedFrameCount> m_stagingBuffers;
-            FixedArray<VkDescriptorSet, kMaxBufferedFrameCount> m_vkBindlessDescriptorSets;
+            //FixedArray<VkCommandPool, kMaxBufferedFrameCount> m_vkGraphicsCommandPools;
+            //FixedArray<VkCommandPool, kMaxBufferedFrameCount> m_vkComputeCommandPools;
+            //FixedArray<StagingBuffer, kMaxBufferedFrameCount> m_stagingBuffers;
+            //FixedArray<VkDescriptorSet, kMaxBufferedFrameCount> m_vkBindlessDescriptorSets;
+            //FixedArray<Vector<CommandQueueHandle>, kMaxBufferedFrameCount> m_finishedCommandQueues;
 
 #if ZP_DEBUG
             VkDebugUtilsMessengerEXT m_vkDebugMessenger;
@@ -1823,7 +1917,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             // TODO: filter out available extensions with requested extensions
             //Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
 
-            constexpr const char* kInstanceExtensionNames[] {
+            const FixedArray kInstanceExtensionNames {
                 VK_KHR_SURFACE_EXTENSION_NAME,
 #if ZP_OS_WINDOWS
                 VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
@@ -1834,13 +1928,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 #endif
             };
 
-            constexpr const char* kValidationLayers[] {
-#if ZP_DEBUG
-                "VK_LAYER_KHRONOS_validation"
-#endif
-            };
 
-            constexpr const char* kDeviceExtensions[] {
+            const FixedArray kDeviceExtensions {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                 VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
                 VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
@@ -1852,6 +1941,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
                 VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
                 VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+                VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+                VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
             };
 
             // app info
@@ -1864,15 +1955,52 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .apiVersion = VK_API_VERSION_1_3,
             };
 
+#if ZP_DEBUG
+            const char* VK_LAYER_KHRONOS_validation = "VK_LAYER_KHRONOS_validation";
+#endif
+
+            const FixedArray kValidationLayers {
+#if ZP_DEBUG
+                VK_LAYER_KHRONOS_validation,
+#endif
+            };
+
             // create instance
             VkInstanceCreateInfo instanceCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
                 .pApplicationInfo = &applicationInfo,
-                .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
-                .ppEnabledLayerNames = kValidationLayers,
-                .enabledExtensionCount = ZP_ARRAY_SIZE( kInstanceExtensionNames ),
-                .ppEnabledExtensionNames = kInstanceExtensionNames,
+                .enabledLayerCount = static_cast<zp_uint32_t>( kValidationLayers.length() ),
+                .ppEnabledLayerNames = kValidationLayers.data(),
+                .enabledExtensionCount = kInstanceExtensionNames.length(),
+                .ppEnabledExtensionNames = kInstanceExtensionNames.data(),
             };
+
+#if ZP_DEBUG
+            const VkBool32 validate_core = VK_TRUE;
+            const VkBool32 validate_sync = VK_TRUE;
+            const VkBool32 thread_safety = VK_TRUE;
+            const char* debug_action[] = {"VK_DBG_LAYER_ACTION_LOG_MSG"};
+            const char* report_flags[] = {"info", "warn", "perf", "error", "debug"};
+            const VkBool32 enable_message_limit = VK_TRUE;
+            const int32_t  duplicate_message_limit = 3;
+
+            const FixedArray layerSettings {
+                VkLayerSettingEXT {
+                    .pLayerName = VK_LAYER_KHRONOS_validation,
+                    .pSettingName = ZP_NAMEOF( validate_core ),
+                    .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+                    .valueCount = 1,
+                    .pValues = &validate_core,
+                },
+            };
+
+            VkLayerSettingsCreateInfoEXT layerSettingsCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
+                .settingCount = static_cast<zp_uint32_t>( layerSettings.length() ),
+                .pSettings = layerSettings.data(),
+            };
+            pNextPushFront( instanceCreateInfo, layerSettingsCreateInfo );
+#endif // ZP_DEBUG
 
 #if ZP_DEBUG
             // add debug info to create instance
@@ -1890,7 +2018,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // TODO: does this need to be here twice?
             pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
-#endif
+#endif // ZP_DEBUG
 
             HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
 
@@ -2064,7 +2192,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, availableDeviceExtensions.data() ) );
 
                 //
-                Vector<const char*> supportedExtensions( ZP_ARRAY_SIZE( kDeviceExtensions ), MemoryLabels::Temp );
+                Vector<const char*> supportedExtensions( kDeviceExtensions.length(), MemoryLabels::Temp );
 
                 VkPhysicalDeviceFeatures2 deviceFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -2140,12 +2268,28 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     supportedExtensions.pushBack( VK_KHR_SWAPCHAIN_EXTENSION_NAME );
                 }
 
+                if( IsExtensionSupported( VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    supportedExtensions.pushBack( VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME );
+                }
+
+                VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphicsPipelineLibraryFeatures {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT,
+                };
+
+                if( IsExtensionSupported( VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, graphicsPipelineLibraryFeatures );
+                    supportedExtensions.pushBack( VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME );
+                }
+
                 vkGetPhysicalDeviceFeatures2( m_vkPhysicalDevice, &deviceFeatures );
 
                 ZP_ASSERT( deviceFeaturesVulkan13.dynamicRendering );
                 ZP_ASSERT( deviceFeaturesVulkan13.maintenance4 );
                 ZP_ASSERT( maintenance5Features.maintenance5 );
                 //ZP_ASSERT( maintenance6Features.maintenance6 );
+                ZP_ASSERT( graphicsPipelineLibraryFeatures.graphicsPipelineLibrary );
 
                 //
                 VkPhysicalDeviceProperties2 deviceProperties {
@@ -2157,21 +2301,24 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 };
                 pNextPushFront( deviceProperties, pushDescriptorProperties );
 
+                VkPhysicalDeviceGraphicsPipelineLibraryPropertiesEXT graphicsPipelineLibraryProperties {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_PROPERTIES_EXT,
+                };
+                pNextPushFront( deviceProperties, graphicsPipelineLibraryProperties );
+
                 vkGetPhysicalDeviceProperties2( m_vkPhysicalDevice, &deviceProperties );
 
                 PrintPhysicalDeviceInfo( deviceProperties.properties );
 
                 //
-                VkDeviceCreateInfo localDeviceCreateInfo {
+                const VkDeviceCreateInfo localDeviceCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                    .pNext = &deviceFeatures,
                     .queueCreateInfoCount = static_cast<uint32_t>( deviceQueueCreateInfos.length() ),
                     .pQueueCreateInfos = deviceQueueCreateInfos.data(),
-                    .enabledLayerCount = ZP_ARRAY_SIZE( kValidationLayers ),
-                    .ppEnabledLayerNames = kValidationLayers,
                     .enabledExtensionCount = static_cast<zp_uint32_t>( supportedExtensions.length() ),
                     .ppEnabledExtensionNames = supportedExtensions.data(),
                 };
-                pNext( localDeviceCreateInfo, deviceFeatures );
 
                 HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
 
@@ -2253,17 +2400,25 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // create per frame command pools
             {
-                const VkCommandPoolCreateInfo poolCreateInfo {
+                const VkCommandPoolCreateInfo poolCreateInfoGraphics {
                     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                     .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                     .queueFamilyIndex = m_queues.graphics.familyIndex,
                 };
 
+                const VkCommandPoolCreateInfo poolCreateInfoCompute {
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                    .queueFamilyIndex = m_queues.compute.familyIndex,
+                };
+
                 for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
                 {
-                    HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfo, &m_vkAllocationCallbacks, &m_vkCommandPools[ i ] ) );
+                    HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfoGraphics, &m_vkAllocationCallbacks, &m_frameResources[ i ].vkCommandPools[ZP_RENDER_QUEUE_GRAPHICS] ) );
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_frameResources[ i ].vkCommandPools[ZP_RENDER_QUEUE_GRAPHICS], "Graphics Command Pool %d", i );
 
-                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkCommandPools[ i ], "Command Pool %d", i );
+                    HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfoCompute, &m_vkAllocationCallbacks, &m_frameResources[ i ].vkCommandPools[ZP_RENDER_QUEUE_COMPUTE] ) );
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_frameResources[ i ].vkCommandPools[ZP_RENDER_QUEUE_COMPUTE], "Compute Command Pool %d", i );
                 }
             }
 
@@ -2301,19 +2456,21 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                     SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Staging Buffer %d", i );
 
-                    m_stagingBuffers[ i ] = StagingBuffer {
+                    m_frameResources[ i ].stagingBuffer = StagingBuffer {
                         .vkBuffer = vkBuffer,
                         .vkDeviceMemory = vkDeviceMemory,
                         .position = 0,
                         .alignment = memoryRequirements.alignment,
                         .size = memoryAllocateInfo.allocationSize,
                     };
+
+                    m_frameResources[ i ].cachedCommandQueues = Vector<CommandQueueHandle>( 8, MemoryLabels::Graphics );
                 };
             }
 
             // create bindless setup
             {
-                const FixedArray<VkDescriptorSetLayoutBinding, 3> bindings {
+                const FixedArray bindings {
                     VkDescriptorSetLayoutBinding {
                         .binding = 0,
                         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -2334,16 +2491,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     },
                 };
 
-                const FixedArray<VkDescriptorBindingFlags, 3> flags {
-                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+                const FixedArray flags {
+                    VkDescriptorBindingFlags { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
+                    VkDescriptorBindingFlags { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
+                    VkDescriptorBindingFlags { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
                 };
-                ZP_ASSERT( bindings.length() == flags.length() );
+                ZP_STATIC_ASSERT( bindings.length() == flags.length() );
 
                 const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-                    .bindingCount = static_cast<uint32_t>( flags.length() ),
+                    .bindingCount = static_cast<zp_uint32_t>( flags.length() ),
                     .pBindingFlags = flags.data(),
                 };
 
@@ -2351,7 +2508,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                     .pNext = &bindingFlagsCreateInfo,
                     .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
-                    .bindingCount = static_cast<uint32_t>( bindings.length() ),
+                    .bindingCount = static_cast<zp_uint32_t>( bindings.length() ),
                     .pBindings = bindings.data(),
                 };
 
@@ -2378,9 +2535,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
                 {
-                    HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &m_vkBindlessDescriptorSets[ i ] ) );
+                    HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &m_frameResources[ i ].vkBindlessDescriptorSet ) );
 
-                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkBindlessDescriptorSets[ i ], "Bindless Descriptor Set %d", i );
+                    SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_frameResources[ i ].vkBindlessDescriptorSet, "Bindless Descriptor Set %d", i );
                 }
             };
         }
@@ -2409,17 +2566,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             // destroy command pools
             vkDestroyCommandPool( m_vkLocalDevice, m_vkTransientCommandPool, &m_vkAllocationCallbacks );
 
-            for( VkCommandPool pool : m_vkCommandPools )
+            // destory frame resources
+            for( FrameResources& frameResources : m_frameResources )
             {
-                vkDestroyCommandPool( m_vkLocalDevice, pool, &m_vkAllocationCallbacks );
-            }
+                vkDestroyCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[0], &m_vkAllocationCallbacks );
+                vkDestroyCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[1], &m_vkAllocationCallbacks );
+                vkDestroyCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[2], &m_vkAllocationCallbacks );
+                vkDestroyCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[3], &m_vkAllocationCallbacks );
 
-            // destroy staging buffer
-            for( auto& stagingBuffer : m_stagingBuffers )
-            {
-                vkDestroyBuffer( m_vkLocalDevice, stagingBuffer.vkBuffer, &m_vkAllocationCallbacks );
-
-                vkFreeMemory( m_vkLocalDevice, stagingBuffer.vkDeviceMemory, &m_vkAllocationCallbacks );
+                vkDestroyBuffer( m_vkLocalDevice, frameResources.stagingBuffer.vkBuffer, &m_vkAllocationCallbacks );
+                vkFreeMemory( m_vkLocalDevice, frameResources.stagingBuffer.vkDeviceMemory, &m_vkAllocationCallbacks );
             }
 
 #if ZP_DEBUG
@@ -2449,7 +2605,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             m_frame = frame;
             m_frameIndex = frameIndex;
 
-            m_stagingBuffers[ frameIndex ].position = 0;
+            m_frameResources[ frameIndex ].stagingBuffer.position = 0;
+
+            HR( vkResetCommandPool( m_vkLocalDevice, m_frameResources[ frameIndex ].vkCommandPools[ZP_RENDER_QUEUE_GRAPHICS], 0 ) );
+            HR( vkResetCommandPool( m_vkLocalDevice, m_frameResources[ frameIndex ].vkCommandPools[ZP_RENDER_QUEUE_COMPUTE], 0 ) );
 
             FlushDestroyQueue();
         }
@@ -2458,15 +2617,54 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
+            Vector<CommandQueueHandle>& commandQueues = m_frameResources[ m_frameIndex ].cachedCommandQueues;
+            Vector<VkCommandBufferSubmitInfo> commandBufferSubmitInfos( commandQueues.length(), MemoryLabels::Temp );
+
+            for( const CommandQueueHandle& commandQueueHandle : commandQueues )
+            {
+                const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
+                ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+
+                commandBufferSubmitInfos.pushBack( {
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                    .commandBuffer = commandQueue.vkCommandBuffer,
+                } );
+            }
+
+            commandQueues.clear();
+#if 0
+            // TODO: add cycling fences when queue changes
+            int currentQueue = -1;
+            Vector<CommandQueueHandle>& commandQueues = m_frameResources[ m_frameIndex ].cachedCommandQueues;
+            for( CommandQueueHandle commandQueueHandle : commandQueues )
+            {
+                const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
+                ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+
+                if( commandQueue.queue != currentQueue )
+                {
+                    if( !commandBufferSubmitInfos.isEmpty() )
+                    {
+
+                    }
+
+                    currentQueue = commandQueue.queue;
+
+                    commandBufferSubmitInfos.reset();
+                }
+
+                commandBufferSubmitInfos.pushBack( {
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                    .commandBuffer = commandQueue.vkCommandBuffer,
+                } );
+            }
+#endif
             const VkSemaphoreSubmitInfo waitSemaphores {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                 .semaphore = waitSemaphore,
                 .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             };
-            const VkCommandBufferSubmitInfo commandBuffers {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-                .commandBuffer = nullptr,
-            };
+
             const VkSemaphoreSubmitInfo signalSemaphores {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                 .semaphore = signalSemaphore,
@@ -2477,13 +2675,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                 .waitSemaphoreInfoCount = 1,
                 .pWaitSemaphoreInfos = &waitSemaphores,
-                .commandBufferInfoCount = 0,
-                .pCommandBufferInfos = &commandBuffers,
+                .commandBufferInfoCount = static_cast<zp_uint32_t>( commandBufferSubmitInfos.length() ),
+                .pCommandBufferInfos = commandBufferSubmitInfos.data(),
                 .signalSemaphoreInfoCount = 1,
                 .pSignalSemaphoreInfos = &signalSemaphores,
             };
 
             HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
+
+
         }
 
         void VulkanContext::FlushDestroyQueue()
@@ -2547,7 +2747,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            StagingBuffer& stagingBuffer = m_stagingBuffers[ m_frameIndex ];
+            StagingBuffer& stagingBuffer = m_frameResources[ m_frameIndex ].stagingBuffer;
             const zp_size_t allocationSize = ZP_ALIGN_SIZE( size, stagingBuffer.alignment );
 
             ZP_ASSERT( ( stagingBuffer.position + allocationSize ) < stagingBuffer.size );
@@ -2565,49 +2765,93 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             return allocation;
         };
 
+        CommandQueueHandle VulkanContext::BeginCommandQueue( RenderQueue queue )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            FrameResources& frameResources = m_frameResources[ m_frameIndex ];
+            VkCommandPool vkCommandPool = frameResources.vkCommandPools[ queue ];
+
+            const VkCommandBufferAllocateInfo commandBufferAllocateInfo {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .commandPool = vkCommandPool,
+                .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                .commandBufferCount = 1,
+            };
+
+            VkCommandBuffer vkCommandBuffer;
+            HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkCommandBuffer ) );
+
+            const VkCommandBufferBeginInfo commandBufferBeginInfo {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            };
+            HR( vkBeginCommandBuffer( vkCommandBuffer, &commandBufferBeginInfo ) );
+
+            zp_uint32_t index;
+            if( m_vkFreeCommandQueues.isEmpty() )
+            {
+                index = m_vkCommandQueues.pushBackEmptyRangeAtomic( 1, false );
+            }
+            else
+            {
+                index = m_vkFreeCommandQueues.dequeue();
+            }
+
+            zp_uint32_t hash = zp_fnv32_1a( m_frame );
+            hash = zp_fnv32_1a( index, hash );
+            hash = zp_fnv32_1a( index, queue );
+
+            m_vkCommandQueues[ index ] = {
+                .vkCommandBuffer = vkCommandBuffer,
+                .queue = queue,
+                .hash = hash,
+            };
+
+            return { .index = index, .hash = hash };
+        }
+
+        void VulkanContext::EndCommandQueue( CommandQueueHandle commandQueueHandle )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
+            ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+
+            HR( vkEndCommandBuffer( commandQueue.vkCommandBuffer ) );
+
+            m_frameResources[ m_frameIndex ].cachedCommandQueues.pushBack( commandQueueHandle );
+        }
+
         BufferHandle VulkanContext::RequestBuffer( zp_size_t size )
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const zp_bool_t allowTransferFrom = true;
-            const zp_bool_t uniformBuffer = false;
+            const GraphicsBufferUsage usage = ZP_GRAPHICS_BUFFER_USAGE_STORAGE;
 
-            VkBufferUsageFlags vkBufferUsage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            VkBufferUsageFlags vkBufferUsage = 0;
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DST, VK_BUFFER_USAGE_TRANSFER_DST_BIT );
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_INDIRECT_ARGS, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_UNIFORM, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT );
+            FlagBits( vkBufferUsage, usage, ZP_GRAPHICS_BUFFER_USAGE_UNIFORM_TEXEL, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
-            if( allowTransferFrom )
-            {
-                vkBufferUsage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-            }
+            const VkSharingMode vkSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            if( uniformBuffer )
-            {
-                vkBufferUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-            }
-
-            switch( 0 )
-            {
-                case 0:
-                    vkBufferUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-                    break;
-
-                case 1:
-                    vkBufferUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-                    break;
-
-                case 2:
-                    vkBufferUsage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-                    break;
-
-            };
-
-            const zp_size_t alignment = uniformBuffer ? 16 : 4;
+            const zp_bool_t isUniformBuffer = zp_flag32_any_set( vkBufferUsage, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT );
+            const zp_size_t alignment = isUniformBuffer ? 16 : 4;
             const zp_size_t alignedSize = ZP_ALIGN_SIZE( size, alignment );
+
+            const VkBufferCreateFlags vkFlags = 0;
 
             const VkBufferCreateInfo bufferCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .flags = vkFlags,
                 .size = alignedSize,
                 .usage = vkBufferUsage,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .sharingMode = vkSharingMode,
             };
 
             VkBuffer vkBuffer {};
@@ -2628,13 +2872,22 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
 
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Buffer (%d)", memoryAllocateInfo.allocationSize );
+            // @formatter:off
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Buffer %c%c%c%c%c%c%c (%d)",
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_TRANSFER_SRC_BIT )            ? 'S' : '-',
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_TRANSFER_DST_BIT )            ? 'D' : '-',
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT )           ? 'V' : '-',
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_INDEX_BUFFER_BIT )            ? 'I' : '-',
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT )         ? 'i' : '-',
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )          ? 'U' : '-',
+                zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT )    ? 'T' : '-',
+                memoryAllocateInfo.allocationSize );
+            // @formatter:on
 
             zp_uint32_t index;
             if( m_vkFreeBuffers.isEmpty() )
             {
-                index = m_vkBuffers.length();
-                m_vkBuffers.pushBackEmpty();
+                index = m_vkBuffers.pushBackEmptyRangeAtomic( 1, false );
             }
             else
             {
@@ -2775,8 +3028,70 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // finalize dstbuffer upload
             {
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, 0, allocation.size, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT );
+                const zp_bool_t readOnlyBuffer = false;
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, 0, allocation.size, readOnlyBuffer ? VK_ACCESS_2_SHADER_READ_BIT : VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT );
                 CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
+            }
+        }
+
+        void VulkanContext::CopyBufferToBuffer( const CommandCopyBuffer& cmd )
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
+            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+
+            VulkanBuffer& srcBuffer = m_vkBuffers[ cmd.srcBuffer.index ];
+            ZP_ASSERT( srcBuffer.hash == cmd.srcBuffer.hash );
+
+            VulkanBuffer& dstBuffer = m_vkBuffers[ cmd.dstBuffer.index ];
+            ZP_ASSERT( dstBuffer.hash == cmd.dstBuffer.hash );
+
+            VkAccessFlags2 srcAccess = srcBuffer.vkAccess;
+            VkAccessFlags2 dstAccess = dstBuffer.vkAccess;
+
+            const zp_bool_t copyToSelf = cmd.srcBuffer == cmd.dstBuffer;
+
+            // transion buffer to TRANSFER READ/WRITE
+            if( copyToSelf )
+            {
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT );
+            }
+            else
+            {
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, VK_ACCESS_2_TRANSFER_READ_BIT );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT );
+            }
+
+            // copy region
+            {
+                const VkBufferCopy2 bufferCopy {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
+                    .srcOffset = cmd.srcOffset,
+                    .dstOffset = cmd.dstOffset,
+                    .size = cmd.size,
+                };
+
+                const VkCopyBufferInfo2 copyBufferInfo {
+                    .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+                    .srcBuffer = srcBuffer.vkBuffer,
+                    .dstBuffer = dstBuffer.vkBuffer,
+                    .regionCount = 1,
+                    .pRegions = &bufferCopy,
+                };
+
+                vkCmdCopyBuffer2( commandQueue.vkCommandBuffer, &copyBufferInfo );
+            }
+
+            // transfer back to original access
+            if( copyToSelf )
+            {
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, srcAccess );
+            }
+            else
+            {
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, srcAccess );
+                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, dstAccess );
             }
         }
 
@@ -2887,8 +3202,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             zp_uint32_t index;
             if( m_vkFreeTextures.isEmpty() )
             {
-                index = m_vkTextures.length();
-                m_vkTextures.pushBackEmpty();
+                index = m_vkTextures.pushBackEmptyRangeAtomic( 1, false );
             }
             else
             {
@@ -2899,6 +3213,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             hash = zp_fnv32_1a( index, hash );
             hash = zp_fnv32_1a( memoryAllocateInfo.allocationSize, hash );
             hash = zp_fnv32_1a( size, hash );
+            hash = zp_fnv32_1a( vkImageType, hash );
+            hash = zp_fnv32_1a( vkFormat, hash );
 
             m_vkTextures[ index ] = VulkanTexture {
                 .vkImage = vkImage,
@@ -2946,8 +3262,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             for( zp_uint32_t i = 0; i < mipLevel; ++i )
             {
-                mipSize.width = zp_max( 1u, mipSize.width >> 1 );
-                mipSize.height = zp_max( 1u, mipSize.height >> 1 );
+                mipSize.width = zp_max( 1U, mipSize.width >> 1 );
+                mipSize.height = zp_max( 1U, mipSize.height >> 1 );
             }
 
             return mipSize;
@@ -2983,7 +3299,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
             }
 
-            // tranfer staging buffer
+            // transfer staging buffer
             {
                 CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
             }
@@ -3161,10 +3477,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             } );
         }
 
-        ShaderHandle VulkanContext::RequestShader()
+        ShaderHandle VulkanContext::RequestGraphicsShader()
         {
             ZP_PROFILE_CPU_BLOCK();
 
+            // shader module
             const MemoryArray<zp_uint32_t> shaderData {};
 
             const VkShaderModuleCreateInfo shaderModuleCreateInfo {
@@ -3173,13 +3490,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .pCode = shaderData.data(),
             };
 
-            VkShaderModule shaderModule;
-            HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
-
-            //
-            //
-            //
-
+            // specialization
             const Memory specializationData {};
 
             FixedVector<VkSpecializationMapEntry, 4> specializationMapEntries;
@@ -3217,17 +3528,18 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 if( zp_flag32_is_bit_set( shaderStageLoadedFlags, i ) )
                 {
                     const VkShaderStageFlagBits stage = Convert( static_cast<ShaderStage>( i ) );
+                    const VkShaderStageFlags stageFlags = stage;
 
-                    pipelineShaderStageCreateInfos.pushBack( {
+                    pipelineShaderStageCreateInfos.pushBack( VkPipelineShaderStageCreateInfo {
                         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                        .pNext = &shaderModuleCreateInfo,
                         .stage = stage,
-                        .module = shaderModule,
                         .pName = kDefaultShaderStageName[ i ],
                         .pSpecializationInfo = &specializationInfo,
                     } );
 
-                    pushConstantRanges.pushBack( {
-                        .stageFlags = stage,
+                    pushConstantRanges.pushBack( VkPushConstantRange {
+                        .stageFlags = stageFlags,
                         .offset = 0,
                         .size = 0,
                     } );
@@ -3258,6 +3570,19 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             VkRenderPass vkRenderPass {};
 
 #if USE_DYNAMIC_RENDERING
+            FixedVector<VkFormat, 8> colorAttachmentFormats;
+            colorAttachmentFormats.pushBack( VK_FORMAT_UNDEFINED );
+            VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+            VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
+
+            VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                .viewMask = 0,
+                .colorAttachmentCount = static_cast<zp_uint32_t>( colorAttachmentFormats.length() ),
+                .pColorAttachmentFormats = colorAttachmentFormats.data(),
+                .depthAttachmentFormat = depthFormat,
+                .stencilAttachmentFormat = stencilFormat,
+            };
 #else
             // collect all attachments
             FixedVector<VkAttachmentDescription2, 8> attachmentDescriptions;
@@ -3326,24 +3651,6 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             HR( vkCreateRenderPass2( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
 #endif
 
-            VkPipeline vkBasePipeline {};
-
-#if USE_DYNAMIC_RENDERING
-            FixedVector<VkFormat, 8> colorAttachmentFormats;
-            colorAttachmentFormats.pushBack( VK_FORMAT_UNDEFINED );
-            VkFormat depthFormat = VK_FORMAT_UNDEFINED;
-            VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
-
-            const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-                .viewMask = 0,
-                .colorAttachmentCount = static_cast<zp_uint32_t>( colorAttachmentFormats.length() ),
-                .pColorAttachmentFormats = colorAttachmentFormats.data(),
-                .depthAttachmentFormat = depthFormat,
-                .stencilAttachmentFormat = stencilFormat,
-            };
-#endif
-
             // TODO: load from shader file
             FixedArray vertexInputBindingDescriptions {
                 VkVertexInputBindingDescription {
@@ -3380,39 +3687,82 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .pVertexAttributeDescriptions = vertexInputAttributeDescriptions.data(),
             };
 
+            // TODO: load from shader file
+            const VkPrimitiveTopology vkTopology = Convert( ZP_TOPOLOGY_TRIANGLE_LIST );
             const VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                .topology = vkTopology,
                 .primitiveRestartEnable = false,
             };
 
+            // TODO: load from shader file
+            const VkCullModeFlags vkCullMode = Convert( ZP_CULL_MODE_BACK );
+            const VkFrontFace vkFrontFace = Convert( ZP_FRONT_FACE_MODE_CCW );
+            const VkPolygonMode vkPolygonMode = Convert( ZP_POLYGON_FILL_MODE_FILL );
             const VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
                 .rasterizerDiscardEnable = true,
-                .polygonMode = VK_POLYGON_MODE_FILL,
-                .cullMode = VK_CULL_MODE_BACK_BIT,
-                .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                .polygonMode = vkPolygonMode,
+                .cullMode = vkCullMode,
+                .frontFace = vkFrontFace,
             };
 
+            // TODO: load from shader file
+            const VkSampleCountFlagBits vkSampleCount = Convert( ZP_SAMPLE_COUNT_1 );
+            const zp_bool_t enableAlphaToCoverage = false;
+            const zp_bool_t enableAlphaToOne = false;
             const VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-                .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+                .rasterizationSamples = vkSampleCount,
+                .alphaToCoverageEnable = enableAlphaToCoverage,
+                .alphaToOneEnable = enableAlphaToOne,
             };
 
+            // TODO: read from shader file
+            const DepthStencilState depthStencilState {
+                .depthCompareOp = ZP_COMPARE_OP_LESS_OR_EQUAL,
+                .depthTestEnabled = true,
+                .depthWriteEnabled = true,
+            };
             const VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-                .depthTestEnable = true,
-                .depthWriteEnable = true,
-                .depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL,
-                .depthBoundsTestEnable = false,
-                .stencilTestEnable = false,
-                .front {},
-                .back {},
+                .depthTestEnable = depthStencilState.depthTestEnabled,
+                .depthWriteEnable = depthStencilState.depthWriteEnabled,
+                .depthCompareOp = Convert( depthStencilState.depthCompareOp ),
+                .depthBoundsTestEnable = depthStencilState.depthBoundsTestEnabled,
+                .stencilTestEnable = depthStencilState.stencilTestEnabled,
+                .front {
+                    .failOp = Convert( depthStencilState.front.failOp ),
+                    .passOp = Convert( depthStencilState.front.passOp ),
+                    .depthFailOp = Convert( depthStencilState.front.depthFailOp ),
+                    .compareOp = Convert( depthStencilState.front.compareOp ),
+                    .compareMask = depthStencilState.front.compareMask,
+                    .writeMask = depthStencilState.front.writeMask,
+                    .reference = depthStencilState.front.reference,
+                },
+                .back {
+                    .failOp = Convert( depthStencilState.back.failOp ),
+                    .passOp = Convert( depthStencilState.back.passOp ),
+                    .depthFailOp = Convert( depthStencilState.back.depthFailOp ),
+                    .compareOp = Convert( depthStencilState.back.compareOp ),
+                    .compareMask = depthStencilState.back.compareMask,
+                    .writeMask = depthStencilState.back.writeMask,
+                    .reference = depthStencilState.back.reference,
+                },
+                .minDepthBounds = depthStencilState.minDepthBounds,
+                .maxDepthBounds = depthStencilState.maxDepthBounds,
             };
 
+            // TODO: read from shader file
             const FixedArray blendStates {
                 VkPipelineColorBlendAttachmentState {
                     .blendEnable = false,
+                    .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+                    .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                    .colorBlendOp = VK_BLEND_OP_ADD,
+                    .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+                    .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+                    .alphaBlendOp = VK_BLEND_OP_ADD,
                     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
                 },
             };
@@ -3438,11 +3788,23 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .pDynamicStates = dynamicStates.data(),
             };
 
-            const VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
+#if ZP_DEBUG
+            VkPipelineCreateFlags flags = VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+#else
+            VkPipelineCreateFlags flags = 0;
+#endif // ZP_DEBUG
+            flags |= VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
+
+            VkGraphicsPipelineLibraryCreateInfoEXT graphicsPipelineLibraryCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
+                .flags = VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT,
+            };
+
+            VkPipeline vkBasePipeline {};
+
+            VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-#if USE_DYNAMIC_RENDERING
-                .pNext = &pipelineRenderingCreateInfo,
-#endif
+                .flags = flags,
                 .stageCount = static_cast<zp_uint32_t>( pipelineShaderStageCreateInfos.length() ),
                 .pStages = pipelineShaderStageCreateInfos.data(),
                 .pVertexInputState = &pipelineVertexInputStateCreateInfo,
@@ -3458,9 +3820,71 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .basePipelineHandle = vkBasePipeline,
                 .basePipelineIndex = -1,
             };
+            pNextPushFront( graphicsPipelineCreateInfo, graphicsPipelineLibraryCreateInfo );
+#if USE_DYNAMIC_RENDERING
+            pNextPushFront( graphicsPipelineCreateInfo, pipelineRenderingCreateInfo );
+#endif
+
 
             VkPipeline vkPipeline;
             HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
+
+            zp_uint32_t index {};
+
+            zp_hash32_t hash = zp_fnv32_1a( m_frame );
+            hash = zp_fnv32_1a( index, hash );
+
+            return { .index = index, .hash = hash };
+        }
+
+        ShaderHandle VulkanContext::RequestComputeShader()
+        {
+            ZP_PROFILE_CPU_BLOCK();
+
+            // shader moducle
+            const MemoryArray<zp_uint32_t> shaderData {};
+
+            const VkShaderModuleCreateInfo shaderModuleCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = shaderData.size(),
+                .pCode = shaderData.data(),
+            };
+
+            VkShaderModule shaderModule;
+            HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
+
+            // create pipeline
+            VkPipeline vkBasePipeline {};
+
+            VkPipelineLayout vkPipelineLayout {};
+
+            const VkSpecializationInfo vkSpecializationInfo {};
+
+            const VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+                .module = shaderModule,
+                .pName = "main",
+                .pSpecializationInfo = &vkSpecializationInfo,
+            };
+
+#if ZP_DEBUG
+            const VkPipelineCreateFlags flags = VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+#else
+            const VkPipelineCreateFlags flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
+#endif // ZP_DEBUG
+
+            const VkComputePipelineCreateInfo computePipelineCreateInfo {
+                .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                .flags = flags,
+                .stage = pipelineShaderStageCreateInfo,
+                .layout = vkPipelineLayout,
+                .basePipelineHandle = vkBasePipeline,
+                .basePipelineIndex = -1,
+            };
+
+            VkPipeline vkPipeline;
+            HR( vkCreateComputePipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
 
             vkDestroyShaderModule( m_vkLocalDevice, shaderModule, &m_vkAllocationCallbacks );
 
@@ -3502,24 +3926,24 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             Size2Du targetSize;
             if( !colorAttachments.empty() )
             {
-                const VulkanRenderTarget& rt = m_vkRenderTargets[ colorAttachments[ 0 ].attachment.index ];
-                ZP_ASSERT( rt.hash == colorAttachments[ 0 ].attachment.hash );
+                const VulkanRenderTarget& rt0 = m_vkRenderTargets[ colorAttachments[ 0 ].attachment.index ];
+                ZP_ASSERT( rt0.hash == colorAttachments[ 0 ].attachment.hash );
 
-                targetSize = Size3Dto2D( rt.size );
+                targetSize = Size3Dto2D( rt0.size );
             }
             else if( cmd.depthAttachment.attachment.valid() )
             {
-                const VulkanRenderTarget& rt = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
-                ZP_ASSERT( rt.hash == cmd.depthAttachment.attachment.hash );
+                const VulkanRenderTarget& dt = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
+                ZP_ASSERT( dt.hash == cmd.depthAttachment.attachment.hash );
 
-                targetSize = Size3Dto2D( rt.size );
+                targetSize = Size3Dto2D( dt.size );
             }
             else if( cmd.stencilAttachment.attachment.valid() )
             {
-                const VulkanRenderTarget& rt = m_vkRenderTargets[ cmd.stencilAttachment.attachment.index ];
-                ZP_ASSERT( rt.hash == cmd.stencilAttachment.attachment.hash );
+                const VulkanRenderTarget& st = m_vkRenderTargets[ cmd.stencilAttachment.attachment.index ];
+                ZP_ASSERT( st.hash == cmd.stencilAttachment.attachment.hash );
 
-                targetSize = Size3Dto2D( rt.size );
+                targetSize = Size3Dto2D( st.size );
             }
             else
             {
@@ -3536,6 +3960,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 renderArea.size.height = targetSize.height;
             }
 
+            CmdBeginDebugLabel( commandQueue.vkCommandBuffer, "", DebugLabelColor::RenderPass );
+
 #if USE_DYNAMIC_RENDERING
             FixedVector<VkRenderingAttachmentInfo, 8> colorAttachmentInfos;
             for( const auto& colorAttachment : colorAttachments )
@@ -3543,12 +3969,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 const VulkanRenderTarget& colorRT = m_vkRenderTargets[ colorAttachment.attachment.index ];
                 ZP_ASSERT( colorRT.hash == colorAttachment.attachment.hash );
 
+                const VkAttachmentLoadOp loadOp = Convert( colorAttachment.loadOp );
+                const VkAttachmentStoreOp storeOp = Convert( colorAttachment.storeOp );
+
                 colorAttachmentInfos.pushBack( {
                     .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                     .imageView = colorRT.vkImageViews[ m_frameIndex ],
                     .imageLayout = colorRT.vkImageLayouts[ m_frameIndex ],
-                    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                    .loadOp = loadOp,
+                    .storeOp = storeOp,
                     .clearValue {
                         .color {
                             .float32 {
@@ -3721,6 +4150,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             vkCmdEndRenderPass2( commandQueue.vkCommandBuffer, &subpassEndInfo );
 #endif
+
+            CmdEndDebugLabel( commandQueue.vkCommandBuffer );
         }
 
         void VulkanContext::Dispatch( const CommandDispatch& cmd )
@@ -3804,21 +4235,21 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 Rect2Di dstRegion = cmd.dstRegion;
 
                 // if src region size is -1, set to size of texture
-                if( srcRegion.size.width < 0 )
+                if( srcRegion.size.width <= 0 )
                 {
                     srcRegion.size.width = srcTexture.size.width;
                 }
-                if( srcRegion.size.height < 0 )
+                if( srcRegion.size.height <= 0 )
                 {
                     srcRegion.size.height = srcTexture.size.height;
                 }
 
                 // if dst region size is -1, set to size of texture
-                if( dstRegion.size.width < 0 )
+                if( dstRegion.size.width <= 0 )
                 {
                     dstRegion.size.width = dstTexture.size.width;
                 }
-                if( dstRegion.size.height < 0 )
+                if( dstRegion.size.height <= 0 )
                 {
                     dstRegion.size.height = dstTexture.size.height;
                 }
@@ -3874,7 +4305,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const VulkanBuffer& buffer = m_vkBuffers[ bufferHandle.index ];
             ZP_ASSERT( buffer.hash == bufferHandle.hash );
 
-            VkDescriptorSet vkDescriptorSet = m_vkBindlessDescriptorSets[ m_frameIndex ];
+            VkDescriptorSet vkDescriptorSet = m_frameResources[ m_frameIndex ].vkBindlessDescriptorSet;
 
             const VkDescriptorBufferInfo bufferInfo {
                 .buffer = buffer.vkBuffer,
@@ -3882,36 +4313,33 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .range = buffer.size,
             };
 
-            zp_size_t writeUpdates = 0;
-            FixedArray<VkWriteDescriptorSet, 2> descriptorSetWrites {};
+            FixedVector<VkWriteDescriptorSet, 2> descriptorSetWrites;
 
-            if( ( buffer.vkBufferUsage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT ) == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )
+            if( zp_flag32_all_set( buffer.vkBufferUsage, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT ) )
             {
-                descriptorSetWrites[ writeUpdates ] = {
+                descriptorSetWrites.pushBack( {
                     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                     .dstSet = vkDescriptorSet,
                     .dstArrayElement = bufferHandle.index,
                     .descriptorCount = 1,
                     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                     .pBufferInfo = &bufferInfo,
-                };
-                ++writeUpdates;
+                } );
             }
 
-            if( ( buffer.vkBufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT ) == VK_BUFFER_USAGE_STORAGE_BUFFER_BIT )
+            if( zp_flag32_all_set( buffer.vkBufferUsage, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT ) )
             {
-                descriptorSetWrites[ writeUpdates ] = {
+                descriptorSetWrites.pushBack( {
                     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                     .dstSet = vkDescriptorSet,
                     .dstArrayElement = bufferHandle.index,
                     .descriptorCount = 1,
                     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                     .pBufferInfo = &bufferInfo,
-                };
-                ++writeUpdates;
+                } );
             }
 
-            vkUpdateDescriptorSets( m_vkLocalDevice, writeUpdates, descriptorSetWrites.data(), 0, nullptr );
+            vkUpdateDescriptorSets( m_vkLocalDevice, static_cast<zp_uint32_t>( descriptorSetWrites.length() ), descriptorSetWrites.data(), 0, nullptr );
         }
 
         void VulkanContext::UseTexture( TextureHandle textureHandle )
@@ -3923,7 +4351,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             const VulkanSampler sampler {};
 
-            VkDescriptorSet vkDescriptorSet = m_vkBindlessDescriptorSets[ m_frameIndex ];
+            VkDescriptorSet vkDescriptorSet = m_frameResources[ m_frameIndex ].vkBindlessDescriptorSet;
 
             // get the lowest loaded mip
             const zp_uint32_t lowestLoadedMip = zp_bitscan_forward( texture.loadedMipFlag );
@@ -3979,7 +4407,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void AcquireNextImage( zp_size_t frameIndex );
 
-            void Present( zp_size_t frameIndex );
+            void Present( zp_size_t frameIndex, VkSemaphore waitSemaphore );
 
             void Rebuild();
 
@@ -4016,7 +4444,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             FixedArray<VkImage, kMaxBufferedFrameCount> m_vkSwapchainImages;
             FixedArray<VkImageView, kMaxBufferedFrameCount> m_vkSwapchainImageViews;
+#if !USE_DYNAMIC_RENDERING
             FixedArray<VkFramebuffer, kMaxBufferedFrameCount> m_vkSwapchainFrameBuffers;
+#endif
 
             FixedArray<VkSemaphore, kMaxBufferedFrameCount> m_vkSwapchainAcquireSemaphores;
             FixedArray<VkSemaphore, kMaxBufferedFrameCount> m_vkRenderFinishedSemaphores;
@@ -4078,7 +4508,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             HR( vkResetFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ] ) );
         }
 
-        void VulkanSwapchain::Present( zp_size_t frameIndex )
+        void VulkanSwapchain::Present( zp_size_t frameIndex, VkSemaphore waitSemaphore )
         {
             ZP_PROFILE_CPU_BLOCK();
 
@@ -4086,7 +4516,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const VkPresentInfoKHR presentInfo {
                 .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &m_vkRenderFinishedSemaphores[ frameIndex ],
+                .pWaitSemaphores = &waitSemaphore,
                 .swapchainCount = 1,
                 .pSwapchains = &m_vkSwapchain,
                 .pImageIndices = &m_swapchainImageIndices[ frameIndex ],
@@ -4208,7 +4638,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, m_vkSwapchainImages.data() ) );
 
-#if 0
+#if !USE_DYNAMIC_RENDERING
             {
                 if( m_swapchainData.vkSwapchainDefaultRenderPass )
                 {
@@ -4392,6 +4822,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 vkDestroyFence( m_context->GetLocalDevice(), m_vkSwapchainImageAcquiredFences[ i ], m_context->GetAllocationCallbacks() );
             }
 
+#if !USE_DYNAMIC_RENDERING
             vkDestroyRenderPass( m_context->GetLocalDevice(), m_vkSwapchainDefaultRenderPass, m_context->GetAllocationCallbacks() );
             m_vkSwapchainDefaultRenderPass = VK_NULL_HANDLE;
 
@@ -4400,6 +4831,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 VkFramebuffer swapChainFramebuffer = m_vkSwapchainFrameBuffers[ i ];
                 vkDestroyFramebuffer( m_context->GetLocalDevice(), swapChainFramebuffer, m_context->GetAllocationCallbacks() );
             }
+#endif
 
             for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
             {
@@ -4429,7 +4861,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void Destroy();
 
-            TextureHandle RequestTexture();
+            TextureHandle RequestTexture( const RequestTextureDesc& requestTextureDesc );
 
             BufferHandle RequestBuffer( zp_size_t size );
 
@@ -4488,6 +4920,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             {
                 ZP_DELETE( GraphicsCommandBuffer, m_frameCommandBuffers[ i ] );
             }
+        }
+
+        TextureHandle VulkanGraphicsDevice::RequestTexture(const RequestTextureDesc& requestTextureDesc)
+        {
+            return {};
         }
 
         BufferHandle VulkanGraphicsDevice::RequestBuffer( zp_size_t size )
@@ -4561,6 +4998,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             DataStreamReader dataStreamReader( cmdBuffer->Data() );
 
+            FixedArray<CommandQueueHandle, 8> commandQueueMap;
+
             while( !dataStreamReader.end() )
             {
                 const CommandHeader* header = dataStreamReader.readPtr<CommandHeader>();
@@ -4588,6 +5027,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         dataStreamReader.read( updateBufferDataExternal );
 
                         m_context.UpdateBufferData( updateBufferDataExternal.cmdQueue, updateBufferDataExternal.dstBuffer, updateBufferDataExternal.dstOffset, updateBufferDataExternal.srcData );
+                    }
+                        break;
+
+                    case CommandType::CopyBuffer:
+                    {
+                        const CommandCopyBuffer* copyBuffer = dataStreamReader.readPtr<CommandCopyBuffer>();
+
+                        m_context.CopyBufferToBuffer( *copyBuffer );
                     }
                         break;
 
@@ -4623,6 +5070,30 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     }
                         break;
 
+                    case CommandType::BeginCommandQueue:
+                    {
+                        CommandBeginCommandQueue beginCommandQueue {};
+                        dataStreamReader.read( beginCommandQueue );
+
+                        ZP_ASSERT( !commandQueueMap[ beginCommandQueue.cmdQueue.index ].valid() );
+                        commandQueueMap[ beginCommandQueue.cmdQueue.index ] = m_context.BeginCommandQueue( beginCommandQueue.queue );
+                    }
+                        break;
+
+                    case CommandType::SubmitCommandQueue:
+                    {
+                        CommandSubmitCommandQueue submitCommandQueue {};
+                        dataStreamReader.read( submitCommandQueue );
+
+                        const CommandQueueHandle& cmdQueue = commandQueueMap[ submitCommandQueue.cmdQueue.index ];
+                        ZP_ASSERT( cmdQueue.valid() );
+
+                        m_context.EndCommandQueue( cmdQueue );
+
+                        commandQueueMap[ submitCommandQueue.cmdQueue.index ] = {};
+                    };
+                        break;
+
                     default:
                         ZP_INVALID_CODE_PATH_MSG( "Unknown CommandType" );
                         break;
@@ -4634,7 +5105,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             m_context.EndFrame( m_swapchain.GetWaitSemaphore( m_frameIndex ), m_swapchain.GetSignalSemaphore( m_frameIndex ), m_swapchain.GetFrameInFlightFence( m_frameIndex ) );
 
-            m_swapchain.Present( m_frameIndex );
+            m_swapchain.Present( m_frameIndex, m_swapchain.GetSignalSemaphore( m_frameIndex ) );
         }
     };
 

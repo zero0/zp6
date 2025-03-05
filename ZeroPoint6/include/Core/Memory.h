@@ -161,27 +161,27 @@ namespace zp
 
         [[nodiscard]] constexpr ZP_FORCEINLINE zp_bool_t empty() const;
 
-        [[nodiscard]] ZP_FORCEINLINE reference operator[]( zp_size_t index );
+        [[nodiscard]] constexpr ZP_FORCEINLINE reference operator[]( zp_size_t index );
 
-        [[nodiscard]] ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE const_reference operator[]( zp_size_t index ) const;
 
-        [[nodiscard]] ZP_FORCEINLINE pointer data();
+        [[nodiscard]] constexpr ZP_FORCEINLINE pointer data();
 
-        [[nodiscard]] ZP_FORCEINLINE const_pointer data() const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE const_pointer data() const;
 
-        [[nodiscard]] ZP_FORCEINLINE iterator begin();
+        [[nodiscard]] constexpr ZP_FORCEINLINE iterator begin();
 
-        [[nodiscard]] ZP_FORCEINLINE iterator end();
+        [[nodiscard]] constexpr ZP_FORCEINLINE iterator end();
 
-        [[nodiscard]] ZP_FORCEINLINE const_iterator begin() const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE const_iterator begin() const;
 
-        [[nodiscard]] ZP_FORCEINLINE const_iterator end() const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE const_iterator end() const;
 
-        [[nodiscard]] ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index ) const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index ) const;
 
-        [[nodiscard]] ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index, zp_size_t length ) const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE MemoryArray<T> split( zp_size_t index, zp_size_t length ) const;
 
-        [[nodiscard]] ZP_FORCEINLINE ReadonlyMemoryArray<T> asReadonly() const;
+        [[nodiscard]] constexpr ZP_FORCEINLINE ReadonlyMemoryArray<T> asReadonly() const;
 
     private:
         value_type m_ptr[Size];
@@ -332,69 +332,69 @@ namespace zp
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::reference FixedArray<T, Size>::operator[]( zp_size_t index )
+    constexpr FixedArray<T, Size>::reference FixedArray<T, Size>::operator[]( zp_size_t index )
     {
         return m_ptr[ index ];
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::const_reference FixedArray<T, Size>::operator[]( zp_size_t index ) const
+    constexpr FixedArray<T, Size>::const_reference FixedArray<T, Size>::operator[]( zp_size_t index ) const
     {
         return m_ptr[ index ];
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::pointer FixedArray<T, Size>::data()
+    constexpr FixedArray<T, Size>::pointer FixedArray<T, Size>::data()
     {
         return m_ptr;
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::const_pointer FixedArray<T, Size>::data() const
+    constexpr FixedArray<T, Size>::const_pointer FixedArray<T, Size>::data() const
     {
         return m_ptr;
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::iterator FixedArray<T, Size>::begin()
+    constexpr FixedArray<T, Size>::iterator FixedArray<T, Size>::begin()
     {
         return m_ptr;
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::iterator FixedArray<T, Size>::end()
+    constexpr FixedArray<T, Size>::iterator FixedArray<T, Size>::end()
     {
         return m_ptr + Size;
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::const_iterator FixedArray<T, Size>::begin() const
+    constexpr FixedArray<T, Size>::const_iterator FixedArray<T, Size>::begin() const
     {
         return m_ptr;
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::const_iterator FixedArray<T, Size>::end() const
+    constexpr FixedArray<T, Size>::const_iterator FixedArray<T, Size>::end() const
     {
         return m_ptr + Size;
     }
 
     template<typename T, zp_size_t Size>
-    MemoryArray<T> FixedArray<T, Size>::split( zp_size_t index ) const
+    constexpr MemoryArray<T> FixedArray<T, Size>::split( zp_size_t index ) const
     {
         ZP_ASSERT( m_ptr && index < Size );
         return FixedArray<T, Size>( m_ptr + index, Size - index );
     }
 
     template<typename T, zp_size_t Size>
-    MemoryArray<T> FixedArray<T, Size>::split( zp_size_t index, zp_size_t length ) const
+    constexpr MemoryArray<T> FixedArray<T, Size>::split( zp_size_t index, zp_size_t length ) const
     {
         ZP_ASSERT( m_ptr && ( index + length ) < Size );
         return FixedArray<T, Size>( m_ptr + index, length );
     }
 
     template<typename T, zp_size_t Size>
-    ReadonlyMemoryArray<T> FixedArray<T, Size>::asReadonly() const
+    constexpr ReadonlyMemoryArray<T> FixedArray<T, Size>::asReadonly() const
     {
         return ReadonlyMemoryArray<T>( m_ptr, Size );
     }

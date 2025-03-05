@@ -41,17 +41,6 @@ namespace zp
         zp_int32_t width, height;
     };
 
-    struct StencilState
-    {
-        StencilOp fail;
-        StencilOp pass;
-        StencilOp depthFail;
-        CompareOp compare;
-        zp_uint32_t compareMask;
-        zp_uint32_t writeMask;
-        zp_uint32_t reference;
-    };
-
     struct BlendState
     {
         zp_bool_t blendEnable;
@@ -230,7 +219,7 @@ namespace zp
     ZP_DECLSPEC_NOVTABLE class GraphicsDevice
     {
     public:
-
+        virtual TextureHandle RequestTexture( const RequestTextureDesc& requestTextureDesc ) = 0;
 
         virtual GraphicsCommandBuffer* SubmitAndRequestNewCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) = 0;
     };
@@ -238,7 +227,7 @@ namespace zp
     //
     //
     //
-
+#if 0
     ZP_DECLSPEC_NOVTABLE class GraphicsDeviceOld
     {
     ZP_NONCOPYABLE( GraphicsDeviceOld );
@@ -362,6 +351,7 @@ namespace zp
 
 #pragma endregion
     };
+#endif
 }
 
 #endif //ZP_GRAPHICSDEVICE_H

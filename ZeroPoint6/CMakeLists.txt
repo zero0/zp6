@@ -196,9 +196,9 @@ target_sources(${ZP_TARGET} PRIVATE
     ${ZP_EXTERNAL_HEADERS}
     ${ZP_EXTERNAL_SRC}
 )
-target_include_directories(${ZP_TARGET}
-    PRIVATE include
-    PRIVATE external
+target_include_directories(${ZP_TARGET} PRIVATE
+    include
+    external
 )
 
 # add_module(CoreModule ${ZP_CORE_MODULE})
@@ -216,7 +216,6 @@ get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
 
 message(CHECK_START "Finding volk")
 if(Vulkan_volk_FOUND)
-
     message(CHECK_PASS "Found volk ${Vulkan_volk_LIBRARY}")
 else()
     message(CHECK_FAIL "Unable to find volk")
@@ -364,12 +363,12 @@ target_include_directories(${ZP_TOOLS_TARGET}
 target_link_options(${ZP_TOOLS_TARGET}
     PRIVATE -static-libgcc -static-libstdc++ -static
 )
-target_link_libraries(${ZP_TOOLS_TARGET}
-    PRIVATE ${Vulkan_LIBRARIES}
-    PRIVATE ${Vulkan_dxc_LIBRARY}
-    PRIVATE "rpcrt4.lib"
-    PRIVATE "dwmapi.dll"
-    PRIVATE "Ws2_32.lib"
+target_link_libraries(${ZP_TOOLS_TARGET} PRIVATE
+    ${Vulkan_LIBRARIES}
+    ${Vulkan_dxc_LIBRARY}
+    rpcrt4.lib
+    dwmapi.dll
+    Ws2_32.lib
 )
 
 if (MSVC)

@@ -397,6 +397,12 @@ namespace zp
     }
 
     template<typename T>
+    Size2D<T> Size3Dto2D( Size3D<T>&& size )
+    {
+        return { .width = size.width, .height = size.height };
+    }
+
+    template<typename T>
     struct Offset3D
     {
         T x, y, z;

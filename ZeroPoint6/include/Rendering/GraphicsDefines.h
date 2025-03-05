@@ -182,7 +182,8 @@ namespace zp
         ZP_RENDER_QUEUE_TRANSFER,
         ZP_RENDER_QUEUE_COMPUTE,
         ZP_RENDER_QUEUE_PRESENT,
-        RenderQueue_Count,
+
+        RenderQueue_Count
     };
 
     enum IndexBufferFormat
@@ -228,7 +229,7 @@ namespace zp
     enum GraphicsBufferUsage : zp_uint32_t
     {
         ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC = 1 << 0,
-        ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DEST = 1 << 1,
+        ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DST = 1 << 1,
 
         ZP_GRAPHICS_BUFFER_USAGE_VERTEX_BUFFER = 1 << 2,
         ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER = 1 << 3,
@@ -342,6 +343,30 @@ namespace zp
         LogicOp_Count,
     };
 
+    struct StencilState
+    {
+        StencilOp passOp;
+        StencilOp failOp;
+        StencilOp depthFailOp;
+        CompareOp compareOp;
+        zp_uint32_t compareMask;
+        zp_uint32_t writeMask;
+        zp_uint32_t reference;
+    };
+
+    struct DepthStencilState
+    {
+        CompareOp depthCompareOp;
+        zp_float32_t minDepthBounds;
+        zp_float32_t maxDepthBounds;
+        StencilState front;
+        StencilState back;
+        ZP_BOOL32( depthTestEnabled );
+        ZP_BOOL32( depthWriteEnabled );
+        ZP_BOOL32( depthBoundsTestEnabled );
+        ZP_BOOL32( stencilTestEnabled );
+    };
+
     enum BlendOp
     {
         ZP_BLEND_OP_ADD,
@@ -452,6 +477,23 @@ namespace zp
         ZP_COLOR_SPACE_REC_2020_LINEAR,
 
         ColorSpace_Count
+    };
+
+    enum AttachmentLoadOp
+    {
+        ZP_ATTACHMENT_LOAD_OP_LOAD,
+        ZP_ATTACHMENT_LOAD_OP_CLEAR,
+        ZP_ATTACHMENT_LOAD_OP_DONT_CARE,
+
+        AttachmentLoadOp_Count
+    };
+
+    enum AttachmentStoreOp
+    {
+        ZP_ATTACHMENT_STORE_OP_STORE,
+        ZP_ATTACHMENT_STORE_OP_DONT_CARE,
+
+        AttachmentStoreOp_Count
     };
 
     enum class DelayedDestroyType

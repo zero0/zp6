@@ -97,6 +97,10 @@ private:                            \
     x( x&& ) = delete;              \
     x& operator=(x &&) = delete;
 
+#define ZP_STATIC_CLASS(x) \
+private:                   \
+    x() = delete;          \
+    ~x() = delete;
 
 #define ZP_PURE_INTERFACE       ZP_DECLSPEC_NOVTABLE class
 

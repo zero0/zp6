@@ -79,7 +79,7 @@ namespace zp
     private:
         enum
         {
-            kLogEntryLineSize = 256
+            kLogEntryLineSize = 1 KB
         };
 
         MutableFixedString<kLogEntryLineSize> m_log;

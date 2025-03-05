@@ -9,6 +9,8 @@
 #include "Core/Math.h"
 #include "Core/Memory.h"
 
+#include "Rendering/GraphicsDefines.h"
+
 namespace zp
 {
     enum class GraphicsHandleType
@@ -160,6 +162,9 @@ namespace zp
         DrawIndexedIndirect,
 
         Blit,
+
+        BeginCommandQueue,
+        SubmitCommandQueue,
     };
 
     struct CommandHeader
@@ -198,8 +203,8 @@ namespace zp
         struct ColorAttachment
         {
             RenderTargetHandle attachment;
-            int loadOp;
-            int storeOp;
+            AttachmentLoadOp loadOp;
+            AttachmentStoreOp storeOp;
             Color clearColor;
         };
 
@@ -298,6 +303,17 @@ namespace zp
         zp_uint32_t dstMip;
         Rect2Di srcRegion;
         Rect2Di dstRegion;
+    };
+
+    struct CommandBeginCommandQueue
+    {
+        RenderQueue queue;
+        CommandQueueHandle cmdQueue;
+    };
+
+    struct CommandSubmitCommandQueue
+    {
+        CommandQueueHandle cmdQueue;
     };
 };
 

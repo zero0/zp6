@@ -65,6 +65,19 @@ namespace zp
         }
     }
 
+    void GraphicsCommandBuffer::CopyBufferToBuffer( CommandQueueHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size )
+    {
+        m_data.write( CommandHeader { .type = CommandType::CopyBuffer } );
+        m_data.write( CommandCopyBuffer {
+            .cmdQueue = cmdQueue,
+            .srcBuffer = srcBuffer,
+            .dstBuffer = dstBuffer,
+            .srcOffset = srcOffset,
+            .dstOffset = dstOffset,
+            .size = size,
+        } );
+    }
+
     void GraphicsCommandBuffer::Dispatch( CommandQueueHandle cmdQueue, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ )
     {
         m_data.write( CommandHeader { .type = CommandType::Dispatch } );
@@ -83,6 +96,24 @@ namespace zp
             .cmdQueue = cmdQueue,
             .buffer = indirectBuffer,
             .offset = offset,
+        } );
+    }
+
+    CommandQueueHandle GraphicsCommandBuffer::BeginCommandQueue( RenderQueue queue )
+    {
+        m_data.write( CommandHeader { .type = CommandType::BeginCommandQueue } );
+        m_data.write( CommandBeginCommandQueue {
+            .queue = queue,
+        } );
+
+        return {};
+    }
+
+    void GraphicsCommandBuffer::SubmitCommandQueue( CommandQueueHandle cmdQueue )
+    {
+        m_data.write( CommandHeader { .type = CommandType::SubmitCommandQueue } );
+        m_data.write( CommandSubmitCommandQueue {
+            .cmdQueue = cmdQueue,
         } );
     }
 };

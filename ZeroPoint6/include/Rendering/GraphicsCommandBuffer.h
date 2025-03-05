@@ -100,6 +100,8 @@ namespace zp
             UpdateBuffer( cmdQueue, dstBuffer, dstOffset, srcMem );
         }
 
+        void CopyBufferToBuffer( CommandQueueHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size );
+
 
         BindSetHandle RequestBindSet( BindSetHandle& bindSetHandle, const RequestBindSetInfo& info );
 
@@ -113,7 +115,7 @@ namespace zp
         void EndRenderPass( CommandQueueHandle cmdQueue, RenderPassHandle renderPassHandle );
 
 
-        void PushConstant( CommandQueueHandle cmdQueue, BindSetHandle bindSetHandle, int shaderStage, zp_uint32_t offset, const Memory memory );
+        void PushConstant( CommandQueueHandle cmdQueue, BindSetHandle bindSetHandle, int shaderStage, zp_uint32_t offset, Memory memory );
 
         void Dispatch( CommandQueueHandle cmdQueue, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ );
 
@@ -122,7 +124,7 @@ namespace zp
         void Draw( CommandQueueHandle cmdQueue, zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance );
 
 
-        CommandQueueHandle BeginCommandQueue();
+        CommandQueueHandle BeginCommandQueue( RenderQueue queue );
 
         void SubmitCommandQueue( CommandQueueHandle cmdQueue );
 
