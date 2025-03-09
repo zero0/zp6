@@ -572,6 +572,24 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 VK_FORMAT_D16_UNORM_S8_UINT,
                 VK_FORMAT_D24_UNORM_S8_UINT,
                 VK_FORMAT_D32_SFLOAT_S8_UINT,
+
+                // Compressed
+                VK_FORMAT_BC1_RGB_UNORM_BLOCK,
+                VK_FORMAT_BC1_RGB_SRGB_BLOCK,
+                VK_FORMAT_BC1_RGBA_UNORM_BLOCK,
+                VK_FORMAT_BC1_RGBA_SRGB_BLOCK,
+
+                VK_FORMAT_BC2_UNORM_BLOCK,
+                VK_FORMAT_BC2_SRGB_BLOCK,
+
+                VK_FORMAT_BC3_UNORM_BLOCK,
+                VK_FORMAT_BC3_SRGB_BLOCK,
+
+                VK_FORMAT_BC6H_UFLOAT_BLOCK,
+                VK_FORMAT_BC6H_SFLOAT_BLOCK,
+
+                VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
+                VK_FORMAT_ASTC_4x4_SRGB_BLOCK,
             };
             ZP_ASSERT( static_cast<zp_size_t>( graphicsFormat ) < ZP_ARRAY_SIZE( formatMap ) );
 
@@ -652,16 +670,6 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( imageTypeMap ) == TextureDimension_Count );
 
             return imageTypeMap[ textureDimension ];
-        }
-
-        constexpr VkFormat Convert( TextureFormat textureFormat )
-        {
-            constexpr VkFormat formatMap[ ] {
-                VK_FORMAT_UNDEFINED,
-            };
-            ZP_ASSERT( ZP_ARRAY_SIZE( formatMap ) == TextureFormat_Count );
-
-            return formatMap[ textureFormat ];
         }
 
         constexpr VkImageUsageFlags Convert( TextureUsage usage )
@@ -1732,7 +1740,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void ReleaseTexture( TextureHandle texture );
 
-            void UpdateTextureMipData( CommandQueueHandle commandQueue, TextureHandle dstTexture, zp_uint32_t mipLevel, Memory srcData );
+            void UpdateTextureMipData( CommandQueueHandle commandQueue, Memory srcData, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer );
 
             void GenerateTextureMipLevels( CommandQueueHandle commandQueue, TextureHandle texture, zp_uint32_t mipLevelFlagsToGenerate );
 
@@ -3388,18 +3396,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         Size2Du CalculateMipSize( zp_uint32_t mipLevel, const Size2Du& size )
         {
-            Size2Du mipSize = size;
-
-            for( zp_uint32_t i = 0; i < mipLevel; ++i )
-            {
-                mipSize.width = zp_max( 1U, mipSize.width >> 1 );
-                mipSize.height = zp_max( 1U, mipSize.height >> 1 );
-            }
-
+            const Size2Du mipSize {
+                .width = zp_max( 1U, size.width >> mipLevel ),
+                .height = zp_max( 1U, size.height >> mipLevel ),
+            };
             return mipSize;
         }
 
-        void VulkanContext::UpdateTextureMipData( CommandQueueHandle commandQueueHandle, TextureHandle dstTextureHandle, zp_uint32_t mipLevel, Memory srcData )
+        void VulkanContext::UpdateTextureMipData( CommandQueueHandle commandQueueHandle, const Memory srcData, TextureHandle dstTextureHandle, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
         {
             const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
             ZP_ASSERT( commandQueue.hash == commandQueue.hash );
@@ -3436,9 +3440,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             const VkImageSubresourceRange subresourceRange {
                 .aspectMask = texture.vkImageAspect,
-                .baseMipLevel = mipLevel,
+                .baseMipLevel = dstMipLevel,
                 .levelCount = 1,
-                .baseArrayLayer = 0,
+                .baseArrayLayer = dstArrayLayer,
                 .layerCount = 1,
             };
 
@@ -3449,7 +3453,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // copy buffer to texture
             {
-                const Size2Du mipSize = CalculateMipSize( mipLevel, Size3Dto2D( texture.size ) );
+                const Size2Du mipSize = CalculateMipSize( dstMipLevel, Size3Dto2D( texture.size ) );
 
                 const VkBufferImageCopy2 region {
                     .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
@@ -3458,7 +3462,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .bufferImageHeight = 0,
                     .imageSubresource {
                         .aspectMask = subresourceRange.aspectMask,
-                        .mipLevel = mipLevel,
+                        .mipLevel = dstMipLevel,
                         .baseArrayLayer = subresourceRange.baseArrayLayer,
                         .layerCount = subresourceRange.layerCount,
                     },
@@ -3478,7 +3482,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
                     .srcBuffer = allocation.vkBuffer,
                     .dstImage = texture.vkImage,
-                    .dstImageLayout = texture.vkImageLayouts[ mipLevel ],
+                    .dstImageLayout = texture.vkImageLayouts[ dstMipLevel ],
                     .regionCount = 1,
                     .pRegions = &region,
                 };
@@ -4644,7 +4648,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             if( m_requiresRebuild )
             {
-                vkDeviceWaitIdle( m_context->GetLocalDevice() );
+                HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
 
                 CreateSwapchain();
 
@@ -5058,7 +5062,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         TextureHandle VulkanGraphicsDevice::RequestTexture( const RequestTextureDesc& requestTextureDesc )
         {
-            return {};
+            return m_context.RequestTexture();
         }
 
         BufferHandle VulkanGraphicsDevice::RequestBuffer( zp_size_t size )
@@ -5169,6 +5173,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         const CommandCopyBuffer* copyBuffer = dataStreamReader.readPtr<CommandCopyBuffer>();
 
                         m_context.CopyBufferToBuffer( *copyBuffer );
+                    }
+                    break;
+
+                    case CommandType::UpdateTextureData:
+                    {
+                        CommandUpdateTextureData updateTextureData {};
+                        dataStreamReader.read( updateTextureData );
+
+                        m_context.UpdateTextureMipData( updateTextureData.cmdQueue, updateTextureData.srcData, updateTextureData.dstTexture, updateTextureData.dstMipLevel, updateTextureData.dstArrayLayer );
                     }
                     break;
 

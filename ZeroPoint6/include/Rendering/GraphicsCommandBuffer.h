@@ -102,6 +102,8 @@ namespace zp
 
         void CopyBufferToBuffer( CommandQueueHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size );
 
+        void UpdateTexture( CommandQueueHandle cmdQueue, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer );
+
 
         BindSetHandle RequestBindSet( BindSetHandle& bindSetHandle, const RequestBindSetInfo& info );
 

@@ -18,27 +18,50 @@ namespace zp
         zp_size_t size;
 
         template<typename T>
-        ZP_FORCEINLINE T* as()
+        [[nodiscard]] ZP_FORCEINLINE T* as()
         {
             ZP_ASSERT( sizeof( T ) <= size );
             return static_cast<T*>( ptr );
         }
 
         template<typename T>
-        ZP_FORCEINLINE const T* as() const
+        [[nodiscard]] ZP_FORCEINLINE const T* as() const
         {
             ZP_ASSERT( sizeof( T ) <= size );
             return static_cast<const T*>( ptr );
         }
 
-        ZP_FORCEINLINE Memory slice( zp_size_t sliceSize ) const
+        [[nodiscard]] ZP_FORCEINLINE Memory slice( zp_size_t sliceSize ) const
         {
             return { .ptr = ptr, .size = sliceSize };
         }
 
-        ZP_FORCEINLINE Memory slice( zp_size_t offset, zp_size_t sliceSize ) const
+        [[nodiscard]] ZP_FORCEINLINE Memory slice( zp_size_t offset, zp_size_t sliceSize ) const
         {
             return { .ptr = static_cast<zp_uint8_t*>(ptr) + offset, .size = sliceSize };
+        }
+    };
+
+    struct ReadOnlyMemory
+    {
+        const void* ptr;
+        zp_size_t size;
+
+        template<typename T>
+        [[nodiscard]] ZP_FORCEINLINE const T* as() const
+        {
+            ZP_ASSERT( sizeof( T ) <= size );
+            return static_cast<const T*>( ptr );
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE ReadOnlyMemory slice( zp_size_t sliceSize ) const
+        {
+            return { .ptr = ptr, .size = sliceSize };
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE ReadOnlyMemory slice( zp_size_t offset, zp_size_t sliceSize ) const
+        {
+            return { .ptr = static_cast<const zp_uint8_t*>(ptr) + offset, .size = sliceSize };
         }
     };
 }
@@ -153,7 +176,7 @@ namespace zp
         explicit FixedArray( value_type (& ptr)[Size] );
 
         template<typename ... Args>
-        explicit FixedArray( Args ... args );
+        FixedArray( Args ... args );
 
         FixedArray( pointer ptr, zp_size_t length );
 

@@ -206,7 +206,7 @@ namespace zp
     struct RequestTextureDesc
     {
         TextureDimension textureDimension;
-        TextureFormat textureFormat;
+        GraphicsFormat textureFormat;
         SampleCount samples;
         TextureUsage usage;
         MemoryPropertyFlags memoryPropertyFlags;

@@ -4,6 +4,7 @@
 
 #include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/Memory.h"
 #include "Core/String.h"
 
 namespace zp
@@ -61,17 +62,23 @@ namespace zp
         return m_str + m_length;
     }
 
+    ReadOnlyMemory String::asMemory() const
+    {
+        return { .ptr = m_str, .size = m_length };
+    }
+
+
     String String::As( const char* c_str )
     {
-        return { reinterpret_cast<const_str_pointer>( c_str ), zp_strlen( c_str ) };
+        return { reinterpret_cast<const_str_pointer>(c_str), zp_strlen( c_str ) };
     }
 
     String String::As( const char* c_str, zp_size_t length )
     {
-        return { reinterpret_cast<const_str_pointer>( c_str ), length };
+        return { reinterpret_cast<const_str_pointer>(c_str), length };
     }
 
-    zp_bool_t String::operator=( const zp::String& other ) const
+    zp_bool_t String::operator==( const String& other ) const
     {
         return m_str == other.m_str || zp_strcmp( m_str, m_length, other.m_str, other.m_length ) == 0;
     }
@@ -79,7 +86,7 @@ namespace zp
 
 namespace zp
 {
-    MutableString::MutableString( zp::MutableString::str_pointer str, zp_size_t capacity )
+    MutableString::MutableString( MutableString::str_pointer str, zp_size_t capacity )
         : m_str( str )
         , m_length( 0 )
         , m_capacity( capacity )
@@ -109,7 +116,7 @@ namespace zp
 
     const char* MutableString::c_str() const
     {
-        return reinterpret_cast<const char*>( m_str );
+        return reinterpret_cast<const char*>(m_str);
     }
 
     MutableString::str_pointer MutableString::str()
@@ -246,7 +253,7 @@ namespace zp
                 }
             }
 
-            token = { front, static_cast<zp_size_t >( end - front ) };
+            token = { front, static_cast<zp_size_t>(end - front) };
 
             hasNext = ( end - m_str.str() ) <= m_str.length();
 

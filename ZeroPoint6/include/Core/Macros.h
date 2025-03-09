@@ -111,9 +111,9 @@ private:                   \
 #define TB              * zp_size_t( zp_size_t(1024) * 1024 * 1024 * 1024 )
 
 // Bits
-#define kb              * zp_size_t( 1000 )
-#define mb              * zp_size_t( 1000 * 1000 )
-#define gb              * zp_size_t( 1000 * 1000 * 1000 )
-#define tb              * zp_size_t( zp_size_t(1000) * 1000 * 1000 * 1000 )
+#define Kb              * zp_size_t( 1000 )
+#define Mb              * zp_size_t( 1000 * 1000 )
+#define Gb              * zp_size_t( 1000 * 1000 * 1000 )
+#define Tb              * zp_size_t( zp_size_t(1000) * 1000 * 1000 * 1000 )
 
 #endif //ZP_MACROS_H

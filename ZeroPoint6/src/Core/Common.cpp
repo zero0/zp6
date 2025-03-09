@@ -159,6 +159,11 @@ void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value )
     ::memset( dst, value, dstLength );
 }
 
+zp_int32_t zp_memcmp( const void* lh, zp_size_t lhLength, const void* rh, zp_size_t rhLength )
+{
+    return ::memcmp( lh, rh, zp_min( lhLength, rhLength ) );
+}
+
 zp_guid128_t zp_generate_unique_guid128()
 {
     zp_uint32_t m3, m2, m1, m0;

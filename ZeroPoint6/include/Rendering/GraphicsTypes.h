@@ -149,6 +149,8 @@ namespace zp
 
         CopyBuffer,
 
+        UpdateTextureData,
+
         BeginRenderPass,
         NextSubpass,
         EndRenderPass,
@@ -196,6 +198,15 @@ namespace zp
         zp_size_t srcOffset;
         zp_size_t dstOffset;
         zp_size_t size;
+    };
+
+    struct CommandUpdateTextureData
+    {
+        CommandQueueHandle cmdQueue;
+        Memory srcData;
+        TextureHandle dstTexture;
+        zp_uint32_t dstMipLevel;
+        zp_uint32_t dstArrayLayer;
     };
 
     struct CommandBeginRenderPass
@@ -316,5 +327,64 @@ namespace zp
         CommandQueueHandle cmdQueue;
     };
 };
+
+namespace zp
+{
+    enum GraphicsFormatComponentMask : zp_uint8_t
+    {
+        ZP_GRAPHICS_FORMAT_COMPONENT_MASK_R = 1 << 0,
+        ZP_GRAPHICS_FORMAT_COMPONENT_MASK_G = 1 << 1,
+        ZP_GRAPHICS_FORMAT_COMPONENT_MASK_B = 1 << 2,
+        ZP_GRAPHICS_FORMAT_COMPONENT_MASK_A = 1 << 3,
+
+        ZP_GRAPHICS_FORMAT_COMPONENT_MASK_D = 1 << 4,
+        ZP_GRAPHICS_FORMAT_COMPONENT_MASK_S = 1 << 5,
+    };
+
+    enum GraphicsFormatComponentType : zp_uint8_t
+    {
+        ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_NONE = 0,
+        ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_INT = 1 << 0,
+        ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_FLOAT = 1 << 1,
+        ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_NORMALIZED = 1 << 2,
+        ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_UNSIGNED = 1 << 3,
+        ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_COMPRESSED = 1 << 4,
+    };
+
+    enum GraphicsFormatResourceCapability : zp_uint8_t
+    {
+        ZP_GRAPHICS_FORMAT_RESOURCE_CAPABILITY_NONE = 0,
+        ZP_GRAPHICS_FORMAT_RESOURCE_CAPABILITY_BUFFER = 1 << 0,
+        ZP_GRAPHICS_FORMAT_RESOURCE_CAPABILITY_TEXTURE = 1 << 1,
+        ZP_GRAPHICS_FORMAT_RESOURCE_CAPABILITY_COLOR_RENDER_TARGET = 1 << 2,
+        ZP_GRAPHICS_FORMAT_RESOURCE_CAPABILITY_DEPTH_RENDER_TARGET = 1 << 3,
+        ZP_GRAPHICS_FORMAT_RESOURCE_CAPABILITY_STENCIL_RENDER_TARGET = 1 << 4,
+    };
+
+    enum GraphicsFormatColorSpace : zp_uint8_t
+    {
+        ZP_GRAPHICS_FORMAT_COLOR_SPACE_UNDEFINED,
+        ZP_GRAPHICS_FORMAT_COLOR_SPACE_LINEAR,
+        ZP_GRAPHICS_FORMAT_COLOR_SPACE_SRGB,
+    };
+
+#pragma pack(push, 1)
+    struct GraphicsFormatCapability
+    {
+        GraphicsFormatComponentType colorComponentType;
+        GraphicsFormatComponentType depthComponentType;
+        GraphicsFormatComponentType stencilComponentType;
+        GraphicsFormatComponentMask componentMask;
+        GraphicsFormatColorSpace colorSpace;
+        zp_uint8_t pixelsInBlockWidth;
+        zp_uint8_t pixelsInBlockHeight;
+        zp_uint8_t blockSize;
+        zp_uint8_t componentCount;
+        zp_uint8_t componentSize[4];
+    };
+#pragma pack(pop)
+
+    const GraphicsFormatCapability& GetGraphicsFormatCapability( GraphicsFormat graphicsFormat );
+}
 
 #endif //ZP_GRAPHICSTYPES_H

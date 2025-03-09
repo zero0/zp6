@@ -172,13 +172,15 @@ void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLe
 
 void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value );
 
+zp_int32_t zp_memcmp( const void* lh, zp_size_t lhLength, const void* rh, zp_size_t rhLength );
+
 
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
 
 template<typename ... Args>
-void zp_assert( const char* msg, const char* file, zp_size_t line, Args... args )
+constexpr void zp_assert( const char* msg, const char* file, zp_size_t line, Args... args )
 {
     char assertMsg[512];
     zp_snprintf( assertMsg, msg, args... );
@@ -539,24 +541,24 @@ namespace zp
         if( asBits )
         {
             info.mem[ 1 ] = 'b';
-            if( bytes > 1 tb )
+            if( bytes > 1 Tb )
             {
-                info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 tb ) );
+                info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 Tb ) );
                 info.mem[ 0 ] = 't';
             }
-            else if( bytes > 1 gb )
+            else if( bytes > 1 Gb )
             {
-                info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 gb );
+                info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 Gb );
                 info.mem[ 0 ] = 'g';
             }
-            else if( bytes > 1 mb )
+            else if( bytes > 1 Mb )
             {
-                info.size = (zp_float32_t)bytes / ( 1 mb );
+                info.size = (zp_float32_t)bytes / ( 1 Mb );
                 info.mem[ 0 ] = 'm';
             }
-            else if( bytes > 1 kb )
+            else if( bytes > 1 Kb )
             {
-                info.size = (zp_float32_t)bytes / ( 1 kb );
+                info.size = (zp_float32_t)bytes / ( 1 Kb );
                 info.mem[ 0 ] = 'k';
             }
             else

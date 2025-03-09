@@ -21,7 +21,7 @@ namespace zp
 
     GraphicsCommandBuffer::GraphicsCommandBuffer( MemoryLabel memoryLabel, zp_size_t pageSize )
         : m_data( memoryLabel, pageSize )
-        , memoryLabel( memoryLabel )
+          , memoryLabel( memoryLabel )
     {
     }
 
@@ -63,6 +63,18 @@ namespace zp
                 .srcData = srcData
             } );
         }
+    }
+
+    void GraphicsCommandBuffer::UpdateTexture( CommandQueueHandle cmdQueue, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
+    {
+        m_data.write( CommandHeader { .type = CommandType::UpdateTextureData } );
+        m_data.write( CommandUpdateTextureData {
+            .cmdQueue = cmdQueue,
+            .srcData = srcMemory,
+            .dstTexture = dstTexture,
+            .dstMipLevel = dstMipLevel,
+            .dstArrayLayer = dstArrayLayer,
+        } );
     }
 
     void GraphicsCommandBuffer::CopyBufferToBuffer( CommandQueueHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size )

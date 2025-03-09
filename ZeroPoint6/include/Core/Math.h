@@ -649,7 +649,17 @@ namespace zp
 
         Color LerpExact( const Color& x, const Color& y, zp_float32_t a );
 
-        Color Mul( const Color& x, const Color& y );
+        Color Add( Color x, Color y );
+
+        Color Mul( Color x, Color y );
+
+        Color Mul( Color x, zp_float32_t y );
+
+        Vector4f Add( Vector4f x, Vector4f y );
+
+        Vector4f Mul( Vector4f x, Vector4f y );
+
+        Vector4f Mul( Vector4f x, zp_float32_t y );
 
         Matrix4x4f Mul( const Matrix4x4f& lh, const Matrix4x4f& rh );
 
@@ -692,6 +702,8 @@ namespace zp
         Vector4i Cmp( const Vector4f& lh, const Vector4f& rh );
 
         Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale = 2.f );
+
+        zp_uint32_t Log2( zp_uint32_t v );
     }
 }
 

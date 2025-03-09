@@ -35,9 +35,11 @@ set(ZP_RENDERING_SRC
     "src/Rendering/GraphicsDevice.cpp"
     "src/Rendering/GraphicsCommandBuffer.cpp"
     "src/Rendering/GraphicsResource.cpp"
+    "src/Rendering/GraphicsTypes.cpp"
     "src/Rendering/ImmediateModeRenderer.cpp"
     #    "src/Rendering/RenderGraph.cpp"
     "src/Rendering/RenderSystem.cpp"
+    "src/Rendering/Texture.cpp"
 )
 
 set(ZP_RENDERING_API_SRC
@@ -173,11 +175,13 @@ set(ZP_HEADERS
 
 set(ZP_EXTERNAL_HEADERS
     "external/tlsf/tlsf.h"
+    "external/stb/stb_image.h"
 )
 source_group(External Header FILES ${ZP_EXTERNAL_HEADERS})
 
 set(ZP_EXTERNAL_SRC
     "external/tlsf/tlsf.c"
+    "external/stb/stb_image.cpp"
     "${Vulkan_INCLUDE_DIRS}/Volk/volk.c"
 )
 source_group(External Source FILES ${ZP_EXTERNAL_SRC})

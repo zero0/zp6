@@ -28,6 +28,7 @@ namespace zp
         ZP_SHADER_STAGE_COMPUTE,
         ZP_SHADER_STAGE_TASK,
         ZP_SHADER_STAGE_MESH,
+
         ShaderStage_Count,
     };
 

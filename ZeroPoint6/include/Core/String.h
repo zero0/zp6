@@ -807,11 +807,13 @@ namespace zp
 
         [[nodiscard]] const_iterator end() const;
 
+        [[nodiscard]] ReadOnlyMemory asMemory() const;
+
         static String As( const char* c_str );
 
         static String As( const char* c_str, zp_size_t length );
 
-        zp_bool_t operator=( const String& other ) const;
+        zp_bool_t operator==( const String& other ) const;
 
     private:
         const_str_pointer m_str;

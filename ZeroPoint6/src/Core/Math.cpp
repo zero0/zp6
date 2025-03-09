@@ -283,13 +283,63 @@ namespace zp
             return r;
         }
 
-        Color Mul( const Color& x, const Color& y )
+        Color Mul( const Color x, const Color y )
         {
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
             ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
+            return r;
+        }
+
+        Color Mul( const Color x, zp_float32_t y )
+        {
+            const __m128 mx = _mm_loadu_ps( x.rgba );
+            const __m128 my = _mm_set1_ps( y );
+
+            ZP_ALIGN16 Color r {};
+            _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
+            return r;
+        }
+
+        Color Add( const Color x, const Color y )
+        {
+            const __m128 mx = _mm_loadu_ps( x.rgba );
+            const __m128 my = _mm_loadu_ps( y.rgba );
+
+            ZP_ALIGN16 Color r {};
+            _mm_store_ps( r.rgba, _mm_add_ps( mx, my ) );
+            return r;
+        }
+
+        Vector4f Add( const Vector4f x, const Vector4f y )
+        {
+            const __m128 mx = _mm_loadu_ps( x.m );
+            const __m128 my = _mm_loadu_ps( y.m );
+
+            ZP_ALIGN16 Vector4f r {};
+            _mm_store_ps( r.m, _mm_add_ps( mx, my ) );
+            return r;
+        }
+
+        Vector4f Mul( const Vector4f x, const Vector4f y )
+        {
+            const __m128 mx = _mm_loadu_ps( x.m );
+            const __m128 my = _mm_loadu_ps( y.m );
+
+            ZP_ALIGN16 Vector4f r {};
+            _mm_store_ps( r.m, _mm_mul_ps( mx, my ) );
+            return r;
+        }
+
+        Vector4f Mul( const Vector4f x, zp_float32_t y )
+        {
+            const __m128 mx = _mm_loadu_ps( x.m );
+            const __m128 my = _mm_set1_ps( y );
+
+            ZP_ALIGN16 Vector4f r {};
+            _mm_store_ps( r.m, _mm_mul_ps( mx, my ) );
             return r;
         }
 
@@ -606,6 +656,11 @@ namespace zp
             _mm_store_ps( matrix.c3.m, c3 );
 
             return matrix;
+        }
+
+        zp_uint32_t Log2( zp_uint32_t v )
+        {
+            return static_cast<zp_uint32_t>( ::log2f( static_cast<zp_float32_t>( v ) ) );
         }
     }
 }

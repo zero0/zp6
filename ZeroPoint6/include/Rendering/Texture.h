@@ -8,59 +8,86 @@
 #include "Core/Defines.h"
 #include "Core/Types.h"
 #include "Core/Math.h"
+#include "Core/Data.h"
 
 #include "Rendering/GraphicsResource.h"
 #include "Rendering/GraphicsDefines.h"
 
 namespace zp
 {
-    struct TextureCreateDesc
+    struct TextureData
     {
-        TextureDimension textureDimension;
-        TextureFormat textureFormat;
-        SampleCount samples;
-        TextureUsage usage;
-        MemoryPropertyFlags memoryPropertyFlags;
-
         Size3Du size;
+        TextureDimension dimension;
+        GraphicsFormat format;
         zp_uint32_t mipCount;
-        zp_uint32_t arrayLayers;
+        zp_uint32_t layerCount;
+
+        Memory data;
+        MemoryLabel memoryLabel;
     };
 
-    struct TextureMip
+    void AllocateTextureData( MemoryLabel memoryLabel, Memory externalTextureData, TextureData& data );
+
+    void FreeTextureData( TextureData& data );
+
+    enum MipDownSampleFunction : zp_uint32_t
     {
-        zp_size_t offset;
-        zp_uint32_t width;
-        zp_uint32_t height;
+        Point,
+        Bilinear,
     };
 
-    struct TextureUpdateDesc
+    enum ComponentSwizzle : zp_uint8_t
     {
-        const void* textureData;
-        zp_size_t textureDataSize;
-
-        TextureMip* mipLevels;
-
-        Rect2Di extents;
-        zp_uint32_t minMipLevel;
-        zp_uint32_t maxMipLevel;
+        Identity,
+        R,
+        G,
+        B,
+        A,
+        Zero,
+        One,
     };
 
-    struct Texture
+    struct ColorSwizzle
     {
-        TextureDimension textureDimension;
-        TextureFormat textureFormat;
-        TextureUsage usage;
+        ComponentSwizzle r;
+        ComponentSwizzle g;
+        ComponentSwizzle b;
+        ComponentSwizzle a;
+    };
 
+    struct TextureExportConfig
+    {
+        Size3Du maxSize;
+        TextureDimension dimension;
+        GraphicsFormat format;
+
+        zp_uint32_t baseMipLevel;
+        zp_uint32_t baseArrayLayer;
+
+        MipDownSampleFunction mipDownSampleFunction;
+
+        ColorSwizzle componentSwizzle;
+
+        zp_uint32_t fadeMipLevelStart;
+        zp_uint32_t fadeMipLevelEnd;
+        Color32 fadeMipLevelDstColor;
+
+        zp_bool_t sRGB;
+        zp_bool_t generateMipMaps;
+        zp_bool_t fadeMipMaps;
+    };
+
+    struct RawTextureData
+    {
         Size3Du size;
-
-        zp_handle_t textureHandle;
-        zp_handle_t textureViewHandle;
-        zp_handle_t textureMemoryHandle;
+        zp_uint32_t componentCount;
+        zp_uint32_t componentSize;
+        MemoryArray<zp_uint8_t> data;
     };
 
-    typedef GraphicsResource<Texture> TextureResource;
-    typedef GraphicsResourceHandle<Texture> TextureResourceHandle;
+    void ExportRawTextureData( const TextureExportConfig& config, const RawTextureData& srcData, DataStreamWriter& dstDataStream );
+
 }
 
 #endif //ZP_TEXTURE_H

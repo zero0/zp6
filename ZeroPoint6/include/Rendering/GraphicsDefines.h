@@ -72,19 +72,12 @@ namespace zp
         ZP_DISPLAY_FORMAT_RGBA32_FLOAT,
 
         // Depth Buffer
-        ZP_DISPLAY_FORMAT_D24S8_UNORM_UINT,
+        ZP_DISPLAY_FORMAT_D24_UNORM_UINT,
+        ZP_DISPLAY_FORMAT_D24_UNORM_S8_UINT,
         ZP_DISPLAY_FORMAT_D32_FLOAT,
+        ZP_DISPLAY_FORMAT_D32_FLOAT_S8_UINT,
 
-        // Compressed
-        ZP_DISPLAY_FORMAT_RGB_BC1,
-        ZP_DISPLAY_FORMAT_RGBA_BC1,
-        ZP_DISPLAY_FORMAT_RGBA_BC2,
-        ZP_DISPLAY_FORMAT_RGBA_BC3,
-        ZP_DISPLAY_FORMAT_ATI1N,
-        ZP_DISPLAY_FORMAT_ATI2N,
-
-        zpDisplayFormat_Count,
-        zpDisplayFormat_Force32 = 1,
+        DisplayFormat_Count
     };
 
     enum GraphicsFormat
@@ -173,6 +166,24 @@ namespace zp
         ZP_GRAPHICS_FORMAT_D24_UNORM_S8_UINT,
         ZP_GRAPHICS_FORMAT_D32_SFLOAT_S8_UINT,
 
+        // Compressed
+        ZP_GRAPHICS_FORMAT_BC1_RGB_UNORM,
+        ZP_GRAPHICS_FORMAT_BC1_RGB_SRGB,
+        ZP_GRAPHICS_FORMAT_BC1_RGBA_UNORM,
+        ZP_GRAPHICS_FORMAT_BC1_RGBA_SRGB,
+
+        ZP_GRAPHICS_FORMAT_BC2_RGBA_UNORM,
+        ZP_GRAPHICS_FORMAT_BC2_RGBA_SRGB,
+
+        ZP_GRAPHICS_FORMAT_BC3_RGBA_UNORM,
+        ZP_GRAPHICS_FORMAT_BC3_RGBA_SRGB,
+
+        ZP_GRAPHICS_FORMAT_BC6H_RGBA_UFLOAT,
+        ZP_GRAPHICS_FORMAT_BC6H_RGBA_SFLOAT,
+
+        ZP_GRAPHICS_FORMAT_ASTCS_4x4_RGBA_UNORM,
+        ZP_GRAPHICS_FORMAT_ASTCS_4x4_RGBA_SRGB,
+
         GraphicsFormat_Count,
     };
 
@@ -192,7 +203,8 @@ namespace zp
         ZP_INDEX_BUFFER_FORMAT_UINT32,
         ZP_INDEX_BUFFER_FORMAT_UINT8,
         ZP_INDEX_BUFFER_FORMAT_NONE,
-        IndexBufferFormat_Count,
+
+        IndexBufferFormat_Count
     };
 
     enum TextureDimension
@@ -205,14 +217,7 @@ namespace zp
         ZP_TEXTURE_DIMENSION_TEXTURE_CUBE_MAP,
         ZP_TEXTURE_DIMENSION_TEXTURE_CUBE_MAP_ARRAY,
 
-        TextureDimension_Count,
-    };
-
-    enum TextureFormat
-    {
-        ZP_TEXTURE_FORMAT_UNKNOWN,
-
-        TextureFormat_Count,
+        TextureDimension_Count
     };
 
     enum TextureUsage

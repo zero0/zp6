@@ -79,7 +79,6 @@ namespace zp
 #endif // ZP_USE_SAFE_FREE
 
 
-
 namespace zp
 {
     class ZP_DECLSPEC_NOVTABLE IMemoryAllocator
@@ -96,7 +95,7 @@ namespace zp
     class MemoryAllocator final : public IMemoryAllocator
     {
         using allocator_type = MemoryAllocator<Storage, Policy, Locking, Profiler>;
-    ZP_NONCOPYABLE( MemoryAllocator );
+        ZP_NONCOPYABLE( MemoryAllocator );
 
     private:
         using storage_value = Storage;
@@ -113,7 +112,7 @@ namespace zp
         using profiler_const_reference = const Profiler&;
 
     public:
-        MemoryAllocator( storage_value storage, policy_value policy, lock_value locking, profiler_value profiler );
+        MemoryAllocator( storage_value storage = {}, policy_value policy = {}, lock_value locking = {}, profiler_value profiler = {} );
 
         ~MemoryAllocator() = default;
 
@@ -448,6 +447,8 @@ namespace zp
 
         [[nodiscard]] zp_size_t total() const;
 
+        [[nodiscard]] zp_size_t overhead() const;
+
         void* allocate( zp_size_t size, zp_size_t alignment );
 
         void* reallocate( void* ptr, zp_size_t size, zp_size_t alignment );
@@ -500,7 +501,7 @@ namespace zp
         void* request_memory( zp_size_t size, zp_size_t& requestedSize )
         {
             requestedSize = Size;
-            return static_cast<void*>( m_memory );
+            return static_cast<void*>(m_memory);
         }
 
         [[nodiscard]] zp_bool_t is_fixed() const
@@ -509,7 +510,7 @@ namespace zp
         }
 
     private:
-        zp_uint8_t m_memory[Size];
+        zp_uint8_t m_memory[ Size ];
     };
 }
 
@@ -528,7 +529,7 @@ namespace zp
         {
             ZP_ASSERT( size <= m_size );
             requestedSize = m_size;
-            return static_cast<void*>( m_memory );
+            return static_cast<void*>(m_memory);
         }
 
         [[nodiscard]] zp_bool_t is_fixed() const
@@ -540,6 +541,42 @@ namespace zp
         void* m_memory;
         zp_size_t m_size;
     };
+
+    class FixedArenaMemoryStorage
+    {
+    public:
+        FixedArenaMemoryStorage( MemoryLabel memoryLabel, zp_size_t size )
+            : m_memory( ZP_MALLOC( memoryLabel, size ) )
+            , m_size( size )
+            , m_memoryLabel( memoryLabel )
+        {
+        }
+
+        ~FixedArenaMemoryStorage()
+        {
+            ZP_SAFE_FREE( m_memoryLabel, m_memory );
+        }
+
+        void* request_memory( zp_size_t size, zp_size_t& requestedSize )
+        {
+            ZP_ASSERT( size <= m_size );
+            requestedSize = m_size;
+            return m_memory;
+        }
+
+        [[nodiscard]] zp_bool_t is_fixed() const
+        {
+            return true;
+        }
+
+    private:
+        void* m_memory;
+        zp_size_t m_size;
+        MemoryLabel m_memoryLabel;
+    };
+
+    using ManualArenaAllocator = MemoryAllocator<FixedAllocatedMemoryStorage, LinearAllocatorPolicy, NullMemoryLock, NullMemoryProfiler>;
+    using ArenaAllocator = MemoryAllocator<FixedArenaMemoryStorage, LinearAllocatorPolicy, NullMemoryLock, NullMemoryProfiler>;
 }
 #if 1
 namespace zp
@@ -624,14 +661,14 @@ namespace zp
         ZP_FORCEINLINE T* as()
         {
             ZP_ASSERT( sizeof( T ) <= size );
-            return static_cast<T*>( ptr );
+            return static_cast<T*>(ptr);
         }
 
         template<typename T>
         ZP_FORCEINLINE const T* as() const
         {
             ZP_ASSERT( sizeof( T ) <= size );
-            return static_cast<const T*>( ptr );
+            return static_cast<const T*>(ptr);
         }
 
         [[nodiscard]] ZP_FORCEINLINE Memory memory() const

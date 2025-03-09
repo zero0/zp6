@@ -203,6 +203,11 @@ namespace zp
         return m_size;
     }
 
+    zp_size_t LinearAllocatorPolicy::overhead() const
+    {
+        return 0;
+    }
+
     void* LinearAllocatorPolicy::allocate( zp_size_t size, zp_size_t alignment )
     {
         zp_uint8_t* mem = static_cast<zp_uint8_t*>( m_ptr ) + m_allocated;
