@@ -63,36 +63,6 @@ namespace zp
 
         void update();
 
-        [[nodiscard]] zp_uint64_t getFrameCount() const
-        {
-            return m_frameCount;
-        }
-
-        [[nodiscard]] ModuleEntryPointAPI* getModuleAPI() const
-        {
-            return m_moduleAPI;
-        }
-
-        [[nodiscard]] GraphicsDevice* getGraphicsDevice() const
-        {
-            return m_graphicsDevice;
-        }
-
-        [[nodiscard]] RenderSystem* getRenderSystem() const
-        {
-            return m_renderSystem;
-        }
-
-        [[nodiscard]] EntityComponentManager* getEntityComponentManager() const
-        {
-            return m_entityComponentManager;
-        }
-
-        [[nodiscard]] AssetSystem* getAssetSystem() const
-        {
-            return m_assetSystem;
-        }
-
         void submitToGPU();
 
     private:
@@ -127,11 +97,7 @@ namespace zp
 
         JobHandle m_previousFrameEnginePipelineHandle;
 
-        GraphicsCommandBuffer* m_graphicsDeviceCommandBuffer;
         GraphicsDevice* m_graphicsDevice;
-        RenderSystem* m_renderSystem;
-        EntityComponentManager* m_entityComponentManager;
-        AssetSystem* m_assetSystem;
 
         zp_uint64_t m_frameCount;
         zp_time_t m_frameStartTime;

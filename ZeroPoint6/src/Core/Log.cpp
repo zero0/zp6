@@ -7,6 +7,7 @@
 #include "Core/Log.h"
 #include "Core/Common.h"
 #include "Core/String.h"
+#include "Core/Memory.h"
 
 #include "Platform/Platform.h"
 
@@ -39,19 +40,19 @@ namespace zp
 
     namespace
     {
-        const char* LogTypeNames[] {
-            "",
-            "[MSG]",
-            "[INFO]",
-            "[WARN]",
-            "[ERROR]",
-            "[FATAL]"
-        };
-        ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( LogTypeNames ) == (int)LogType::Count );
-
         template<zp_bool_t IsError, LogType LogType>
         void PrintLogEntry( const char* color, const char* msg )
         {
+            constexpr FixedArray kLogTypeNames {
+                "",
+                "[MSG]",
+                "[INFO]",
+                "[WARN]",
+                "[ERROR]",
+                "[FATAL]"
+            };
+            ZP_STATIC_ASSERT( kLogTypeNames.length() == (int)LogType::Count );
+
             const DateTime dateTime = Platform::DateTimeNowLocal();
 
             const zp_size_t kDateTimeStrSize = 64;
@@ -64,11 +65,11 @@ namespace zp
 
             if constexpr( IsError )
             {
-                zp_error_printfln( format, color, dateTimeStr.c_str(), LogTypeNames[ (int)LogType ], threadID, msg );
+                zp_error_printfln( format, color, dateTimeStr.c_str(), kLogTypeNames[ (int)LogType ], threadID, msg );
             }
             else
             {
-                zp_printfln( format, color, dateTimeStr.c_str(), LogTypeNames[ (int)LogType ], threadID, msg );
+                zp_printfln( format, color, dateTimeStr.c_str(), kLogTypeNames[ (int)LogType ], threadID, msg );
             }
         }
     }
@@ -76,40 +77,6 @@ namespace zp
 
 namespace zp
 {
-    template<>
-    LogEntry<LogType::Null>& LogEntry<LogType::Null>::operator<<( const char* str )
-    {
-        return *this;
-    }
-
-    template<>
-    LogEntry<LogType::Null>& LogEntry<LogType::Null>::operator<<( zp_int32_t value )
-    {
-        return *this;
-    }
-
-    template<>
-    void LogEntry<LogType::Null>::operator<<( Log::EndToken )
-    {
-    }
-}
-
-namespace zp
-{
-    template<>
-    LogEntry<LogType::Message>& LogEntry<LogType::Message>::operator<<( const char* str )
-    {
-        m_log.append( str );
-        return *this;
-    }
-
-    template<>
-    LogEntry<LogType::Message>& LogEntry<LogType::Message>::operator<<( zp_int32_t value )
-    {
-        m_log.appendFormat( "%d", value );
-        return *this;
-    }
-
     template<>
     void LogEntry<LogType::Message>::operator<<( Log::EndToken )
     {
@@ -120,20 +87,6 @@ namespace zp
 namespace zp
 {
     template<>
-    LogEntry<LogType::Info>& LogEntry<LogType::Info>::operator<<( const char* str )
-    {
-        m_log.append( str );
-        return *this;
-    }
-
-    template<>
-    LogEntry<LogType::Info>& LogEntry<LogType::Info>::operator<<( zp_int32_t value )
-    {
-        m_log.appendFormat( "%d", value );
-        return *this;
-    }
-
-    template<>
     void LogEntry<LogType::Info>::operator<<( Log::EndToken )
     {
         PrintLogEntry<false, LogType::Info>( ZP_CC( NORMAL, DEFAULT, DEFAULT ), m_log.c_str() );
@@ -142,20 +95,6 @@ namespace zp
 
 namespace zp
 {
-    template<>
-    LogEntry<LogType::Warning>& LogEntry<LogType::Warning>::operator<<( const char* str )
-    {
-        m_log.append( str );
-        return *this;
-    }
-
-    template<>
-    LogEntry<LogType::Warning>& LogEntry<LogType::Warning>::operator<<( zp_int32_t value )
-    {
-        m_log.appendFormat( "%d", value );
-        return *this;
-    }
-
     template<>
     void LogEntry<LogType::Warning>::operator<<( Log::EndToken )
     {
@@ -166,20 +105,6 @@ namespace zp
 namespace zp
 {
     template<>
-    LogEntry<LogType::Error>& LogEntry<LogType::Error>::operator<<( const char* str )
-    {
-        m_log.append( str );
-        return *this;
-    }
-
-    template<>
-    LogEntry<LogType::Error>& LogEntry<LogType::Error>::operator<<( zp_int32_t value )
-    {
-        m_log.appendFormat( "%d", value );
-        return *this;
-    }
-
-    template<>
     void LogEntry<LogType::Error>::operator<<( Log::EndToken )
     {
         PrintLogEntry<true, LogType::Error>( ZP_CC( NORMAL, RED, DEFAULT ), m_log.c_str() );
@@ -188,20 +113,6 @@ namespace zp
 
 namespace zp
 {
-    template<>
-    LogEntry<LogType::Fatal>& LogEntry<LogType::Fatal>::operator<<( const char* str )
-    {
-        m_log.append( str );
-        return *this;
-    }
-
-    template<>
-    LogEntry<LogType::Fatal>& LogEntry<LogType::Fatal>::operator<<( zp_int32_t value )
-    {
-        m_log.appendFormat( "%d", value );
-        return *this;
-    }
-
     template<>
     void LogEntry<LogType::Fatal>::operator<<( Log::EndToken )
     {

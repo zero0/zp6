@@ -53,6 +53,12 @@ namespace zp
             return write( arr, sizeof( T ) * Size );
         }
 
+        template<zp_size_t Size>
+        zp_size_t write( const char (& arr)[Size] )
+        {
+            return write( arr, sizeof( char ) * Size );
+        }
+
         template<typename T>
         zp_size_t write( const T& value )
         {
@@ -178,37 +184,37 @@ namespace zp
 
 constexpr zp_uint32_t zp_make_cc4( char c0, char c1, char c2, char c3 )
 {
-    zp_uint32_t cc = 0;
-    cc |= c0 << 24;
-    cc |= c1 << 16;
-    cc |= c2 << 8;
-    cc |= c3 << 0;
-    return cc;
+    zp_uint32_t cc4 = 0;
+    cc4 |= c0 << 24;
+    cc4 |= c1 << 16;
+    cc4 |= c2 << 8;
+    cc4 |= c3 << 0;
+    return cc4;
 }
 
 constexpr zp_uint32_t zp_make_cc4( const char* str )
 {
     const zp_size_t len = zp_strlen( str );
 
-    zp_uint32_t cc = 0;
+    zp_uint32_t cc4 = 0;
     for( zp_size_t i = 0; i < 4 && i < len; ++i )
     {
-        cc |= str[ i ] << ( 32 - ( ( i + 1 ) * 8 ) );
+        cc4 |= str[ i ] << ( 32 - ( ( i + 1 ) * 8 ) );
         //cc |= str[i] << ( i * 8 );
     }
-    return cc;
+    return cc4;
 }
 
 constexpr zp_uint64_t zp_make_cc8( const char* str )
 {
     const zp_size_t len = zp_strlen( str );
 
-    zp_uint64_t cc = 0;
+    zp_uint64_t cc8 = 0;
     for( zp_size_t i = 0; i < 8 && i < len; ++i )
     {
-        cc |= str[ i ] << ( 64 - ( ( i + 1 ) * 8 ) );
+        cc8 |= str[ i ] << ( 64 - ( ( i + 1 ) * 8 ) );
     }
-    return cc;
+    return cc8;
 }
 
 namespace zp

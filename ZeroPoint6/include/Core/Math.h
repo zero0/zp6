@@ -295,51 +295,54 @@ namespace zp
 
     typedef Bounds2D<zp_float32_t> Bounds2Df;
 
-    template<typename T>
+    template<typename TOffset, typename TSize>
     struct Rect2D
     {
-        Offset2D<T> offset;
-        Size2D<T> size;
+        using offset_value = Offset2D<TOffset>;
+        using size_value = Size2D<TSize>;
 
-        Offset2D<T> min() const
+        offset_value offset;
+        size_value size;
+
+        offset_value min() const
         {
             return offset;
         }
 
-        Offset2D<T> max() const
+        offset_value max() const
         {
             return { .x = offset.x + size.width, .y = offset.y + size.height };
         }
 
-        Offset2D<T> center() const
+        offset_value center() const
         {
             return {
-                .x = ( offset.x + size.width ) / static_cast<T>( 2 ),
-                .y = ( offset.y + size.height ) / static_cast<T>( 2 )
+                .x = ( offset.x + size.width ) / static_cast<TOffset>( 2 ),
+                .y = ( offset.y + size.height ) / static_cast<TOffset>( 2 )
             };
         }
 
-        T left() const
+        TOffset left() const
         {
             return offset.x;
         }
 
-        T right() const
+        TOffset right() const
         {
             return offset.x + size.width;
         }
 
-        T top() const
+        TOffset top() const
         {
             return offset.y + size.height;
         }
 
-        T bottom() const
+        TOffset bottom() const
         {
             return offset.y;
         }
 
-        Offset2D<T> topLeft() const
+        offset_value topLeft() const
         {
             return {
                 .x = offset.x,
@@ -347,7 +350,7 @@ namespace zp
             };
         }
 
-        Offset2D<T> topRight() const
+        offset_value topRight() const
         {
             return {
                 .x = offset.x + size.width,
@@ -355,7 +358,7 @@ namespace zp
             };
         }
 
-        Offset2D<T> bottomLeft() const
+        offset_value bottomLeft() const
         {
             return {
                 .x = offset.x,
@@ -363,7 +366,7 @@ namespace zp
             };
         }
 
-        Offset2D<T> bottomRight() const
+        offset_value bottomRight() const
         {
             return {
                 .x = offset.x + size.width,
@@ -372,11 +375,13 @@ namespace zp
         }
     };
 
-    typedef Rect2D<zp_int32_t> Rect2Di;
+    typedef Rect2D<zp_int32_t, zp_int32_t> Rect2Di;
 
-    typedef Rect2D<zp_uint32_t> Rect2Du;
+    using RectArea2D = Rect2D<zp_int32_t, zp_uint32_t>;
 
-    typedef Rect2D<zp_float32_t> Rect2Df;
+    typedef Rect2D<zp_uint32_t, zp_uint32_t> Rect2Du;
+
+    typedef Rect2D<zp_float32_t, zp_float32_t> Rect2Df;
 
     template<typename T>
     struct Size3D

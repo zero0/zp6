@@ -14,11 +14,11 @@ ZP_TEST_GROUP( Math )
     {
         ZP_TEST( Length )
         {
-            const Vector4f a { 1, 1, 1, 1 };
-            const zp_float32_t len = Math::Length( a );
+            const Vector4f v { 1, 1, 1, 1 };
+            const zp_float32_t len = Math::Length( v );
 
-            ZP_CHECK_EQUALS( len, 1 );
-            ZP_CHECK_APPROX( len, 1, 0.000001f );
+            ZP_CHECK_EQUALS( len, 1.0f );
+            ZP_CHECK_APPROX( len, 1.0f, 0.000001f );
         };
     };
 };
@@ -84,10 +84,18 @@ namespace zp
             }
 
             Test* test;
-            ITestResult* results;
+            ITestResults* results;
         };
 
         testResults.StartRun();
+
+        TestResult r;
+        r.msg.append( __FILE__ );
+        r.msg.append( '@' );
+        r.msg.appendFormat( "%d", __LINE__ );
+        r.msg.append( ' ' );
+        r.msg.append( __FUNCTION__ );
+        r.msg.append( ':' );
 
         for( Test* test = s_context.m_firstTest; test != s_context.m_firstTest; test = test->m_next )
         {
@@ -113,14 +121,22 @@ namespace zp
     //
     //
 
-    void TestResults::Pass()
+    TestResults::TestResult( MemoryLabel memoryLabel )
+        : m_results( 8, memoryLabel )
+        , m_numTests( 0 )
+        , m_numPassed( 0 )
+        , m_numFailed( 0 )
     {
+    }
 
+    void TestResults::Pass( const char* operation, const char* file, zp_uint32_t line )
+    {
+        ++m_numPassed;
     }
 
     void TestResults::Fail( const char* operation, const char* reason, const char* file, zp_uint32_t line )
     {
-
+        ++m_numFailed;
     }
 
     void TestResults::StartRun()
@@ -135,7 +151,7 @@ namespace zp
 
     void TestResults::StartTest()
     {
-
+        ++m_numTests;
     }
 
     void TestResults::EndTest()

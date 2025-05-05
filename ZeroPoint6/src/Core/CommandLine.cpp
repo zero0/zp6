@@ -2,8 +2,11 @@
 // Created by phosg on 7/16/2023.
 //
 
+#include "Core/Defines.h"
 #include "Core/Common.h"
 #include "Core/CommandLine.h"
+#include "Core/String.h"
+#include "Core/Log.h"
 
 namespace zp
 {
@@ -296,25 +299,36 @@ namespace zp
 
     void CommandLine::printHelp() const
     {
-        for( const String& t : m_commandLineTokens )
+#if ZP_DEBUG
+        MutableFixedString512 tokens {};
+        tokens.append( "Tokens:\n" );
+        for( const String& token : m_commandLineTokens )
         {
-            zp_printfln( "= %.*s", t.length(), t.c_str() );
+            tokens.appendFormat( "= %.*s\n", token.length(), token.c_str() );
         }
 
-        for( const auto& op : m_commandLineOperations )
+        Log::message() << tokens.c_str() << Log::endl;
+#endif // ZP_DEBUG
+
+        MutableFixedString128 operationLine {};
+        for( const auto& cmd : m_commandLineOperations )
         {
-            if( !op.longName.empty() && op.shortName.empty() )
+            operationLine.clear();
+
+            if( !cmd.longName.empty() && cmd.shortName.empty() )
             {
-                zp_printfln( "%-20.*s%.*s", op.longName.length(), op.longName.str(), op.description.length(), op.description.str() );
+                operationLine.appendFormat( "%-30.*s%.*s", cmd.longName.length(), cmd.longName.str(), cmd.description.length(), cmd.description.str() );
             }
-            else if( op.longName.empty() && !op.shortName.empty() )
+            else if( cmd.longName.empty() && !cmd.shortName.empty() )
             {
-                zp_printfln( "%-20.*s%.*s", op.shortName.length(), op.shortName.str(), op.description.length(), op.description.str() );
+                operationLine.appendFormat( "%-30.*s%.*s", cmd.shortName.length(), cmd.shortName.str(), cmd.description.length(), cmd.description.str() );
             }
-            else if( !op.longName.empty() && !op.shortName.empty() )
+            else if( !cmd.longName.empty() && !cmd.shortName.empty() )
             {
-                zp_printfln( "%-5.*s,%-14.*s%.*s", op.shortName.length(), op.shortName.str(), op.longName.length(), op.longName.str(), op.description.length(), op.description.str() );
+                operationLine.appendFormat( "%-10.*s,%-20.*s%.*s", cmd.shortName.length(), cmd.shortName.str(), cmd.longName.length(), cmd.longName.str(), cmd.description.length(), cmd.description.str() );
             }
+
+            Log::message() << operationLine.c_str() << Log::endl;
         }
     }
 }

@@ -9,6 +9,7 @@
 #include "Core/CommandLine.h"
 #include "Core/Log.h"
 #include "Core/Job.h"
+#include "Core/Allocator.h"
 #include "Core/Function.h"
 #include "Core/Profiler.h"
 
@@ -29,7 +30,7 @@ namespace zp
 {
     namespace
     {
-        Engine* s_engine = {};
+        Engine* s_engine {};
 
         void OnWindowResize( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr )
         {
@@ -78,11 +79,7 @@ namespace zp
         , m_compiledExecutionGraph( memoryLabel )
         , m_subsystemManager( memoryLabel )
         , m_previousFrameEnginePipelineHandle {}
-        , m_graphicsDeviceCommandBuffer( nullptr )
         , m_graphicsDevice( nullptr )
-        , m_renderSystem( nullptr )
-        , m_entityComponentManager( nullptr )
-        , m_assetSystem( nullptr )
         , m_frameCount( 0 )
         , m_frameStartTime( 0 )
         , m_timeFrequencyS( Platform::TimeFrequency() )
@@ -122,25 +119,24 @@ namespace zp
     void Engine::initialize( const String& cmdLine )
     {
         CommandLine cmd( MemoryLabels::Temp );
-        auto maxJobThreadParam = cmd.addOperation(
-            {
-                .shortName = {},
-                .longName = String::As( "max-job-threads" ),
-                .minParameterCount = 1,
-                .maxParameterCount = 1,
-                .type = CommandLineOperationParameterType::Int32,
-            } );
-        auto headlessParam = cmd.addOperation(
-            {
-                .longName = String::As( "headless" ),
-            } );
+        const auto maxJobThreadParam = cmd.addOperation(
+        {
+            .shortName = {},
+            .longName = String::As( "max-job-threads" ),
+            .minParameterCount = 1,
+            .maxParameterCount = 1,
+            .type = CommandLineOperationParameterType::Int32,
+        } );
+        const auto headlessParam = cmd.addOperation(
+        {
+            .longName = String::As( "headless" ),
+        } );
 
         if( !cmd.parse( cmdLine ) )
         {
             Log::error() << "Failed to parse Command Line" << Log::endl;
+            cmd.printHelp();
         }
-
-        cmd.printHelp();
 
         zp_int32_t maxJobThreads = 2;
         cmd.tryGetParameterAsInt32( maxJobThreadParam, maxJobThreads );
@@ -199,12 +195,12 @@ namespace zp
             };
 
             m_windowHandle = Platform::OpenWindow(
-                {
-                    .callbacks = &m_windowCallbacks,
-                    .width = windowSize.size.width,
-                    .height = windowSize.size.height,
-                    .showWindow = false
-                } );
+            {
+                .callbacks = &m_windowCallbacks,
+                .width = windowSize.size.width,
+                .height = windowSize.size.height,
+                .showWindow = false
+            } );
         }
 
         // create console
@@ -242,7 +238,7 @@ namespace zp
         // create systems
         m_subsystemManager.RegisterSubsystem<EntityComponentManager>( memoryLabel );
 
-        return;
+#if 0
         const char* moduleDLLPath = "";
         if( !zp_strempty( moduleDLLPath ) )
         {
@@ -340,6 +336,7 @@ namespace zp
         {
             m_moduleAPI->onEnginePostInitialize( this );
         }
+#endif
     }
 
     namespace
@@ -423,7 +420,6 @@ namespace zp
         };
     }
 
-
     void Engine::startEngine()
     {
         JobSystem::InitializeJobThreads();
@@ -434,10 +430,6 @@ namespace zp
         }
 
         JobSystem::Start( InitialEngineJob { .engine = this } );
-
-        //JobWorkFunc eee = JobWorkFunc::from_lambda( lambdaFunction );
-
-        //JobSystem::Execute( eee );
     }
 
     void Engine::stopEngine()
@@ -495,10 +487,6 @@ namespace zp
         DestroyGraphicsDevice( m_graphicsDevice );
         m_graphicsDevice = nullptr;
 
-        ZP_SAFE_DELETE( RenderSystem, m_renderSystem );
-        ZP_SAFE_DELETE( EntityComponentManager, m_entityComponentManager );
-        ZP_SAFE_DELETE( AssetSystem, m_assetSystem );
-
 #if ZP_USE_PROFILER
         Profiler::DestroyProfilerThread();
 
@@ -540,34 +528,34 @@ namespace zp
             {
                 zp_printfln( "Enter Uninitialized" );
             }
-                break;
+            break;
 
             case EngineState::Running:
             {
                 zp_printfln( "Enter Running" );
                 startEngine();
             }
-                break;
+            break;
             case EngineState::Destroy:
             {
                 zp_printfln( "Enter Destroy" );
             }
-                break;
+            break;
             case EngineState::Reloading:
             {
                 zp_printfln( "Enter Reloading" );
             }
-                break;
+            break;
             case EngineState::Restarting:
             {
                 zp_printfln( "Enter Restarting" );
             }
-                break;
+            break;
             case EngineState::Exit:
             {
                 zp_printfln( "Enter Exit" );
             }
-                break;
+            break;
         }
     }
 
@@ -579,14 +567,14 @@ namespace zp
             {
                 m_nextEngineState = EngineState::Running;
             }
-                break;
+            break;
             case EngineState::Running:
             {
                 JobSystem::ProcessJobs();
 
                 Platform::YieldCurrentThread();
             }
-                break;
+            break;
             case EngineState::Destroy:
             {
                 if( m_shouldReload )
@@ -602,17 +590,17 @@ namespace zp
                     m_nextEngineState = EngineState::Exit;
                 }
             }
-                break;
+            break;
             case EngineState::Reloading:
             {
                 m_nextEngineState = EngineState::Running;
             }
-                break;
+            break;
             case EngineState::Restarting:
             {
                 m_nextEngineState = EngineState::Running;
             }
-                break;
+            break;
             case EngineState::Exit:
                 break;
         }
@@ -630,7 +618,7 @@ namespace zp
                 zp_printfln( "Exit Running" );
                 stopEngine();
             }
-                break;
+            break;
             case EngineState::Destroy:
                 zp_printfln( "Exit Destroy" );
                 break;
@@ -861,7 +849,7 @@ namespace zp
         const zp_time_t totalCPUTime = now - m_frameStartTime;
         m_frameStartTime = now;
 
-        const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * totalCPUTime ) / static_cast<zp_float64_t>( m_timeFrequencyS );
+        const zp_float64_t durationMS = static_cast<zp_float64_t>(1000 * totalCPUTime) / static_cast<zp_float64_t>(m_timeFrequencyS);
 
         MutableFixedString128 windowTitle;
         windowTitle.format( "ZeroPoint 6 - Frame:%d (%f ms) T:(%d)", m_frameCount, durationMS, Platform::GetCurrentThreadId() );
@@ -1007,6 +995,6 @@ namespace zp
 
     void Engine::submitToGPU()
     {
-        m_graphicsDeviceCommandBuffer = m_graphicsDevice->SubmitAndRequestNewCommandBuffer( m_graphicsDeviceCommandBuffer );
+        //m_graphicsDeviceCommandBuffer = m_graphicsDevice->SubmitAndRequestNewCommandBuffer( m_graphicsDeviceCommandBuffer );
     }
 }

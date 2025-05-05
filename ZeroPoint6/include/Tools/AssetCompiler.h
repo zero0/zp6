@@ -88,9 +88,7 @@ namespace zp
     public:
         explicit AssetCompilerApplication( MemoryLabel memoryLabel );
 
-        void processCommandLine( const String& cmdLine );
-
-        void initialize();
+        void initialize( const String& commandLine );
 
         void process();
 
@@ -99,6 +97,8 @@ namespace zp
         [[nodiscard]] zp_bool_t isRunning() const;
 
         [[nodiscard]] zp_int32_t getExitCode() const;
+
+        void requestExit( zp_int32_t exitCode );
 
     private:
         AssetCompiler m_assetCompiler;

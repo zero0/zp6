@@ -31,6 +31,10 @@ namespace zp
 
     void FreeTextureData( TextureData& data );
 
+    //
+    //
+    //
+
     enum MipDownSampleFunction : zp_uint32_t
     {
         Point,

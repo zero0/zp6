@@ -50,6 +50,11 @@ function(add_module name)
 endfunction()
 endif()
 
+set(ZP_VERSION_MAJOR 6)
+set(ZP_VERSION_MINOR 0)
+set(ZP_VERSION_PATCH 0)
+set(ZP_VERSION ${ZP_VERSION_MAJOR}.${ZP_VERSION_MINOR}.${ZP_VERSION_PATCH})
+
 set(PLATFORM_FULL_NAME Windows)
 set(PLATFORM_NAME Win)
 set(PLATFORM_ARCH x64)

@@ -49,6 +49,13 @@ constexpr zp_bool_t zp_strempty( const char* str, zp_size_t length )
     return !( length != 0 && str != nullptr && str[ 0 ] != '\0' );
 }
 
+template<zp_size_t Size>
+constexpr zp_size_t zp_strlen( const char (& str)[Size] )
+{
+    ZP_UNUSED( str );
+    return Size;
+}
+
 constexpr zp_size_t zp_strlen( const char* str )
 {
     const char* iter = str;
@@ -69,7 +76,7 @@ constexpr zp_bool_t zp_strempty( const zp_char8_t* str )
     return !( str != nullptr && str[ 0 ] != '\0' );
 }
 
-constexpr zp_bool_t zp_strempty( const zp_char8_t* str, zp_size_t length )
+constexpr zp_bool_t zp_strempty( const zp_char8_t*const str, const zp_size_t length )
 {
     return !( length != 0 && str != nullptr && str[ 0 ] != '\0' );
 }
@@ -657,7 +664,7 @@ constexpr zp_bool_t zp_try_uint32_to_string( const zp_uint32_t m, char* str )
     return true;
 }
 
-constexpr zp_bool_t zp_try_parse_hash64( const char* str, zp_hash64_t* hash )
+constexpr zp_bool_t zp_try_parse_hash64( const char* str, zp_hash64_t& hash )
 {
     const zp_size_t length = zp_strlen( str );
     zp_bool_t ok = length == 16;
@@ -669,7 +676,7 @@ constexpr zp_bool_t zp_try_parse_hash64( const char* str, zp_hash64_t* hash )
 
         if( ok )
         {
-            *hash = ( (zp_uint64_t)m1 << 32 ) | m0;
+            hash = ( (zp_uint64_t)m1 << 32 ) | m0;
         }
     }
 
@@ -783,43 +790,138 @@ namespace zp
         using const_str_pointer = const char_type*;
         using const_iterator = const_str_pointer;
 
-        String() = default;
+        constexpr String() = default;
 
-        explicit String( const_str_pointer str );
+        constexpr explicit String( const_str_pointer str );
 
-        String( const_str_pointer str, zp_size_t length );
+        constexpr String( const_str_pointer str, zp_size_t length );
 
-        ~String() = default;
+        constexpr ~String() = default;
 
-        [[nodiscard]] char_type operator[]( zp_size_t index ) const;
+        [[nodiscard]] constexpr char_type operator[]( zp_size_t index ) const;
 
-        [[nodiscard]] zp_bool_t empty() const;
+        [[nodiscard]] constexpr zp_bool_t empty() const;
 
-        [[nodiscard]] zp_size_t length() const;
+        [[nodiscard]] constexpr zp_size_t length() const;
 
-        [[nodiscard]] const char* c_str() const;
+        [[nodiscard]] constexpr zp_size_t size() const;
 
-        [[nodiscard]] const_str_pointer str() const;
+        [[nodiscard]] constexpr const char* c_str() const;
 
-        [[nodiscard]] const_str_pointer data() const;
+        [[nodiscard]] constexpr const_str_pointer str() const;
 
-        [[nodiscard]] const_iterator begin() const;
+        [[nodiscard]] constexpr const_str_pointer data() const;
 
-        [[nodiscard]] const_iterator end() const;
+        [[nodiscard]] constexpr const_iterator begin() const;
 
-        [[nodiscard]] ReadOnlyMemory asMemory() const;
+        [[nodiscard]] constexpr const_iterator end() const;
 
-        static String As( const char* c_str );
+        [[nodiscard]] constexpr ReadOnlyMemory asMemory() const;
 
-        static String As( const char* c_str, zp_size_t length );
+        constexpr static String As( const char* c_str );
 
-        zp_bool_t operator==( const String& other ) const;
+        constexpr static String As( const char* c_str, zp_size_t length );
+
+        constexpr zp_bool_t operator==( const String& other ) const;
+
+        constexpr zp_bool_t operator!=( const String& other ) const;
 
     private:
         const_str_pointer m_str;
         zp_size_t m_length;
     };
 }
+
+namespace zp
+{
+    constexpr String::String( const_str_pointer str )
+        : m_str( str )
+        , m_length( zp_strlen( str ) )
+    {
+    }
+
+    constexpr String::String( const_str_pointer str, zp_size_t length )
+        : m_str( str )
+        , m_length( length )
+    {
+    }
+
+    constexpr String::char_type String::operator[]( zp_size_t index ) const
+    {
+        ZP_ASSERT( m_str != nullptr && index < m_length );
+        return m_str != nullptr && index < m_length ? m_str[ index ] : '\0';
+    }
+
+    constexpr zp_bool_t String::empty() const
+    {
+        return zp_strempty( m_str, m_length );
+    }
+
+    constexpr zp_size_t String::length() const
+    {
+        return m_length;
+    }
+
+    constexpr zp_size_t String::size() const
+    {
+        return m_length * sizeof( char_type );
+    }
+
+    constexpr const char* String::c_str() const
+    {
+        return static_cast<const char*>(static_cast<const void*>(m_str));
+    }
+
+    constexpr String::const_str_pointer String::str() const
+    {
+        return m_str;
+    }
+
+    constexpr String::const_str_pointer String::data() const
+    {
+        return m_str;
+    }
+
+    constexpr String::const_iterator String::begin() const
+    {
+        return m_str;
+    }
+
+    constexpr String::const_iterator String::end() const
+    {
+        return m_str + m_length;
+    }
+
+    constexpr ReadOnlyMemory String::asMemory() const
+    {
+        return { .ptr = m_str, .size = m_length };
+    }
+
+
+    constexpr String String::As( const char* c_str )
+    {
+        return { static_cast<const_str_pointer>(static_cast<const void*>(c_str)), zp_strlen( c_str ) };
+    }
+
+    constexpr String String::As( const char* c_str, zp_size_t length )
+    {
+        return { static_cast<const_str_pointer>(static_cast<const void*>(c_str)), length };
+    }
+
+    constexpr zp_bool_t String::operator==( const String& other ) const
+    {
+        return m_str == other.m_str || zp_strcmp( m_str, m_length, other.m_str, other.m_length ) == 0;
+    }
+
+    constexpr zp_bool_t String::operator!=( const String& other ) const
+    {
+        return !(*this == other);
+    }
+}
+
+//
+//
+//
 
 namespace zp
 {
@@ -897,9 +999,10 @@ namespace zp
     };
 }
 
-    //
-    //
-    //
+//
+//
+//
+
 #pragma region Alloc String
 namespace zp
 {
@@ -1176,13 +1279,13 @@ namespace zp
 
         FixedString<Size>& operator=( const String& other ) noexcept
         {
-            zp_strncpy( m_str, other.str, other.length );
+            zp_strncpy( m_str, other.str(), other.length() );
             return *this;
         }
 
         FixedString<Size>& operator=( String&& other ) noexcept
         {
-            zp_strncpy( m_str, other.str, other.length );
+            zp_strncpy( m_str, other.str(), other.length() );
             return *this;
         }
 
@@ -1391,6 +1494,10 @@ namespace zp
         Tokenizer( const String& str, const char* delim );
 
         Tokenizer( const char* str, zp_size_t length, const char* delim );
+
+        [[nodiscard]] zp_size_t position() const;
+
+        String remaining() const;
 
         zp_bool_t next( String& token );
 

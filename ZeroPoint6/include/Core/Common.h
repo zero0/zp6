@@ -66,19 +66,19 @@ using zp_remove_pointer_t = typename zp_remove_pointer<T>::type;
 template<typename T>
 constexpr T&& zp_forward( zp_remove_reference_t<T>& val )
 {
-    return static_cast<T&&>( val );
+    return static_cast<T&&>(val);
 }
 
 template<typename T>
 constexpr T&& zp_forward( zp_remove_reference_t<T>&& val )
 {
-    return static_cast<T&&>( val );
+    return static_cast<T&&>(val);
 }
 
 template<typename T>
 constexpr zp_remove_reference_t<T>&& zp_move( T&& val )
 {
-    return static_cast<zp_remove_reference_t<T>&&>( val );
+    return static_cast<zp_remove_reference_t<T>&&>(val);
 }
 
 
@@ -104,20 +104,20 @@ zp_int32_t zp_error_printfln( const char* format, ... );
 
 zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... );
 
-template<zp_size_t Size, typename ... Args>
-zp_int32_t zp_snprintf( char (& dest)[Size], const char* format, Args ... args )
+template<zp_size_t Size, typename... Args>
+zp_int32_t zp_snprintf( char ( &dest )[ Size ], const char* format, Args... args )
 {
-    return zp_snprintf( static_cast<char*>(dest), Size, format,  args... );
+    return zp_snprintf( static_cast<char*>(dest), Size, format, args... );
 }
 
-template<typename ... Args>
-zp_int32_t zp_snprintf( zp_char8_t* dest, zp_size_t destSize, const char* format, Args ... args )
+template<typename... Args>
+zp_int32_t zp_snprintf( zp_char8_t* dest, zp_size_t destSize, const char* format, Args... args )
 {
     return zp_snprintf( reinterpret_cast<char*>(dest), destSize, format, args... );
 }
 
-template<zp_size_t Size, typename ... Args>
-zp_int32_t zp_snprintf( zp_char8_t (& dest)[Size], const char* format, Args ... args )
+template<zp_size_t Size, typename... Args>
+zp_int32_t zp_snprintf( zp_char8_t ( &dest )[ Size ], const char* format, Args... args )
 {
     return zp_snprintf( reinterpret_cast<char*>(dest), Size, format, args... );
 }
@@ -153,7 +153,7 @@ constexpr T zp_upper_pow2_generic( T val )
 #endif
 
 template<typename T, zp_size_t Size>
-constexpr zp_size_t zp_array_size( T(&)[Size] )
+constexpr zp_size_t zp_array_size( T ( & )[ Size ] )
 {
     return Size;
 }
@@ -168,21 +168,48 @@ constexpr zp_size_t zp_align_size( zp_size_t size, zp_size_t alignment )
     return ( size + ( alignment - 1 ) ) & -alignment;
 }
 
+constexpr void* zp_offset_ptr( void* ptr, zp_ptrdiff_t offset )
+{
+    return static_cast<void*>(static_cast<zp_uint8_t*>(ptr) + offset);
+}
+
+constexpr const void* zp_offset_ptr( const void* ptr, zp_ptrdiff_t offset )
+{
+    return static_cast<const void*>(static_cast<const zp_uint8_t*>(ptr) + offset);
+}
+
 void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength );
 
 void zp_memset( void* dst, zp_size_t dstLength, zp_int32_t value );
 
 zp_int32_t zp_memcmp( const void* lh, zp_size_t lhLength, const void* rh, zp_size_t rhLength );
 
+template<typename TLIter, typename TRIter>
+zp_int32_t zp_memcmp( const TLIter* lhBegin, const TLIter* lhEnd, const TRIter* rhBegin, const TRIter* rhEnd )
+{
+    return zp_memcmp( lhBegin, lhEnd - lhBegin, rhBegin, rhEnd - rhBegin );
+}
+
+template<typename TL, typename TR>
+zp_int32_t zp_memcmp( const TL& lh, const TR& rh )
+{
+    return zp_memcmp( lh.begin(), lh.end(), rh.begin(), rh.end() );
+}
+
+template<typename T>
+zp_int32_t zp_memcmp( const T& lh, const T& rh )
+{
+    return zp_memcmp( &lh, sizeof( T ), &rh, sizeof( T ) );
+}
 
 #define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
 
 #if ZP_USE_ASSERTIONS
 
-template<typename ... Args>
+template<typename... Args>
 constexpr void zp_assert( const char* msg, const char* file, zp_size_t line, Args... args )
 {
-    char assertMsg[512];
+    char assertMsg[ 512 ];
     zp_snprintf( assertMsg, msg, args... );
 
     zp_error_printfln( "Assertion failed %s:%d - %s", file, line, assertMsg );
@@ -249,7 +276,7 @@ ZP_FORCEINLINE void zp_zero_memory_array( T* arr, zp_size_t length )
 }
 
 template<typename T, zp_size_t Size>
-ZP_FORCEINLINE void zp_zero_memory_array( T( & arr )[Size] )
+ZP_FORCEINLINE void zp_zero_memory_array( T ( &arr )[ Size ] )
 {
     zp_memset( arr, sizeof( T ) * Size, 0 );
 }
@@ -300,6 +327,8 @@ constexpr zp_int32_t zp_bitscan_reverse( zp_uint64_t val )
 zp_guid128_t zp_generate_unique_guid128();
 
 zp_guid128_t zp_generate_guid128();
+
+zp_guid128_t zp_generate_guid128( const zp_uint8_t (&bytes)[16] );
 
 //
 //
@@ -385,7 +414,9 @@ template<typename T>
 constexpr const T* zp_find( const T* begin, const T* end, const T& value )
 {
     const T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t
-    { return lh == rh; } );
+    {
+        return lh == rh;
+    } );
     return found;
 }
 
@@ -435,7 +466,7 @@ constexpr zp_bool_t zp_try_index_of( T* begin, T* end, const T& value, zp_size_t
 }
 
 template<typename T, zp_size_t Size, typename Eq>
-constexpr zp_size_t zp_find_index( const T (& arr)[Size], const T& value, Eq eq )
+constexpr zp_size_t zp_find_index( const T ( &arr )[ Size ], const T& value, Eq eq )
 {
     zp_size_t index = zp::npos;
 
@@ -452,7 +483,7 @@ constexpr zp_size_t zp_find_index( const T (& arr)[Size], const T& value, Eq eq 
 }
 
 template<typename T, zp_size_t Size, typename Eq>
-constexpr zp_bool_t zp_try_find_index( const T (& arr)[Size], const T& value, Eq eq, zp_size_t& index )
+constexpr zp_bool_t zp_try_find_index( const T ( &arr )[ Size ], const T& value, Eq eq, zp_size_t& index )
 {
     zp_bool_t found = false;
 
@@ -531,7 +562,7 @@ namespace zp
     struct SizeInfo
     {
         zp_float32_t size;
-        zp_char8_t mem[4];
+        zp_char8_t mem[ 4 ];
     };
 
     constexpr SizeInfo GetSizeInfoFromBytes( zp_size_t bytes, zp_bool_t asBits = false )

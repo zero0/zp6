@@ -14,6 +14,7 @@
 
 #include "Rendering/Texture.h"
 #include "Rendering/GraphicsDefines.h"
+#include "Rendering/GraphicsTypes.h"
 
 #define STBI_NO_STDIO
 #include "stb/stb_image.h"
@@ -85,7 +86,7 @@ namespace zp
 
         zp_size_t GetTextureMemorySize( const Size3Du& size, zp_uint32_t pixelsPerBlock, zp_uint32_t blockSize )
         {
-            // pixelsPerBLock = 1 (uncompressed)
+            // pixelsPerBlock = 1 (uncompressed)
             //                  16 (block compressed 4x4)
             const zp_uint32_t memorySize = ( size.width * size.height / pixelsPerBlock ) * size.depth * blockSize;
             return memorySize;
@@ -102,7 +103,7 @@ namespace zp
 
         const zp_uint8_t* GetColorAt( const RawTextureData& textureData, zp_uint32_t x, zp_uint32_t y, zp_uint32_t z )
         {
-            const zp_ptrdiff_t colorSize = textureData.componentCount * textureData.componentSize;
+            const zp_ptrdiff_t colorSize = static_cast<zp_ptrdiff_t>( textureData.componentCount ) * textureData.componentSize;
             const zp_ptrdiff_t xOffset = static_cast<zp_ptrdiff_t>(x) * colorSize;
             const zp_ptrdiff_t yOffset = static_cast<zp_ptrdiff_t>(y) * textureData.size.width * colorSize;
             const zp_ptrdiff_t zOffset = static_cast<zp_ptrdiff_t>(z) * textureData.size.width * textureData.size.height * colorSize;
@@ -131,6 +132,9 @@ namespace zp
                     case sizeof( zp_float32_t ):
                         color.rgba[ component ] = reinterpret_cast<const zp_float32_t*>(rawColor)[ component ];
                         break;
+                    default:
+                        ZP_INVALID_CODE_PATH();
+                        break;
                 }
             }
 
@@ -156,6 +160,9 @@ namespace zp
                         break;
                     case sizeof( zp_float32_t ):
                         reinterpret_cast<zp_float32_t*>(rawColor)[ component ] = color.rgba[ component ];
+                        break;
+                    default:
+                        ZP_INVALID_CODE_PATH();
                         break;
                 }
             }
@@ -328,7 +335,7 @@ namespace zp
         KTX2Header header;
         reader.read( header );
 
-        ZP_ASSERT( zp_memcmp( header.identifier.data(), header.identifier.length(), kFileIdentifier.data(), kFileIdentifier.length() ) == 0 );
+        ZP_ASSERT( zp_memcmp( header.identifier, kFileIdentifier ) == 0 );
 
 
     }
@@ -414,11 +421,13 @@ namespace zp
             compressedMipLevels.pushBack( compressedMipMemory );
         }
 
+        const GraphicsFormatCapability& cap = GetGraphicsFormatCapability( config.format );
+
         // header
         const KTX2Header header {
             .identifier = kFileIdentifier,
             .vkFormat = static_cast<zp_uint32_t>(config.format),
-            .typeSize = 1,
+            .typeSize = cap.componentSize[0],
             .pixelWidth = baseMipSize.width,
             .pixelHeight = baseMipSize.height,
             .pixelDepth = baseMipSize.depth,
@@ -470,7 +479,7 @@ namespace zp
 
             for( const KTX2KeyValue& kv : kvdKeyValues )
             {
-                const zp_ptrdiff_t kvOffset = dstDataStream.write<zp_uint32_t>( 0 );
+                const zp_size_t kvOffset = dstDataStream.write<zp_uint32_t>( 0 );
                 dstDataStream.write( kv.key.c_str(), kv.key.length() );
                 dstDataStream.write( '\0' );
                 dstDataStream.write( kv.value.c_str(), kv.value.length() );
@@ -480,7 +489,7 @@ namespace zp
                 // alignment not included in kvLength
                 dstDataStream.writeAlignment( 4 );
 
-                dstDataStream.writeAt( kvLength, kvOffset, DataStreamSeekOrigin::Exact );
+                dstDataStream.writeAt( kvLength, static_cast<zp_ptrdiff_t>(kvOffset), DataStreamSeekOrigin::Exact );
             }
 
             index.kvdByteLength = dstDataStream.position() - index.kvdByteOffset;

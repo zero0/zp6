@@ -9,83 +9,6 @@
 
 namespace zp
 {
-    String::String( const_str_pointer str )
-        : m_str( str )
-        , m_length( zp_strlen( str ) )
-    {
-    }
-
-    String::String( const_str_pointer str, zp_size_t length )
-        : m_str( str )
-        , m_length( length )
-    {
-    }
-
-    String::char_type String::operator[]( zp_size_t index ) const
-    {
-        ZP_ASSERT( m_str != nullptr && index < m_length );
-        return m_str != nullptr ? m_str[ index ] : '\0';
-    }
-
-    zp_bool_t String::empty() const
-    {
-        return zp_strempty( m_str, m_length );
-    }
-
-    zp_size_t String::length() const
-    {
-        return m_length;
-    }
-
-    const char* String::c_str() const
-    {
-        return reinterpret_cast<const char*>(m_str);
-    }
-
-    String::const_str_pointer String::str() const
-    {
-        return m_str;
-    }
-
-    String::const_str_pointer String::data() const
-    {
-        return m_str;
-    }
-
-    String::const_iterator String::begin() const
-    {
-        return m_str;
-    }
-
-    String::const_iterator String::end() const
-    {
-        return m_str + m_length;
-    }
-
-    ReadOnlyMemory String::asMemory() const
-    {
-        return { .ptr = m_str, .size = m_length };
-    }
-
-
-    String String::As( const char* c_str )
-    {
-        return { reinterpret_cast<const_str_pointer>(c_str), zp_strlen( c_str ) };
-    }
-
-    String String::As( const char* c_str, zp_size_t length )
-    {
-        return { reinterpret_cast<const_str_pointer>(c_str), length };
-    }
-
-    zp_bool_t String::operator==( const String& other ) const
-    {
-        return m_str == other.m_str || zp_strcmp( m_str, m_length, other.m_str, other.m_length ) == 0;
-    }
-}
-
-namespace zp
-{
     MutableString::MutableString( MutableString::str_pointer str, zp_size_t capacity )
         : m_str( str )
         , m_length( 0 )
@@ -222,6 +145,17 @@ namespace zp
     {
     }
 
+    zp_size_t Tokenizer::position() const
+    {
+        return m_next;
+    }
+
+    String Tokenizer::remaining() const
+    {
+        return String::As( m_str.c_str() + m_next, m_str.length() - m_next );
+    }
+
+
     zp_bool_t Tokenizer::next( String& token )
     {
         token = {};
@@ -229,17 +163,50 @@ namespace zp
         zp_bool_t hasNext = false;
         if( m_next < m_str.length() )
         {
+#if 1
+            zp_bool_t fullDelim = true;
+            const zp_char8_t* end = m_str.str() + m_next;
+
+            while( *end != '\0' && end < m_str.end() )
+            {
+                zp_bool_t isDelim = false;
+                if( fullDelim )
+                {
+                    isDelim = zp_strcmp( end, m_delim.length(), m_delim.str(), m_delim.length() ) == 0;
+                }
+                else
+                {
+                    for( zp_size_t i = 0; i < m_delim.length() && !isDelim; ++i )
+                    {
+                        isDelim = m_delim[ i ] == *end;
+                    }
+                }
+
+                if( isDelim )
+                {
+                    break;
+                }
+
+                ++end;
+            }
+
+            const zp_char8_t* front = m_str.str() + m_next;
+            token = { front, static_cast<zp_size_t>(end - front) };
+            m_next += token.length() + ( fullDelim ? m_delim.length() : 0 );
+
+            hasNext = m_next <= m_str.length();
+#else
             const zp_char8_t* front = m_str.str() + m_next;
             const zp_char8_t* end = m_str.str() + m_next;
 
             zp_size_t idx = front - m_str.str();
 
-            while( *end && idx < m_str.length() )
+            while( *end != '\0' && idx < m_str.length() )
             {
-                zp_bool_t isDelim = false;
-                for( zp_size_t i = 0; i < m_delim.length() && !isDelim; ++i )
+                zp_bool_t isDelim = true;
+                for( zp_size_t i = 0; i < m_delim.length() && isDelim; ++i )
                 {
-                    isDelim = m_delim[ i ] == *end;
+                    isDelim &= m_delim[ i ] == *end;
                 }
 
                 if( isDelim )
@@ -257,7 +224,7 @@ namespace zp
 
             hasNext = ( end - m_str.str() ) <= m_str.length();
 
-            while( *end && idx < m_str.length() )
+            while( *end != '\0' && idx < m_str.length() )
             {
                 zp_bool_t isDelim = false;
                 for( zp_size_t i = 0; i < m_delim.length() && !isDelim; ++i )
@@ -277,6 +244,7 @@ namespace zp
             }
 
             m_next = end - m_str.str();
+#endif
         }
 
         return hasNext;

@@ -171,14 +171,14 @@ namespace zp
         using iterator = T*;
         using const_iterator = const T*;
 
-        FixedArray();
+        constexpr FixedArray();
 
-        explicit FixedArray( value_type (& ptr)[Size] );
+        constexpr explicit FixedArray( value_type (& ptr)[Size] );
 
         template<typename ... Args>
-        FixedArray( Args ... args );
+        constexpr FixedArray( Args ... args );
 
-        FixedArray( pointer ptr, zp_size_t length );
+        constexpr FixedArray( pointer ptr, zp_size_t length );
 
         [[nodiscard]] constexpr ZP_FORCEINLINE zp_size_t length() const;
 
@@ -314,26 +314,26 @@ namespace zp
 namespace zp
 {
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::FixedArray()
+    constexpr FixedArray<T, Size>::FixedArray()
         : m_ptr()
     {
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::FixedArray( T (& ptr)[Size] )
+    constexpr FixedArray<T, Size>::FixedArray( T (& ptr)[Size] )
         : m_ptr( ptr )
     {
     }
 
     template<typename T, zp_size_t Size>
     template<typename ... Args>
-    FixedArray<T, Size>::FixedArray( Args ... args )
+    constexpr FixedArray<T, Size>::FixedArray( Args ... args )
         : m_ptr { zp_forward<T>( args )... }
     {
     }
 
     template<typename T, zp_size_t Size>
-    FixedArray<T, Size>::FixedArray( pointer ptr, zp_size_t length )
+    constexpr FixedArray<T, Size>::FixedArray( pointer ptr, zp_size_t length )
         : m_ptr()
     {
         for( zp_size_t i = 0, imax = zp_min( Size, length ); i < imax; ++i )

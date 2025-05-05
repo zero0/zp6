@@ -1,9 +1,4 @@
 
-set(ZP_VERSION_MAJOR 6)
-set(ZP_VERSION_MINOR 0)
-set(ZP_VERSION_PATCH 0)
-set(ZP_VERSION ${ZP_VERSION_MAJOR}.${ZP_VERSION_MINOR}.${ZP_VERSION_PATCH})
-
 find_package(Vulkan REQUIRED COMPONENTS volk dxc)
 
 project(ZeroPoint VERSION ${ZP_VERSION} LANGUAGES CXX)
@@ -18,6 +13,7 @@ set(ZP_CORE_SRC
     "src/Core/CommandLine.cpp"
     "src/Core/Common.cpp"
     "src/Core/Data.cpp"
+    "src/Core/Http.cpp"
     "src/Core/Job.cpp"
     "src/Core/Log.cpp"
     "src/Core/Math.cpp"
@@ -85,6 +81,7 @@ set(ZP_CORE_HEADERS
     "include/Core/Defines.h"
     "include/Core/Function.h"
     "include/Core/Hash.h"
+    "include/Core/Http.h"
     "include/Core/Job.h"
     "include/Core/Log.h"
     "include/Core/Macros.h"
@@ -326,12 +323,14 @@ install(TARGETS ${ZP_TARGET}
 #
 #
 
-project(ZeroPointTools VERSION ${ZP_VERSION} LANGUAGES CXX)
+
+project(AssetCompiler VERSION ${ZP_VERSION} LANGUAGES CXX)
 
 set(ZP_TOOLS_TARGET ${PROJECT_NAME}_${PLATFORM_NAME}_${PLATFORM_ARCH})
 
 set(ZP_TOOLS_SRC
     "src/Tools/AssetCompiler.cpp"
+    "src/Tools/ShaderCompiler.cpp"
     "src/Tools/${PLATFORM_FULL_NAME}/AssetCompiler${PLATFORM_FULL_NAME}Main.cpp"
     "src/Tools/${PLATFORM_FULL_NAME}/ShaderCompiler${PLATFORM_FULL_NAME}.cpp"
 )
@@ -342,57 +341,58 @@ set(ZP_TOOLS_HEADERS
 
 add_executable(${ZP_TOOLS_TARGET})
 target_sources(${ZP_TOOLS_TARGET}
-    PRIVATE ${ZP_CORE_HEADERS}
-    PRIVATE ${ZP_CORE_SRC}
-    PRIVATE ${ZP_ENTRY_POINT}
-    PRIVATE ${ZP_PLATFORM_HEADERS}
-    PRIVATE ${ZP_PLATFORM_SRC}
-    PRIVATE ${ZP_EXTERNAL_HEADERS}
-    PRIVATE ${ZP_EXTERNAL_SRC}
-    PRIVATE ${ZP_TOOLS_HEADERS}
-    PRIVATE ${ZP_TOOLS_SRC}
+        PRIVATE ${ZP_CORE_HEADERS}
+        PRIVATE ${ZP_CORE_SRC}
+        PRIVATE ${ZP_ENTRY_POINT}
+        PRIVATE ${ZP_PLATFORM_HEADERS}
+        PRIVATE ${ZP_PLATFORM_SRC}
+        PRIVATE ${ZP_EXTERNAL_HEADERS}
+        PRIVATE ${ZP_EXTERNAL_SRC}
+        PRIVATE ${ZP_TOOLS_HEADERS}
+        PRIVATE ${ZP_TOOLS_SRC}
 )
 target_include_directories(${ZP_TOOLS_TARGET}
-    PRIVATE include
-    PRIVATE external
+        PRIVATE include
+        PRIVATE external
 )
 
 set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
-    VERSION ${ZP_VERSION}
+        VERSION ${ZP_VERSION}
 )
 
 target_include_directories(${ZP_TOOLS_TARGET}
-    PRIVATE ${Vulkan_INCLUDE_DIRS}
+        PRIVATE ${Vulkan_INCLUDE_DIRS}
 )
 target_link_options(${ZP_TOOLS_TARGET}
-    PRIVATE -static-libgcc -static-libstdc++ -static
+        PRIVATE -static-libgcc -static-libstdc++ -static
 )
 target_link_libraries(${ZP_TOOLS_TARGET} PRIVATE
-    ${Vulkan_LIBRARIES}
-    ${Vulkan_dxc_LIBRARY}
-    rpcrt4.lib
-    dwmapi.dll
-    Ws2_32.lib
+        ${Vulkan_LIBRARIES}
+        ${Vulkan_dxc_LIBRARY}
+        rpcrt4
+        dwmapi
+        Ws2_32
+        dbghelp
 )
 
 if (MSVC)
     set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
-        LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-        VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            LINK_FLAGS "/SUBSYSTEM:WINDOWS"
+            VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
     set_target_properties(${ZP_TOOLS_TARGET} PROPERTIES
-        LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-        VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            LINK_FLAGS "/SUBSYSTEM:WINDOWS"
+            VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 elseif (GCC OR CLANG)
 else ()
 endif ()
 
 install(TARGETS ${ZP_TOOLS_TARGET}
-    CONFIGURATIONS Debug
-    RUNTIME DESTINATION ${ROOT_DIR}/Debug/bin
+        CONFIGURATIONS Debug
+        RUNTIME DESTINATION ${ROOT_DIR}/Debug/bin
 )
 install(TARGETS ${ZP_TOOLS_TARGET}
-    CONFIGURATIONS Release
-    RUNTIME DESTINATION ${ROOT_DIR}/Release/bin
+        CONFIGURATIONS Release
+        RUNTIME DESTINATION ${ROOT_DIR}/Release/bin
 )

@@ -6,7 +6,9 @@
 #define ZP_TEST_H
 
 #include "Core/Macros.h"
+#include "Core/String.h"
 #include "Core/Types.h"
+#include "Core/Vector.h"
 
 //
 #define ZP_TEST_GROUP( group ) namespace TestGroup##group
@@ -20,12 +22,12 @@ class Test##name : public zp::Test              \
 {                                               \
 public:                                         \
     Test##name() : Test() {}                    \
-    void Run( zp::ITestResult* const __result ) final; \
-    void Setup( zp::ITestResult* const __result ) final; \
-    void Teardown( zp::ITestResult* const __result ) final; \
+    void Run( zp::ITestResults* const __result ) final; \
+    void Setup( zp::ITestResults* const __result ) final; \
+    void Teardown( zp::ITestResults* const __result ) final; \
 };                                              \
 Test##name g_Test##name;                        \
-void Test##name::Run( zp::ITestResult* const __result )
+void Test##name::Run( zp::ITestResults* const __result )
 
 //
 #define ZP_TEST_ARGS( name, args )              \
@@ -33,22 +35,22 @@ class Test##name final : public zp::Test        \
 {                                               \
 public:                                         \
     Test##name() : Test() {}                    \
-    void Run( zp::ITestResult* const __ result ) final; \
-    void Setup( zp::ITestResult* const __result ) final; \
-    void Teardown( zp::ITestResult* const __result ) final; \
+    void Run( zp::ITestResults* const __ result ) final; \
+    void Setup( zp::ITestResults* const __result ) final; \
+    void Teardown( zp::ITestResults* const __result ) final; \
 private:                                        \
     struct args m_args;                         \
 };                                              \
 Test##name g_Test##name;                        \
-void Test##name::Run( zp::ITestResult* const __result )
+void Test##name::Run( zp::ITestResults* const __result )
 
 //
 #define ZP_TEST_SETUP( name )                   \
-void Test##name::Setup( zp::ITestResult* const __result )
+void Test##name::Setup( zp::ITestResults* const __result )
 
 //
 #define ZP_TEST_TEARDOWN( name )                \
-void Test##name::Teardown( zp::ITestResult* const __result )
+void Test##name::Teardown( zp::ITestResults* const __result )
 
 //
 //
@@ -59,11 +61,11 @@ do                                                                              
 {                                                                               \
     if( op( (lh), (rh) ) )                                                      \
     {                                                                           \
-        __result->Pass();                                                         \
+        __result->Pass( #op "( " #lh ", " #rh ")", __FILE__, __LINE__ );        \
     }                                                                           \
     else                                                                        \
     {                                                                           \
-        __result->Fail( #op "( " #lh ", " #rh ")", msg, __FILE__, __LINE__ ); \
+        __result->Fail( #op "( " #lh ", " #rh ")", msg, __FILE__, __LINE__ );   \
     }                                                                           \
 } while( false )
 
@@ -74,11 +76,11 @@ do                                                                   \
 {                                                                    \
     if( (lh) == (rh) )                                               \
     {                                                                \
-        __result->Pass();                                              \
+        __result->Pass( #lh " == " #rh, __FILE__, __LINE__ );        \
     }                                                                \
     else                                                             \
     {                                                                \
-        __result->Fail( #lh " == " #rh, msg, __FILE__, __LINE__ ); \
+        __result->Fail( #lh " == " #rh, msg, __FILE__, __LINE__ );   \
     }                                                                \
 } while( false )
 
@@ -89,11 +91,11 @@ do                                                                   \
 {                                                                    \
     if( (lh) != (rh) )                                               \
     {                                                                \
-        __result->Pass();                                              \
+        __result->Pass( #lh " != " #rh, __FILE__, __LINE__ );        \
     }                                                                \
     else                                                             \
     {                                                                \
-        __result->Fail( #lh " != " #rh, msg, __FILE__, __LINE__ ); \
+        __result->Fail( #lh " != " #rh, msg, __FILE__, __LINE__ );  \
     }                                                                \
 } while( false )
 
@@ -108,7 +110,7 @@ do                                                                   \
     const zp_float32_t fd = flh - frh;                               \
     if( fd >= -fep && fd <= fep )                                    \
     {                                                                \
-        __result->Pass();                                              \
+        __result->Pass( #lh " ~ " #rh " (" #ep ")", __FILE__, __LINE__ ); \
     }                                                                \
     else                                                             \
     {                                                                \
@@ -126,10 +128,12 @@ namespace zp
 {
     class Test;
 
-    ZP_PURE_INTERFACE ITestResult
+    ZP_PURE_INTERFACE ITestResults
     {
     public:
-        virtual void Pass() = 0;
+        virtual ~ITestResults() = default;
+
+        virtual void Pass( const char* operation, const char* file, zp_uint32_t line ) = 0;
 
         virtual void Fail( const char* operation, const char* reason, const char* file, zp_uint32_t line ) = 0;
     };
@@ -137,10 +141,20 @@ namespace zp
     class TestFilter
     {};
 
-    class TestResults : public ITestResult
+    struct TestResult
+    {
+        MutableFixedString128 msg;
+        Test* test;
+        zp_time_t duration;
+        zp_bool_t passed;
+    };
+
+    class TestResults : public ITestResults
     {
     public:
-        void Pass() final;
+        explicit TestResult( MemoryLabel memoryLabel );
+
+        void Pass( const char* operation, const char* file, zp_uint32_t line ) final;
 
         void Fail( const char* operation, const char* reason, const char* file, zp_uint32_t line ) final;
 
@@ -151,6 +165,12 @@ namespace zp
         void StartTest();
 
         void EndTest();
+
+    private:
+        Vector<TestResult> m_results;
+        zp_size_t m_numTests;
+        zp_size_t m_numPassed;
+        zp_size_t m_numFailed;
     };
 
     class TestRunner final
@@ -170,13 +190,13 @@ namespace zp
     public:
         Test();
 
-        virtual void Run( ITestResult* result ) = 0;
+        virtual void Run( ITestResults* result ) = 0;
 
-        virtual void Setup( ITestResult* result )
+        virtual void Setup( ITestResults* result )
         {
         };
 
-        virtual void Teardown( ITestResult* result )
+        virtual void Teardown( ITestResults* result )
         {
         };
 

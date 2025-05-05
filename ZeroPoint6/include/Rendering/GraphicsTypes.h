@@ -222,21 +222,21 @@ namespace zp
         struct DepthAttachment
         {
             RenderTargetHandle attachment;
-            int loadOp;
-            int storeOp;
+            AttachmentLoadOp loadOp;
+            AttachmentStoreOp storeOp;
             zp_float32_t clearDepth;
         };
 
         struct StencilAttachment
         {
             RenderTargetHandle attachment;
-            int loadOp;
-            int storeOp;
+            AttachmentLoadOp loadOp;
+            AttachmentStoreOp storeOp;
             zp_uint32_t clearStencil;
         };
 
         CommandQueueHandle cmdQueue;
-        Rect2Du renderArea;
+        RectArea2D renderArea;
 
         DepthAttachment depthAttachment;
         StencilAttachment stencilAttachment;

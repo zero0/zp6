@@ -36,7 +36,7 @@ enum
 
 zp_int32_t zp_printf( const char* text, ... )
 {
-    char szBuff[kPrintBufferSize];
+    char szBuff[ kPrintBufferSize ];
     va_list arg;
     va_start( arg, text );
     const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
@@ -56,11 +56,11 @@ zp_int32_t zp_printf( const char* text, ... )
 
 zp_int32_t zp_printfln( const char* text, ... )
 {
-    char szBuff[kPrintBufferSize];
+    char szBuff[ kPrintBufferSize ];
 
     va_list arg;
     va_start( arg, text );
-    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize-1, text, arg );
+    const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize - 1, text, arg );
     va_end( arg );
 
     szBuff[ write ] = '\n';
@@ -81,7 +81,7 @@ zp_int32_t zp_printfln( const char* text, ... )
 
 zp_int32_t zp_error_printf( const char* text, ... )
 {
-    char szBuff[kPrintBufferSize];
+    char szBuff[ kPrintBufferSize ];
     va_list arg;
     va_start( arg, text );
     const zp_int32_t write = ::_vsnprintf_s( szBuff, kPrintBufferSize, text, arg );
@@ -101,7 +101,7 @@ zp_int32_t zp_error_printf( const char* text, ... )
 
 zp_int32_t zp_error_printfln( const char* text, ... )
 {
-    char szBuff[kPrintBufferSize];
+    char szBuff[ kPrintBufferSize ];
 
     va_list arg;
     va_start( arg, text );
@@ -172,15 +172,15 @@ zp_guid128_t zp_generate_unique_guid128()
     UUID uuid;
     ::UuidCreate( &uuid );
 
-    m3 = static_cast<zp_uint32_t>( uuid.Data1 );
-    m2 = static_cast<zp_uint32_t>( uuid.Data2 << 16 ) | uuid.Data3;
+    m3 = static_cast<zp_uint32_t>(uuid.Data1);
+    m2 = static_cast<zp_uint32_t>(uuid.Data2 << 16) | uuid.Data3;
     m1 = uuid.Data4[ 0 ] << 24 | uuid.Data4[ 1 ] << 16 | uuid.Data4[ 2 ] << 8 | uuid.Data4[ 3 ];
     m0 = uuid.Data4[ 4 ] << 24 | uuid.Data4[ 5 ] << 16 | uuid.Data4[ 6 ] << 8 | uuid.Data4[ 7 ];
 #endif
 
     zp_guid128_t guid {
-        .m32 = ( static_cast<zp_uint64_t>( m3 ) << 32 ) | m2,
-        .m10 = ( static_cast<zp_uint64_t>( m1 ) << 32 ) | m0
+        .m32 = ( static_cast<zp_uint64_t>(m3) << 32 ) | m2,
+        .m10 = ( static_cast<zp_uint64_t>(m1) << 32 ) | m0
     };
 
     return guid;
@@ -194,16 +194,33 @@ zp_guid128_t zp_generate_guid128()
     UUID uuid;
     ::UuidCreateSequential( &uuid );
 
-    m3 = static_cast<zp_uint32_t>( uuid.Data1 );
-    m2 = static_cast<zp_uint32_t>( uuid.Data2 << 16 ) | uuid.Data3;
+    m3 = static_cast<zp_uint32_t>(uuid.Data1);
+    m2 = static_cast<zp_uint32_t>(uuid.Data2 << 16) | uuid.Data3;
     m1 = uuid.Data4[ 0 ] << 24 | uuid.Data4[ 1 ] << 16 | uuid.Data4[ 2 ] << 8 | uuid.Data4[ 3 ];
     m0 = uuid.Data4[ 4 ] << 24 | uuid.Data4[ 5 ] << 16 | uuid.Data4[ 6 ] << 8 | uuid.Data4[ 7 ];
 #endif
 
     zp_guid128_t guid {
-        .m32 = ( static_cast<zp_uint64_t>( m3 ) << 32 ) | m2,
-        .m10 = ( static_cast<zp_uint64_t>( m1 ) << 32 ) | m0
+        .m32 = ( static_cast<zp_uint64_t>(m3) << 32 ) | m2,
+        .m10 = ( static_cast<zp_uint64_t>(m1) << 32 ) | m0
     };
+
+    return guid;
+}
+
+zp_guid128_t zp_generate_guid128( const zp_uint8_t ( &bytes )[ 16 ] )
+{
+    zp_guid128_t guid {};
+
+    zp_uint32_t idx = 0;
+    for( zp_uint32_t offset = 8; idx < 8; ++idx, offset += 8 )
+    {
+        guid.m32 |= static_cast<zp_uint64_t>(bytes[ idx ]) << ( 64 - offset );
+    }
+    for( zp_uint32_t offset = 8; idx < 16; ++idx, offset += 8 )
+    {
+        guid.m10 |= static_cast<zp_uint64_t>(bytes[ idx ]) << ( 64 - offset );
+    }
 
     return guid;
 }
@@ -269,10 +286,10 @@ namespace
 
 zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcSize, void* dstBuffer, zp_size_t dstPosition )
 {
-    zp_size_t hashTab[HASH_SIZE];
+    zp_size_t hashTab[ HASH_SIZE ];
 
-    const zp_uint8_t* inBuff = static_cast<const zp_uint8_t*>( srcBuffer );
-    zp_uint8_t* outBuff = static_cast<zp_uint8_t*>( dstBuffer );
+    const zp_uint8_t* inBuff = static_cast<const zp_uint8_t*>(srcBuffer);
+    zp_uint8_t* outBuff = static_cast<zp_uint8_t*>(dstBuffer);
 
     zp_int32_t literals = 0;
 
@@ -296,8 +313,8 @@ zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size
             && reff > 0
             && ( off = srcPosition - reff - 1 ) < MAX_OFF
             && inBuff[ reff + 2 ] == p2
-            && inBuff[ reff + 1 ] == static_cast<zp_uint8_t>( future >> 8 )
-            && inBuff[ reff ] == static_cast<zp_uint8_t>( future >> 16 ) )
+            && inBuff[ reff + 1 ] == static_cast<zp_uint8_t>(future >> 8)
+            && inBuff[ reff ] == static_cast<zp_uint8_t>(future >> 16) )
         {
             // match
             maxLen = srcSize - srcPosition - 2;
@@ -316,7 +333,7 @@ zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size
             {
                 // set the control byte at the start of the literal run
                 // to store the number of literals
-                outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>( literals - 1 );
+                outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>(literals - 1);
                 literals = 0;
             }
 
@@ -329,15 +346,15 @@ zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size
             len -= 2;
             if( len < 7 )
             {
-                outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>( ( off >> 8 ) + ( len << 5 ) );
+                outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>(( off >> 8 ) + ( len << 5 ));
             }
             else
             {
-                outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>( ( off >> 8 ) + ( 7 << 5 ) );
-                outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>( len - 7 );
+                outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>(( off >> 8 ) + ( 7 << 5 ));
+                outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>(len - 7);
             }
 
-            outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>( off );
+            outBuff[ dstPosition++ ] = static_cast<zp_uint8_t>(off);
             // move one byte forward to allow for a literal run control byte
             dstPosition++;
             srcPosition += len;
@@ -359,7 +376,7 @@ zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size
             // to the control byte and start a new chunk
             if( literals == MAX_LITERAL )
             {
-                outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>( literals - 1 );
+                outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>(literals - 1);
                 literals = 0;
                 // move ahead one byte to allow for the
                 // literal run control byte
@@ -375,14 +392,14 @@ zp_size_t zp_lzf_compress( const void* srcBuffer, zp_size_t srcPosition, zp_size
         literals++;
         if( literals == MAX_LITERAL )
         {
-            outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>( literals - 1 );
+            outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>(literals - 1);
             literals = 0;
             dstPosition++;
         }
     }
 
     // writes the final literal run length to the control byte
-    outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>( literals - 1 );
+    outBuff[ dstPosition - literals - 1 ] = static_cast<zp_uint8_t>(literals - 1);
     if( literals == 0 )
     {
         dstPosition--;
@@ -397,8 +414,8 @@ void zp_lzf_expand( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcS
     zp_size_t len;
     zp_size_t i;
 
-    const zp_uint8_t* inBuff = static_cast<const zp_uint8_t*>( srcBuffer );
-    zp_uint8_t* outBuff = static_cast<zp_uint8_t*>( dstBuffer );
+    const zp_uint8_t* inBuff = static_cast<const zp_uint8_t*>(srcBuffer);
+    zp_uint8_t* outBuff = static_cast<zp_uint8_t*>(dstBuffer);
 
     do
     {
@@ -456,6 +473,5 @@ void zp_lzf_expand( const void* srcBuffer, zp_size_t srcPosition, zp_size_t srcS
             //dstPosition += len;
             //ctrl += len;
         }
-    }
-    while( dstPosition < dstSize );
+    } while( dstPosition < dstSize );
 }

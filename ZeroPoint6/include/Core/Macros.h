@@ -1,6 +1,8 @@
 #ifndef ZP_MACROS_H
 #define ZP_MACROS_H
 
+#include "Core/Defines.h"
+
 #define ZP_UNUSED(v)                    (void)v
 
 #define ZP_CONCAT_(a, b)                a ## b
@@ -22,7 +24,7 @@
 
 #define ZP_ALIGN_SIZE(s,a)              zp_align_size( s, a )
 
-#define ZP_OFFSET_PTR(ptr, offset)      static_cast<void*>( static_cast<zp_uint8_t*>(ptr) + static_cast<zp_ptrdiff_t>(offset) )
+#define ZP_OFFSET_PTR(ptr, offset)      zp_offset_ptr( ptr, offset )
 #define ZP_PTR_DIFF(ptr0, ptr1)         static_cast<zp_ptrdiff_t>( static_cast<zp_uint8_t*>(ptr0) - static_cast<zp_uint8_t*>(ptr1) )
 
 #define ZP_FG_BLACK     "30"

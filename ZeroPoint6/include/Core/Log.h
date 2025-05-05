@@ -70,9 +70,24 @@ namespace zp
     class LogEntry
     {
     public:
-        LogEntry& operator<<( const char* str );
+        using value_type = LogEntry<Type>;
+        using reference_type = value_type&;
 
-        LogEntry& operator<<( zp_int32_t value );
+        auto operator<<( const char* str ) -> reference_type;
+
+        auto operator<<( String str ) -> reference_type;
+
+        auto operator<<( zp_int32_t value ) -> reference_type;
+
+        auto operator<<( zp_uint32_t value ) -> reference_type;
+
+        auto operator<<( zp_int64_t value ) -> reference_type;
+
+        auto operator<<( zp_uint64_t value ) -> reference_type;
+
+        auto operator<<( zp_float32_t value ) -> reference_type;
+
+        auto operator<<( const void* ptr ) -> reference_type;
 
         void operator<<( Log::EndToken );
 
@@ -84,6 +99,118 @@ namespace zp
 
         MutableFixedString<kLogEntryLineSize> m_log;
     };
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( const char* str ) -> reference_type
+    {
+        m_log.append( str );
+        return *this;
+    }
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( const String str ) -> reference_type
+    {
+        m_log.append( str.c_str(), str.length() );
+        return *this;
+    }
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( zp_int32_t value ) -> reference_type
+    {
+        m_log.appendFormat( "%d", value );
+        return *this;
+    }
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( zp_uint32_t value ) -> reference_type
+    {
+        m_log.appendFormat( "%u", value );
+        return *this;
+    }
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( zp_int64_t value ) -> reference_type
+    {
+        m_log.appendFormat( "%dl", value );
+        return *this;
+    }
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( zp_uint64_t value ) -> reference_type
+    {
+        m_log.appendFormat( "%ul", value );
+        return *this;
+    }
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( zp_float32_t value ) -> reference_type
+    {
+        m_log.appendFormat( "%f", value );
+        return *this;
+    }
+
+    template<LogType Type>
+    auto LogEntry<Type>::operator<<( const void* ptr ) -> reference_type
+    {
+        m_log.appendFormat( "%p", ptr );
+        return *this;
+    }
+
+    //
+    // Null LogEntry
+    //
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( const char* ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( const String ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( zp_int32_t ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( zp_uint32_t ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( zp_int64_t ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( zp_uint64_t ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( zp_float32_t ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline auto LogEntry<LogType::Null>::operator<<( const void* ) -> reference_type
+    {
+        return *this;
+    }
+
+    template<>
+    inline void LogEntry<LogType::Null>::operator<<( Log::EndToken )
+    {
+    }
 }
 
 #endif //ZP_LOG_H

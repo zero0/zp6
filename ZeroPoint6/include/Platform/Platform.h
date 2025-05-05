@@ -75,6 +75,30 @@ namespace zp
         ZP_OPEN_FILE_MODE_READ,
         ZP_OPEN_FILE_MODE_WRITE,
         ZP_OPEN_FILE_MODE_READ_WRITE,
+
+        OpenFileMode_Count
+    };
+
+    enum OpenMemoryMappedFileMode
+    {
+        ZP_OPEN_MEMORY_MAPPED_FILE_MODE_READ,
+        ZP_OPEN_MEMORY_MAPPED_FILE_MODE_WRITE,
+        ZP_OPEN_MEMORY_MAPPED_FILE_MODE_READ_WRITE,
+
+        ZP_OPEN_MEMORY_MAPPED_FILE_MODE_EXEC_READ,
+        ZP_OPEN_MEMORY_MAPPED_FILE_MODE_EXEC_WRITE,
+        ZP_OPEN_MEMORY_MAPPED_FILE_MODE_EXEC_READ_WRITE,
+
+        OpenMemoryMappedFileMode_Count
+    };
+
+    enum MapViewOfMemoryMappedFileMode
+    {
+        ZP_MAP_VIEW_OF_MEMORY_MAPPED_FILE_MODE_READ,
+        ZP_MAP_VIEW_OF_MEMORY_MAPPED_FILE_MODE_WRITE,
+        ZP_MAP_VIEW_OF_MEMORY_MAPPED_FILE_MODE_READ_WRITE,
+
+        MapViewOfMemoryMappedFileMode_Count
     };
 
     enum CreateFileMode
@@ -304,6 +328,8 @@ namespace zp
             return GetCurrentDirStr( path, Size );
         }
 
+
+
         enum class CreateDirResult
         {
             Success,
@@ -337,6 +363,36 @@ namespace zp
 
         extern zp_char8_t PathSep;
     }
+
+    // Memory Mapped Files
+    struct MemoryMappedFileHandle
+    {
+        zp_handle_t handle;
+
+        ZP_FORCEINLINE explicit operator zp_bool_t() const
+        {
+            return handle != nullptr;
+        }
+    };
+
+    struct MemoryMappedFileView
+    {
+        Memory mappedView;
+
+        Memory view;
+    };
+
+    namespace Platform
+    {
+        MemoryMappedFileHandle OpenMemoryMappedFileHandle( FileHandle fileHandle, OpenMemoryMappedFileMode openMemoryMappedFileMode, zp_size_t length );
+
+        void CloseMemoryMappedFileHandle( MemoryMappedFileHandle memoryMappedFileHandle );
+
+        MemoryMappedFileView MapViewOfMemoryMappedFile( MemoryMappedFileHandle memoryMappedFileHandle, MapViewOfMemoryMappedFileMode viewMode, zp_size_t offset, zp_size_t length );
+
+        void UnmapViewOfMemoryMappedFile( MemoryMappedFileView view );
+
+    };
 
     // Process
     namespace Platform
@@ -546,7 +602,7 @@ namespace zp
     };
 
     // Networking
-    constexpr const zp_ptr_t ZP_INVALID_SOCKET = ~0;
+    constexpr zp_ptr_t ZP_INVALID_SOCKET = ~0;
 
     struct Socket
     {
@@ -634,6 +690,13 @@ namespace zp
             return Platform::DirectoryExists( m_path.c_str() );
         }
 
+        FilePath& operator/=( const char* other )
+        {
+            m_path.append( other );
+            m_path.append( Platform::PathSep );
+            return *this;
+        }
+
         FilePath& operator/( const char* other )
         {
             m_path.append( Platform::PathSep );
@@ -652,6 +715,12 @@ namespace zp
         {
             m_path.append( Platform::PathSep );
             m_path.append( other.m_path );
+            return *this;
+        }
+
+        FilePath& operator+=( const char* other )
+        {
+            m_path.append( other );
             return *this;
         }
 
