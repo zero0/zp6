@@ -163,7 +163,7 @@ namespace zp
             zp_hash32_t hash;
         };
 
-        struct VulkanCommandQueue
+        struct VulkanCommandBuffer
         {
             VkCommandBuffer vkCommandBuffer;
             RenderQueue queue;
@@ -193,7 +193,7 @@ namespace zp
 
         struct FrameResources
         {
-            Vector<CommandQueueHandle> cachedCommandQueues;
+            Vector<CommandBufferHandle> cachedCommandBuffers;
 
             StagingBuffer stagingBuffer;
 
@@ -1063,7 +1063,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 }
             }
 
-            SizeInfo sizeInfo = GetSizeInfoFromBytes( memorySize );
+            const SizeInfo sizeInfo = GetSizeInfoFromBytes( memorySize );
             info.appendFormat( "%1.1f %s", sizeInfo.size, sizeInfo.mem );
             info.append( ' ' );
 
@@ -1741,9 +1741,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
 #pragma region Command Queue
 
-            CommandQueueHandle BeginCommandQueue( RenderQueue queue );
+            CommandBufferHandle BeginCommandBuffer( RenderQueue queue );
 
-            void EndCommandQueue( CommandQueueHandle commandQueueHandle );
+            void EndCommandBuffer( CommandBufferHandle commandBufferHandle );
 
 #pragma endregion
 
@@ -1753,7 +1753,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void ReleaseBuffer( BufferHandle bufferHandle );
 
-            void UpdateBufferData( CommandQueueHandle commandQueueHandle, BufferHandle dstBuffer, zp_size_t dstOffset, Memory srcData );
+            void UpdateBufferData( CommandBufferHandle commandBufferHandle, BufferHandle dstBuffer, zp_size_t dstOffset, Memory srcData );
 
             void CopyBufferToBuffer( const CommandCopyBuffer& cmd );
 
@@ -1765,9 +1765,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             void ReleaseTexture( TextureHandle texture );
 
-            void UpdateTextureMipData( CommandQueueHandle commandQueue, Memory srcData, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer );
+            void UpdateTextureMipData( CommandBufferHandle commandBuffer, Memory srcData, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer );
 
-            void GenerateTextureMipLevels( CommandQueueHandle commandQueue, TextureHandle texture, zp_uint32_t mipLevelFlagsToGenerate );
+            void GenerateTextureMipLevels( CommandBufferHandle commandBuffer, TextureHandle texture, zp_uint32_t mipLevelFlagsToGenerate );
 
 #pragma endregion
 
@@ -1808,9 +1808,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             void UseTexture( TextureHandle textureHandle );
 
             template<typename T>
-            void QueueDestroy( T handle )
+            void QueueDestroy( T vkHandle )
             {
-                QueueDestroy( handle, GetObjectType( handle ) );
+                QueueDestroy( vkHandle, GetObjectType( vkHandle ) );
             }
 
             void QueueDestroy( void* handle, VkObjectType objectType );
@@ -1877,7 +1877,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             //FixedArray<VkCommandPool, kMaxBufferedFrameCount> m_vkComputeCommandPools;
             //FixedArray<StagingBuffer, kMaxBufferedFrameCount> m_stagingBuffers;
             //FixedArray<VkDescriptorSet, kMaxBufferedFrameCount> m_vkBindlessDescriptorSets;
-            //FixedArray<Vector<CommandQueueHandle>, kMaxBufferedFrameCount> m_finishedCommandQueues;
+            //FixedArray<Vector<CommandBufferHandle>, kMaxBufferedFrameCount> m_finishedCommandBuffers;
 
 #if ZP_DEBUG
             VkDebugUtilsMessengerEXT m_vkDebugMessenger;
@@ -1890,8 +1890,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             Vector<DelayedDestroyInfo> m_delayedDestroyed;
 
-            Vector<VulkanCommandQueue> m_vkCommandQueues;
-            Queue<zp_uint32_t> m_vkFreeCommandQueues;
+            Vector<VulkanCommandBuffer> m_vkCommandBuffers;
+            Queue<zp_uint32_t> m_vkFreeCommandBuffers;
 
             Vector<VulkanBuffer> m_vkBuffers;
             Queue<zp_uint32_t> m_vkFreeBuffers;
@@ -1908,8 +1908,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         VulkanContext::VulkanContext()
             : m_delayedDestroyed( 8, MemoryLabels::Graphics )
-            , m_vkCommandQueues( 4, MemoryLabels::Graphics )
-            , m_vkFreeCommandQueues( 4, MemoryLabels::Graphics )
+            , m_vkCommandBuffers( 4, MemoryLabels::Graphics )
+            , m_vkFreeCommandBuffers( 4, MemoryLabels::Graphics )
             , m_vkBuffers( 16, MemoryLabels::Graphics )
             , m_vkFreeBuffers( 16, MemoryLabels::Graphics )
         {
@@ -2535,7 +2535,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         .size = memoryAllocateInfo.allocationSize,
                     };
 
-                    m_frameResources[ i ].cachedCommandQueues = Vector<CommandQueueHandle>( 8, MemoryLabels::Graphics );
+                    m_frameResources[ i ].cachedCommandBuffers = Vector<CommandBufferHandle>( 8, MemoryLabels::Graphics );
                 };
             }
 
@@ -2677,16 +2677,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             frameResources.stagingBuffer.position = 0;
 
             // clear command queues
-            for( const CommandQueueHandle& commandQueueHandle : frameResources.cachedCommandQueues )
+            for( const CommandBufferHandle& commandBufferHandle : frameResources.cachedCommandBuffers )
             {
-                VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-                ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+                VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+                ZP_ASSERT( commandBuffer.hash == commandBufferHandle.hash );
 
-                vkFreeCommandBuffers( m_vkLocalDevice, frameResources.vkCommandPools[ commandQueue.queue ], 1, &commandQueue.vkCommandBuffer );
+                vkFreeCommandBuffers( m_vkLocalDevice, frameResources.vkCommandPools[ commandBuffer.queue ], 1, &commandBuffer.vkCommandBuffer );
 
-                m_vkFreeCommandQueues.enqueueAtomic( commandQueueHandle.index );
+                m_vkFreeCommandBuffers.enqueueAtomic( commandBufferHandle.index );
             }
-            frameResources.cachedCommandQueues.clear();
+            frameResources.cachedCommandBuffers.clear();
 
             // reset command pools
             HR( vkResetCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[ ZP_RENDER_QUEUE_GRAPHICS ], 0 ) );
@@ -2700,17 +2700,17 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             ZP_PROFILE_CPU_BLOCK();
 
             FrameResources& frameResources = m_frameResources[ m_frameIndex ];
-            const Vector<CommandQueueHandle>& commandQueues = frameResources.cachedCommandQueues;
+            const Vector<CommandBufferHandle>& commandBuffers = frameResources.cachedCommandBuffers;
 
             FixedVector<VkCommandBufferSubmitInfo, 1> graphicsCommandBufferSubmitInfo {};
             FixedVector<VkCommandBufferSubmitInfo, 1> computeCommandBufferSubmitInfo {};
 
-            for( const CommandQueueHandle& commandQueueHandle : commandQueues )
+            for( const CommandBufferHandle& commandBufferHandle : commandBuffers )
             {
-                const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-                ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+                const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+                ZP_ASSERT( commandBuffer.hash == commandBufferHandle.hash );
 
-                switch( commandQueue.queue )
+                switch( commandBuffer.queue )
                 {
                     case ZP_RENDER_QUEUE_GRAPHICS:
                     {
@@ -2740,7 +2740,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                         VkCommandBuffer vkCommandBuffer = graphicsCommandBufferSubmitInfo[ 0 ].commandBuffer;
                         CmdBeginDebugLabel( vkCommandBuffer, "Execute Command Buffer", DebugLabelColor::GraphicsCommandBufferExecution );
-                        vkCmdExecuteCommands( vkCommandBuffer, 1, &commandQueue.vkCommandBuffer );
+                        vkCmdExecuteCommands( vkCommandBuffer, 1, &commandBuffer.vkCommandBuffer );
                         CmdEndDebugLabel( vkCommandBuffer );
                         break;
                     }
@@ -2774,7 +2774,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                         VkCommandBuffer vkCommandBuffer = computeCommandBufferSubmitInfo[ 0 ].commandBuffer;
                         CmdBeginDebugLabel( vkCommandBuffer, "Execute Command Buffer", DebugLabelColor::ComputeCommandBufferExecution );
-                        vkCmdExecuteCommands( vkCommandBuffer, 1, &commandQueue.vkCommandBuffer );
+                        vkCmdExecuteCommands( vkCommandBuffer, 1, &commandBuffer.vkCommandBuffer );
                         CmdEndDebugLabel( vkCommandBuffer );
                         break;
                     }
@@ -2798,27 +2798,27 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 #if 0
             // TODO: add cycling fences when queue changes
             int currentQueue = -1;
-            Vector<CommandQueueHandle>& commandQueues = m_frameResources[ m_frameIndex ].cachedCommandQueues;
-            for( CommandQueueHandle commandQueueHandle : commandQueues )
+            Vector<CommandBufferHandle>& commandBuffers = m_frameResources[ m_frameIndex ].cachedCommandBuffers;
+            for( CommandBufferHandle commandBufferHandle : commandBuffers )
             {
-                const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-                ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+                const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+                ZP_ASSERT( commandBuffer.hash == commandBufferHandle.hash );
 
-                if( commandQueue.queue != currentQueue )
+                if( commandBuffer.queue != currentQueue )
                 {
                     if( !commandBufferSubmitInfos.isEmpty() )
                     {
 
                     }
 
-                    currentQueue = commandQueue.queue;
+                    currentQueue = commandBuffer.queue;
 
                     commandBufferSubmitInfos.reset();
                 }
 
                 commandBufferSubmitInfos.pushBack( {
                     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-                    .commandBuffer = commandQueue.vkCommandBuffer,
+                    .commandBuffer = commandBuffer.vkCommandBuffer,
                 } );
             }
 #endif
@@ -2965,7 +2965,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             return allocation;
         };
 
-        CommandQueueHandle VulkanContext::BeginCommandQueue( RenderQueue queue )
+        CommandBufferHandle VulkanContext::BeginCommandBuffer( RenderQueue queue )
         {
             ZP_PROFILE_CPU_BLOCK();
 
@@ -2989,20 +2989,20 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             HR( vkBeginCommandBuffer( vkCommandBuffer, &commandBufferBeginInfo ) );
 
             zp_uint32_t index;
-            if( m_vkFreeCommandQueues.isEmpty() )
+            if( m_vkFreeCommandBuffers.isEmpty() )
             {
-                index = m_vkCommandQueues.pushBackEmptyRangeAtomic( 1, false );
+                index = m_vkCommandBuffers.pushBackEmptyRangeAtomic( 1, false );
             }
             else
             {
-                index = m_vkFreeCommandQueues.dequeue();
+                index = m_vkFreeCommandBuffers.dequeue();
             }
 
             zp_uint32_t hash = zp_fnv32_1a( m_frame );
             hash = zp_fnv32_1a( index, hash );
             hash = zp_fnv32_1a( index, queue );
 
-            m_vkCommandQueues[ index ] = {
+            m_vkCommandBuffers[ index ] = {
                 .vkCommandBuffer = vkCommandBuffer,
                 .queue = queue,
                 .hash = hash,
@@ -3011,16 +3011,16 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             return { .index = index, .hash = hash };
         }
 
-        void VulkanContext::EndCommandQueue( CommandQueueHandle commandQueueHandle )
+        void VulkanContext::EndCommandBuffer( CommandBufferHandle commandBufferHandle )
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-            ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+            ZP_ASSERT( commandBuffer.hash == commandBufferHandle.hash );
 
-            HR( vkEndCommandBuffer( commandQueue.vkCommandBuffer ) );
+            HR( vkEndCommandBuffer( commandBuffer.vkCommandBuffer ) );
 
-            m_frameResources[ m_frameIndex ].cachedCommandQueues.pushBack( commandQueueHandle );
+            m_frameResources[ m_frameIndex ].cachedCommandBuffers.pushBack( commandBufferHandle );
         }
 
         BufferHandle VulkanContext::RequestBuffer( zp_size_t size )
@@ -3131,14 +3131,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             QueueDestroy( buffer.vkBuffer );
         }
 
-        void VulkanContext::UpdateBufferData( CommandQueueHandle commandQueueHandle, BufferHandle dstBufferHandle, zp_size_t dstOffset, Memory srcData )
+        void VulkanContext::UpdateBufferData( CommandBufferHandle commandBufferHandle, BufferHandle dstBufferHandle, zp_size_t dstOffset, Memory srcData )
         {
             ZP_PROFILE_CPU_BLOCK();
 
             StagingBufferAllocation allocation = Allocate( srcData.size );
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-            ZP_ASSERT( commandQueue.hash == commandQueueHandle.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+            ZP_ASSERT( commandBuffer.hash == commandBufferHandle.hash );
 
             VulkanBuffer& dstBuffer = m_vkBuffers[ dstBufferHandle.index ];
             ZP_ASSERT( dstBuffer.hash == dstBufferHandle.hash );
@@ -3187,7 +3187,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 };
 
                 vkCmdPipelineBarrier(
-                    commandQueue.vkCommandBuffer,
+                    commandBuffer.vkCommandBuffer,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                     0,
@@ -3200,10 +3200,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 );
 #endif
 
-                //CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
-                //CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer.vkBuffer, dstBuffer.offset, allocation.size, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT );
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, 0, allocation.size, VK_ACCESS_2_TRANSFER_WRITE_BIT );
+                //CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
+                //CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, dstBuffer.vkBuffer, dstBuffer.offset, allocation.size, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, dstBuffer, 0, allocation.size, VK_ACCESS_2_TRANSFER_WRITE_BIT );
             }
 
             // copy staging vkBuffer to dst vkBuffer
@@ -3223,14 +3223,14 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .pRegions = &region,
                 };
 
-                vkCmdCopyBuffer2( commandQueue.vkCommandBuffer, &copyBufferInfo );
+                vkCmdCopyBuffer2( commandBuffer.vkCommandBuffer, &copyBufferInfo );
             }
 
             // finalize dstbuffer upload
             {
                 const zp_bool_t readOnlyBuffer = false;
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, 0, allocation.size, readOnlyBuffer ? VK_ACCESS_2_SHADER_READ_BIT : VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT );
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, dstBuffer, 0, allocation.size, readOnlyBuffer ? VK_ACCESS_2_SHADER_READ_BIT : VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
             }
         }
 
@@ -3238,8 +3238,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
             VulkanBuffer& srcBuffer = m_vkBuffers[ cmd.srcBuffer.index ];
             ZP_ASSERT( srcBuffer.hash == cmd.srcBuffer.hash );
@@ -3252,15 +3252,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             const zp_bool_t copyToSelf = cmd.srcBuffer == cmd.dstBuffer;
 
-            // transion buffer to TRANSFER READ/WRITE
+            // transition buffer to TRANSFER READ/WRITE
             if( copyToSelf )
             {
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, srcBuffer, VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT );
             }
             else
             {
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, VK_ACCESS_2_TRANSFER_READ_BIT );
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, srcBuffer, VK_ACCESS_2_TRANSFER_READ_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, dstBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT );
             }
 
             // copy region
@@ -3280,18 +3280,18 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .pRegions = &bufferCopy,
                 };
 
-                vkCmdCopyBuffer2( commandQueue.vkCommandBuffer, &copyBufferInfo );
+                vkCmdCopyBuffer2( commandBuffer.vkCommandBuffer, &copyBufferInfo );
             }
 
             // transfer back to original access
             if( copyToSelf )
             {
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, srcAccess );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, srcBuffer, srcAccess );
             }
             else
             {
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, srcBuffer, srcAccess );
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, dstBuffer, dstAccess );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, srcBuffer, srcAccess );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, dstBuffer, dstAccess );
             }
         }
 
@@ -3465,10 +3465,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             return mipSize;
         }
 
-        void VulkanContext::UpdateTextureMipData( CommandQueueHandle commandQueueHandle, const Memory srcData, TextureHandle dstTextureHandle, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
+        void VulkanContext::UpdateTextureMipData( CommandBufferHandle commandBufferHandle, const Memory srcData, TextureHandle dstTextureHandle, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
         {
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-            ZP_ASSERT( commandQueue.hash == commandQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+            ZP_ASSERT( commandBuffer.hash == commandBuffer.hash );
 
             VulkanTexture& texture = m_vkTextures[ dstTextureHandle.index ];
             ZP_ASSERT( dstTextureHandle.hash == texture.hash );
@@ -3497,7 +3497,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // transfer staging buffer
             {
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
             }
 
             const VkImageSubresourceRange subresourceRange {
@@ -3510,7 +3510,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // transition image to DST_OPT
             {
-                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange );
+                CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange );
             }
 
             // copy buffer to texture
@@ -3549,17 +3549,17 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .pRegions = &region,
                 };
 
-                vkCmdCopyBufferToImage2( commandQueue.vkCommandBuffer, &copyBufferToImageInfo );
+                vkCmdCopyBufferToImage2( commandBuffer.vkCommandBuffer, &copyBufferToImageInfo );
             }
 
             // transition to READ_ONLY_OPT
             {
-                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange );
-                CmdTransitionBufferAccess( commandQueue.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
+                CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange );
+                CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_HOST_WRITE_BIT );
             }
         }
 
-        void VulkanContext::GenerateTextureMipLevels( CommandQueueHandle commandQueueHandle, TextureHandle textureHandle, zp_uint32_t mipLevelFlagsToGenerate )
+        void VulkanContext::GenerateTextureMipLevels( CommandBufferHandle commandBufferHandle, TextureHandle textureHandle, zp_uint32_t mipLevelFlagsToGenerate )
         {
             VulkanTexture& texture = m_vkTextures[ textureHandle.index ];
             ZP_ASSERT( textureHandle.hash == texture.hash );
@@ -3570,11 +3570,11 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 return;
             }
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ commandQueueHandle.index ];
-            ZP_ASSERT( commandQueueHandle.hash == commandQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ commandBufferHandle.index ];
+            ZP_ASSERT( commandBufferHandle.hash == commandBuffer.hash );
 
             // transition all mips to DST_OPT
-            CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {
+            CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {
                 .aspectMask = texture.vkImageAspect,
                 .baseMipLevel = 0,
                 .levelCount = texture.mipCount,
@@ -3603,7 +3603,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     texture.loadedMipFlag |= 1 << dstMip;
 
                     // transition previous mip to SRC_OPT
-                    CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, {
+                    CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, {
                         .aspectMask = texture.vkImageAspect,
                         .baseMipLevel = srcMip,
                         .levelCount = 1,
@@ -3647,10 +3647,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         .filter = VK_FILTER_LINEAR,
                     };
 
-                    vkCmdBlitImage2( commandQueue.vkCommandBuffer, &blitImageInfo );
+                    vkCmdBlitImage2( commandBuffer.vkCommandBuffer, &blitImageInfo );
 
                     // transition previous mip to READ_ONLY_OPT
-                    CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, {
+                    CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, {
                         .aspectMask = texture.vkImageAspect,
                         .baseMipLevel = srcMip,
                         .levelCount = 1,
@@ -3664,7 +3664,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
 
             // transition all mips to READ_ONLY_OPT
-            CmdTransitionImageLayout( commandQueue.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, {
+            CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, {
                 .aspectMask = texture.vkImageAspect,
                 .baseMipLevel = 0,
                 .levelCount = texture.mipCount,
@@ -3715,7 +3715,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             };
             ZP_STATIC_ASSERT( kDefaultShaderStageName.length() == ShaderStage_Count );
 
-            zp_uint32_t shaderStageLoadedFlags = 1 << ZP_SHADER_STAGE_VERTEX | 1 << ZP_SHADER_STAGE_FRAGMENT;
+            const zp_uint32_t shaderStageLoadedFlags = 1 << ZP_SHADER_STAGE_VERTEX | 1 << ZP_SHADER_STAGE_FRAGMENT;
 
             FixedVector<VkPipelineShaderStageCreateInfo, ShaderStage_Count> pipelineShaderStageCreateInfos;
             FixedVector<VkPushConstantRange, ShaderStage_Count> pushConstantRanges;
@@ -4134,8 +4134,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
             // get the size of target based on attachments
             Size2Du targetSize;
@@ -4175,7 +4175,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 renderArea.size.height = targetSize.height;
             }
 
-            CmdBeginDebugLabel( commandQueue.vkCommandBuffer, "", DebugLabelColor::RenderPass );
+            CmdBeginDebugLabel( commandBuffer.vkCommandBuffer, "", DebugLabelColor::RenderPass );
 
 #if USE_DYNAMIC_RENDERING
             FixedVector<VkRenderingAttachmentInfo, 8> colorAttachmentInfos;
@@ -4274,7 +4274,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .pStencilAttachment = useDepthStencil ? nullptr : &stencilAttachment,
             };
 
-            vkCmdBeginRendering( commandQueue.vkCommandBuffer, &renderingInfo );
+            vkCmdBeginRendering( commandBuffer.vkCommandBuffer, &renderingInfo );
 #else
             FixedVector<VkClearValue, 8> clearValues;
             clearValues.pushBack( {
@@ -4304,7 +4304,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .contents = VK_SUBPASS_CONTENTS_INLINE,
             };
 
-            vkCmdBeginRenderPass2( commandQueue.vkCommandBuffer, &renderPassBeginInfo, &subpassBeginInfo );
+            vkCmdBeginRenderPass2( commandBuffer.vkCommandBuffer, &renderPassBeginInfo, &subpassBeginInfo );
 #endif
         }
 
@@ -4312,8 +4312,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
 #if USE_DYNAMIC_RENDERING
             const FixedArray memoryBarriers {
@@ -4333,9 +4333,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .pMemoryBarriers = memoryBarriers.data(),
             };
 
-            CmdMarkDebugLabel( commandQueue.vkCommandBuffer, "", DebugLabelColor::RenderPass );
+            CmdMarkDebugLabel( commandBuffer.vkCommandBuffer, "", DebugLabelColor::RenderPass );
 
-            vkCmdPipelineBarrier2( commandQueue.vkCommandBuffer, &dependencyInfo );
+            vkCmdPipelineBarrier2( commandBuffer.vkCommandBuffer, &dependencyInfo );
 #else
             const VkSubpassBeginInfo subpassBeginInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO,
@@ -4346,7 +4346,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_END_INFO,
             };
 
-            vkCmdNextSubpass2( commandQueue.vkCommandBuffer, &subpassBeginInfo, &subpassEndInfo );
+            vkCmdNextSubpass2( commandBuffer.vkCommandBuffer, &subpassBeginInfo, &subpassEndInfo );
 #endif
         }
 
@@ -4354,20 +4354,20 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
 #if USE_DYNAMIC_RENDERING
-            vkCmdEndRendering( commandQueue.vkCommandBuffer );
+            vkCmdEndRendering( commandBuffer.vkCommandBuffer );
 #else
             const VkSubpassEndInfo subpassEndInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_END_INFO,
             };
 
-            vkCmdEndRenderPass2( commandQueue.vkCommandBuffer, &subpassEndInfo );
+            vkCmdEndRenderPass2( commandBuffer.vkCommandBuffer, &subpassEndInfo );
 #endif
 
-            CmdEndDebugLabel( commandQueue.vkCommandBuffer );
+            CmdEndDebugLabel( commandBuffer.vkCommandBuffer );
         }
 
         void VulkanContext::Dispatch( const CommandDispatch& cmd )
@@ -4375,10 +4375,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             ZP_PROFILE_CPU_BLOCK();
             ZP_PROFILE_GPU_STATS_DISPATCH( 1 );
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
-            vkCmdDispatch( commandQueue.vkCommandBuffer, cmd.groupCountX, cmd.groupCountY, cmd.groupCountZ );
+            vkCmdDispatch( commandBuffer.vkCommandBuffer, cmd.groupCountX, cmd.groupCountY, cmd.groupCountZ );
         }
 
         void VulkanContext::DispatchIndirect( const CommandDispatchIndirect& cmd )
@@ -4386,13 +4386,13 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             ZP_PROFILE_CPU_BLOCK();
             ZP_PROFILE_GPU_STATS_DISPATCH( 1 );
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
             const VulkanBuffer& indirectBuffer = m_vkBuffers[ cmd.buffer.index ];
             ZP_ASSERT( indirectBuffer.hash == cmd.buffer.hash );
 
-            vkCmdDispatchIndirect( commandQueue.vkCommandBuffer, indirectBuffer.vkBuffer, indirectBuffer.offset + cmd.offset );
+            vkCmdDispatchIndirect( commandBuffer.vkCommandBuffer, indirectBuffer.vkBuffer, indirectBuffer.offset + cmd.offset );
         }
 
         void VulkanContext::Draw( const CommandDraw& cmd )
@@ -4400,18 +4400,18 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             ZP_PROFILE_CPU_BLOCK();
             ZP_PROFILE_GPU_STATS_DRAW( vertexCount, instanceCount );
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
-            vkCmdDraw( commandQueue.vkCommandBuffer, cmd.vertexCount, cmd.instanceCount, cmd.firstVertex, cmd.firstInstance );
+            vkCmdDraw( commandBuffer.vkCommandBuffer, cmd.vertexCount, cmd.instanceCount, cmd.firstVertex, cmd.firstInstance );
         }
 
         void VulkanContext::Blit( const CommandBlit& cmd )
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            const VulkanCommandQueue& commandQueue = m_vkCommandQueues[ cmd.cmdQueue.index ];
-            ZP_ASSERT( commandQueue.hash == cmd.cmdQueue.hash );
+            const VulkanCommandBuffer& commandBuffer = m_vkCommandBuffers[ cmd.commandBuffer.index ];
+            ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
             VulkanTexture& srcTexture = m_vkTextures[ cmd.srcTexture.index ];
             ZP_ASSERT( srcTexture.hash == cmd.srcTexture.hash );
@@ -4441,8 +4441,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             // transition images to proper transition layouts for blit
             {
-                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, srcTexture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcImageSubresourceRange );
-                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, dstTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstImageSubresourceRange );
+                CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, srcTexture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcImageSubresourceRange );
+                CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, dstTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstImageSubresourceRange );
             }
 
             // blit
@@ -4504,13 +4504,13 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     .filter = VK_FILTER_LINEAR,
                 };
 
-                vkCmdBlitImage2( commandQueue.vkCommandBuffer, &blitImageInfo );
+                vkCmdBlitImage2( commandBuffer.vkCommandBuffer, &blitImageInfo );
             }
 
             // transition images back to what layout they were
             {
-                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, srcTexture, srcLayout, srcImageSubresourceRange );
-                CmdTransitionImageLayout( commandQueue.vkCommandBuffer, dstTexture, dstLayout, dstImageSubresourceRange );
+                CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, srcTexture, srcLayout, srcImageSubresourceRange );
+                CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, dstTexture, dstLayout, dstImageSubresourceRange );
             }
         }
 
@@ -4825,7 +4825,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const VkPresentModeKHR presentMode = ChooseSwapChainPresentMode( presentModes, m_vSync );
 
             // TODO: make configurable?
-            const FixedArray<VkSurfaceFormatKHR, 2> preferredSurfaceFormats {
+            const FixedArray preferredSurfaceFormats {
                 VkSurfaceFormatKHR { .format = VK_FORMAT_B8G8R8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
                 VkSurfaceFormatKHR { .format = VK_FORMAT_R8G8B8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
             };
@@ -4848,7 +4848,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             const Queues& queues = m_context->GetQueues();
             const bool useConcurrentSharingMode = queues.graphics.familyIndex != queues.present.familyIndex;
 
-            const FixedArray<zp_uint32_t, 2> indices {
+            const FixedArray indices {
                 queues.graphics.familyIndex,
                 queues.present.familyIndex,
             };
@@ -4991,7 +4991,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
                 HR( vkCreateImageView( m_context->GetLocalDevice(), &imageViewCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageViews[ i ] ) );
 
-                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainImageViews[ i ], "Swapchain Image View %d", i );
+                SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainImageViews[ i ], "Swapchain ImageView %d", i );
 
 #if !USE_DYNAMIC_RENDERING
                 //
@@ -5054,12 +5054,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
             {
-                VkImageView& swapChainImageView = m_vkSwapchainImageViews[ i ];
-                vkDestroyImageView( m_context->GetLocalDevice(), swapChainImageView, m_context->GetAllocationCallbacks() );
-                swapChainImageView = VK_NULL_HANDLE;
+                VkImageView swapchainImageView = m_vkSwapchainImageViews[ i ];
+                m_vkSwapchainImageViews[ i ] = VK_NULL_HANDLE;
+
+                //vkDestroyImageView( m_context->GetLocalDevice(), swapChainImageView, m_context->GetAllocationCallbacks() );
+                m_context->QueueDestroy( swapchainImageView );
             }
 
-            vkDestroySwapchainKHR( m_context->GetLocalDevice(), m_vkSwapchain, m_context->GetAllocationCallbacks() );
+            m_context->QueueDestroy( m_vkSwapchain );
+            //vkDestroySwapchainKHR( m_context->GetLocalDevice(), m_vkSwapchain, m_context->GetAllocationCallbacks() );
             m_vkSwapchain = VK_NULL_HANDLE;
         }
     }
@@ -5218,7 +5221,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             DataStreamReader dataStreamReader( cmdBuffer->Data() );
 
-            FixedArray<CommandQueueHandle, 8> commandQueueMap;
+            FixedArray<CommandBufferHandle, 8> commandBufferMap;
 
             while( !dataStreamReader.end() )
             {
@@ -5237,7 +5240,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         const Memory srcData = dataStreamReader.readMemory( updateBufferData.srcLength );
                         dataStreamReader.readAlignment( 8 );
 
-                        m_context.UpdateBufferData( updateBufferData.cmdQueue, updateBufferData.dstBuffer, updateBufferData.dstOffset, srcData );
+                        m_context.UpdateBufferData( updateBufferData.commandBuffer, updateBufferData.dstBuffer, updateBufferData.dstOffset, srcData );
                     }
                     break;
 
@@ -5246,7 +5249,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         CommandUpdateBufferDataExternal updateBufferDataExternal {};
                         dataStreamReader.read( updateBufferDataExternal );
 
-                        m_context.UpdateBufferData( updateBufferDataExternal.cmdQueue, updateBufferDataExternal.dstBuffer, updateBufferDataExternal.dstOffset, updateBufferDataExternal.srcData );
+                        m_context.UpdateBufferData( updateBufferDataExternal.commandBuffer, updateBufferDataExternal.dstBuffer, updateBufferDataExternal.dstOffset, updateBufferDataExternal.srcData );
                     }
                     break;
 
@@ -5263,7 +5266,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                         CommandUpdateTextureData updateTextureData {};
                         dataStreamReader.read( updateTextureData );
 
-                        m_context.UpdateTextureMipData( updateTextureData.cmdQueue, updateTextureData.srcData, updateTextureData.dstTexture, updateTextureData.dstMipLevel, updateTextureData.dstArrayLayer );
+                        m_context.UpdateTextureMipData( updateTextureData.commandBuffer, updateTextureData.srcData, updateTextureData.dstTexture, updateTextureData.dstMipLevel, updateTextureData.dstArrayLayer );
                     }
                     break;
 
@@ -5292,6 +5295,24 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     }
                     break;
 
+                    case CommandType::DrawIndexed:
+                    {
+                        const CommandDrawIndexed* drawIndexed = dataStreamReader.readPtr<CommandDrawIndexed>();
+                    }
+                    break;
+
+                    case CommandType::DrawIndirect:
+                    {
+                        const CommandDrawIndirect* drawIndexed = dataStreamReader.readPtr<CommandDrawIndirect>();
+                    }
+                    break;
+
+                    case CommandType::DrawIndexedIndirect:
+                    {
+                        const CommandDrawIndexedIndirect* drawIndexed = dataStreamReader.readPtr<CommandDrawIndexedIndirect>();
+                    }
+                    break;
+
                     case CommandType::Blit:
                     {
                         const CommandBlit* blit = dataStreamReader.readPtr<CommandBlit>();
@@ -5300,27 +5321,27 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                     }
                     break;
 
-                    case CommandType::BeginCommandQueue:
+                    case CommandType::BeginCommandBuffer:
                     {
-                        CommandBeginCommandQueue beginCommandQueue {};
-                        dataStreamReader.read( beginCommandQueue );
+                        CommandBeginCommandBuffer beginCommandBuffer {};
+                        dataStreamReader.read( beginCommandBuffer );
 
-                        ZP_ASSERT( !commandQueueMap[ beginCommandQueue.cmdQueue.index ].valid() );
-                        commandQueueMap[ beginCommandQueue.cmdQueue.index ] = m_context.BeginCommandQueue( beginCommandQueue.queue );
+                        ZP_ASSERT( !commandBufferMap[ beginCommandBuffer.commandBuffer.index ].valid() );
+                        commandBufferMap[ beginCommandBuffer.commandBuffer.index ] = m_context.BeginCommandBuffer( beginCommandBuffer.queue );
                     }
                     break;
 
-                    case CommandType::SubmitCommandQueue:
+                    case CommandType::SubmitCommandBuffer:
                     {
-                        CommandSubmitCommandQueue submitCommandQueue {};
-                        dataStreamReader.read( submitCommandQueue );
+                        CommandSubmitCommandBuffer submitCommandBuffer {};
+                        dataStreamReader.read( submitCommandBuffer );
 
-                        const CommandQueueHandle& cmdQueue = commandQueueMap[ submitCommandQueue.cmdQueue.index ];
-                        ZP_ASSERT( cmdQueue.valid() );
+                        const CommandBufferHandle& commandBuffer = commandBufferMap[ submitCommandBuffer.commandBuffer.index ];
+                        ZP_ASSERT( commandBuffer.valid() );
 
-                        m_context.EndCommandQueue( cmdQueue );
+                        m_context.EndCommandBuffer( commandBuffer );
 
-                        commandQueueMap[ submitCommandQueue.cmdQueue.index ] = {};
+                        commandBufferMap[ submitCommandBuffer.commandBuffer.index ] = {};
                     };
                         break;
 
@@ -5397,8 +5418,8 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .computeFamily = VK_QUEUE_FAMILY_IGNORED,
             .presentFamily = VK_QUEUE_FAMILY_IGNORED
         }
-        //, m_commandQueueCount( 0 )
-        //, m_commandQueues( 4, memoryLabel )
+        //, m_commandBufferCount( 0 )
+        //, m_commandBuffers( 4, memoryLabel )
         , m_currentFrameIndex( 0 )
         , memoryLabel( memoryLabel )
     {
@@ -6092,9 +6113,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             perFrameData.perFrameStagingBuffer.graphicsBuffer = m_stagingBuffer.splitBuffer( perFrameStagingBufferOffset, perFrameStagingBufferSize );
             perFrameData.perFrameStagingBuffer.allocated = 0;
 
-            perFrameData.commandQueueCount = 0;
-            perFrameData.commandQueueCapacity = 0;
-            perFrameData.commandQueues = nullptr;
+            perFrameData.commandBufferCount = 0;
+            perFrameData.commandBufferCapacity = 0;
+            perFrameData.commandBuffers = nullptr;
 
             perFrameStagingBufferOffset += perFrameStagingBufferSize;
 
@@ -6118,19 +6139,19 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             vkDestroyQueryPool( m_vkLocalDevice, perFrameData.vkPipelineStatisticsQueryPool, &m_vkAllocationCallbacks );
             vkDestroyQueryPool( m_vkLocalDevice, perFrameData.vkTimestampQueryPool, &m_vkAllocationCallbacks );
 #endif
-            if( perFrameData.commandQueues )
+            if( perFrameData.commandBuffers )
             {
-                for( zp_size_t i = 0; i < perFrameData.commandQueueCapacity; ++i )
+                for( zp_size_t i = 0; i < perFrameData.commandBufferCapacity; ++i )
                 {
-                    if( perFrameData.commandQueues && perFrameData.commandQueues[ i ].commandBuffer )
+                    if( perFrameData.commandBuffers && perFrameData.commandBuffers[ i ].commandBuffer )
                     {
-                        const auto commandBuffer = static_cast<VkCommandBuffer>( perFrameData.commandQueues[ i ].commandBuffer );
-                        const auto commandPool = static_cast<VkCommandPool>( perFrameData.commandQueues[ i ].commandBufferPool );
+                        const auto commandBuffer = static_cast<VkCommandBuffer>( perFrameData.commandBuffers[ i ].commandBuffer );
+                        const auto commandPool = static_cast<VkCommandPool>( perFrameData.commandBuffers[ i ].commandBufferPool );
                         vkFreeCommandBuffers( m_vkLocalDevice, commandPool, 1, &commandBuffer );
                     }
                 }
 
-                ZP_FREE( memoryLabel, perFrameData.commandQueues );
+                ZP_FREE( memoryLabel, perFrameData.commandBuffers );
             }
 
             perFrameData.vkSwapChainAcquireSemaphore = VK_NULL_HANDLE;
@@ -6143,9 +6164,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             perFrameData.vkTimestampQueryPool = VK_NULL_HANDLE;
 #endif
             perFrameData.perFrameStagingBuffer = {};
-            perFrameData.commandQueueCount = 0;
-            perFrameData.commandQueueCapacity = 0;
-            perFrameData.commandQueues = nullptr;
+            perFrameData.commandBufferCount = 0;
+            perFrameData.commandBufferCapacity = 0;
+            perFrameData.commandBuffers = nullptr;
         }
     }
 
@@ -6159,9 +6180,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
         processDelayedDestroy();
 
-        for( zp_size_t i = 0; i < currentFrameData.commandQueueCount; ++i )
+        for( zp_size_t i = 0; i < currentFrameData.commandBufferCount; ++i )
         {
-            HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ i ].commandBuffer ), 0 ) );
+            HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>( currentFrameData.commandBuffers[ i ].commandBuffer ), 0 ) );
         }
 
         const VkResult result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, UINT64_MAX, currentFrameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &currentFrameData.swapChainImageIndex );
@@ -6181,17 +6202,17 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         {
             PerFrameData& prevFrameData = getFrameData( prevFrame );
 
-            if( prevFrameData.commandQueueCount > 0 )
+            if( prevFrameData.commandBufferCount > 0 )
             {
                 zp_uint64_t timestamps[16] {};
                 VkResult r;
 
-                r = vkGetQueryPoolResults( m_vkLocalDevice, prevFrameData.vkTimestampQueryPool, 0, prevFrameData.commandQueueCount * 2, sizeof( timestamps ), timestamps, sizeof( zp_uint64_t ), VK_QUERY_RESULT_64_BIT );
+                r = vkGetQueryPoolResults( m_vkLocalDevice, prevFrameData.vkTimestampQueryPool, 0, prevFrameData.commandBufferCount * 2, sizeof( timestamps ), timestamps, sizeof( zp_uint64_t ), VK_QUERY_RESULT_64_BIT );
                 if( r == VK_SUCCESS )
                 {
                     zp_uint64_t totalTime = 0;
 
-                    for( zp_int32_t i = 0; i < ( prevFrameData.commandQueueCount * 2 ); i += 2 )
+                    for( zp_int32_t i = 0; i < ( prevFrameData.commandBufferCount * 2 ); i += 2 )
                     {
                         totalTime += timestamps[ i + 1 ] - timestamps[ i ];
                     }
@@ -6203,7 +6224,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 #endif
 
         currentFrameData.perFrameStagingBuffer.allocated = 0;
-        currentFrameData.commandQueueCount = 0;
+        currentFrameData.commandBufferCount = 0;
     }
 
     void VulkanGraphicsDevice::submit()
@@ -6213,9 +6234,9 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const PerFrameData& currentFrameData = getCurrentFrameData();
 
         // if there are no command queues, add the default swapchain render pass
-        if( currentFrameData.commandQueueCount == 0 )
+        if( currentFrameData.commandBufferCount == 0 )
         {
-            auto cmd = requestCommandQueue( ZP_RENDER_QUEUE_GRAPHICS );
+            auto cmd = requestCommandBuffer( ZP_RENDER_QUEUE_GRAPHICS );
 
             beginRenderPass( nullptr, cmd );
 
@@ -6223,15 +6244,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         }
 
         // release any open command queues
-        if( currentFrameData.commandQueueCount > 0 )
+        if( currentFrameData.commandBufferCount > 0 )
         {
-            const zp_size_t preCommandQueueIndex = currentFrameData.commandQueueCount - 1;
-            releaseCommandQueue( currentFrameData.commandQueues + preCommandQueueIndex );
+            const zp_size_t preCommandBufferIndex = currentFrameData.commandBufferCount - 1;
+            releaseCommandBuffer( currentFrameData.commandBuffers + preCommandBufferIndex );
 
 #if ZP_USE_PROFILER
-    //vkCmdWriteTimestamp( dstbuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, currentFrameData.vkTimestampQueryPool, preCommandQueueIndex * 2 + 1 );
+    //vkCmdWriteTimestamp( dstbuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, currentFrameData.vkTimestampQueryPool, preCommandBufferIndex * 2 + 1 );
     //vkCmdEndQuery( dstbuffer, currentFrameData.vkPipelineStatisticsQueryPool, 0 );
-    //vkCmdResetQueryPool( static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ preCommandQueueIndex ].commandBuffer ), currentFrameData.vkTimestampQueryPool, commandQueueCount * 2 + 2, 16 - (commandQueueCount * 2 + 2));
+    //vkCmdResetQueryPool( static_cast<VkCommandBuffer>( currentFrameData.commandBuffers[ preCommandBufferIndex ].commandBuffer ), currentFrameData.vkTimestampQueryPool, commandBufferCount * 2 + 2, 16 - (commandBufferCount * 2 + 2));
 #endif
             //HR( vkEndCommandBuffer( dstbuffer ) );
         }
@@ -6240,10 +6261,10 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         const VkSemaphore waitSemaphores[] { currentFrameData.vkSwapChainAcquireSemaphore };
         ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( waitStages ) == ZP_ARRAY_SIZE( waitSemaphores ) );
 
-        VkCommandBuffer graphicsQueueCommandBuffers[currentFrameData.commandQueueCount];
-        for( zp_size_t i = 0; i < currentFrameData.commandQueueCount; ++i )
+        VkCommandBuffer graphicsQueueCommandBuffers[currentFrameData.commandBufferCount];
+        for( zp_size_t i = 0; i < currentFrameData.commandBufferCount; ++i )
         {
-            graphicsQueueCommandBuffers[ i ] = static_cast<VkCommandBuffer>( currentFrameData.commandQueues[ i ].commandBuffer );
+            graphicsQueueCommandBuffers[ i ] = static_cast<VkCommandBuffer>( currentFrameData.commandBuffers[ i ].commandBuffer );
         }
 
         VkSemaphore signalSemaphores[] { currentFrameData.vkRenderFinishedSemaphore };
@@ -6252,7 +6273,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .waitSemaphoreCount = ZP_ARRAY_SIZE( waitSemaphores ),
             .pWaitSemaphores = waitSemaphores,
             .pWaitDstStageMask = waitStages,
-            .commandBufferCount = static_cast<uint32_t>( currentFrameData.commandQueueCount ),
+            .commandBufferCount = static_cast<uint32_t>( currentFrameData.commandBufferCount ),
             .pCommandBuffers = graphicsQueueCommandBuffers,
             .signalSemaphoreCount = ZP_ARRAY_SIZE( signalSemaphores ),
             .pSignalSemaphores = signalSemaphores,
@@ -6991,48 +7012,48 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         vkUnmapMemory( m_vkLocalDevice, vkDeviceMemory );
     }
 
-    CommandQueue* VulkanGraphicsDevice::requestCommandQueue( RenderQueue queue )
+    CommandBuffer* VulkanGraphicsDevice::requestCommandBuffer( RenderQueue queue )
     {
         // TODO: remove when other queues are supported
         queue = ZP_RENDER_QUEUE_GRAPHICS;
 
         PerFrameData& frameData = getCurrentFrameData();
 
-        const zp_size_t commandQueueIndex = Atomic::IncrementSizeT( &frameData.commandQueueCount ) - 1;
-        if( commandQueueIndex == frameData.commandQueueCapacity )
+        const zp_size_t commandBufferIndex = Atomic::IncrementSizeT( &frameData.commandBufferCount ) - 1;
+        if( commandBufferIndex == frameData.commandBufferCapacity )
         {
-            const zp_size_t newCommandQueueCapacity = frameData.commandQueueCapacity == 0 ? 4 : frameData.commandQueueCapacity * 2;
+            const zp_size_t newCommandBufferCapacity = frameData.commandBufferCapacity == 0 ? 4 : frameData.commandBufferCapacity * 2;
 
-            auto* newCommandQueues = ZP_MALLOC_T_ARRAY( memoryLabel, CommandQueue, newCommandQueueCapacity );
-            zp_zero_memory_array( newCommandQueues, newCommandQueueCapacity );
+            auto* newCommandBuffers = ZP_MALLOC_T_ARRAY( memoryLabel, CommandBuffer, newCommandBufferCapacity );
+            zp_zero_memory_array( newCommandBuffers, newCommandBufferCapacity );
 
-            if( frameData.commandQueues )
+            if( frameData.commandBuffers )
             {
-                for( zp_size_t i = 0; i < frameData.commandQueueCount; ++i )
+                for( zp_size_t i = 0; i < frameData.commandBufferCount; ++i )
                 {
-                    newCommandQueues[ i ] = zp_move( frameData.commandQueues[ i ] );
+                    newCommandBuffers[ i ] = zp_move( frameData.commandBuffers[ i ] );
                 }
 
-                ZP_FREE( memoryLabel, frameData.commandQueues );
-                frameData.commandQueues = nullptr;
+                ZP_FREE( memoryLabel, frameData.commandBuffers );
+                frameData.commandBuffers = nullptr;
             }
 
-            frameData.commandQueues = newCommandQueues;
-            frameData.commandQueueCapacity = newCommandQueueCapacity;
+            frameData.commandBuffers = newCommandBuffers;
+            frameData.commandBufferCapacity = newCommandBufferCapacity;
         }
 
         if( false )
         {
-            const zp_size_t prevCommandQueueIndex = commandQueueIndex - 1;
-            CommandQueue& prevCommandQueue = frameData.commandQueues[ prevCommandQueueIndex ];
-            VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( prevCommandQueue.commandBuffer );
+            const zp_size_t prevCommandBufferIndex = commandBufferIndex - 1;
+            CommandBuffer& prevCommandBuffer = frameData.commandBuffers[ prevCommandBufferIndex ];
+            VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( prevCommandBuffer.commandBuffer );
 
             if( commandBuffer )
             {
 #if ZP_USE_PROFILER
-                if( prevCommandQueue.queue != ZP_RENDER_QUEUE_TRANSFER )
+                if( prevCommandBuffer.queue != ZP_RENDER_QUEUE_TRANSFER )
                 {
-                    //vkCmdWriteTimestamp( commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, prevCommandQueueIndex * 2 + 1 );
+                    //vkCmdWriteTimestamp( commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameData.vkTimestampQueryPool, prevCommandBufferIndex * 2 + 1 );
                     //vkCmdEndQuery( commandBuffer, frameData.vkPipelineStatisticsQueryPool, 0 );
                 }
 #endif
@@ -7040,24 +7061,24 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
         }
 
-        CommandQueue* commandQueue = &frameData.commandQueues[ commandQueueIndex ];
-        if( commandQueue->commandBuffer != VK_NULL_HANDLE && commandQueue->queue != queue )
+        CommandBuffer* commandBuffer = &frameData.commandBuffers[ commandBufferIndex ];
+        if( commandBuffer->commandBuffer != VK_NULL_HANDLE && commandBuffer->queue != queue )
         {
-            auto commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
-            auto commandPool = static_cast<VkCommandPool>( commandQueue->commandBufferPool );
+            auto commandBuffer = static_cast<VkCommandBuffer>( commandBuffer->commandBuffer );
+            auto commandPool = static_cast<VkCommandPool>( commandBuffer->commandBufferPool );
             vkFreeCommandBuffers( m_vkLocalDevice, commandPool, 1, &commandBuffer );
 
-            commandQueue->commandBuffer = nullptr;
-            commandQueue->commandBufferPool = nullptr;
+            commandBuffer->commandBuffer = nullptr;
+            commandBuffer->commandBufferPool = nullptr;
         }
 
-        commandQueue->queue = queue;
-        commandQueue->frameCount = m_currentFrameIndex;
+        commandBuffer->queue = queue;
+        commandBuffer->frameCount = m_currentFrameIndex;
 
-        if( commandQueue->commandBuffer == nullptr )
+        if( commandBuffer->commandBuffer == nullptr )
         {
-            VkCommandPool commandPool = getCommandPool( commandQueue );
-            commandQueue->commandBufferPool = commandPool;
+            VkCommandPool commandPool = getCommandPool( commandBuffer );
+            commandBuffer->commandBufferPool = commandPool;
 
             VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -7068,7 +7089,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
 
             VkCommandBuffer commandBuffer;
             HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &commandBuffer ) );
-            commandQueue->commandBuffer = commandBuffer;
+            commandBuffer->commandBuffer = commandBuffer;
 
 #if ZP_DEBUG
             const char* kQueueNames[] {
@@ -7078,7 +7099,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
                 "Present",
             };
 
-            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_BUFFER, commandBuffer, "%s Command Buffer #%d (%d)", kQueueNames[ queue ], commandQueueIndex, Platform::GetCurrentThreadId() );
+            SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_COMMAND_BUFFER, commandBuffer, "%s Command Buffer #%d (%d)", kQueueNames[ queue ], commandBufferIndex, Platform::GetCurrentThreadId() );
 #endif
         }
 
@@ -7088,37 +7109,37 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .pInheritanceInfo = nullptr,
         };
 
-        VkCommandBuffer dstbuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
+        VkCommandBuffer dstbuffer = static_cast<VkCommandBuffer>( commandBuffer->commandBuffer );
         HR( vkBeginCommandBuffer( dstbuffer, &commandBufferBeginInfo ) );
 
 #if ZP_USE_PROFILER
         if( queue != ZP_RENDER_QUEUE_TRANSFER )
         {
-            //vkCmdResetQueryPool( dstbuffer, frameData.vkTimestampQueryPool, commandQueueIndex * 2, 2 );
-            //vkCmdWriteTimestamp( dstbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, frameData.vkTimestampQueryPool, commandQueueIndex * 2 );
+            //vkCmdResetQueryPool( dstbuffer, frameData.vkTimestampQueryPool, commandBufferIndex * 2, 2 );
+            //vkCmdWriteTimestamp( dstbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, frameData.vkTimestampQueryPool, commandBufferIndex * 2 );
         }
 
         //vkCmdBeginQuery( dstbuffer, frameData.vkPipelineStatisticsQueryPool, 0, 0 );
 #endif
 
-        return commandQueue;
+        return commandBuffer;
     }
 
-    CommandQueue* VulkanGraphicsDevice::requestCommandQueue( CommandQueue* parentCommandQueue )
+    CommandBuffer* VulkanGraphicsDevice::requestCommandBuffer( CommandBuffer* parentCommandBuffer )
     {
         return nullptr;
     }
 
-    void VulkanGraphicsDevice::releaseCommandQueue( CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::releaseCommandBuffer( CommandBuffer* commandBuffer )
     {
-        if( commandQueue )
+        if( commandBuffer )
         {
-            VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
+            VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandBuffer->commandBuffer );
             HR( vkEndCommandBuffer( commandBuffer ) );
         }
     }
 
-    void VulkanGraphicsDevice::beginRenderPass( const RenderPass* renderPass, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::beginRenderPass( const RenderPass* renderPass, CommandBuffer* commandBuffer )
     {
         VkClearValue clearValues[] {
             {
@@ -7126,7 +7147,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
         };
 
-        PerFrameData& frameData = getFrameData( commandQueue->frameCount );
+        PerFrameData& frameData = getFrameData( commandBuffer->frameCount );
         VkRenderPassBeginInfo renderPassBeginInfo {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .renderPass = renderPass ? static_cast<VkRenderPass>( renderPass->internalRenderPass ) : m_swapchainData.vkSwapchainDefaultRenderPass,
@@ -7139,34 +7160,34 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             .pClearValues = clearValues,
         };
 
-        vkCmdBeginRenderPass( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
+        vkCmdBeginRenderPass( static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
     }
 
-    void VulkanGraphicsDevice::nextSubpass( CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::nextSubpass( CommandBuffer* commandBuffer )
     {
-        vkCmdNextSubpass( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), VK_SUBPASS_CONTENTS_INLINE );
+        vkCmdNextSubpass( static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), VK_SUBPASS_CONTENTS_INLINE );
     }
 
-    void VulkanGraphicsDevice::endRenderPass( CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::endRenderPass( CommandBuffer* commandBuffer )
     {
-        vkCmdEndRenderPass( static_cast<VkCommandBuffer>(commandQueue->commandBuffer) );
+        vkCmdEndRenderPass( static_cast<VkCommandBuffer>(commandBuffer->commandBuffer) );
     }
 
-    void VulkanGraphicsDevice::bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::bindPipeline( const GraphicsPipelineState* graphicsPipelineState, PipelineBindPoint bindPoint, CommandBuffer* commandBuffer )
     {
-        vkCmdBindPipeline( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), Convert( bindPoint ), static_cast<VkPipeline>(graphicsPipelineState->pipelineState) );
+        vkCmdBindPipeline( static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), Convert( bindPoint ), static_cast<VkPipeline>(graphicsPipelineState->pipelineState) );
     }
 
-    void VulkanGraphicsDevice::bindIndexBuffer( const GraphicsBuffer* graphicsBuffer, const IndexBufferFormat indexBufferFormat, zp_size_t offset, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::bindIndexBuffer( const GraphicsBuffer* graphicsBuffer, const IndexBufferFormat indexBufferFormat, zp_size_t offset, CommandBuffer* commandBuffer )
     {
         ZP_ASSERT( graphicsBuffer->usageFlags & ZP_GRAPHICS_BUFFER_USAGE_INDEX_BUFFER );
 
         const VkIndexType indexType = Convert( indexBufferFormat );
         const VkDeviceSize bufferOffset = graphicsBuffer->offset + offset;
-        vkCmdBindIndexBuffer( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), static_cast<VkBuffer>( graphicsBuffer->dstbuffer), bufferOffset, indexType );
+        vkCmdBindIndexBuffer( static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), static_cast<VkBuffer>( graphicsBuffer->dstbuffer), bufferOffset, indexType );
     }
 
-    void VulkanGraphicsDevice::bindVertexBuffers( zp_uint32_t firstBinding, zp_uint32_t bindingCount, const GraphicsBuffer** graphicsBuffers, zp_size_t* offsets, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::bindVertexBuffers( zp_uint32_t firstBinding, zp_uint32_t bindingCount, const GraphicsBuffer** graphicsBuffers, zp_size_t* offsets, CommandBuffer* commandBuffer )
     {
         VkBuffer vertexBuffers[bindingCount];
         VkDeviceSize vertexBufferOffsets[bindingCount];
@@ -7177,15 +7198,15 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             vertexBufferOffsets[ i ] = graphicsBuffers[ i ]->offset + ( offsets == nullptr ? 0 : offsets[ i ] );
         }
 
-        vkCmdBindVertexBuffers( static_cast<VkCommandBuffer>(commandQueue->commandBuffer), firstBinding, bindingCount, vertexBuffers, vertexBufferOffsets );
+        vkCmdBindVertexBuffers( static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), firstBinding, bindingCount, vertexBuffers, vertexBufferOffsets );
     }
 
-    void VulkanGraphicsDevice::updateTexture( const TextureUpdateDesc* textureUpdateDesc, const Texture* dstTexture, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::updateTexture( const TextureUpdateDesc* textureUpdateDesc, const Texture* dstTexture, CommandBuffer* commandBuffer )
     {
-        PerFrameData& frameData = getFrameData( commandQueue->frameCount );
+        PerFrameData& frameData = getFrameData( commandBuffer->frameCount );
         GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( textureUpdateDesc->textureDataSize );
 
-        auto commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
+        auto commandBuffer = static_cast<VkCommandBuffer>( commandBuffer->commandBuffer );
         const zp_uint32_t mipCount = textureUpdateDesc->maxMipLevel - textureUpdateDesc->minMipLevel;
 
         // copy data to staging dstbuffer
@@ -7307,12 +7328,12 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         }
     }
 
-    void VulkanGraphicsDevice::updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc, const GraphicsBuffer* dstGraphicsBuffer, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::updateBuffer( const GraphicsBufferUpdateDesc* graphicsBufferUpdateDesc, const GraphicsBuffer* dstGraphicsBuffer, CommandBuffer* commandBuffer )
     {
-        PerFrameData& frameData = getFrameData( commandQueue->frameCount );
+        PerFrameData& frameData = getFrameData( commandBuffer->frameCount );
         GraphicsBufferAllocation allocation = frameData.perFrameStagingBuffer.allocate( graphicsBufferUpdateDesc->size );
 
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandQueue->commandBuffer );
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>( commandBuffer->commandBuffer );
 
         // copy data to staging dstbuffer
         {
@@ -7416,46 +7437,46 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         }
     }
 
-    void VulkanGraphicsDevice::draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::draw( zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance, CommandBuffer* commandBuffer )
     {
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
         vkCmdDraw( commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance );
     }
 
-    void VulkanGraphicsDevice::drawIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::drawIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandBuffer* commandBuffer )
     {
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
         VkBuffer indirectBuffer = static_cast<VkBuffer>(dstbuffer.dstbuffer);
         vkCmdDrawIndirect( commandBuffer, indirectBuffer, dstbuffer.offset, drawCount, stride );
     }
 
-    void VulkanGraphicsDevice::drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::drawIndexed( zp_uint32_t indexCount, zp_uint32_t instanceCount, zp_uint32_t firstIndex, zp_int32_t vertexOffset, zp_uint32_t firstInstance, CommandBuffer* commandBuffer )
     {
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
         vkCmdDrawIndexed( commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance );
     }
 
-    void VulkanGraphicsDevice::drawIndexedIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::drawIndexedIndirect( const GraphicsBuffer& dstbuffer, zp_uint32_t drawCount, zp_uint32_t stride, CommandBuffer* commandBuffer )
     {
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
         VkBuffer indirectBuffer = static_cast<VkBuffer>(dstbuffer.dstbuffer);
         vkCmdDrawIndexedIndirect( commandBuffer, indirectBuffer, dstbuffer.offset, drawCount, stride );
     }
 
-    void VulkanGraphicsDevice::dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::dispatch( zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ, CommandBuffer* commandBuffer )
     {
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
         vkCmdDispatch( commandBuffer, groupCountX, groupCountY, groupCountZ );
     }
 
-    void VulkanGraphicsDevice::dispatchIndirect( const GraphicsBuffer& dstbuffer, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::dispatchIndirect( const GraphicsBuffer& dstbuffer, CommandBuffer* commandBuffer )
     {
-        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandQueue->commandBuffer);
+        VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
         VkBuffer indirectBuffer = static_cast<VkBuffer>(dstbuffer.dstbuffer);
         vkCmdDispatchIndirect( commandBuffer, indirectBuffer, dstbuffer.offset );
     }
 
-    void VulkanGraphicsDevice::beginEventLabel( const char* eventLabel, const Color& color, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::beginEventLabel( const char* eventLabel, const Color& color, CommandBuffer* commandBuffer )
     {
 #if ZP_DEBUG
         VkDebugMarkerMarkerInfoEXT debugMarkerMarkerInfo {
@@ -7469,18 +7490,18 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             },
         };
 
-        CallDebugUtil( vkCmdDebugMarkerBeginEXT, m_vkInstance, static_cast<VkCommandBuffer>(commandQueue->commandBuffer), &debugMarkerMarkerInfo );
+        CallDebugUtil( vkCmdDebugMarkerBeginEXT, m_vkInstance, static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), &debugMarkerMarkerInfo );
 #endif
     }
 
-    void VulkanGraphicsDevice::endEventLabel( CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::endEventLabel( CommandBuffer* commandBuffer )
     {
 #if ZP_DEBUG
-        CallDebugUtil( vkCmdDebugMarkerEndEXT, m_vkInstance, static_cast<VkCommandBuffer>(commandQueue->commandBuffer) );
+        CallDebugUtil( vkCmdDebugMarkerEndEXT, m_vkInstance, static_cast<VkCommandBuffer>(commandBuffer->commandBuffer) );
 #endif
     }
 
-    void VulkanGraphicsDevice::markEventLabel( const char* eventLabel, const Color& color, CommandQueue* commandQueue )
+    void VulkanGraphicsDevice::markEventLabel( const char* eventLabel, const Color& color, CommandBuffer* commandBuffer )
     {
 #if ZP_DEBUG
         VkDebugMarkerMarkerInfoEXT debugMarkerMarkerInfo {
@@ -7494,7 +7515,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             }
         };
 
-        CallDebugUtil( vkCmdDebugMarkerInsertEXT, m_vkInstance, static_cast<VkCommandBuffer>(commandQueue->commandBuffer), &debugMarkerMarkerInfo );
+        CallDebugUtil( vkCmdDebugMarkerInsertEXT, m_vkInstance, static_cast<VkCommandBuffer>(commandBuffer->commandBuffer), &debugMarkerMarkerInfo );
 #endif
     }
 
@@ -7513,7 +7534,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
         thread_local VkCommandPool t_vkComputeCommandPool;
     }
 
-    VkCommandPool VulkanGraphicsDevice::getCommandPool( CommandQueue* commandQueue )
+    VkCommandPool VulkanGraphicsDevice::getCommandPool( CommandBuffer* commandBuffer )
     {
         if( !t_isCommandPoolCreated )
         {
@@ -7550,7 +7571,7 @@ constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType   \
             t_vkGraphicsCommandPool
         };
 
-        return commandPoolMap[ commandQueue->queue ];
+        return commandPoolMap[ commandBuffer->queue ];
     }
 
     VkDescriptorSetLayout VulkanGraphicsDevice::getDescriptorSetLayout( const VkDescriptorSetLayoutCreateInfo& createInfo )

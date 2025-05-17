@@ -15,7 +15,7 @@ namespace zp
 {
     enum class GraphicsHandleType
     {
-        CommandQueue,
+        CommandBuffer,
         Buffer,
         Texture,
         RenderTarget,
@@ -129,7 +129,7 @@ namespace zp
         }
     };
 
-    using CommandQueueHandle = GraphicsHandle<GraphicsHandleType::CommandQueue>;
+    using CommandBufferHandle = GraphicsHandle<GraphicsHandleType::CommandBuffer>;
     using TextureHandle = GraphicsHandle<GraphicsHandleType::Texture>;
     using RenderTargetHandle = GraphicsHandle<GraphicsHandleType::RenderTarget>;
     using ShaderHandle = GraphicsHandle<GraphicsHandleType::Shader>;
@@ -165,8 +165,8 @@ namespace zp
 
         Blit,
 
-        BeginCommandQueue,
-        SubmitCommandQueue,
+        BeginCommandBuffer,
+        SubmitCommandBuffer,
     };
 
     struct CommandHeader
@@ -176,7 +176,7 @@ namespace zp
 
     struct CommandUpdateBufferData
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         BufferHandle dstBuffer;
         zp_size_t dstOffset;
         zp_size_t srcLength;
@@ -184,7 +184,7 @@ namespace zp
 
     struct CommandUpdateBufferDataExternal
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         BufferHandle dstBuffer;
         zp_size_t dstOffset;
         Memory srcData;
@@ -192,7 +192,7 @@ namespace zp
 
     struct CommandCopyBuffer
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         BufferHandle srcBuffer;
         BufferHandle dstBuffer;
         zp_size_t srcOffset;
@@ -202,7 +202,7 @@ namespace zp
 
     struct CommandUpdateTextureData
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         Memory srcData;
         TextureHandle dstTexture;
         zp_uint32_t dstMipLevel;
@@ -235,7 +235,7 @@ namespace zp
             zp_uint32_t clearStencil;
         };
 
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         RectArea2D renderArea;
 
         DepthAttachment depthAttachment;
@@ -245,17 +245,17 @@ namespace zp
 
     struct CommandNextSubpass
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
     };
 
     struct CommandEndRenderPass
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
     };
 
     struct CommandDispatch
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         zp_uint32_t groupCountX;
         zp_uint32_t groupCountY;
         zp_uint32_t groupCountZ;
@@ -263,14 +263,14 @@ namespace zp
 
     struct CommandDispatchIndirect
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         BufferHandle buffer;
         zp_size_t offset;
     };
 
     struct CommandDraw
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         zp_uint32_t vertexCount;
         zp_uint32_t instanceCount;
         zp_uint32_t firstVertex;
@@ -279,7 +279,7 @@ namespace zp
 
     struct CommandDrawIndexed
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         zp_uint32_t indexCount;
         zp_uint32_t instanceCount;
         zp_uint32_t firstIndex;
@@ -289,7 +289,7 @@ namespace zp
 
     struct CommandDrawIndirect
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         BufferHandle buffer;
         zp_size_t offset;
         zp_uint32_t drawCount;
@@ -298,7 +298,7 @@ namespace zp
 
     struct CommandDrawIndexedIndirect
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         BufferHandle buffer;
         zp_size_t offset;
         zp_uint32_t drawCount;
@@ -307,7 +307,7 @@ namespace zp
 
     struct CommandBlit
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
         TextureHandle srcTexture;
         TextureHandle dstTexture;
         zp_uint32_t srcMip;
@@ -316,15 +316,15 @@ namespace zp
         Rect2Di dstRegion;
     };
 
-    struct CommandBeginCommandQueue
+    struct CommandBeginCommandBuffer
     {
         RenderQueue queue;
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
     };
 
-    struct CommandSubmitCommandQueue
+    struct CommandSubmitCommandBuffer
     {
-        CommandQueueHandle cmdQueue;
+        CommandBufferHandle commandBuffer;
     };
 };
 

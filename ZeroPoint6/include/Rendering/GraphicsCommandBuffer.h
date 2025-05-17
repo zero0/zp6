@@ -90,45 +90,45 @@ namespace zp
 
         BufferHandle RequestBuffer( BufferHandle bufferHandle, const RequestBufferInfo& info );
 
-        void UpdateBuffer( CommandQueueHandle cmdQueue, BufferHandle dstBuffer, zp_size_t dstOffset, const Memory& srcData );
+        void UpdateBuffer( CommandBufferHandle cmdQueue, BufferHandle dstBuffer, zp_size_t dstOffset, const Memory& srcData );
 
         template<typename T>
-        void UpdateBuffer( CommandQueueHandle cmdQueue, BufferHandle dstBuffer, zp_size_t dstOffset, T&& srcData )
+        void UpdateBuffer( CommandBufferHandle cmdQueue, BufferHandle dstBuffer, zp_size_t dstOffset, T&& srcData )
         {
             ZP_STATIC_ASSERT( sizeof( T ) % 16 == 0 );
             const Memory srcMem { .ptr = &srcData, .size = sizeof( T ) };
             UpdateBuffer( cmdQueue, dstBuffer, dstOffset, srcMem );
         }
 
-        void CopyBufferToBuffer( CommandQueueHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size );
+        void CopyBufferToBuffer( CommandBufferHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size );
 
-        void UpdateTexture( CommandQueueHandle cmdQueue, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer );
+        void UpdateTexture( CommandBufferHandle cmdQueue, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer );
 
 
         BindSetHandle RequestBindSet( BindSetHandle& bindSetHandle, const RequestBindSetInfo& info );
 
-        void Bind( CommandQueueHandle cmdQueue, BindSetHandle bindSetHandle );
+        void Bind( CommandBufferHandle cmdQueue, BindSetHandle bindSetHandle );
 
 
-        RenderPassHandle BeginRenderPass( CommandQueueHandle cmdQueue, RenderPassHandle& renderPassHandle );
+        RenderPassHandle BeginRenderPass( CommandBufferHandle cmdQueue, RenderPassHandle& renderPassHandle );
 
-        void NextSubPass( CommandQueueHandle cmdQueue, RenderPassHandle renderPassHandle );
+        void NextSubPass( CommandBufferHandle cmdQueue, RenderPassHandle renderPassHandle );
 
-        void EndRenderPass( CommandQueueHandle cmdQueue, RenderPassHandle renderPassHandle );
-
-
-        void PushConstant( CommandQueueHandle cmdQueue, BindSetHandle bindSetHandle, int shaderStage, zp_uint32_t offset, Memory memory );
-
-        void Dispatch( CommandQueueHandle cmdQueue, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ );
-
-        void DispatchIndirect( CommandQueueHandle cmdQueue, BufferHandle indirectBuffer, zp_size_t offset = 0 );
-
-        void Draw( CommandQueueHandle cmdQueue, zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance );
+        void EndRenderPass( CommandBufferHandle cmdQueue, RenderPassHandle renderPassHandle );
 
 
-        CommandQueueHandle BeginCommandQueue( RenderQueue queue );
+        void PushConstant( CommandBufferHandle cmdQueue, BindSetHandle bindSetHandle, int shaderStage, zp_uint32_t offset, Memory memory );
 
-        void SubmitCommandQueue( CommandQueueHandle cmdQueue );
+        void Dispatch( CommandBufferHandle cmdQueue, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ );
+
+        void DispatchIndirect( CommandBufferHandle cmdQueue, BufferHandle indirectBuffer, zp_size_t offset = 0 );
+
+        void Draw( CommandBufferHandle cmdQueue, zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance );
+
+
+        CommandBufferHandle BeginCommandBuffer( RenderQueue queue );
+
+        void SubmitCommandBuffer( CommandBufferHandle cmdQueue );
 
     private:
         DataStreamWriter m_data;

@@ -237,25 +237,28 @@ namespace zp
     template<typename T, typename Allocator>
     void Queue<T, Allocator>::clear()
     {
-        const zp_size_t head = m_head % m_capacity;
-        const zp_size_t tail = m_tail % m_capacity;
+        if( m_data != nullptr )
+        {
+            const zp_size_t head = m_head % m_capacity;
+            const zp_size_t tail = m_tail % m_capacity;
 
-        if( head < tail )
-        {
-            for( zp_size_t i = head, imax = tail; i < imax; ++i )
+            if( head < tail )
             {
-                ( m_data + i )->~T();
+                for( zp_size_t i = head, imax = tail; i < imax; ++i )
+                {
+                    ( m_data + i )->~T();
+                }
             }
-        }
-        else if( head != tail )
-        {
-            for( zp_size_t i = head, imax = m_capacity; i < imax; ++i )
+            else if( head != tail )
             {
-                ( m_data + i )->~T();
-            }
-            for( zp_size_t i = 0, imax = tail; i < imax; ++i )
-            {
-                ( m_data + i )->~T();
+                for( zp_size_t i = head, imax = m_capacity; i < imax; ++i )
+                {
+                    ( m_data + i )->~T();
+                }
+                for( zp_size_t i = 0, imax = tail; i < imax; ++i )
+                {
+                    ( m_data + i )->~T();
+                }
             }
         }
 
@@ -301,7 +304,7 @@ namespace zp
             capacity = 4;
         }
 
-        pointer newData = static_cast<pointer>( m_allocator.allocate( sizeof( T ) * capacity ) );
+        pointer newData = static_cast<pointer>(m_allocator.allocate( sizeof( T ) * capacity ));
         zp_zero_memory_array( newData, capacity );
 
         if( m_data != nullptr )
@@ -348,7 +351,7 @@ namespace zp
 namespace zp
 {
     template<typename T, zp_size_t Size>
-    using FixedQueue = Queue<T, FixedMemoryVectorAllocator<Size, sizeof(T)>>;
+    using FixedQueue = Queue<T, FixedMemoryVectorAllocator<Size, sizeof( T )> >;
 }
 
 #endif //ZP_QUEUE_H

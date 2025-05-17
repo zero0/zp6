@@ -39,13 +39,13 @@ namespace zp
         return bufferHandle;
     }
 
-    void GraphicsCommandBuffer::UpdateBuffer( CommandQueueHandle cmdQueue, BufferHandle dstBuffer, zp_size_t dstOffset, const Memory& srcData )
+    void GraphicsCommandBuffer::UpdateBuffer( CommandBufferHandle commandBuffer, BufferHandle dstBuffer, zp_size_t dstOffset, const Memory& srcData )
     {
         if( srcData.size < kUpdateBufferInlineMaxSize )
         {
             m_data.write( CommandHeader { .type = CommandType::UpdateBufferData } );
             m_data.write( CommandUpdateBufferData {
-                .cmdQueue = cmdQueue,
+                .commandBuffer = commandBuffer,
                 .dstBuffer = dstBuffer,
                 .dstOffset = dstOffset,
                 .srcLength = srcData.size
@@ -57,7 +57,7 @@ namespace zp
         {
             m_data.write( CommandHeader { .type = CommandType::UpdateBufferDataExternal } );
             m_data.write( CommandUpdateBufferDataExternal {
-                .cmdQueue = cmdQueue,
+                .commandBuffer = commandBuffer,
                 .dstBuffer = dstBuffer,
                 .dstOffset = dstOffset,
                 .srcData = srcData
@@ -65,11 +65,11 @@ namespace zp
         }
     }
 
-    void GraphicsCommandBuffer::UpdateTexture( CommandQueueHandle cmdQueue, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
+    void GraphicsCommandBuffer::UpdateTexture( CommandBufferHandle commandBuffer, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
     {
         m_data.write( CommandHeader { .type = CommandType::UpdateTextureData } );
         m_data.write( CommandUpdateTextureData {
-            .cmdQueue = cmdQueue,
+            .commandBuffer = commandBuffer,
             .srcData = srcMemory,
             .dstTexture = dstTexture,
             .dstMipLevel = dstMipLevel,
@@ -77,11 +77,11 @@ namespace zp
         } );
     }
 
-    void GraphicsCommandBuffer::CopyBufferToBuffer( CommandQueueHandle cmdQueue, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size )
+    void GraphicsCommandBuffer::CopyBufferToBuffer( CommandBufferHandle commandBuffer, BufferHandle srcBuffer, BufferHandle dstBuffer, zp_size_t srcOffset, zp_size_t dstOffset, zp_size_t size )
     {
         m_data.write( CommandHeader { .type = CommandType::CopyBuffer } );
         m_data.write( CommandCopyBuffer {
-            .cmdQueue = cmdQueue,
+            .commandBuffer = commandBuffer,
             .srcBuffer = srcBuffer,
             .dstBuffer = dstBuffer,
             .srcOffset = srcOffset,
@@ -90,42 +90,42 @@ namespace zp
         } );
     }
 
-    void GraphicsCommandBuffer::Dispatch( CommandQueueHandle cmdQueue, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ )
+    void GraphicsCommandBuffer::Dispatch( CommandBufferHandle commandBuffer, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ )
     {
         m_data.write( CommandHeader { .type = CommandType::Dispatch } );
         m_data.write( CommandDispatch {
-            .cmdQueue = cmdQueue,
+            .commandBuffer = commandBuffer,
             .groupCountX = groupCountX,
             .groupCountY = groupCountY,
             .groupCountZ = groupCountZ,
         } );
     }
 
-    void GraphicsCommandBuffer::DispatchIndirect( CommandQueueHandle cmdQueue, BufferHandle indirectBuffer, zp_size_t offset )
+    void GraphicsCommandBuffer::DispatchIndirect( CommandBufferHandle commandBuffer, BufferHandle indirectBuffer, zp_size_t offset )
     {
         m_data.write( CommandHeader { .type = CommandType::DispatchIndirect } );
         m_data.write( CommandDispatchIndirect {
-            .cmdQueue = cmdQueue,
+            .commandBuffer = commandBuffer,
             .buffer = indirectBuffer,
             .offset = offset,
         } );
     }
 
-    CommandQueueHandle GraphicsCommandBuffer::BeginCommandQueue( RenderQueue queue )
+    CommandBufferHandle GraphicsCommandBuffer::BeginCommandBuffer( RenderQueue queue )
     {
-        m_data.write( CommandHeader { .type = CommandType::BeginCommandQueue } );
-        m_data.write( CommandBeginCommandQueue {
+        m_data.write( CommandHeader { .type = CommandType::BeginCommandBuffer } );
+        m_data.write( CommandBeginCommandBuffer {
             .queue = queue,
         } );
 
         return {};
     }
 
-    void GraphicsCommandBuffer::SubmitCommandQueue( CommandQueueHandle cmdQueue )
+    void GraphicsCommandBuffer::SubmitCommandBuffer( CommandBufferHandle commandBuffer )
     {
-        m_data.write( CommandHeader { .type = CommandType::SubmitCommandQueue } );
-        m_data.write( CommandSubmitCommandQueue {
-            .cmdQueue = cmdQueue,
+        m_data.write( CommandHeader { .type = CommandType::SubmitCommandBuffer } );
+        m_data.write( CommandSubmitCommandBuffer {
+            .commandBuffer = commandBuffer,
         } );
     }
 };
