@@ -357,12 +357,14 @@ namespace zp
     template<typename T, zp_size_t Size>
     constexpr FixedArray<T, Size>::reference FixedArray<T, Size>::operator[]( zp_size_t index )
     {
+        ZP_ASSERT( index < Size );
         return m_ptr[ index ];
     }
 
     template<typename T, zp_size_t Size>
     constexpr FixedArray<T, Size>::const_reference FixedArray<T, Size>::operator[]( zp_size_t index ) const
     {
+        ZP_ASSERT( index < Size );
         return m_ptr[ index ];
     }
 

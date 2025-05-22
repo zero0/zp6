@@ -6,6 +6,7 @@
 #include "Core/Types.h"
 #include "Core/Common.h"
 #include "Core/Allocator.h"
+#include "Core/Memory.h"
 
 #include "Platform/Platform.h"
 
@@ -17,7 +18,7 @@ namespace zp
 {
     namespace
     {
-        IMemoryAllocator* s_memoryAllocators[kMaxMemoryLabels];
+        FixedArray<IMemoryAllocator*, kMaxMemoryLabels> s_memoryAllocators;
     }
 
     void RegisterAllocator( const MemoryLabel memoryLabel, IMemoryAllocator* memoryAllocator )

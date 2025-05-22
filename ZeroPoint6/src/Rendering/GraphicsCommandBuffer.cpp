@@ -16,12 +16,14 @@ namespace zp
         {
             kUpdateBufferInlineAlignment = 8,
             kUpdateBufferInlineMaxSize = 1024,
+            kPushConstantInlineAlignment = 8,
+            kPushConstantInlineMaxSize = 256,
         };
     }
 
     GraphicsCommandBuffer::GraphicsCommandBuffer( MemoryLabel memoryLabel, zp_size_t pageSize )
         : m_data( memoryLabel, pageSize )
-          , memoryLabel( memoryLabel )
+        , memoryLabel( memoryLabel )
     {
     }
 
@@ -29,6 +31,12 @@ namespace zp
     {
         return m_data.memory();
     }
+
+    void GraphicsCommandBuffer::Reset()
+    {
+        m_data.reset();
+    }
+
 
     BufferHandle GraphicsCommandBuffer::RequestBuffer( BufferHandle bufferHandle, const RequestBufferInfo& info )
     {
@@ -65,7 +73,7 @@ namespace zp
         }
     }
 
-    void GraphicsCommandBuffer::UpdateTexture( CommandBufferHandle commandBuffer, Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
+    void GraphicsCommandBuffer::UpdateTexture( CommandBufferHandle commandBuffer, const Memory srcMemory, TextureHandle dstTexture, zp_uint32_t dstMipLevel, zp_uint32_t dstArrayLayer )
     {
         m_data.write( CommandHeader { .type = CommandType::UpdateTextureData } );
         m_data.write( CommandUpdateTextureData {
@@ -74,6 +82,31 @@ namespace zp
             .dstTexture = dstTexture,
             .dstMipLevel = dstMipLevel,
             .dstArrayLayer = dstArrayLayer,
+        } );
+    }
+
+    RenderPassHandle GraphicsCommandBuffer::BeginRenderPass( CommandBufferHandle commandBuffer, RenderPassHandle renderPassHandle )
+    {
+        return {};
+    }
+
+    void GraphicsCommandBuffer::EndRenderPass( CommandBufferHandle commandBuffer, RenderPassHandle renderPassHandle )
+    {
+
+    }
+
+    PipelineHandle GraphicsCommandBuffer::RequestPipeline( const RequestPipelineInfo& info )
+    {
+        return {};
+    }
+
+
+    void GraphicsCommandBuffer::BindPipeline( CommandBufferHandle commandBuffer, PipelineHandle pipelineHandle )
+    {
+        m_data.write( CommandHeader { .type = CommandType::BindPipeline } );
+        m_data.write( CommandBindPipeline {
+            .commandBuffer = commandBuffer,
+            .pipeline = pipelineHandle,
         } );
     }
 
@@ -88,6 +121,34 @@ namespace zp
             .dstOffset = dstOffset,
             .size = size,
         } );
+    }
+
+    void GraphicsCommandBuffer::PushConstant( CommandBufferHandle commandBuffer, PipelineHandle pipline, int shaderStage, zp_uint32_t offset, const Memory& srcMemory )
+    {
+        if( srcMemory.size < kPushConstantInlineMaxSize )
+        {
+            m_data.write( CommandHeader { .type = CommandType::PushConstant } );
+            m_data.write( CommandPushConstant {
+                .commandBuffer = commandBuffer,
+                .pipeline = pipline,
+                .offset = offset,
+                .size = srcMemory.size,
+                .shaderStage = shaderStage,
+            } );
+            m_data.write( srcMemory.ptr, srcMemory.size );
+            m_data.writeAlignment( kPushConstantInlineAlignment );
+        }
+        else
+        {
+            m_data.write( CommandHeader { .type = CommandType::PushConstantExternal } );
+            m_data.write( CommandPushConstantExternal {
+                .commandBuffer = commandBuffer,
+                .pipeline = pipline,
+                .offset = offset,
+                .srcData = srcMemory,
+                .shaderStage = shaderStage,
+            } );
+        }
     }
 
     void GraphicsCommandBuffer::Dispatch( CommandBufferHandle commandBuffer, zp_uint32_t groupCountX, zp_uint32_t groupCountY, zp_uint32_t groupCountZ )
@@ -108,6 +169,18 @@ namespace zp
             .commandBuffer = commandBuffer,
             .buffer = indirectBuffer,
             .offset = offset,
+        } );
+    }
+
+    void GraphicsCommandBuffer::Draw( CommandBufferHandle commandBuffer, zp_uint32_t vertexCount, zp_uint32_t instanceCount, zp_uint32_t firstVertex, zp_uint32_t firstInstance )
+    {
+        m_data.write( CommandHeader { .type = CommandType::Draw } );
+        m_data.write( CommandDraw {
+            .commandBuffer = commandBuffer,
+            .vertexCount = vertexCount,
+            .instanceCount = instanceCount,
+            .firstVertex = firstVertex,
+            .firstInstance = firstInstance,
         } );
     }
 

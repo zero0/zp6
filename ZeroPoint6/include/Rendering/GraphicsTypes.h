@@ -20,7 +20,7 @@ namespace zp
         Texture,
         RenderTarget,
         Shader,
-        BindSet,
+        Pipeline,
         RenderPass,
 
         _Count,
@@ -120,12 +120,17 @@ namespace zp
 
         [[nodiscard]] zp_bool_t valid() const
         {
-            return index != 0 && hash != 0;
+            return index != 0 || hash != 0 ;
         }
 
         zp_bool_t operator==( const_reference_type other ) const
         {
             return index == other.index && hash == other.hash;
+        }
+
+        zp_bool_t operator!=( const_reference_type other ) const
+        {
+            return index != other.index && hash != other.hash;
         }
     };
 
@@ -134,7 +139,7 @@ namespace zp
     using RenderTargetHandle = GraphicsHandle<GraphicsHandleType::RenderTarget>;
     using ShaderHandle = GraphicsHandle<GraphicsHandleType::Shader>;
     using BufferHandle = GraphicsHandle<GraphicsHandleType::Buffer>;
-    using BindSetHandle = GraphicsHandle<GraphicsHandleType::BindSet>;
+    using PipelineHandle = GraphicsHandle<GraphicsHandleType::Pipeline>;
     using RenderPassHandle = GraphicsHandle<GraphicsHandleType::RenderPass>;
 
     //
@@ -150,6 +155,11 @@ namespace zp
         CopyBuffer,
 
         UpdateTextureData,
+
+        BindPipeline,
+
+        PushConstant,
+        PushConstantExternal,
 
         BeginRenderPass,
         NextSubpass,
@@ -207,6 +217,30 @@ namespace zp
         TextureHandle dstTexture;
         zp_uint32_t dstMipLevel;
         zp_uint32_t dstArrayLayer;
+    };
+
+    struct CommandBindPipeline
+    {
+        CommandBufferHandle commandBuffer;
+        PipelineHandle pipeline;
+    };
+
+    struct CommandPushConstant
+    {
+        CommandBufferHandle commandBuffer;
+        PipelineHandle pipeline;
+        zp_size_t offset;
+        zp_size_t size;
+        int shaderStage;
+    };
+
+    struct CommandPushConstantExternal
+    {
+        CommandBufferHandle commandBuffer;
+        PipelineHandle pipeline;
+        zp_size_t offset;
+        Memory srcData;
+        int shaderStage;
     };
 
     struct CommandBeginRenderPass

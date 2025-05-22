@@ -130,14 +130,14 @@ namespace zp
     template<LogType Type>
     auto LogEntry<Type>::operator<<( zp_int64_t value ) -> reference_type
     {
-        m_log.appendFormat( "%dl", value );
+        m_log.appendFormat( "%ld", value );
         return *this;
     }
 
     template<LogType Type>
     auto LogEntry<Type>::operator<<( zp_uint64_t value ) -> reference_type
     {
-        m_log.appendFormat( "%ul", value );
+        m_log.appendFormat( "%lu", value );
         return *this;
     }
 

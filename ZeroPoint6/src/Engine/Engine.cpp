@@ -995,6 +995,30 @@ namespace zp
 
     void Engine::submitToGPU()
     {
+        GraphicsCommandBuffer* graphicsCommandBuffer = m_graphicsDevice->RequestCommandBuffer();
+
+        {
+            auto commandBuffer = graphicsCommandBuffer->BeginCommandBuffer( ZP_RENDER_QUEUE_GRAPHICS );
+#if 0
+            auto pipeline = m_graphicsCommandBuffer->RequestPipeline( {} );
+
+            auto buffer = m_graphicsCommandBuffer->RequestBuffer( {}, {} );
+
+            m_graphicsCommandBuffer->PushConstant( commandBuffer, pipeline, 0, 0, {} );
+
+            m_graphicsCommandBuffer->BeginRenderPass( commandBuffer, {} );
+
+            m_graphicsCommandBuffer->BindPipeline( commandBuffer, {} );
+
+            m_graphicsCommandBuffer->Draw( commandBuffer, 3, 1, 0, 0 );
+
+            m_graphicsCommandBuffer->EndRenderPass( commandBuffer, {} );
+#endif
+            graphicsCommandBuffer->SubmitCommandBuffer( commandBuffer );
+        }
+
+        m_graphicsDevice->SubmitCommandBuffer( graphicsCommandBuffer );
+
         //m_graphicsDeviceCommandBuffer = m_graphicsDevice->SubmitAndRequestNewCommandBuffer( m_graphicsDeviceCommandBuffer );
     }
 }
