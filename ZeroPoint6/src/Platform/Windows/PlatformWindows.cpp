@@ -342,7 +342,7 @@ namespace
 
             case WM_DESTROY:
             {
-                PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
+                PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( ::GetWindowLongPtr( hWnd, GWLP_USERDATA ) );
                 ZP_ASSERT( notifyIconData );
 
                 ::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
@@ -689,13 +689,16 @@ namespace zp
             );
         ZP_ASSERT( hWnd );
 
+        const zp_uint32_t cx = ::GetSystemMetrics( SM_CXSMICON );
+        const zp_uint32_t cy = ::GetSystemMetrics( SM_CYSMICON );
+
         *notifyIconData = {
             .cbSize = sizeof( NOTIFYICONDATA ),
             .hWnd = hWnd,
             .uID = *(UINT*)notifyIconData,
             .uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP,
             .uCallbackMessage = ZP_SYSTRAY_CMD,
-            .hIcon = static_cast<HICON>(LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR )),
+            .hIcon = static_cast<HICON>(LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR )),
             .szTip = "ZeroPoint AssetCompiler",
             .szInfo = "AssetCompiler",
             .uVersion = NOTIFYICON_VERSION_4,
@@ -704,7 +707,7 @@ namespace zp
         const WINBOOL ok = ::Shell_NotifyIcon( NIM_ADD, notifyIconData );
         if( ok != FALSE )
         {
-            ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)notifyIconData );
+            ::SetWindowLongPtr( hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(notifyIconData) );
         }
         else
         {
