@@ -108,34 +108,34 @@
 
 namespace zp::Http
 {
-    enum StatusCode
+    enum class StatusCode
     {
-        ZP_HTTP_STATUS_UNKNOWN = 0,
-#define XX(code, name, string)      ZP_HTTP_STATUS_##name = code,
+        UNKNOWN = 0,
+#define XX(code, name, string)      name = code,
         HTTP_STATUS_CODES( XX )
 #undef XX
     };
 
     enum class Version
     {
-        Unknown,
+        UNKNOWN,
         Http1_0,
         Http1_1,
         Http2_0,
     };
 
-    enum Method
+    enum class Method
     {
-        ZP_HTTP_METHOD_UNKNOWN,
-#define XX(name, string)        ZP_HTTP_METHOD_##name,
+        UNKNOWN,
+#define XX(name, string)        name,
         HTTP_METHODS( XX )
 #undef XX
     };
 
-    enum HeaderKey
+    enum class HeaderKey
     {
-        ZP_HTTP_HEADER_UNKNOWN,
-#define XX(name, string)        ZP_HTTP_HEADER_##name,
+        UNKNOWN,
+#define XX(name, string)        name,
         HTTP_HEADERS( XX )
 #undef XX
     };

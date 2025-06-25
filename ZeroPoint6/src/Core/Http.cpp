@@ -12,10 +12,6 @@
 #define LF  '\n'
 #define CRLF "\r\n"
 
-#define _CC(x)  x
-#define CCCCCC( a, b,c )       _CC(a ## :: ## b ## :: ## c)
-#define CCC( a, b )       _CC(a ## :: ## b)
-
 namespace zp
 {
     namespace Http
@@ -24,8 +20,8 @@ namespace zp
         {
             Http::Method ParseMethod( const String& string )
             {
-#define TEST_METHOD(name, str)  else if( zp_strcmp( string, #name ) == 0 ) { method = ZP_HTTP_METHOD_##name; }
-                Http::Method method = ZP_HTTP_METHOD_UNKNOWN;
+#define TEST_METHOD(name, str)  else if( zp_strcmp( string, #name ) == 0 ) { method = Method::name; }
+                Http::Method method = Method::UNKNOWN;
 
                 if( string.empty() )
                 {
@@ -38,7 +34,7 @@ namespace zp
 
             Http::Version ParseVersion( const String& string )
             {
-                Http::Version version = Http::Version::Unknown;
+                Http::Version version = Http::Version::UNKNOWN;
 
                 const char* httpHeader = zp_strnstr( string, "HTTP/" );
                 if( string.length() >= zp_strlen( "HTTP/x.x" ) && httpHeader != nullptr )
@@ -89,9 +85,9 @@ namespace zp
 
             Http::HeaderKey ParseHeaderKey( const String& string )
             {
-#define TEST_HEADER(name, str)  else if( zp_strcmp( string, #str ) == 0 ) { key = ZP_HTTP_HEADER_##name; }
+#define TEST_HEADER(name, str)  else if( zp_strcmp( string, #str ) == 0 ) { key = HeaderKey::name; }
 
-                Http::HeaderKey key = ZP_HTTP_HEADER_UNKNOWN;
+                Http::HeaderKey key = HeaderKey::UNKNOWN;
 
                 if( string.empty() )
                 {
@@ -107,7 +103,7 @@ namespace zp
             {
                 switch( headerKey )
                 {
-#define WRITE_HEADER(name, str)     case ZP_HTTP_HEADER_##name: writer.write( #str ); break;
+#define WRITE_HEADER(name, str)     case HeaderKey::name: writer.write( #str ); break;
                     HTTP_HEADERS( WRITE_HEADER )
 #undef WRITE_HEADER
                     default:
@@ -118,7 +114,7 @@ namespace zp
 
             void WriteHeader( const Header& header, DataStreamWriter& writer )
             {
-                if( header.key != ZP_HTTP_HEADER_UNKNOWN )
+                if( header.key != HeaderKey::UNKNOWN )
                 {
                     WriteHeaderKey( header.key, writer );
                     writer.write( ':' );
@@ -132,7 +128,7 @@ namespace zp
             {
                 switch( statusCode )
                 {
-#define WRITE_STATUS(code, name, str)   case ZP_HTTP_STATUS_##name: writer.write( #code " " #str ); break;
+#define WRITE_STATUS(code, name, str)   case StatusCode::name: writer.write( #code " " #str ); break;
                     HTTP_STATUS_CODES( WRITE_STATUS )
 #undef WRITE_STATUS
                     default:
@@ -215,7 +211,7 @@ namespace zp
                                     .key = ParseHeaderKey( key ),
                                 };
 
-                                if( header.key != ZP_HTTP_HEADER_UNKNOWN )
+                                if( header.key != HeaderKey::UNKNOWN )
                                 {
                                     outRequest.headers.pushBack( header );
                                 }
@@ -236,7 +232,7 @@ namespace zp
                     }
                 }
 
-                outRequest.statusCode = ZP_HTTP_STATUS_OK;
+                outRequest.statusCode = StatusCode::OK;
             }
         }
     }
@@ -258,6 +254,6 @@ namespace zp
 
         outMemory.write( CRLF );
 
-        return Http::ZP_HTTP_STATUS_OK;
+        return Http::StatusCode::OK;
     }
 }
