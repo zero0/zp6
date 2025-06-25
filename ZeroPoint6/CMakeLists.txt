@@ -222,6 +222,28 @@ else()
     message(CHECK_FAIL "Unable to find volk")
 endif()
 
+find_library(SLANG_LIB
+    NAMES slang
+    HINTS ${_Vulkan_LIB_DIR}
+)
+message(CHECK_START "Finding slang")
+if(SLANG_LIB)
+    message(CHECK_PASS "Found slang ${SLANG_LIB}")
+else()
+    message(CHECK_FAIL "Unable to find slang")
+endif()
+
+find_library(SLANGD_LIB
+    NAMES slangd
+    HINTS ${_Vulkan_LIB_DIR}
+)
+message(CHECK_START "Finding slangd")
+if(SLANGD_LIB)
+    message(CHECK_PASS "Found slangd ${SLANGD_LIB}")
+else()
+    message(CHECK_FAIL "Unable to find slangd")
+endif()
+
 # Define VK_NO_PROTOTYPES to avoid including Vulkan prototypes
 # This is necessary because we are using volk to load Vulkan functions
 target_compile_definitions(${ZP_TARGET} PRIVATE VK_NO_PROTOTYPES)
@@ -332,7 +354,7 @@ set(ZP_TOOLS_SRC
     "src/Tools/AssetCompiler.cpp"
     "src/Tools/ShaderCompiler.cpp"
     "src/Tools/${PLATFORM_FULL_NAME}/AssetCompiler${PLATFORM_FULL_NAME}Main.cpp"
-    "src/Tools/${PLATFORM_FULL_NAME}/ShaderCompiler${PLATFORM_FULL_NAME}.cpp"
+    #"src/Tools/${PLATFORM_FULL_NAME}/ShaderCompiler${PLATFORM_FULL_NAME}.cpp"
 )
 
 set(ZP_TOOLS_HEADERS
@@ -369,6 +391,8 @@ target_link_options(${ZP_TOOLS_TARGET}
 target_link_libraries(${ZP_TOOLS_TARGET} PRIVATE
         ${Vulkan_LIBRARIES}
         ${Vulkan_dxc_LIBRARY}
+        debug ${SLANGD_LIB}
+        general ${SLANG_LIB}
         rpcrt4
         dwmapi
         Ws2_32
