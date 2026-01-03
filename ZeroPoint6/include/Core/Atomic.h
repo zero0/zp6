@@ -9,7 +9,7 @@
 #include "Core/Types.h"
 #include "Core/Macros.h"
 
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
 
 #include <intrin.h>
 
@@ -42,7 +42,7 @@ namespace zp
     {
         ZP_FORCEINLINE void MemoryBarrier()
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             _mm_mfence();
 #endif
         }
@@ -53,63 +53,63 @@ namespace zp
 
         ZP_FORCEINLINE zp_int32_t And( zp_int32_t* destination, zp_int32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedAnd( reinterpret_cast<__LONG32 volatile *>(destination), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t Or( zp_int32_t* destination, zp_int32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedOr( reinterpret_cast<__LONG32 volatile *>(destination), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t Xor( zp_int32_t* destination, zp_int32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedXor( reinterpret_cast<__LONG32 volatile *>(destination), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t Increment( zp_int32_t* addend )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedIncrement( reinterpret_cast<__LONG32 volatile *>(addend) );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t Decrement( zp_int32_t* addend )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedDecrement( reinterpret_cast<__LONG32 volatile *>(addend) );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t Add( zp_int32_t* addend, zp_int32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedAdd( reinterpret_cast<__LONG32 volatile *>(addend), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t Exchange( zp_int32_t* target, zp_int32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedExchange( reinterpret_cast<__LONG32 volatile *>(target), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t ExchangeAdd( zp_int32_t* target, zp_int32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedExchangeAdd( reinterpret_cast<__LONG32 volatile *>(target), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int32_t CompareExchange( zp_int32_t* destination, zp_int32_t exChange, zp_int32_t comperand )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedCompareExchange( reinterpret_cast<__LONG32 volatile *>(destination), exChange, comperand );
 #endif
         }
@@ -120,63 +120,63 @@ namespace zp
 
         ZP_FORCEINLINE zp_uint32_t And( zp_uint32_t* destination, zp_uint32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedAnd( reinterpret_cast<__LONG32 volatile *>(destination), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t Or( zp_uint32_t* destination, zp_uint32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedOr( reinterpret_cast<__LONG32 volatile *>(destination), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t Xor( zp_uint32_t* destination, zp_uint32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedXor( reinterpret_cast<__LONG32 volatile *>(destination), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t Increment( zp_uint32_t* addend )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedIncrement( reinterpret_cast<__LONG32 volatile *>(addend) );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t Decrement( zp_uint32_t* addend )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedDecrement( reinterpret_cast<__LONG32 volatile *>(addend) );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t Add( zp_uint32_t* addend, zp_uint32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedAdd( reinterpret_cast<__LONG32 volatile *>(addend), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t Exchange( zp_uint32_t* target, zp_uint32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedExchange( reinterpret_cast<__LONG32 volatile *>(target), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t ExchangeAdd( zp_uint32_t* target, zp_uint32_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedExchangeAdd( reinterpret_cast<__LONG32 volatile *>(target), value );
 #endif
         }
 
         ZP_FORCEINLINE zp_uint32_t CompareExchange( zp_uint32_t* destination, zp_uint32_t exChange, zp_uint32_t comperand )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedCompareExchange( reinterpret_cast<__LONG32 volatile *>(destination), exChange, comperand );
 #endif
         }
@@ -187,8 +187,8 @@ namespace zp
 
         ZP_FORCEINLINE zp_size_t AddSizeT( zp_size_t* addend, zp_size_t value )
         {
-#if ZP_OS_WINDOWS
-#if ZP_ARCH64
+#if ZP_PLATFORM_WINDOWS
+#if ZP_PLATFORM_ARCH64
             return _InterlockedAdd64( reinterpret_cast<__int64 volatile *>(addend), static_cast<__int64>(value) );
 #else
             return _InterlockedAdd( (long*)addend );
@@ -198,8 +198,8 @@ namespace zp
 
         ZP_FORCEINLINE zp_size_t IncrementSizeT( zp_size_t* addend )
         {
-#if ZP_OS_WINDOWS
-#if ZP_ARCH64
+#if ZP_PLATFORM_WINDOWS
+#if ZP_PLATFORM_ARCH64
             return _InterlockedIncrement64( reinterpret_cast<__int64 volatile *>(addend) );
 #else
             return _InterlockedIncrement( (long*)addend );
@@ -209,8 +209,8 @@ namespace zp
 
         ZP_FORCEINLINE zp_size_t DecrementSizeT( zp_size_t* addend )
         {
-#if ZP_OS_WINDOWS
-#if ZP_ARCH64
+#if ZP_PLATFORM_WINDOWS
+#if ZP_PLATFORM_ARCH64
             return _InterlockedDecrement64( reinterpret_cast<__int64 volatile *>(addend) );
 #else
             return _InterlockedDecrement( (long*)addend );
@@ -220,8 +220,8 @@ namespace zp
 
         ZP_FORCEINLINE zp_size_t ExchangeSizeT( zp_size_t* target, zp_size_t value )
         {
-#if ZP_OS_WINDOWS
-#if ZP_ARCH64
+#if ZP_PLATFORM_WINDOWS
+#if ZP_PLATFORM_ARCH64
             return _InterlockedExchange64( reinterpret_cast<__int64 volatile *>(target), static_cast<__int64>(value) );
 #else
             return _InterlockedExchange( (long*)target, (long)value );
@@ -231,8 +231,8 @@ namespace zp
 
         ZP_FORCEINLINE zp_size_t ExchangeAddSizeT( zp_size_t* target, zp_size_t value )
         {
-#if ZP_OS_WINDOWS
-#if ZP_ARCH64
+#if ZP_PLATFORM_WINDOWS
+#if ZP_PLATFORM_ARCH64
             return _InterlockedExchangeAdd64( reinterpret_cast<__int64 volatile *>(target), static_cast<__int64>(value) );
 #else
             return _InterlockedExchangeAdd( (long*)target, (long)value );
@@ -242,8 +242,8 @@ namespace zp
 
         ZP_FORCEINLINE zp_size_t CompareExchangeSizeT( zp_size_t* destination, zp_size_t exChange, zp_size_t comperand )
         {
-#if ZP_OS_WINDOWS
-#if ZP_ARCH64
+#if ZP_PLATFORM_WINDOWS
+#if ZP_PLATFORM_ARCH64
             return _InterlockedCompareExchange64( reinterpret_cast<__int64 volatile *>(destination), static_cast<__int64>(exChange), static_cast<__int64>(comperand) );
 #else
             return _InterlockedCompareExchange((long*)destination, (long)exChange, (long)comperand );
@@ -256,63 +256,63 @@ namespace zp
 
         ZP_FORCEINLINE zp_int64_t And( zp_int64_t* destination, zp_int64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedAnd64( destination, value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t Or( zp_int64_t* destination, zp_int64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedOr64( destination, value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t Xor( zp_int64_t* destination, zp_int64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedXor64( destination, value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t Increment( zp_int64_t* addend )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedIncrement64( addend );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t Decrement( zp_int64_t* addend )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedDecrement64( addend );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t Add( zp_int64_t* addend, zp_int64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedAdd64( addend, value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t Exchange( zp_int64_t* target, zp_int64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedExchange64( target, value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t ExchangeAdd( zp_int64_t* target, zp_int64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedExchangeAdd64( target, value );
 #endif
         }
 
         ZP_FORCEINLINE zp_int64_t CompareExchange( zp_int64_t* destination, zp_int64_t exChange, zp_int64_t comperand )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return _InterlockedCompareExchange64( destination, exChange, comperand );
 #endif
         }
@@ -323,7 +323,7 @@ namespace zp
 
         ZP_FORCEINLINE zp_uint64_t Exchange( zp_uint64_t* target, zp_uint64_t value )
         {
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
             return static_cast<zp_uint64_t>( _InterlockedExchange64( reinterpret_cast<__int64 volatile *>( target ), static_cast<__int64>( value ) ) );
 #endif
         }

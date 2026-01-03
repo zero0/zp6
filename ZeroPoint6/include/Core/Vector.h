@@ -28,7 +28,7 @@ namespace zp
         }
     };
 
-    template<zp_size_t Length, zp_size_t Size>
+    template<zp_size_t Length, typename T>
     struct FixedMemoryVectorAllocator
     {
         [[nodiscard]] void* allocate( zp_size_t size )
@@ -40,7 +40,7 @@ namespace zp
         {
         }
 
-        zp_uint8_t m_data[Length * Size];
+        T m_data[ Length ];
     };
 }
 
@@ -218,7 +218,7 @@ namespace zp
 namespace zp
 {
     template<typename T, zp_size_t Size>
-    using FixedVector = Vector<T, FixedMemoryVectorAllocator<Size, sizeof(T)>>;
+    using FixedVector = Vector<T, FixedMemoryVectorAllocator<Size, T>>;
 
 }
 

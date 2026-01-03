@@ -264,7 +264,7 @@ namespace zp
                 {
                     if( srcData.componentCount == 4 && srcData.componentSize == sizeof( zp_uint8_t ) )
                     {
-                        compressedTexture = { .ptr = (void*)srcData.data.data(), .size = srcData.data.size() };
+                        compressedTexture = srcData.data.memory();
                     }
                     else
                     {
@@ -342,7 +342,7 @@ namespace zp
 
     void FreeTextureData( TextureData& data )
     {
-        ZP_SAFE_FREE( data.memoryLabel, data.data.ptr );
+        ZP_SAFE_FREE( data.memoryLabel, data.data.ptr() );
         data = {};
     }
 
@@ -513,10 +513,10 @@ namespace zp
 
                 const KTX2Level level {
                     .byteOffset = dstDataStream.position(),
-                    .byteLength = compressedMipLevel.size,
-                    .uncompressedByteLength = supercompressionScheme == 0 ? compressedMipLevel.size : 0,
+                    .byteLength = compressedMipLevel.size(),
+                    .uncompressedByteLength = supercompressionScheme == 0 ? compressedMipLevel.size() : 0,
                 };
-                dstDataStream.write( compressedMipLevel.ptr, compressedMipLevel.size );
+                dstDataStream.write( compressedMipLevel.ptr(), compressedMipLevel.size() );
 
                 // write back level index
                 dstDataStream.writeAt( level, mipLevelOffsets[ mip ], DataStreamSeekOrigin::Exact );

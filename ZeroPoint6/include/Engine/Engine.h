@@ -7,6 +7,7 @@
 
 #include "Core/Defines.h"
 #include "Core/Types.h"
+#include "Core/Macros.h"
 #include "Core/Allocator.h"
 #include "Core/Job.h"
 

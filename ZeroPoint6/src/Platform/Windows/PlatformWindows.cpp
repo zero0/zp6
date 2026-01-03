@@ -1048,14 +1048,14 @@ namespace zp
         const zp_ptrdiff_t viewOffset = offset - alignedOffset;
 
         return {
-            .mappedView { .ptr = view, .size = alignedLength },
-            .view { .ptr = ZP_OFFSET_PTR( view, viewOffset ), .size = length }
+            .mappedView { view, alignedLength },
+            .view { ZP_OFFSET_PTR( view, viewOffset ), length }
         };
     }
 
     void Platform::UnmapViewOfMemoryMappedFile( MemoryMappedFileView view )
     {
-        const BOOL ok = ::UnmapViewOfFile( view.mappedView.ptr );
+        const BOOL ok = ::UnmapViewOfFile( view.mappedView.ptr() );
         if( !ok )
         {
             PrintLastErrorMsg( "Failed to Unmap View of Memory Mapped File" );
@@ -1758,7 +1758,7 @@ namespace zp
         ZP_ASSERT( socket.handle != ZP_INVALID_SOCKET );
         ZP_ASSERT( dstSize < zp_limit<int>::max() );
 
-        const int flags = 0;
+        const int flags = MSG_PEEK;
         int result = ::recv( socket.handle, static_cast<char*>(dst), static_cast<int>(dstSize), flags );
         if( result == SOCKET_ERROR )
         {
@@ -1766,7 +1766,30 @@ namespace zp
 
             result = 0;
         }
+/*
+        fd_set readSet;
+        FD_ZERO( &readSet );
+        FD_SET( socket.handle, &readSet );
 
+        const int r = ::select( 0, nullptr, nullptr, 0, nullptr );
+        if( r > 0 )
+        {
+
+        }
+        else if( r == 0 )
+        {
+
+        }
+        else
+        {
+            PrintLastWSAErrorMsg( "" );
+        }
+
+        if( FD_ISSET( socket.handle, &readSet ) )
+        {
+
+        }
+*/
         return result;
     }
 

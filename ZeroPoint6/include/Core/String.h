@@ -5,6 +5,7 @@
 #ifndef ZP_STRING_H
 #define ZP_STRING_H
 
+#include "Core/String.h"
 #include "Core/Defines.h"
 #include "Core/Macros.h"
 #include "Core/Types.h"
@@ -50,7 +51,7 @@ constexpr zp_bool_t zp_strempty( const char* str, zp_size_t length )
 }
 
 template<zp_size_t Size>
-constexpr zp_size_t zp_strlen( const char (& str)[Size] )
+constexpr zp_size_t zp_strlen( const char ( &str )[ Size ] )
 {
     ZP_UNUSED( str );
     return Size;
@@ -76,7 +77,7 @@ constexpr zp_bool_t zp_strempty( const zp_char8_t* str )
     return !( str != nullptr && str[ 0 ] != '\0' );
 }
 
-constexpr zp_bool_t zp_strempty( const zp_char8_t*const str, const zp_size_t length )
+constexpr zp_bool_t zp_strempty( const zp_char8_t* const str, const zp_size_t length )
 {
     return !( length != 0 && str != nullptr && str[ 0 ] != '\0' );
 }
@@ -149,13 +150,13 @@ constexpr zp_int32_t zp_strcmp( const zp_char8_t* lh, zp_size_t lhSize, const zp
 }
 
 template<zp_size_t RHSize>
-zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char (& rh)[RHSize] )
+zp_int32_t zp_strcmp( const char* lh, zp_size_t lhSize, const char ( &rh )[ RHSize ] )
 {
     return zp_strcmp( lh, lhSize, rh, zp_strlen( rh ) );
 }
 
 template<zp_size_t LHSize>
-zp_int32_t zp_strcmp( const char (& lh)[LHSize], const char* rh, zp_size_t rhSize )
+zp_int32_t zp_strcmp( const char ( &lh )[ LHSize ], const char* rh, zp_size_t rhSize )
 {
     return zp_strcmp( lh, zp_strlen( lh ), rh, rhSize );
 }
@@ -205,19 +206,19 @@ constexpr void zp_strncpy( zp_char8_t* dstStr, zp_size_t dstLength, const zp_cha
 }
 
 template<zp_size_t Size>
-constexpr void zp_strncpy( char (& dstStr)[Size], const char* srcStr, zp_size_t srcLen )
+constexpr void zp_strncpy( char ( &dstStr )[ Size ], const char* srcStr, zp_size_t srcLen )
 {
     zp_strncpy( dstStr, Size, srcStr, srcLen );
 }
 
 template<zp_size_t Size>
-constexpr void zp_strncpy( zp_char8_t (& dstStr)[Size], const zp_char8_t* srcStr, zp_size_t srcLen )
+constexpr void zp_strncpy( zp_char8_t ( &dstStr )[ Size ], const zp_char8_t* srcStr, zp_size_t srcLen )
 {
     zp_strncpy( dstStr, Size, srcStr, srcLen );
 }
 
 template<zp_size_t Size>
-constexpr void zp_strncpy( zp_char8_t (& dstStr)[Size], const char* srcStr, zp_size_t srcLen )
+constexpr void zp_strncpy( zp_char8_t ( &dstStr )[ Size ], const char* srcStr, zp_size_t srcLen )
 {
     zp_strncpy( dstStr, Size, reinterpret_cast<const zp_char8_t*>(srcStr), srcLen );
 }
@@ -385,7 +386,7 @@ constexpr const char* zp_strnstr( const char* str, zp_size_t strLen, const char*
 }
 
 template<zp_size_t Size>
-constexpr const char* zp_strnstr( const char* str, zp_size_t strLen, const char (& find)[Size] )
+constexpr const char* zp_strnstr( const char* str, zp_size_t strLen, const char ( &find )[ Size ] )
 {
     return zp_strnstr( str, strLen, find, zp_strlen( find ) );
 }
@@ -429,10 +430,12 @@ constexpr char* zp_strrchr( char* str, char ch )
     return end;
 }
 
-constexpr zp_uint32_t zp_char_to_uint32( char c )
+constexpr auto zp_try_char_to_uint32( char lit, zp_uint32_t& value ) -> zp_bool_t
 {
-    zp_uint32_t v;
-    switch( c )
+    zp_bool_t valid = true;
+    value = 0;
+
+    switch( lit )
     {
         case '0':
         case '1':
@@ -444,7 +447,7 @@ constexpr zp_uint32_t zp_char_to_uint32( char c )
         case '7':
         case '8':
         case '9':
-            v = (zp_uint32_t)( c - '0' );
+            value = (zp_uint32_t)( lit - '0' );
             break;
 
         case 'a':
@@ -453,7 +456,7 @@ constexpr zp_uint32_t zp_char_to_uint32( char c )
         case 'd':
         case 'e':
         case 'f':
-            v = ( (zp_uint32_t)( c - 'a' ) + 10 );
+            value = ( (zp_uint32_t)( lit - 'a' ) + 10 );
             break;
 
         case 'A':
@@ -462,319 +465,205 @@ constexpr zp_uint32_t zp_char_to_uint32( char c )
         case 'D':
         case 'E':
         case 'F':
-            v = ( (zp_uint32_t)( c - 'A' ) + 10 );
+            value = ( (zp_uint32_t)( lit - 'A' ) + 10 );
             break;
 
         default:
-            v = 0;
-    }
-    return v;
-}
-
-constexpr zp_bool_t zp_try_parse_uint8( const char* str, zp_size_t length, zp_uint8_t* m )
-{
-    zp_uint32_t value = 0;
-    zp_uint32_t v = 0;
-    for( zp_int32_t i = 0; i < length && i < 2; ++i )
-    {
-        const char c = str[ i ];
-        switch( c )
-        {
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                v = (zp_uint32_t)( c - '0' );
-                break;
-
-            case 'a':
-            case 'b':
-            case 'c':
-            case 'd':
-            case 'e':
-            case 'f':
-                v = ( (zp_uint32_t)( c - 'a' ) + 10 );
-                break;
-
-            case 'A':
-            case 'B':
-            case 'C':
-            case 'D':
-            case 'E':
-            case 'F':
-                v = ( (zp_uint32_t)( c - 'A' ) + 10 );
-                break;
-
-            default:
-                return false;
-        }
-
-        value |= ( v & 0x0F ) << ( ( ( length - 1 ) - i ) * 4 );
+            valid = false;
+            break;
     }
 
-    *m = value;
-    return true;
+    return valid;
 }
 
-constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_uint32_t* m )
+template<typename T>
+constexpr auto zp_try_parse_generic( const char* str, zp_size_t length, T& outValue ) -> zp_bool_t
 {
-    zp_uint32_t value = 0;
+    constexpr zp_size_t kNumByteChars = sizeof( T ) * 2;
+
+    T value {};
     zp_uint32_t v;
-    for( zp_int32_t i = 0; i < 8; ++i )
+
+    for( zp_size_t i = 0; i < length && i < kNumByteChars; ++i )
     {
         const char c = str[ i ];
-        switch( c )
+        if( !zp_try_char_to_uint32( c, v ) )
         {
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                v = (zp_uint32_t)( c - '0' );
-                break;
-
-            case 'a':
-            case 'b':
-            case 'c':
-            case 'd':
-            case 'e':
-            case 'f':
-                v = ( (zp_uint32_t)( c - 'a' ) + 10 );
-                break;
-
-            case 'A':
-            case 'B':
-            case 'C':
-            case 'D':
-            case 'E':
-            case 'F':
-                v = ( (zp_uint32_t)( c - 'A' ) + 10 );
-                break;
-
-            default:
-                return false;
+            return false;
         }
 
-        value |= ( v & 0x0F ) << ( ( 7 - i ) * 4 );
+        value |= static_cast<T>(v & 0x0F) << ( ( ( length - 1 ) - i ) * 4 );
     }
 
-    *m = value;
+    outValue = value;
     return true;
 }
 
-constexpr zp_bool_t zp_try_parse_uint32( const char* str, zp_size_t length, zp_uint32_t* m )
+constexpr auto zp_try_parse_uint8( const char* str, zp_size_t length, zp_uint8_t& m ) -> zp_bool_t
 {
-    zp_uint32_t value = 0;
-    zp_uint32_t v = 0;
-    for( zp_int32_t i = 0; i < length && i < 8; ++i )
-    {
-        const char c = str[ i ];
-        switch( c )
-        {
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                v = (zp_uint32_t)( c - '0' );
-                break;
-
-            case 'a':
-            case 'b':
-            case 'c':
-            case 'd':
-            case 'e':
-            case 'f':
-                v = ( (zp_uint32_t)( c - 'a' ) + 10 );
-                break;
-
-            case 'A':
-            case 'B':
-            case 'C':
-            case 'D':
-            case 'E':
-            case 'F':
-                v = ( (zp_uint32_t)( c - 'A' ) + 10 );
-                break;
-
-            default:
-                return false;
-        }
-
-        value |= ( v & 0x0F ) << ( ( ( length - 1 ) - i ) * 4 );
-    }
-
-    *m = value;
-    return true;
+    return zp_try_parse_generic<zp_uint8_t>( str, length, m );
 }
 
-constexpr zp_bool_t zp_try_uint32_to_string( const zp_uint32_t m, char* str )
+constexpr auto zp_try_parse_uint16( const char* str, zp_size_t length, zp_uint16_t& m ) -> zp_bool_t
+{
+    return zp_try_parse_generic<zp_uint16_t>( str, length, m );
+}
+
+constexpr auto zp_try_parse_uint32( const char* str, zp_size_t length, zp_uint32_t& m ) -> zp_bool_t
+{
+    return zp_try_parse_generic<zp_uint32_t>( str, length, m );
+}
+
+constexpr auto zp_try_parse_uint64( const char* str, zp_size_t length, zp_uint64_t& m ) -> zp_bool_t
+{
+    return zp_try_parse_generic<zp_uint64_t>( str, length, m );
+}
+
+//
+//
+//
+
+constexpr zp_bool_t zp_try_uint32_to_char( const zp_uint32_t value, char& outChar, zp_bool_t useCapital = false )
 {
     char lit;
-    for( zp_int32_t i = 0; i < 8; ++i )
+
+    const zp_uint32_t mask = value & 0x0F;
+    switch( mask )
     {
-        const zp_uint32_t cur = ( m >> ( ( 7 - i ) * 4 ) ) & 0x0F;
-        switch( cur )
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+            lit = static_cast<char>('0' + mask);
+            break;
+
+        case 10:
+        case 11:
+        case 12:
+        case 13:
+        case 14:
+        case 15:
+            lit = static_cast<char>(( useCapital ? 'A' : 'a' ) + ( mask - 10 ));
+            break;
+
+        default:
+            return false;
+    }
+
+    outChar = lit;
+    return true;
+}
+
+template<typename T>
+constexpr zp_bool_t zp_try_generic_to_string( const T& value, char* str, zp_size_t length )
+{
+    constexpr zp_size_t kNumByteChars = sizeof( T ) * 2;
+
+    char lit;
+
+    for( zp_size_t i = 0; i < length && i < kNumByteChars; ++i )
+    {
+        const zp_uint32_t cur = static_cast<zp_uint32_t>(value >> ( ( ( kNumByteChars - 1 ) - i ) * 4 ));
+        if( !zp_try_uint32_to_char( cur, lit ) )
         {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 7:
-            case 8:
-            case 9:
-                lit = (char)( '0' + cur );
-                break;
-
-            case 10:
-            case 11:
-            case 12:
-            case 13:
-            case 14:
-            case 15:
-                lit = (char)( 'a' + ( cur - 10 ) );
-                break;
-
-            default:
-                return false;
+            return false;
         }
 
         str[ i ] = lit;
     }
 
+    str[ kNumByteChars ] = '\0';
+
     return true;
 }
 
-constexpr zp_bool_t zp_try_parse_hash64( const char* str, zp_hash64_t& hash )
+constexpr auto zp_try_uint8_to_string( const zp_uint8_t value, char* str, zp_size_t length ) -> zp_bool_t
 {
-    const zp_size_t length = zp_strlen( str );
-    zp_bool_t ok = length == 16;
-    if( ok )
-    {
-        zp_uint32_t m1, m0;
-        ok = zp_try_parse_uint32( str + 0, &m1 );
-        ok = ok && zp_try_parse_uint32( str + 8, &m0 );
+    return zp_try_generic_to_string<zp_uint8_t>( value, str, length );
+}
 
-        if( ok )
-        {
-            hash = ( (zp_uint64_t)m1 << 32 ) | m0;
-        }
+constexpr auto zp_try_uint16_to_string( const zp_uint16_t value, char* str, zp_size_t length ) -> zp_bool_t
+{
+    return zp_try_generic_to_string<zp_uint16_t>( value, str, length );
+}
+
+constexpr auto zp_try_uint32_to_string( const zp_uint32_t value, char* str, zp_size_t length ) -> zp_bool_t
+{
+    return zp_try_generic_to_string<zp_uint32_t>( value, str, length );
+}
+
+constexpr auto zp_try_uint64_to_string( const zp_uint64_t value, char* str, zp_size_t length ) -> zp_bool_t
+{
+    return zp_try_generic_to_string<zp_uint64_t>( value, str, length );
+}
+
+//
+//
+//
+
+constexpr auto zp_try_parse_hash64( const char* str, zp_size_t length, zp_hash64_t& hash ) -> zp_bool_t
+{
+    constexpr zp_size_t kNumByteChars = sizeof( zp_hash64_t ) * 2;
+    return length == kNumByteChars ? zp_try_parse_uint64( str, length, hash ) : false;
+}
+
+constexpr auto zp_try_hash64_to_string( const zp_hash64_t& hash, char* str, zp_size_t length ) -> zp_bool_t
+{
+    return zp_try_uint64_to_string( hash, str, length );
+}
+
+constexpr auto zp_try_parse_hash128( const char* str, zp_size_t length, zp_hash128_t& hash ) -> zp_bool_t
+{
+    constexpr zp_size_t kNumByteChars = sizeof( zp_hash128_t ) * 2;
+
+    if( length == kNumByteChars )
+    {
+        zp_bool_t valid = true;
+        valid &= zp_try_parse_uint64( str, length, hash.m32 );
+        valid &= zp_try_parse_hash64( str + 16, length - 16, hash.m10 );
+        return valid;
     }
 
-    return ok;
+    return false;
 }
 
-constexpr zp_bool_t zp_try_hash64_to_string( const zp_hash64_t& hash, char* str )
+constexpr auto zp_try_hash128_to_string( const zp_hash128_t& hash, char* str, zp_size_t length ) -> zp_bool_t
 {
-    zp_bool_t ok;
-    const zp_uint32_t m1 { (zp_uint32_t)( hash >> 32 ) };
-    const zp_uint32_t m0 { (zp_uint32_t)hash };
+    zp_bool_t valid = true;
+    valid &= zp_try_uint64_to_string( hash.m32, str, length );
+    valid &= zp_try_uint64_to_string( hash.m10, str + 16, length - 16 );
 
-    ok = zp_try_uint32_to_string( m1, str + 0 );
-    ok = ok && zp_try_uint32_to_string( m0, str + 8 );
-    *( str + 16 ) = '\0';
-
-    return ok;
+    return valid;
 }
 
-constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_size_t length, zp_hash128_t* hash )
+constexpr auto zp_try_parse_guid128( const char* str, zp_size_t length, zp_guid128_t& guid ) -> zp_bool_t
 {
-    zp_bool_t ok = length >= 32;
-    if( ok )
+    constexpr zp_size_t kNumByteChars = sizeof( zp_guid128_t ) * 2;
+
+    if( length == kNumByteChars )
     {
-        zp_uint32_t m3, m2, m1, m0;
-        ok = zp_try_parse_uint32( str + 0, &m3 );
-        ok = ok && zp_try_parse_uint32( str + 8, &m2 );
-        ok = ok && zp_try_parse_uint32( str + 16, &m1 );
-        ok = ok && zp_try_parse_uint32( str + 24, &m0 );
-
-        if( ok )
-        {
-            hash->m32 = ( (zp_uint64_t)m3 << 32 ) | m2;
-            hash->m10 = ( (zp_uint64_t)m1 << 32 ) | m0;
-            //hash->m3 = m3;
-            //hash->m2 = m2;
-            //hash->m1 = m1;
-            //hash->m0 = m0;
-        }
+        zp_bool_t valid = true;
+        valid &= zp_try_parse_uint64( str, length, guid.m32 );
+        valid &= zp_try_parse_hash64( str + 16, length - 16, guid.m10 );
+        return valid;
     }
 
-    return ok;
+    return false;
 }
 
-constexpr zp_bool_t zp_try_parse_hash128( const char* str, zp_hash128_t* hash )
+constexpr auto zp_try_guid128_to_string( const zp_guid128_t& guid, char* str, zp_size_t length ) -> zp_bool_t
 {
-    const zp_size_t length = zp_strlen( str );
-    return zp_try_parse_hash128( str, length, hash );
-}
+    zp_bool_t valid = true;
+    valid &= zp_try_uint64_to_string( guid.m32, str, length );
+    valid &= zp_try_uint64_to_string( guid.m10, str + 16, length - 16 );
 
-constexpr zp_bool_t zp_try_hash128_to_string( const zp_hash128_t& hash, char* str )
-{
-    zp_bool_t ok;
-    ok = zp_try_uint32_to_string( (zp_uint32_t)( hash.m32 >> 32 ), str + 0 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)hash.m32, str + 8 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint64_t)( hash.m10 >> 32 ), str + 16 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)hash.m10, str + 24 );
-    *( str + 32 ) = '\0';
-
-    return ok;
-}
-
-constexpr zp_bool_t zp_try_parse_guid128( const char* str, zp_guid128_t* guid )
-{
-    const zp_size_t length = zp_strlen( str );
-    zp_bool_t ok = length >= 32;
-    if( ok )
-    {
-        zp_uint32_t m3, m2, m1, m0;
-        ok = zp_try_parse_uint32( str + 0, &m3 );
-        ok = ok && zp_try_parse_uint32( str + 8, &m2 );
-        ok = ok && zp_try_parse_uint32( str + 16, &m1 );
-        ok = ok && zp_try_parse_uint32( str + 24, &m0 );
-
-        if( ok )
-        {
-            guid->m32 = ( (zp_uint64_t)m3 << 32 ) | m2;
-            guid->m10 = ( (zp_uint64_t)m1 << 32 ) | m0;
-            //guid->m3 = m3;
-            //guid->m2 = m2;
-            //guid->m1 = m1;
-            //guid->m0 = m0;
-        }
-    }
-
-    return ok;
-}
-
-constexpr zp_bool_t zp_try_guid128_to_string( const zp_guid128_t& guid, char* str )
-{
-    zp_bool_t ok;
-    ok = zp_try_uint32_to_string( (zp_uint32_t)( guid.m32 >> 32 ), str + 0 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)guid.m32, str + 8 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint64_t)( guid.m10 >> 32 ), str + 16 );
-    ok = ok && zp_try_uint32_to_string( (zp_uint32_t)guid.m10, str + 24 );
-    *( str + 32 ) = '\0';
-
-    return ok;
+    return valid;
 }
 
 //
@@ -821,6 +710,8 @@ namespace zp
         constexpr static String As( const char* c_str );
 
         constexpr static String As( const char* c_str, zp_size_t length );
+
+        constexpr static String As( const Memory& memory );
 
         constexpr zp_bool_t operator==( const String& other ) const;
 
@@ -908,6 +799,11 @@ namespace zp
         return { static_cast<const_str_pointer>(static_cast<const void*>(c_str)), length };
     }
 
+    constexpr String String::As( const Memory& memory )
+    {
+        return { static_cast<const_str_pointer>(memory.ptr()), memory.size() };
+    }
+
     constexpr zp_bool_t String::operator==( const String& other ) const
     {
         return m_str == other.m_str || zp_strcmp( m_str, m_length, other.m_str, other.m_length ) == 0;
@@ -915,7 +811,7 @@ namespace zp
 
     constexpr zp_bool_t String::operator!=( const String& other ) const
     {
-        return !(*this == other);
+        return !( *this == other );
     }
 }
 
@@ -974,15 +870,15 @@ namespace zp
 
         void append( const String& str );
 
-        template<class ... Args>
-        void format( const char* format, Args ... args )
+        template<class... Args>
+        void format( const char* format, Args... args )
         {
             const zp_int32_t len = zp_snprintf( m_str, m_capacity, format, zp_forward( args... ) );
             m_length = len;
         }
 
-        template<class ... Args>
-        void appendFormat( const char* format, Args ... args )
+        template<class... Args>
+        void appendFormat( const char* format, Args... args )
         {
             const zp_int32_t len = zp_snprintf( m_str + m_length, m_capacity - m_length, format, zp_forward( args... ) );
             m_length += len;
@@ -1048,7 +944,7 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>( str ) );
+                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>(str) );
             }
         }
 
@@ -1060,7 +956,7 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>( str ) );
+                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>(str) );
             }
         }
 
@@ -1134,7 +1030,7 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return reinterpret_cast<const char*>( m_str);
+            return reinterpret_cast<const char*>(m_str);
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -1249,7 +1145,7 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return reinterpret_cast<const char*>( m_str );
+            return reinterpret_cast<const char*>(m_str);
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -1302,22 +1198,24 @@ namespace zp
         }
 
     private:
-        zp_char8_t m_str[Size];
+        zp_char8_t m_str[ Size ];
     };
 
     // Predefined FixedString lengths
-    typedef FixedString<16> FixedString16;
-    typedef FixedString<32> FixedString32;
-    typedef FixedString<64> FixedString64;
-    typedef FixedString<128> FixedString128;
-    typedef FixedString<256> FixedString256;
-    typedef FixedString<512> FixedString512;
-    typedef FixedString<1024> FixedString1024;
+    using FixedString16 = FixedString<16>;
+    using FixedString32 = FixedString<32>;
+    using FixedString64 = FixedString<64>;
+    using FixedString128 = FixedString<128>;
+    using FixedString256 = FixedString<256>;
+    using FixedString512 = FixedString<512>;
+    using FixedString1024 = FixedString<1024>;
 
     template<zp_size_t Size>
     class MutableFixedString
     {
     public:
+        using self_type = MutableFixedString<Size>;
+
         MutableFixedString()
             : m_str()
             , m_length( 0 )
@@ -1368,12 +1266,12 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return reinterpret_cast<const char*>( m_str );
+            return reinterpret_cast<const char*>(m_str);
         }
 
         [[nodiscard]] char* mutable_str()
         {
-            return reinterpret_cast<char*>( m_str );
+            return reinterpret_cast<char*>(m_str);
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -1387,30 +1285,41 @@ namespace zp
             m_str[ 0 ] = '\0';
         }
 
-        void append( char ch )
+        self_type& appendLine()
+        {
+            m_str[ m_length ] = '\n';
+            m_length++;
+            m_str[ m_length ] = '\0';
+            return *this;
+        }
+
+        self_type& append( char ch )
         {
             m_str[ m_length ] = ch;
             m_length++;
             m_str[ m_length ] = '\0';
+            return *this;
         }
 
-        void append( zp_char8_t ch )
+        self_type& append( zp_char8_t ch )
         {
             m_str[ m_length ] = ch;
             m_length++;
             m_str[ m_length ] = '\0';
+            return *this;
         }
 
-        void append( const char* str )
+        self_type& append( const char* str )
         {
             for( ; m_length < Size && *str; ++m_length, ++str )
             {
                 m_str[ m_length ] = *str;
             }
             m_str[ m_length ] = '\0';
+            return *this;
         }
 
-        void append( const char* str, zp_size_t length )
+        self_type& append( const char* str, zp_size_t length )
         {
             const char* end = str + length;
             for( ; m_length < Size && *str && str != end; ++m_length, ++str )
@@ -1418,39 +1327,42 @@ namespace zp
                 m_str[ m_length ] = *str;
             }
             m_str[ m_length ] = '\0';
+            return *this;
         }
 
-        void append( const String& str )
+        self_type& append( const String& str )
         {
-            append( str.c_str(), str.length() );
+            return append( str.c_str(), str.length() );
         }
 
-        template<class ... Args>
-        void format( const char* format, Args ... args )
+        template<class... Args>
+        void format( const char* format, Args... args )
         {
             const zp_int32_t len = zp_snprintf( m_str, Size, format, args... );
             m_length = len;
         }
 
-        template<class ... Args>
-        void appendFormat( const char* format, Args ... args )
+        template<class... Args>
+        self_type& appendFormat( const char* format, Args... args )
         {
             const zp_int32_t len = zp_snprintf( m_str + m_length, Size - m_length, format, args... );
             m_length += len;
+            return *this;
         }
 
         [[nodiscard]] operator String() const
         {
             return { m_str, m_length };
         }
-//
+
+        //
         //explicit operator MutableString()
         //{
         //    return { .str = m_path, .length = length, .capacity = Size };
         //}
 
     private:
-        zp_char8_t m_str[Size];
+        zp_char8_t m_str[ Size ];
         zp_size_t m_length;
     };
 
@@ -1518,7 +1430,7 @@ namespace zp
 zp_int32_t zp_strcmp( const zp::String& lh, const zp::String& rh );
 
 template<zp_size_t RHSize>
-zp_int32_t zp_strcmp( const zp::String& str, const char (& rh)[RHSize] )
+zp_int32_t zp_strcmp( const zp::String& str, const char ( &rh )[ RHSize ] )
 {
     return zp_strcmp( str, zp::String::As( rh, zp_strlen( rh ) ) );
 }
@@ -1526,7 +1438,7 @@ zp_int32_t zp_strcmp( const zp::String& str, const char (& rh)[RHSize] )
 const char* zp_strnstr( const zp::String& str, const zp::String& find );
 
 template<zp_size_t Size>
-const char* zp_strnstr( const zp::String& str, const char (& find)[Size] )
+const char* zp_strnstr( const zp::String& str, const char ( &find )[ Size ] )
 {
     return zp_strnstr( str, zp::String::As( find, zp_strlen( find ) ) );
 }

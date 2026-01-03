@@ -9,7 +9,7 @@
 
 namespace zp
 {
-        enum ShaderOutputReflectionResourceType : zp_uint8_t
+    enum ShaderOutputReflectionResourceType : zp_uint8_t
     {
         ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_CBUFFER,
         ZP_SHADER_OUTPUT_REFLECTION_RESOURCE_TYPE_TBUFFER,
@@ -177,13 +177,12 @@ namespace zp
 
 namespace zp::ShaderCompiler
 {
-    void ShaderCompilerExecuteJob( const JobHandle& parentJob, AssetCompilerTask* task );
+    void Initialize();
 
-    void ShaderCompilerExecute( AssetCompilerTask* task );
+    void Shutdown();
 
-    Memory ShaderCompilerCreateTaskMemory( MemoryLabel memoryLabel, const String& inFile, const String& outFile, const CommandLine& cmdLine );
-
-    void ShaderCompilerDestroyTaskMemory( MemoryLabel memoryLabel, Memory memory );
+    void QueueShaderCompilerTaskRequest();
+    void QueueShaderCompilerTask(int entryP);
 }
 
 #endif //ZP_SHADERCOMPILER_H

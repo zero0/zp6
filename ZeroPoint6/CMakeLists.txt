@@ -18,6 +18,7 @@ set(ZP_CORE_SRC
     "src/Core/Log.cpp"
     "src/Core/Math.cpp"
     "src/Core/Profiler.cpp"
+    "src/Core/Properties.cpp"
     "src/Core/String.cpp"
     "src/Core/Threading.cpp"
 )
@@ -56,18 +57,29 @@ set(ZP_ENGINE_SRC
     "src/Engine/${PLATFORM_FULL_NAME}/Main${PLATFORM_FULL_NAME}.cpp"
 )
 
+set(ZP_TEST_SRC
+    "src/Test/Test.cpp"
+)
+
 set(ZP_SRC
     ${ZP_CORE_SRC}
     ${ZP_PLATFORM_SRC}
     ${ZP_ENGINE_SRC}
     ${ZP_RENDERING_SRC}
     ${ZP_RENDERING_API_SRC}
+    ${ZP_TEST_SRC}
 )
 
 # Header Files
 configure_file(
     "include/Core/Version.h.in"
     "include/Core/Version.h"
+    NEWLINE_STYLE UNIX
+    @ONLY
+)
+configure_file(
+    "include/Core/Config.h.in"
+    "include/Core/Config.h"
     NEWLINE_STYLE UNIX
     @ONLY
 )
@@ -89,6 +101,7 @@ set(ZP_CORE_HEADERS
     "include/Core/Math.h"
     "include/Core/Memory.h"
     "include/Core/Profiler.h"
+    "include/Core/Properties.h"
     "include/Core/Queue.h"
     "include/Core/Set.h"
     "include/Core/String.h"
@@ -144,6 +157,10 @@ set(ZP_RENDERING_HEADERS
     "include/Rendering/Swapchain.h"
 )
 
+set(ZP_TEST_HEADERS
+    "include/Test/Test.h"
+)
+
 set(ZP_RENDERING_API_HEADERS
     "include/Rendering/${ZP_RENDERING_API}/${ZP_RENDERING_API}GraphicsDevice.h"
 )
@@ -155,6 +172,7 @@ set(ZP_HEADERS
     ${ZP_PLATFORM_HEADERS}
     ${ZP_RENDERING_HEADERS}
     ${ZP_RENDERING_API_HEADERS}
+    ${ZP_TEST_HEADERS}
 )
 
 # set(ZP_CORE_MODULE

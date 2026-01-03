@@ -51,7 +51,7 @@ constexpr zp_hash32_t zp_fnv32_1a( const T (& value)[Size], zp_hash32_t h = 2166
 
 constexpr zp_hash32_t zp_fnv32_1a( const zp::Memory& memory, zp_hash32_t h = 2166136261u )
 {
-    return zp_fnv32_1a( memory.ptr, memory.size, h );
+    return zp_fnv32_1a( memory.ptr(), memory.size(), h );
 }
 
 //
@@ -95,7 +95,7 @@ constexpr zp_hash64_t zp_fnv64_1a( const T (& value)[Size], zp_hash64_t h = 0xcb
 
 constexpr zp_hash64_t zp_fnv64_1a( const zp::Memory& memory, zp_hash64_t h = 0xcbf29ce484222325 )
 {
-    return zp_fnv64_1a( memory.ptr, memory.size, h );
+    return zp_fnv64_1a( memory.ptr(), memory.size(), h );
 }
 
 //
@@ -214,7 +214,7 @@ constexpr zp_hash128_t zp_fnv128_1a( const T( & array )[Count], zp_hash128_t h =
 
 constexpr zp_hash128_t zp_fnv128_1a( const zp::Memory& memory, zp_hash128_t h = { .m32 = 0x6c62272e07bb0142, .m10 = 0x62b821756295c58d } )
 {
-    return zp_fnv128_1a( memory.ptr, memory.size, h );
+    return zp_fnv128_1a( memory.ptr(), memory.size(), h );
 }
 
 //

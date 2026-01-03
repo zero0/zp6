@@ -1,0 +1,10 @@
+//
+// Created by phosg on 10/13/2025.
+//
+
+#ifndef ZP_CONFIG_H
+#define ZP_CONFIG_H
+
+#cmakedefine ZP_RENDERING_API   @ZP_RENDERING_API@
+
+#endif //ZP_CONFIG_H

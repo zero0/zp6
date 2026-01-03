@@ -351,7 +351,7 @@ namespace zp
 namespace zp
 {
     template<typename T, zp_size_t Size>
-    using FixedQueue = Queue<T, FixedMemoryVectorAllocator<Size, sizeof( T )> >;
+    using FixedQueue = Queue<T, FixedMemoryVectorAllocator<Size, T> >;
 }
 
 #endif //ZP_QUEUE_H

@@ -10,6 +10,7 @@
 #include "Core/Data.h"
 #include "Core/String.h"
 
+    // @formatter:off
 #define HTTP_STATUS_CODES(XX)                                                 \
     XX(100, CONTINUE,                        Continue)                        \
     XX(101, SWITCHING_PROTOCOLS,             Switching Protocols)             \
@@ -82,29 +83,30 @@
     XX(PATCH,       PATCH)         \
     XX(CONNECT,     CONNECT)
 
-#define HTTP_HEADERS(XX)                                        \
-    XX(ACCEPT,                      Accept)                     \
-    XX(ACCEPT_ENCODING,             Accept-Encoding)            \
-    XX(CACHE_CONTROL,               Cache-Control)              \
-    XX(CONNECTION,                  Connection)                 \
-    XX(CONTENT_DIGEST,              Content-Digest)             \
-    XX(CONTENT_ENCODING,            Content-Encoding)           \
-    XX(CONTENT_LENGTH,              Content-Length)             \
-    XX(CONTENT_TYPE,                Content-Type)               \
-    XX(CONTENT_RANGE,               Content-Range)              \
-    XX(COOKIE,                      Cookie)                     \
-    XX(DATE,                        Date)                       \
-    XX(HOST,                        Host)                       \
-    XX(LOCATION,                    Location)                   \
-    XX(LAST_MODIFIED,               Last-Modified)              \
-    XX(SEC_WEBSOCKET_ACCEPT,        Sec-WebSocket-Accept)       \
-    XX(SEC_WEBSOCKET_EXTENSIONS,    Sec-WebSocket-Extensions)   \
-    XX(SEC_WEBSOCKET_KEY,           Sec-WebSocket-Key)          \
-    XX(SEC_WEBSOCKET_PROTOCOL,      Sec-WebSocket-Protocol)     \
-    XX(SEC_WEBSOCKET_VERSION,       Sec-WebSocket-Version)      \
-    XX(SERVER,                      Server)                     \
-    XX(UPGRADE,                     Upgrade)                    \
-    XX(USER_AGENT,                  User-Agent)
+#define HTTP_HEADERS(XX)                                                                 \
+    XX(ACCEPT,                      Accept,                     HeaderValueType::String) \
+    XX(ACCEPT_ENCODING,             Accept-Encoding,            HeaderValueType::String) \
+    XX(CACHE_CONTROL,               Cache-Control,              HeaderValueType::String) \
+    XX(CONNECTION,                  Connection,                 HeaderValueType::String) \
+    XX(CONTENT_DIGEST,              Content-Digest,             HeaderValueType::String) \
+    XX(CONTENT_ENCODING,            Content-Encoding,           HeaderValueType::String) \
+    XX(CONTENT_LENGTH,              Content-Length,             HeaderValueType::Int)    \
+    XX(CONTENT_TYPE,                Content-Type,               HeaderValueType::String) \
+    XX(CONTENT_RANGE,               Content-Range,              HeaderValueType::String) \
+    XX(COOKIE,                      Cookie,                     HeaderValueType::String) \
+    XX(DATE,                        Date,                       HeaderValueType::Date)   \
+    XX(HOST,                        Host,                       HeaderValueType::String) \
+    XX(LOCATION,                    Location,                   HeaderValueType::String) \
+    XX(LAST_MODIFIED,               Last-Modified,              HeaderValueType::Date)   \
+    XX(SEC_WEBSOCKET_ACCEPT,        Sec-WebSocket-Accept,       HeaderValueType::String) \
+    XX(SEC_WEBSOCKET_EXTENSIONS,    Sec-WebSocket-Extensions,   HeaderValueType::String) \
+    XX(SEC_WEBSOCKET_KEY,           Sec-WebSocket-Key,          HeaderValueType::String) \
+    XX(SEC_WEBSOCKET_PROTOCOL,      Sec-WebSocket-Protocol,     HeaderValueType::String) \
+    XX(SEC_WEBSOCKET_VERSION,       Sec-WebSocket-Version,      HeaderValueType::String) \
+    XX(SERVER,                      Server,                     HeaderValueType::String) \
+    XX(UPGRADE,                     Upgrade,                    HeaderValueType::String) \
+    XX(USER_AGENT,                  User-Agent,                 HeaderValueType::String)
+// @formatter:on
 
 namespace zp::Http
 {
@@ -132,17 +134,25 @@ namespace zp::Http
 #undef XX
     };
 
+    enum class HeaderValueType
+    {
+        String,
+        Int,
+        Date,
+    };
+
     enum class HeaderKey
     {
         UNKNOWN,
-#define XX(name, string)        name,
+#define XX(name, string, type)        name,
         HTTP_HEADERS( XX )
 #undef XX
     };
 
     struct Header
     {
-        String value;
+        String stringValue;
+        zp_uint64_t intValue;
         HeaderKey key;
     };
 
@@ -158,11 +168,10 @@ namespace zp::Http
 
     struct Response
     {
-        String path;
-        String body;
-        FixedVector<Header, 16> headers;
         Version version;
         StatusCode statusCode;
+        FixedVector<Header, 16> headers;
+        String body;
     };
 
     StatusCode ParseRequest( const Memory& inMemory, Request& outRequest );

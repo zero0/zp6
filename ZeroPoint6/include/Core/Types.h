@@ -39,7 +39,7 @@ constexpr zp_handle_t ZP_NULL_HANDLE = static_cast<zp_handle_t>(nullptr);
 #define ZP_BOOL32( x )      zp_uint32_t x : 1
 #define ZP_BOOL64( x )      zp_uint64_t x : 1
 
-#ifdef ZP_ARCH64
+#ifdef ZP_PLATFORM_ARCH64
 using zp_size_t = unsigned long long;
 using zp_ptrdiff_t = long long;
 using zp_ptr_t = unsigned long long;
@@ -147,6 +147,10 @@ namespace zp
 {
     using MemoryLabel = zp_uint8_t;
 }
+
+//
+//
+//
 
 namespace zp
 {

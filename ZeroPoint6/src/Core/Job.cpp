@@ -252,8 +252,6 @@ namespace zp
         {
             Job* job {};
 
-            auto* info = &t_threadInfo;
-
             const zp_size_t index = t_threadInfo.allocatedJobCount % kJobsPerThread;
             ++t_threadInfo.allocatedJobCount;
 
@@ -368,15 +366,15 @@ namespace zp
             if( job->callback )
             {
                 Memory sharedMemory {
-                    .ptr = job->jobSharedMemorySize == 0 ? nullptr : ZP_MALLOC( MemoryLabels::ThreadSafe, job->jobSharedMemorySize ),
-                    .size = job->jobSharedMemorySize
+                    job->jobSharedMemorySize == 0 ? nullptr : ZP_MALLOC( MemoryLabels::ThreadSafe, job->jobSharedMemorySize ),
+                    job->jobSharedMemorySize
                 };
 
                 JobWorkArgs args {
                     .currentJob { .job = job },
                     .parentJob { .job = job->parentJob },
                     .groupId = job->batchId,
-                    .jobMemory { .ptr = job->data.data(), .size = job->data.length() },
+                    .jobMemory { job->data.data(), job->data.length() },
                     .sharedMemory = sharedMemory,
                 };
 
@@ -386,9 +384,9 @@ namespace zp
                     job->callback( args );
                 }
 
-                if( sharedMemory.ptr != nullptr )
+                if( sharedMemory.ptr() != nullptr )
                 {
-                    ZP_FREE( MemoryLabels::ThreadSafe, sharedMemory.ptr );
+                    ZP_FREE( MemoryLabels::ThreadSafe, sharedMemory.ptr() );
                 }
             }
 
@@ -471,7 +469,7 @@ namespace zp
             Profiler::InitializeProfilerThread();
 #endif
 
-            const zp_size_t index = static_cast<zp_size_t>( reinterpret_cast<zp_ptr_t>( threadData ) );
+            const zp_size_t index = static_cast<zp_size_t>(reinterpret_cast<zp_ptr_t>(threadData));
 
             Log::info() << "Entering Worker Thread..." << Log::endl;
 
@@ -544,7 +542,7 @@ namespace zp
             g_context.allBatchJobQueues.pushBackEmpty();
 
             zp_uint32_t threadID;
-            const ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &threadID );
+            const ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>(static_cast<zp_ptr_t>(i)), stackSize, &threadID );
 
             Platform::SetThreadIdealProcessor( threadHandle, 1 + ( i % numAvailableProcessors ) ); // proc 0 is used for main thread
 
@@ -581,6 +579,16 @@ namespace zp
 
         // destroy main thread job info
         DestroyLocalThreadInfo();
+    }
+
+    zp_uint32_t JobSystem::GetThreadCount()
+    {
+        return g_context.threadCount;
+    }
+
+    zp_uint32_t JobSystem::GetJobQueueCount()
+    {
+        return g_context.threadCount + 1;
     }
 
     void JobSystem::Complete( JobHandle jobHandle )
@@ -719,7 +727,7 @@ namespace zp
         Job* job = AllocateJob();
 
         job->callback = jobCallback;
-        zp_memcpy( job->data.data(), job->data.length(), jobData.ptr, jobData.size );
+        zp_memcpy( job->data.asMemory(), jobData );
 
         QueueNextJob( job );
 
@@ -734,7 +742,7 @@ namespace zp
         Job* job = AllocateJob();
 
         job->callback = jobCallback;
-        zp_memcpy( job->data.data(), job->data.length(), jobData.ptr, jobData.size );
+        zp_memcpy( job->data.asMemory(), jobData );
 
         ExecuteJob( job );
 
@@ -789,7 +797,7 @@ namespace zp
     {
         JobHeader* header()
         {
-            JobHeader* h = reinterpret_cast<JobHeader*>( m_jobData );
+            JobHeader* h = reinterpret_cast<JobHeader*>(m_jobData);
             return h;
         }
 
@@ -814,7 +822,7 @@ namespace zp
         void addDependency( Job* job )
         {
             JobHeader* h = header();
-            Job** dep = reinterpret_cast<Job**>( m_jobData + ( kJobPayload - sizeof( Job* ) * ( 1 + h->numDependencies ) ) );
+            Job** dep = reinterpret_cast<Job**>(m_jobData + ( kJobPayload - sizeof( Job* ) * ( 1 + h->numDependencies ) ));
             dep[ h->numDependencies ] = job;
             ++h->numDependencies;
         }
@@ -823,12 +831,12 @@ namespace zp
         {
             JobHeader* h = header();
             return {
-                .ptr = h->numDependencies == 0 ? nullptr : reinterpret_cast<Job**>( m_jobData + ( kJobPayload - sizeof( Job* ) * ( 1 + h->numDependencies ) ) ),
-                .length = static_cast<zp_size_t >(h->numDependencies)
+                .ptr = h->numDependencies == 0 ? nullptr : reinterpret_cast<Job**>(m_jobData + ( kJobPayload - sizeof( Job* ) * ( 1 + h->numDependencies ) )),
+                .length = static_cast<zp_size_t>(h->numDependencies)
             };
         }
 
-        zp_uint8_t m_jobData[kJobPayload];
+        zp_uint8_t m_jobData[ kJobPayload ];
     };
 }
 
@@ -843,15 +851,19 @@ namespace
         kJobQueueCountMask = kJobQueueCount - 1,
     };
 
-    ZP_STATIC_ASSERT( zp_is_pow2( kJobQueueCount ) );
-    ZP_STATIC_ASSERT( zp_is_pow2( kJobsPerThread ) );
+    ZP_STATIC_ASSERT ( zp_is_pow2
+    ( kJobQueueCount )
+    );
+    ZP_STATIC_ASSERT ( zp_is_pow2
+    ( kJobsPerThread )
+    );
 }
 
 namespace
 {
     class JobQueue
     {
-    ZP_NONCOPYABLE( JobQueue );
+        ZP_NONCOPYABLE( JobQueue );
 
     public:
         [[nodiscard]] zp_bool_t empty() const;
@@ -948,12 +960,13 @@ namespace
 {
     struct JobThreadInfo
     {
-        Job jobs[kJobsPerThread];
+        Job jobs[ kJobsPerThread ];
         zp_size_t allocatedJobCount;
         JobQueue* localJobQueue;
         JobQueue* localBatchJobQueue;
         zp_bool_t isRunning;
     };
+
     thread_local JobThreadInfo t_threadInfo;
 
 
@@ -1119,22 +1132,23 @@ namespace
 
     zp_uint32_t WorkerThreadFunc( void* threadData )
     {
+
 #if ZP_USE_PROFILER
-        Profiler::InitializeProfilerThread();
+Profiler::InitializeProfilerThread();
 #endif
 
-        const zp_size_t index = static_cast<zp_size_t>( reinterpret_cast<zp_ptr_t>( threadData ) );
+const zp_size_t index = static_cast<zp_size_t>(reinterpret_cast<zp_ptr_t>(threadData));
 
-        g_allJobThreadInfos[ index ] = &t_threadInfo;
+g_allJobThreadInfos [ index ] = &t_threadInfo;
 
-        zp_zero_memory_array( t_threadInfo.jobs );
+zp_zero_memory_array ( t_threadInfo.jobs);
 
-        t_threadInfo.allocatedJobCount = 0;
-        t_threadInfo.localJobQueue = g_allJobQueues[ index ];
-        t_threadInfo.localBatchJobQueue = g_allBatchJobQueues[ index ];
-        t_threadInfo.isRunning = true;
+t_threadInfo.allocatedJobCount=0;
+t_threadInfo.localJobQueue= g_allJobQueues[ index ];
+t_threadInfo.localBatchJobQueue= g_allBatchJobQueues[ index ];
+t_threadInfo.isRunning=true;
 
-        while( t_threadInfo.isRunning )
+        while( t_threadInfo.isRunning)
         {
             Job* job = GetJob();
             if( job && t_threadInfo.isRunning )
@@ -1145,11 +1159,11 @@ namespace
             Platform::YieldCurrentThread();
         }
 
-        zp_printfln( "Exiting Worker Thread %d", Platform::GetCurrentThreadId() );
+zp_printfln ( "Exiting Worker Thread %d", Platform::GetCurrentThreadId());
 
-        t_threadInfo.allocatedJobCount = 0;
-        t_threadInfo.localBatchJobQueue = nullptr;
-        t_threadInfo.localJobQueue = nullptr;
+t_threadInfo.allocatedJobCount=0;
+t_threadInfo.localBatchJobQueue=nullptr;
+t_threadInfo.localJobQueue=nullptr;
 
         return 0;
     }
@@ -1254,12 +1268,12 @@ void JobSystem::Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount )
     zp_zero_memory_array( g_allQueues.ptr, g_allQueues.length );
 
     g_allJobQueues = {
-        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, JobQueue*, threadJobCount ),
+        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, JobQueue *, threadJobCount ),
         .length = threadJobCount
     };
 
     g_allBatchJobQueues = {
-        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, JobQueue*, threadJobCount ),
+        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, JobQueue *, threadJobCount ),
         .length = threadJobCount
     };
 
@@ -1270,7 +1284,7 @@ void JobSystem::Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount )
     }
 
     g_allJobThreadInfos = {
-        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, JobThreadInfo*, threadJobCount ),
+        .ptr = ZP_MALLOC_T_ARRAY( memoryLabel, JobThreadInfo *, threadJobCount ),
         .length = threadJobCount
     };
     zp_zero_memory_array( g_allJobThreadInfos.ptr, g_allJobThreadInfos.length );
@@ -1295,13 +1309,13 @@ void JobSystem::Teardown()
 void JobSystem::InitializeJobThreads()
 {
     const zp_size_t stackSize = 1 MB;
-    MutableFixedString<64> threadName;
+    MutableFixedString < 64 > threadName;
 
     const zp_uint32_t numAvailableProcessors = Platform::GetProcessorCount() - 1;
     for( zp_uint32_t i = 0; i < g_allJobThreadHandles.length; ++i )
     {
         zp_uint32_t threadID;
-        ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &threadID );
+        ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>(static_cast<zp_ptr_t>(i)), stackSize, &threadID );
 
         Platform::SetThreadIdealProcessor( threadHandle, 1 + ( i % numAvailableProcessors ) ); // proc 0 is used for main thread
 

@@ -8,16 +8,20 @@
 #include "Core/CommandLine.h"
 #include "Core/Log.h"
 #include "Core/Http.h"
+#include "Core/Profiler.h"
 
 #include "Platform/Platform.h"
+
+#include "Rendering/Shader.h"
 
 #include "Tools/AssetCompiler.h"
 #include "Tools/ShaderCompiler.h"
 
+
 using namespace zp;
 
 
-void zp::AssetCompilerTask::Execute( const zp::JobHandle& jobHandle, zp::AssetCompilerTask* task )
+void AssetCompilerTask::Execute( const zp::JobHandle& jobHandle, zp::AssetCompilerTask* task )
 {
     if( task->jobExec )
     {
@@ -53,7 +57,7 @@ const AssetCompilerProcessor* AssetCompiler::getCompilerProcessor( const String&
 AssetCompilerApplication::AssetCompilerApplication( MemoryLabel memoryLabel )
     : m_assetCompiler( memoryLabel )
     , m_exitCode( 0 )
-    , m_isRunning( true )
+    , m_isRunning( false )
     , m_infoPort( 8080 )
     , m_assetPort( 40000 )
     , memoryLabel( memoryLabel )
@@ -62,15 +66,17 @@ AssetCompilerApplication::AssetCompilerApplication( MemoryLabel memoryLabel )
 
 void AssetCompilerApplication::initialize( const String& commandLine )
 {
-    CommandLine cmdLine( 0 );
+    zp_size_t numJobThreads = 2;
+
+    CommandLine cmdLine( MemoryLabels::Default );
     if( cmdLine.parse( commandLine.c_str() ) )
     {
         const CommandLineOperation versionOp = cmdLine.addOperation( {
-            .shortName = String::As( "-v"),
+            .shortName = String::As( "-v" ),
             .longName = String::As( "--version" ),
         } );
         const CommandLineOperation helpOp = cmdLine.addOperation( {
-            .shortName = String::As( "-h"),
+            .shortName = String::As( "-h" ),
             .longName = String::As( "--help" )
         } );
 
@@ -87,11 +93,17 @@ void AssetCompilerApplication::initialize( const String& commandLine )
         } );
 
         const CommandLineOperation libraryOp = cmdLine.addOperation( {
-           .longName = String::As( "--library-path" ),
-           .minParameterCount = 1,
-           .maxParameterCount = 1,
-       } );
+            .longName = String::As( "--library-path" ),
+            .minParameterCount = 1,
+            .maxParameterCount = 1,
+        } );
 
+        const CommandLineOperation jobThreadCountOp = cmdLine.addOperation( {
+            .longName = String::As( "--job-count" ),
+            .minParameterCount = 1,
+            .maxParameterCount = 1,
+            .type = CommandLineOperationParameterType::Int32,
+        } );
         //
         // Operations
         //
@@ -127,25 +139,48 @@ void AssetCompilerApplication::initialize( const String& commandLine )
         {
 
         }
+
+        zp_int32_t jobThreadCount;
+        if( cmdLine.tryGetParameterAsInt32( jobThreadCountOp, jobThreadCount ) )
+        {
+            numJobThreads = zp_max( jobThreadCount, 1 );
+        }
     }
     else
     {
         ZP_ASSERT_MSG_ARGS( false, "Failed to parse command line: %s", commandLine.c_str() );
     }
 
+#if ZP_USE_PROFILER
+    Profiler::CreateProfiler( MemoryLabels::Profiling, {
+        .maxThreadCount = numJobThreads + 2, // main thread + socket thread
+        .maxCPUEventsPerThread = 128,
+        .maxMemoryEventsPerThread = 128,
+        .maxGPUEventsPerThread = 4,
+        .maxFramesToCapture = 120,
+    } );
+
+    Profiler::InitializeProfilerThread();
+#endif
+
+    // initialize job system
+    JobSystem::Setup( MemoryLabels::Default, numJobThreads );
+
     Platform::InitializeNetworking();
+
+    ShaderCompiler::Initialize();
+
+    Log::info() << "Register File Extensions..." << Log::endl;
 
     const OpenSystemTrayDesc openSystemTrayDesc {};
     m_systemTray = Platform::OpenSystemTray( openSystemTrayDesc );
 
-    Log::info() << "Register File Extensions..." << Log::endl;
-
     // register file extensions
     m_assetCompiler.registerFileExtension( String::As( ".shader" ), {
-        .createTaskFunc = ShaderCompiler::ShaderCompilerCreateTaskMemory,
-        .deleteTaskFunc = ShaderCompiler::ShaderCompilerDestroyTaskMemory,
-        .executeFunc = nullptr, //ShaderCompiler::ShaderCompilerExecute,
-        .jobExecuteFunc = ShaderCompiler::ShaderCompilerExecuteJob,
+        //.createTaskFunc = ShaderCompiler::ShaderCompilerCreateTaskMemory,
+        //.deleteTaskFunc = ShaderCompiler::ShaderCompilerDestroyTaskMemory,
+        //.executeFunc = nullptr, //ShaderCompiler::ShaderCompilerExecute,
+        //.jobExecuteFunc = ShaderCompiler::ShaderCompilerExecuteJob,
     } );
     m_assetCompiler.registerFileExtension( String::As( ".compute" ), {} );
 
@@ -153,6 +188,9 @@ void AssetCompilerApplication::initialize( const String& commandLine )
     m_assetCompiler.registerFileExtension( String::As( ".png" ), {} );
     m_assetCompiler.registerFileExtension( String::As( ".jpg" ), {} );
     m_assetCompiler.registerFileExtension( String::As( ".jpeg" ), {} );
+
+    m_assetCompiler.registerFileExtension( String::As( ".prefab" ), {} );
+    m_assetCompiler.registerFileExtension( String::As( ".txt" ), {} );
 
     Log::info() << "Asset Port: " << m_assetPort << Log::endl;
 
@@ -164,51 +202,84 @@ void AssetCompilerApplication::initialize( const String& commandLine )
         .connectionProtocol = ConnectionProtocol::TCP,
         .socketDirection = SocketDirection::Listen,
     } );
-    Log::info() << "Info Listening on Port:  " << m_infoPort << Log::endl;
 
-    m_receiveThread = Platform::CreateThread( ReceiveInfoSocketThreadFunc, this, 1 MB, nullptr );
+    zp_uint32_t threadId;
+    m_receiveThread = Platform::CreateThread( ReceiveInfoSocketThreadFunc, this, 1 MB, &threadId );
+
+    Log::info() << "Info Listening on Port:  " << m_infoPort << " (" << threadId << ")" << Log::endl;
+
+    m_isRunning = true;
 }
 
 zp_uint32_t AssetCompilerApplication::ReceiveInfoSocketThreadFunc( void* param )
 {
+#if ZP_USE_PROFILER
+    Profiler::InitializeProfilerThread();
+#endif
+
     AssetCompilerApplication* app = static_cast<AssetCompilerApplication*>(param);
 
     while( app->m_isRunning )
     {
-        Socket acceptedSocket = Platform::AcceptSocket( app->m_infoSocket );
+        const Socket acceptedSocket = Platform::AcceptSocket( app->m_infoSocket );
         if( acceptedSocket && app->m_isRunning )
         {
-            FixedArray<zp_uint8_t, 8 KB> mem;
-            const zp_size_t read = Platform::ReceiveSocket( acceptedSocket, mem.data(), mem.length() );
+            DataStreamWriter requestWriter( MemoryLabels::ThreadSafe, 4 KB );
 
-            zp_printfln( "%d: %.*s", read, read, mem.data() );
+            {
+                FixedArray<zp_uint8_t, 1 KB> buffer;
+
+                zp_size_t read;
+                do
+                {
+                    read = Platform::ReceiveSocket( acceptedSocket, buffer.data(), buffer.length() );
+                    Log::info() << "read: " << read << Log::endl;
+                    if( read > 0 )
+                    {
+                        requestWriter.write( buffer.data(), read );
+                    }
+                } while( read > 0 );
+            }
+
+            const Memory requestMemory = requestWriter.memory();
+            Log::info() << requestMemory.m_size << ": " << (const char*)requestMemory.as<char*>() << Log::endl;
 
             Http::Request request {};
-            Http::ParseRequest( { .ptr = mem.data(), .size = read }, request );
+            Http::ParseRequest( requestMemory, request );
 
             //
             //
             //
 
-            DataStreamWriter writer( 0 );
+            DataStreamWriter responseWriter( MemoryLabels::ThreadSafe, 4 KB );
             const Http::Response response {
                 .version = Http::Version::Http1_1,
-                .statusCode = Http::ZP_HTTP_STATUS_OK,
+                .statusCode = Http::StatusCode::OK,
+                .body = String::As( "Hello HTTP!" ),
             };
-            Http::WriteResponse( response, writer );
+            Http::WriteResponse( response, responseWriter );
 
-            const Memory sendMemory = writer.memory();
-            Platform::SendSocket( acceptedSocket, sendMemory.ptr, sendMemory.size );
+            const Memory sendMemory = responseWriter.memory();
+
+            Log::info() << sendMemory.m_size << ": " << (const char*)sendMemory.as<char*>() << Log::endl;
+
+            Platform::SendSocket( acceptedSocket, sendMemory.m_ptr, sendMemory.m_size );
 
             Platform::CloseSocket( acceptedSocket );
         }
     }
+
+#if ZP_USE_PROFILER
+    Profiler::DestroyProfilerThread();
+#endif
 
     return 0;
 }
 
 void AssetCompilerApplication::shutdown()
 {
+    ShaderCompiler::Shutdown();
+
     Platform::CloseSocket( m_infoSocket );
 
     Platform::JoinThreads( &m_receiveThread, 1 );
@@ -217,6 +288,16 @@ void AssetCompilerApplication::shutdown()
     Platform::CloseSystemTray( m_systemTray );
 
     Platform::ShutdownNetworking();
+
+    JobSystem::ExitJobThreads();
+
+    JobSystem::Teardown();
+
+#if ZP_USE_PROFILER
+    Profiler::DestroyProfilerThread();
+
+    Profiler::DestroyProfiler();
+#endif
 
     Log::info() << "Shutdown" << Log::endl;
 }

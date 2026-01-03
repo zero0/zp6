@@ -5,9 +5,9 @@
 #ifndef ZP_JOB_H
 #define ZP_JOB_H
 
-#include "Core/Common.h"
 #include "Core/Types.h"
-#include "Core/Allocator.h"
+#include "Core/Memory.h"
+#include "Core/Common.h"
 #include "Core/Function.h"
 
 namespace zp
@@ -44,6 +44,10 @@ namespace zp
 
         void ExitJobThreads();
 
+        zp_uint32_t GetThreadCount();
+
+        zp_uint32_t GetJobQueueCount();
+
         void Complete( JobHandle jobHandle );
 
         zp_bool_t IsComplete( JobHandle jobHandle );
@@ -67,7 +71,7 @@ namespace zp
         JobHandle Start( T&& jobData )
         {
             using TJob = zp_remove_reference_t<T>;
-            return Start( Memory { .ptr = &jobData, .size = sizeof( TJob ) }, TJob::Execute );
+            return Start( Memory { &jobData, sizeof( TJob ) }, TJob::Execute );
         }
 
         //
@@ -77,7 +81,7 @@ namespace zp
         JobHandle Run( T&& jobData )
         {
             using TJob = zp_remove_reference_t<T>;
-            return Run( Memory { .ptr = &jobData, .size = sizeof( TJob ) }, TJob::Execute );
+            return Run( Memory { &jobData, sizeof( TJob ) }, TJob::Execute );
         }
 
         void ScheduleBatchJobs();

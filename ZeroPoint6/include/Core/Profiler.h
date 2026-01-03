@@ -13,7 +13,7 @@
 
 #if ZP_USE_PROFILER
 #ifndef __FILENAME__
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
 #define __FILENAME__                        (zp_strrchr("\\" __FILE__, '\\') + 1)
 #else
 #define __FILENAME__                        (zp_strrchr("/" __FILE__, '/') + 1)
@@ -180,11 +180,11 @@ namespace zp
 #endif
     struct ProfilerCreateDesc
     {
-        zp_size_t maxThreadCount;
         zp_size_t maxCPUEventsPerThread;
         zp_size_t maxMemoryEventsPerThread;
         zp_size_t maxGPUEventsPerThread;
         zp_size_t maxFramesToCapture;
+        zp_uint32_t maxThreadCount;
     };
 
     namespace Profiler

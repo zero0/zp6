@@ -19,6 +19,7 @@ namespace zp
 
         constexpr zp_size_t CommandLineOperationToIndex( const CommandLineOperation& operation )
         {
+            ZP_ASSERT( operation.id > 0 );
             return operation.id - 1;
         }
     }

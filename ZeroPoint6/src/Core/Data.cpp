@@ -107,7 +107,7 @@ void DataStreamWriter::reset()
 
 Memory DataStreamWriter::memory() const
 {
-    return { .ptr = m_buffer, .size = m_position };
+    return { m_buffer, m_position };
 }
 
 Memory DataStreamWriter::memory( zp_size_t offset, zp_size_t size ) const
@@ -119,8 +119,8 @@ Memory DataStreamWriter::memory( zp_size_t offset, zp_size_t size ) const
     }
 
     return {
-        .ptr = m_buffer + offset,
-        .size = size
+        m_buffer + offset,
+        size
     };
 }
 
@@ -244,7 +244,7 @@ zp_size_t DataStreamReader::position() const
 
 zp_bool_t DataStreamReader::end() const
 {
-    return m_position >= m_memory.size;
+    return m_position >= m_memory.size();
 }
 
 zp_size_t DataStreamReader::seek( zp_ptrdiff_t offset, DataStreamSeekOrigin origin )
@@ -267,13 +267,13 @@ zp_size_t DataStreamReader::seek( zp_ptrdiff_t offset, DataStreamSeekOrigin orig
             }
             break;
         case DataStreamSeekOrigin::End:
-            if( offset < 0 && -offset > m_memory.size )
+            if( offset < 0 && -offset > m_memory.size() )
             {
                 m_position = 0;
             }
             else
             {
-                m_position = offset + m_memory.size;
+                m_position = offset + m_memory.size();
             }
             break;
         case DataStreamSeekOrigin::Exact:
@@ -296,12 +296,12 @@ Memory DataStreamReader::memory() const
 
 Memory DataStreamReader::memory( zp_size_t offset, zp_size_t size ) const
 {
-    return { .ptr = ZP_OFFSET_PTR( m_memory.ptr, offset ), .size = size };
+    return m_memory.slice( offset, size );
 }
 
 DataStreamReader DataStreamReader::slice( zp_size_t size )
 {
-    return DataStreamReader( { .ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position ), .size = size } );
+    return DataStreamReader( m_memory.slice( m_position, size ) );
 }
 
 zp_size_t DataStreamReader::read( void* ptr, zp_size_t size )
@@ -309,9 +309,9 @@ zp_size_t DataStreamReader::read( void* ptr, zp_size_t size )
     const zp_size_t oldPosition = m_position;
 
     const zp_size_t newPosition = m_position + size;
-    if( newPosition < m_memory.size )
+    if( newPosition < m_memory.size() )
     {
-        zp_memcpy( ptr, size, ZP_OFFSET_PTR( m_memory.ptr, m_position ), m_memory.size - m_position );
+        zp_memcpy( ptr, size, ZP_OFFSET_PTR( m_memory.ptr(), m_position ), m_memory.size() - m_position );
     }
     m_position = newPosition;
 
@@ -325,7 +325,7 @@ zp_size_t DataStreamReader::readReverse( void* ptr, zp_size_t size )
     if( m_position >= size )
     {
         const zp_size_t newPosition = m_position - size;
-        zp_memcpy( ptr, size, ZP_OFFSET_PTR( m_memory.ptr, newPosition ), m_memory.size - newPosition );
+        zp_memcpy( ptr, size, ZP_OFFSET_PTR( m_memory.ptr(), newPosition ), m_memory.size() - newPosition );
         m_position = newPosition;
     }
     else
@@ -341,9 +341,9 @@ Memory DataStreamReader::readMemory( zp_size_t size )
     Memory memory {};
 
     const zp_size_t newPosition = m_position + size;
-    if( newPosition < m_memory.size )
+    if( newPosition < m_memory.size() )
     {
-        memory = { .ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position ), .size = size };
+        memory = m_memory.slice( m_position, size );
         m_position = newPosition;
     }
 
@@ -355,9 +355,9 @@ void* DataStreamReader::readPtr( zp_size_t size )
     void* ptr {};
 
     const zp_size_t newPosition = m_position + size;
-    if( newPosition < m_memory.size )
+    if( newPosition < m_memory.size() )
     {
-        ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position );
+        ptr = ZP_OFFSET_PTR( m_memory.ptr(), m_position );
         m_position = newPosition;
     }
 
@@ -369,9 +369,9 @@ void* DataStreamReader::readPtrArray( zp_size_t size, zp_size_t length )
     void* ptr {};
 
     const zp_size_t newPosition = m_position + ( size * length );
-    if( newPosition < m_memory.size )
+    if( newPosition < m_memory.size() )
     {
-        ptr = ZP_OFFSET_PTR( m_memory.ptr, m_position );
+        ptr = ZP_OFFSET_PTR( m_memory.ptr(), m_position );
         m_position = newPosition;
     }
 
@@ -675,7 +675,7 @@ ArchiveBuilderResult ArchiveBuilder::loadArchive( Memory archiveMemory )
         reader.read( blockHeader );
 
         ArchiveBuilderBlock block {
-            .id  = blockIds[ i ].id,
+            .id = blockIds[ i ].id,
             .type = 0,
             .flags = ZP_ARCHIVE_BUILDER_BLOCK_FLAG_NONE,
         };
@@ -841,7 +841,7 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
     struct BlockOffsetSize
     {
         zp_size_t offset;
-        zp_size_t size;     // block size without alignment
+        zp_size_t size; // block size without alignment
     };
     Map<zp_hash64_t, BlockOffsetSize> blockIdToOffset( memoryLabel, sortedBlockCount );
 
@@ -864,20 +864,20 @@ ArchiveBuilderResult ArchiveBuilder::compile( ArchiveBuilderCompilerOptions opti
         {
             offset = outCompiledData.write<ArchiveBlockHeader>( {
                 .type = block.type,
-                .headerSize = block.header.ptr && block.header.size ? zp_uint32_t( block.header.size ) : 0,
-                .dataSize = block.data.ptr && block.data.size ? zp_uint32_t( block.data.size ) : 0,
+                .headerSize = block.header.ptr() && block.header.size() ? zp_uint32_t( block.header.size() ) : 0,
+                .dataSize = block.data.ptr() && block.data.size() ? zp_uint32_t( block.data.size() ) : 0,
             } );
-// TODO: compress?
+            // TODO: compress?
             // write header if provided
-            if( block.header.ptr && block.header.size )
+            if( block.header.ptr() && block.header.size() )
             {
-                outCompiledData.write( block.header.ptr, block.header.size );
+                outCompiledData.write( block.header.ptr(), block.header.size() );
             }
 
             // write data if provided
-            if( block.data.ptr && block.data.size )
+            if( block.data.ptr() && block.data.size() )
             {
-                outCompiledData.write( block.data.ptr, block.data.size );
+                outCompiledData.write( block.data.ptr(), block.data.size() );
             }
         }
 

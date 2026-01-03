@@ -7,9 +7,9 @@
 
 namespace zp
 {
-    typedef void (* OnApplicationFocused)();
+    using OnApplicationFocused = void (* )();
 
-    typedef void (* OnApplicationUnfocused)();
+    using OnApplicationUnfocused = void (* )();
 
     struct ApplicationEntryPoint
     {
@@ -17,7 +17,7 @@ namespace zp
         OnApplicationUnfocused onApplicationUnfocused;
     };
 
-    typedef const ApplicationEntryPoint* (__cdecl* GetApplicationEntryPoint)();
+    using GetApplicationEntryPoint = ApplicationEntryPoint* (* )();
 }
 
 #endif //ZP_APPLICATIONENTRYPOINT_H

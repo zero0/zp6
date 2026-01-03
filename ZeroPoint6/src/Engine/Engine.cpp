@@ -134,39 +134,11 @@ namespace zp
 
         if( !cmd.parse( cmdLine ) )
         {
-            Log::error() << "Failed to parse Command Line" << Log::endl;
+            ZP_LOG_ERROR( "Failed to parse Command Line" );
             cmd.printHelp();
         }
 
-        zp_int32_t maxJobThreads = 2;
-        cmd.tryGetParameterAsInt32( maxJobThreadParam, maxJobThreads );
-
-        Platform::InitializeNetworking();
-
-        Platform::InitializeStackTrace();
-
-        const ThreadHandle mainThreadHandle = Platform::GetCurrentThread();
-        Platform::SetThreadName( mainThreadHandle, String::As( "MainThread" ) );
-        Platform::SetThreadIdealProcessor( mainThreadHandle, 0 );
-
-        const zp_uint32_t numJobThreads = 2; // Platform::GetProcessorCount() - 1;
-
-#if ZP_USE_PROFILER
-        Profiler::CreateProfiler( MemoryLabels::Profiling, {
-            .maxThreadCount = numJobThreads + 1,
-            .maxCPUEventsPerThread = 128,
-            .maxMemoryEventsPerThread = 128,
-            .maxGPUEventsPerThread = 4,
-            .maxFramesToCapture = 120,
-        } );
-
-        Profiler::InitializeProfilerThread();
-#endif
-
         ZP_PROFILE_CPU_BLOCK_E( Initialize Engine );
-
-        // initialize job system
-        JobSystem::Setup( MemoryLabels::Default, numJobThreads );
 
         const zp_bool_t headless = cmd.hasFlag( headlessParam );
         const Rect2Di windowSize {
@@ -217,15 +189,18 @@ namespace zp
         {
             ZP_PROFILE_CPU_BLOCK_E( Create Graphics Device );
 
-            const GraphicsDeviceDesc dd {
+            const zp_uint32_t bufferedFrameCount = 4;
+            const zp_size_t stagingBufferSize = 32 MB;
+
+            const GraphicsDeviceDesc desc {
                 .appName = String::As( "AppName" ),
                 .windowHandle = m_windowHandle,
-                .stagingBufferSize = 32 MB,
-                .threadCount = numJobThreads,
-                .bufferedFrameCount = 4,
+                .stagingBufferSize = stagingBufferSize,
+                .threadCount = JobSystem::GetThreadCount(),
+                .bufferedFrameCount = bufferedFrameCount,
             };
 
-            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, dd );
+            m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, desc );
             //m_graphicsDevice->createSwapchain( m_windowHandle.m_handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
 
@@ -411,7 +386,7 @@ namespace zp
             {
                 ZP_PROFILE_CPU_BLOCK();
 
-                Log::info() << "Init job exec" << Log::endl;
+                ZP_LOG_INFO( "Init job exec" );
 
                 Engine* engine = args.jobMemory.as<InitialEngineJob>()->engine;
 
@@ -422,7 +397,6 @@ namespace zp
 
     void Engine::startEngine()
     {
-        JobSystem::InitializeJobThreads();
 
         if( m_moduleAPI )
         {
@@ -437,7 +411,6 @@ namespace zp
         JobSystem::Complete( m_previousFrameEnginePipelineHandle );
         m_previousFrameEnginePipelineHandle = {};
 
-        JobSystem::ExitJobThreads();
 
         if( m_moduleAPI )
         {
@@ -486,18 +459,6 @@ namespace zp
 
         DestroyGraphicsDevice( m_graphicsDevice );
         m_graphicsDevice = nullptr;
-
-#if ZP_USE_PROFILER
-        Profiler::DestroyProfilerThread();
-
-        Profiler::DestroyProfiler();
-#endif
-
-        JobSystem::Teardown();
-
-        Platform::ShutdownNetworking();
-
-        Platform::ShutdownStackTrace();
     }
 
     void Engine::reload()
@@ -999,20 +960,22 @@ namespace zp
 
         {
             auto commandBuffer = graphicsCommandBuffer->BeginCommandBuffer( ZP_RENDER_QUEUE_GRAPHICS );
-#if 0
-            auto pipeline = m_graphicsCommandBuffer->RequestPipeline( {} );
 
-            auto buffer = m_graphicsCommandBuffer->RequestBuffer( {}, {} );
 
-            m_graphicsCommandBuffer->PushConstant( commandBuffer, pipeline, 0, 0, {} );
+#if 1
+            auto pipeline = graphicsCommandBuffer->RequestPipeline( {} );
 
-            m_graphicsCommandBuffer->BeginRenderPass( commandBuffer, {} );
+            auto buffer = graphicsCommandBuffer->RequestBuffer( {}, {} );
 
-            m_graphicsCommandBuffer->BindPipeline( commandBuffer, {} );
+            graphicsCommandBuffer->PushConstant( commandBuffer, pipeline, 0, 0, {} );
 
-            m_graphicsCommandBuffer->Draw( commandBuffer, 3, 1, 0, 0 );
+            graphicsCommandBuffer->BeginRenderPass( commandBuffer, {} );
 
-            m_graphicsCommandBuffer->EndRenderPass( commandBuffer, {} );
+            graphicsCommandBuffer->BindPipeline( commandBuffer, {} );
+
+            graphicsCommandBuffer->Draw( commandBuffer, 3, 1, 0, 0 );
+
+            graphicsCommandBuffer->EndRenderPass( commandBuffer, {} );
 #endif
             graphicsCommandBuffer->SubmitCommandBuffer( commandBuffer );
         }

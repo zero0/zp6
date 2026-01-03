@@ -12,7 +12,7 @@
 #include "Core/Common.h"
 #include "Core/String.h"
 
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 
 #include <Windows.h>
@@ -168,7 +168,7 @@ zp_guid128_t zp_generate_unique_guid128()
 {
     zp_uint32_t m3, m2, m1, m0;
 
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
     UUID uuid;
     ::UuidCreate( &uuid );
 
@@ -190,7 +190,7 @@ zp_guid128_t zp_generate_guid128()
 {
     zp_uint32_t m3, m2, m1, m0;
 
-#if ZP_OS_WINDOWS
+#if ZP_PLATFORM_WINDOWS
     UUID uuid;
     ::UuidCreateSequential( &uuid );
 

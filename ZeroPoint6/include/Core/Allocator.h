@@ -42,27 +42,25 @@ namespace zp
     ZP_STATIC_ASSERT( static_cast<MemoryLabel>( MemoryLabels::MemoryLabels_Count ) < kMaxMemoryLabels );
 }
 
-#define ZP_USE_MEMORY_PROFILER          ZP_USE_PROFILER
+#define ZP_NEW( l, t )                      new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l))
+#define ZP_NEW_ARGS( l, t, ... )            new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l),__VA_ARGS__)
 
-#define ZP_NEW( l, t )                  new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l))
-#define ZP_NEW_ARGS( l, t, ... )        new (zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment)) t(static_cast<zp::MemoryLabel>(l),__VA_ARGS__)
-
-#define ZP_DELETE( t, p )               do { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = static_cast<t*>(p)->memoryLabel; static_cast<t*>(p)->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); p = nullptr; } while( false )
-#define ZP_DELETE_LABEL( l, t, p )      do { p->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(p); p = nullptr; } while( false )
+#define ZP_DELETE( t, p )                   do { const zp::MemoryLabel ZP_CONCAT(__memoryLabel_, __LINE__) = static_cast<t*>(p)->memoryLabel; static_cast<t*>(p)->~t(); zp::GetAllocator(ZP_CONCAT(__memoryLabel_, __LINE__))->free(p); (p) = nullptr; } while( false )
+#define ZP_DELETE_LABEL( l, t, p )          do { (p)->~t(); zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(p); (p) = nullptr; } while( false )
 
 #if ZP_USE_SAFE_DELETE
 #define ZP_SAFE_DELETE( t, p )              do { if( p ) { ZP_DELETE( t, p ); } } while( false )
 #define ZP_SAFE_DELETE_LABEL( l, t, p )     do { if( p ) { ZP_DELETE_LABEL( l, t, p ); } } while( false )
 #else // !ZP_USE_SAFE_DELETE
-#define ZP_SAFE_DELETE( t, p )          ZP_DELETE(t, p)
-#define ZP_SAFE_DELETE_LABEL( l, t, p ) ZP_DELETE_LABEL(l, t, p)
+#define ZP_SAFE_DELETE( t, p )              ZP_DELETE(t, p)
+#define ZP_SAFE_DELETE_LABEL( l, t, p )     ZP_DELETE_LABEL(l, t, p)
 #endif // ZP_USE_SAFE_DELETE
 
-#define ZP_MALLOC( l, s )               zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), zp::kDefaultMemoryAlignment)
-#define ZP_ALIGNED_MALLOC( l, s, a )    zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), (a))
+#define ZP_MALLOC( l, s )                           zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), zp::kDefaultMemoryAlignment)
+#define ZP_ALIGNED_MALLOC( l, s, a )                zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate((s), (a))
 
-#define ZP_MALLOC_T( l, t )                 static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment))
-#define ZP_ALIGNED_MALLOC_T( l, t, a )      static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), (a)))
+#define ZP_MALLOC_T( l, t )                         static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), zp::kDefaultMemoryAlignment))
+#define ZP_ALIGNED_MALLOC_T( l, t, a )              static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t), (a)))
 
 #define ZP_MALLOC_T_ARRAY( l, t, c )                static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), zp::kDefaultMemoryAlignment))
 #define ZP_ALIGNED_MALLOC_T_ARRAY( l, t, c, a )     static_cast<t*>(zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->allocate(sizeof(t) * (c), (a)))
@@ -70,7 +68,7 @@ namespace zp
 #define ZP_REALLOC( l, p, s )                       zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->reallocate( (p), (s), zp::kDefaultMemoryAlignment)
 #define ZP_ALIGNED_REALLOC( l, p, s, a )            zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->reallocate((p), (s), (a))
 
-#define ZP_FREE( l, p )                 do { zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free(static_cast<void*>(p)); } while( false )
+#define ZP_FREE( l, p )                             zp::GetAllocator(static_cast<zp::MemoryLabel>(l))->free((p))
 
 #if ZP_USE_SAFE_FREE
 #define ZP_SAFE_FREE( l, p )            do { if( p ) { ZP_FREE( l, p ); } } while( false )
@@ -602,11 +600,11 @@ namespace zp
         }
 
         AllocMemory( MemoryLabel memoryLabel, Memory memory )
-            : ptr( memory.size ? ZP_MALLOC( memoryLabel, memory.size ) : nullptr )
-            , size( memory.size )
+            : ptr( memory.size() ? ZP_MALLOC( memoryLabel, memory.size() ) : nullptr )
+            , size( memory.size() )
             , memoryLabel( memoryLabel )
         {
-            zp_memcpy( ptr, size, memory.ptr, memory.size );
+            zp_memcpy( ptr, size, memory.ptr(), memory.size() );
         }
 
         AllocMemory( const AllocMemory& other )
@@ -673,14 +671,14 @@ namespace zp
 
         [[nodiscard]] ZP_FORCEINLINE Memory memory() const
         {
-            return { .ptr = ptr, .size = size };
+            return { ptr, size };
         }
 
         [[nodiscard]] ZP_FORCEINLINE Memory slice( zp_size_t offset, zp_size_t sz ) const
         {
             return {
-                .ptr = ZP_OFFSET_PTR( ptr, offset ),
-                .size = sz
+                ZP_OFFSET_PTR( ptr, offset ),
+                sz
             };
         }
     };

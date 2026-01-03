@@ -49,16 +49,16 @@ namespace zp
 
     void GraphicsCommandBuffer::UpdateBuffer( CommandBufferHandle commandBuffer, BufferHandle dstBuffer, zp_size_t dstOffset, const Memory& srcData )
     {
-        if( srcData.size < kUpdateBufferInlineMaxSize )
+        if( srcData.size() < kUpdateBufferInlineMaxSize )
         {
             m_data.write( CommandHeader { .type = CommandType::UpdateBufferData } );
             m_data.write( CommandUpdateBufferData {
                 .commandBuffer = commandBuffer,
                 .dstBuffer = dstBuffer,
                 .dstOffset = dstOffset,
-                .srcLength = srcData.size
+                .srcLength = srcData.size()
             } );
-            m_data.write( srcData.ptr, srcData.size );
+            m_data.write( srcData.ptr(), srcData.size() );
             m_data.writeAlignment( kUpdateBufferInlineAlignment );
         }
         else
@@ -125,17 +125,17 @@ namespace zp
 
     void GraphicsCommandBuffer::PushConstant( CommandBufferHandle commandBuffer, PipelineHandle pipline, int shaderStage, zp_uint32_t offset, const Memory& srcMemory )
     {
-        if( srcMemory.size < kPushConstantInlineMaxSize )
+        if( srcMemory.size() < kPushConstantInlineMaxSize )
         {
             m_data.write( CommandHeader { .type = CommandType::PushConstant } );
             m_data.write( CommandPushConstant {
                 .commandBuffer = commandBuffer,
                 .pipeline = pipline,
                 .offset = offset,
-                .size = srcMemory.size,
+                .size = srcMemory.size(),
                 .shaderStage = shaderStage,
             } );
-            m_data.write( srcMemory.ptr, srcMemory.size );
+            m_data.write( srcMemory.ptr(), srcMemory.size() );
             m_data.writeAlignment( kPushConstantInlineAlignment );
         }
         else

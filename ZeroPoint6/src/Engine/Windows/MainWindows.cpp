@@ -1,4 +1,5 @@
 
+#include "Core/String.h"
 #include "Engine/Engine.h"
 #include "EntryPoint/EntryPoint.h"
 
@@ -10,7 +11,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 {
     using namespace zp;
 
-    EntryPointDesc desc {};
-    int ret = EntryPointMain<Engine>( String::As( lpCmdLine ), desc );
+    const EntryPointDesc desc {};
+    const int ret = EntryPointMain<Engine>( String::As( lpCmdLine ), desc );
     return ret;
 }

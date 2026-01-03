@@ -1328,7 +1328,7 @@ namespace
                 {
                     AllocMemory compressedShaderBinary( data->memoryLabel, dataHeader.size );
 
-                    const zp_size_t compressedSize = zp_lzf_compress( shaderObjPtr, 0, shaderObjSize, compressedShaderBinary.ptr, compressedShaderBinary.size );
+                    const zp_size_t compressedSize = zp_lzf_compress( shaderObjPtr, 0, shaderObjSize, compressedShaderBinary.ptr, 0 );
                     dataHeader.compressedSize = compressedSize;
 
                     shaderStream.write( dataHeader );

@@ -3,29 +3,20 @@
 //
 
 #include "Test/Test.h"
+
+#include "Core/Log.h"
 #include "Core/Macros.h"
 #include "Core/Math.h"
 
+#include "Platform/Platform.h"
+
 using namespace zp;
-
-ZP_TEST_GROUP( Math )
-{
-    ZP_TEST_SUITE( Vector4f )
-    {
-        ZP_TEST( Length )
-        {
-            const Vector4f v { 1, 1, 1, 1 };
-            const zp_float32_t len = Math::Length( v );
-
-            ZP_CHECK_EQUALS( len, 1.0f );
-            ZP_CHECK_APPROX( len, 1.0f, 0.000001f );
-        };
-    };
-};
 
 namespace zp
 {
-    Test::Test()
+    ITest::ITest()
+        : m_next( nullptr )
+        , m_prev( nullptr )
     {
         TestRunner::Add( this );
     }
@@ -38,13 +29,13 @@ namespace zp
     {
         struct TestRunnerContext
         {
-            Test* m_firstTest;
+            ITest* m_firstTest;
         };
 
         TestRunnerContext s_context {};
     }
 
-    void TestRunner::Add( Test* test )
+    void TestRunner::Add( ITest* test )
     {
         if( s_context.m_firstTest == nullptr )
         {
@@ -65,7 +56,7 @@ namespace zp
     {
         struct SetupTeardownFinallyBlock
         {
-            SetupTeardownFinallyBlock( Test* test, TestResults& testResults )
+            SetupTeardownFinallyBlock( ITest* test, TestResults& testResults )
                 : test( test )
                 , results( &testResults )
             {
@@ -83,35 +74,39 @@ namespace zp
                 }
             }
 
-            Test* test;
+            ITest* test;
             ITestResults* results;
         };
 
         testResults.StartRun();
 
-        TestResult r;
-        r.msg.append( __FILE__ );
-        r.msg.append( '@' );
-        r.msg.appendFormat( "%d", __LINE__ );
-        r.msg.append( ' ' );
-        r.msg.append( __FUNCTION__ );
-        r.msg.append( ':' );
+        const zp_time_t startTime = Platform::TimeNow();
 
-        for( Test* test = s_context.m_firstTest; test != s_context.m_firstTest; test = test->m_next )
+        ITest* currentTest = s_context.m_firstTest;
+        if( currentTest != nullptr )
         {
-            testResults.StartTest();
-
-            try
+            do
             {
-                const SetupTeardownFinallyBlock setupTeardown( test, testResults );
+                const zp_time_t startTestTime = Platform::TimeNow();
 
-                test->Run( &testResults );
-            }
-            catch( ... )
-            {
-            };
+                testResults.StartTest();
 
-            testResults.EndTest();
+                try
+                {
+                    const SetupTeardownFinallyBlock setupTeardown( currentTest, testResults );
+
+                    currentTest->Run( &testResults );
+                }
+                catch( ... )
+                {
+                };
+
+                testResults.EndTest();
+
+                const zp_time_t endTestTime = Platform::TimeNow();
+
+                currentTest = currentTest->m_next;
+            } while( currentTest != s_context.m_firstTest );
         }
 
         testResults.EndRun();
@@ -121,7 +116,7 @@ namespace zp
     //
     //
 
-    TestResults::TestResult( MemoryLabel memoryLabel )
+    TestResults::TestResults( MemoryLabel memoryLabel )
         : m_results( 8, memoryLabel )
         , m_numTests( 0 )
         , m_numPassed( 0 )
@@ -129,24 +124,43 @@ namespace zp
     {
     }
 
-    void TestResults::Pass( const char* operation, const char* file, zp_uint32_t line )
+    void TestResults::Pass( const TestResultDesc& result )
     {
         ++m_numPassed;
+        zp_printfln( ZP_CC_B( GREEN, DEFAULT ) "[PASS]" ZP_CC_RESET " %s %s:%d %s", result.testName, result.file, result.line, result.operation );
     }
 
-    void TestResults::Fail( const char* operation, const char* reason, const char* file, zp_uint32_t line )
+    void TestResults::Fail( const TestResultDesc& result )
     {
         ++m_numFailed;
+        if( result.reason )
+        {
+            zp_printfln( ZP_CC_B( RED, DEFAULT ) "[FAIL]" ZP_CC_RESET " %s %s:%d %s - %s", result.testName, result.file, result.line, result.operation, result.reason );
+        }
+        else
+        {
+            zp_printfln( ZP_CC_B( RED, DEFAULT ) "[FAIL]" ZP_CC_RESET " %s %s:%d %s", result.testName, result.file, result.line, result.operation );
+        }
     }
 
     void TestResults::StartRun()
     {
-
+        m_numTests = 0;
+        m_numPassed = 0;
+        m_numFailed = 0;
+        m_startTime = Platform::TimeNow();
     }
 
     void TestResults::EndRun()
     {
+        const zp_time_t endTime = Platform::TimeNow();
 
+        MutableFixedString256 log;
+        log.append( "[Test Run Complete]" ).appendLine();
+        log.append( "  Passed: " ).appendFormat( "%d", m_numPassed ).appendLine();
+        log.append( "  Failed: " ).appendFormat( "%d", m_numFailed );
+
+        zp_printfln( log.c_str() );
     }
 
     void TestResults::StartTest()

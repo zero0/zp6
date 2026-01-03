@@ -28,6 +28,11 @@ namespace zp
         return {};
     }
 
+    LogEntryPerformance Log::perf()
+    {
+        return {};
+    }
+
     LogEntryError Log::error()
     {
         return {};
@@ -47,6 +52,7 @@ namespace zp
                 "",
                 "[MSG]",
                 "[INFO]",
+                "[PERF]",
                 "[WARN]",
                 "[ERROR]",
                 "[FATAL]"
@@ -90,6 +96,15 @@ namespace zp
     void LogEntry<LogType::Info>::operator<<( Log::EndToken )
     {
         PrintLogEntry<false, LogType::Info>( ZP_CC( NORMAL, DEFAULT, DEFAULT ), m_log.c_str() );
+    }
+}
+
+namespace zp
+{
+    template<>
+    void LogEntry<LogType::Performance>::operator<<( Log::EndToken )
+    {
+        PrintLogEntry<false, LogType::Info>( ZP_CC( NORMAL, BLUE, DEFAULT ), m_log.c_str() );
     }
 }
 

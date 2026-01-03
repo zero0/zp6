@@ -72,6 +72,12 @@ namespace zp
 
     typedef GraphicsResource<Shader> ShaderResource;
     typedef GraphicsResourceHandle<Shader> ShaderResourceHandle;
+
+    //
+    //
+    //
+
+
 }
 
 #endif //ZP_SHADER_H

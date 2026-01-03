@@ -8,6 +8,8 @@
 #include "Core/String.h"
 #include "Core/Http.h"
 
+#include "Platform/Platform.h"
+
 #define CR  '\r'
 #define LF  '\n'
 #define CRLF "\r\n"
@@ -85,7 +87,7 @@ namespace zp
 
             Http::HeaderKey ParseHeaderKey( const String& string )
             {
-#define TEST_HEADER(name, str)  else if( zp_strcmp( string, #str ) == 0 ) { key = HeaderKey::name; }
+#define TEST_HEADER(name, str, type)  else if( zp_strcmp( string, #str ) == 0 ) { key = HeaderKey::name; }
 
                 Http::HeaderKey key = HeaderKey::UNKNOWN;
 
@@ -99,27 +101,57 @@ namespace zp
 #undef TEST_HEADER
             }
 
-            void WriteHeaderKey( const HeaderKey headerKey, DataStreamWriter& writer )
+            void WriteHeaderKey( const Header& header, DataStreamWriter& writer )
             {
-                switch( headerKey )
+                switch( header.key )
                 {
-#define WRITE_HEADER(name, str)     case HeaderKey::name: writer.write( #str ); break;
-                    HTTP_HEADERS( WRITE_HEADER )
-#undef WRITE_HEADER
+#define WRITE_HEADER_KEY(name, str, type)     case HeaderKey::name: writer.write( #str ); break;
+                    HTTP_HEADERS( WRITE_HEADER_KEY )
+#undef WRITE_HEADER_KEY
                     default:
                         ZP_INVALID_CODE_PATH();
                         break;
                 }
             }
 
-            void WriteHeader( const Header& header, DataStreamWriter& writer )
+            void WriteHeaderValue( const Header& header, DataStreamWriter& writer )
+            {
+                MutableFixedString64 buffer;
+                switch( header.key )
+                {
+#define WRITE_HEADER_VALUE(name, str, type)     \
+    case HeaderKey::name: \
+        if constexpr( type == HeaderValueType::String )\
+        {\
+            writer.write( header.stringValue.c_str(), header.stringValue.length() ); \
+        }\
+        else if constexpr( type == HeaderValueType::Int )\
+        {\
+            buffer.format( "%lu", header.intValue );\
+            writer.write( buffer.c_str(), buffer.length() ); \
+        }\
+        else if constexpr( type == HeaderValueType::Date )\
+        {\
+            const DateTime dt {}; \
+            const zp_size_t len = Platform::DateTimeToString( dt, buffer.mutable_str(), buffer.length() ); \
+            writer.write( header.stringValue.c_str(), len ); \
+        }\
+        break;
+                    HTTP_HEADERS( WRITE_HEADER_VALUE )
+#undef WRITE_HEADER_VALUE
+                    default:
+                        ZP_INVALID_CODE_PATH();
+                        break;
+                }
+            }
+
+            void WriteHeaderEntry( const Header& header, DataStreamWriter& writer )
             {
                 if( header.key != HeaderKey::UNKNOWN )
                 {
-                    WriteHeaderKey( header.key, writer );
-                    writer.write( ':' );
-                    writer.write( ' ' );
-                    writer.write( header.value.c_str(), header.value.length() );
+                    WriteHeaderKey( header, writer );
+                    writer.write( ": " );
+                    WriteHeaderValue( header, writer );
                     writer.write( CRLF );
                 }
             }
@@ -138,14 +170,24 @@ namespace zp
 
             void WriteVersion( Version version, DataStreamWriter& writer )
             {
-                writer.write( "HTTP/1.1" );
-                writer.write( "" );
+                switch( version )
+                {
+                    case Version::Http1_0:
+                        writer.write( "HTTP/1.0" );
+                        break;
+                    case Version::Http1_1:
+                        writer.write( "HTTP/1.1" );
+                        break;
+                    case Version::Http2_0:
+                        writer.write( "HTTP/2.0" );
+                        break;
+                }
             }
 
             void WriteResponseHeader( const Response& response, DataStreamWriter& writer )
             {
                 WriteVersion( response.version, writer );
-                writer.write( ' ' );
+                writer.write( " " );
                 WriteStatusCode( response.statusCode, writer );
                 writer.write( CRLF );
             }
@@ -164,7 +206,7 @@ namespace zp
 
                 outRequest = {};
 
-                const String string( inMemory.as<zp_char8_t>(), inMemory.size );
+                const String string( inMemory.as<zp_char8_t>(), inMemory.size() );
                 Tokenizer tokenizer( string, CRLF );
 
                 String token {};
@@ -207,7 +249,7 @@ namespace zp
                                 headerTokenizer.next( key );
 
                                 const Header header {
-                                    .value = headerTokenizer.remaining(),
+                                    .stringValue = headerTokenizer.remaining(),
                                     .key = ParseHeaderKey( key ),
                                 };
 
@@ -228,6 +270,7 @@ namespace zp
                         break;
 
                         default:
+                            ZP_INVALID_CODE_PATH();
                             break;
                     }
                 }
@@ -237,23 +280,33 @@ namespace zp
         }
     }
 
-    Http::StatusCode Http::ParseRequest( const Memory& inMemory, Http::Request& outRequest )
+    Http::StatusCode Http::ParseRequest( const Memory& inMemory, Request& outRequest )
     {
         ParseRequestImpl( inMemory, outRequest );
         return outRequest.statusCode;
     }
 
-    Http::StatusCode Http::WriteResponse( const Http::Response& inResponse, DataStreamWriter& outMemory )
+    Http::StatusCode Http::WriteResponse( const Response& inResponse, DataStreamWriter& outMemory )
     {
         WriteResponseHeader( inResponse, outMemory );
 
         for( const auto& header : inResponse.headers )
         {
-            WriteHeader( header, outMemory );
+            WriteHeaderEntry( header, outMemory );
         }
 
-        outMemory.write( CRLF );
+        if( !inResponse.body.empty() )
+        {
+            WriteHeaderEntry( {
+                .intValue = inResponse.body.length(),
+                .key = HeaderKey::CONTENT_LENGTH,
+            }, outMemory );
 
-        return Http::StatusCode::OK;
+            outMemory.write( CRLF );
+
+            outMemory.write( inResponse.body.data(), inResponse.body.size() );
+        }
+
+        return StatusCode::OK;
     }
 }

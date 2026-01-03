@@ -146,7 +146,7 @@ constexpr T zp_upper_pow2_generic( T val )
 #define zp_upper_pow2_32( x )     zp_upper_pow2_generic<zp_uint32_t, 5>( x )
 #define zp_upper_pow2_64( x )     zp_upper_pow2_generic<zp_uint64_t, 6>( x )
 
-#if ZP_ARCH64
+#if ZP_PLATFORM_ARCH64
 #define zp_upper_pow2_size( x )   zp_upper_pow2_generic<zp_size_t, 6>( x )
 #else
 #define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 5>( x )
@@ -215,11 +215,11 @@ constexpr void zp_assert( const char* msg, const char* file, zp_size_t line, Arg
     zp_error_printfln( "Assertion failed %s:%d - %s", file, line, assertMsg );
 }
 
-#define ZP_ASSERT( t )                                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return; }} while( false )
-#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) { zp_assert( #t, __FILE__, __LINE__ ); return v; }} while( false )
-#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) { zp_assert( #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
+#define ZP_ASSERT( t )                                      do { if( !(t) ) [[unlikely]] { zp_assert( #t, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) [[unlikely]] { zp_assert( #t, __FILE__, __LINE__ ); return; }} while( false )
+#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) [[unlikely]] { zp_assert( #t, __FILE__, __LINE__ ); return v; }} while( false )
+#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) [[unlikely]] { zp_assert( #t ": " msg, __FILE__, __LINE__ ); }} while( false )
+#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) [[unlikely]] { zp_assert( #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
 #define ZP_INVALID_CODE_PATH()                              do { zp_assert( "Invalid Code Path", __FILE__, __LINE__ ); } while( false )
 #define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__ ); } while( false )
 #define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); } while( false )

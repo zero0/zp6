@@ -41,6 +41,8 @@ namespace zp
 
         [[nodiscard]] Memory memory( zp_size_t offset, zp_size_t size ) const;
 
+        [[nodiscard]] String toString() const { return String::As( (const char*)m_buffer, m_position ); };
+
         DataStreamWriter slice( zp_size_t size );
 
         zp_size_t write( const void* ptr, zp_size_t size );
@@ -56,7 +58,7 @@ namespace zp
         template<zp_size_t Size>
         zp_size_t write( const char (& arr)[Size] )
         {
-            return write( arr, sizeof( char ) * Size );
+            return write( arr, sizeof( char ) * ( Size - 1 ) );
         }
 
         template<typename T>

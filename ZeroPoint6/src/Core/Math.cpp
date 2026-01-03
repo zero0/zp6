@@ -49,42 +49,42 @@ namespace zp
 
 
     template<>
-    const Vector2f Vector2f::zero = { 0, 0 };
+    const Vector2f Vector2f::zero { 0, 0 };
 
     template<>
-    const Vector2f Vector2f::one = { 1, 1 };
+    const Vector2f Vector2f::one { 1, 1 };
 
     template<>
-    const Vector2i Vector2i::zero = { 0, 0 };
+    const Vector2i Vector2i::zero { 0, 0 };
 
     template<>
-    const Vector2i Vector2i::one = { 1, 1 };
-
-
-    template<>
-    const Vector3f Vector3f::zero = { 0, 0, 0 };
-
-    template<>
-    const Vector3f Vector3f::one = { 1, 1, 1 };
-
-    template<>
-    const Vector3i Vector3i::zero = { 0, 0, 0 };
-
-    template<>
-    const Vector3i Vector3i::one = { 1, 1, 1 };
+    const Vector2i Vector2i::one { 1, 1 };
 
 
     template<>
-    const Vector4f Vector4f::zero = { 0, 0, 0, 0 };
+    const Vector3f Vector3f::zero { 0, 0, 0 };
 
     template<>
-    const Vector4f Vector4f::one = { 1, 1, 1, 1 };
+    const Vector3f Vector3f::one { 1, 1, 1 };
 
     template<>
-    const Vector4i Vector4i::zero = { 0, 0, 0, 0 };
+    const Vector3i Vector3i::zero { 0, 0, 0 };
 
     template<>
-    const Vector4i Vector4i::one = { 1, 1, 1, 1 };
+    const Vector3i Vector3i::one { 1, 1, 1 };
+
+
+    template<>
+    const Vector4f Vector4f::zero { 0, 0, 0, 0 };
+
+    template<>
+    const Vector4f Vector4f::one { 1, 1, 1, 1 };
+
+    template<>
+    const Vector4i Vector4i::zero { 0, 0, 0, 0 };
+
+    template<>
+    const Vector4i Vector4i::one { 1, 1, 1, 1 };
 
     //
     //
@@ -248,7 +248,7 @@ namespace zp
             const __m128 invW = _mm_rcp_ps( _mm_set1_ps( v.w ) );
             const __m128 xyzw = _mm_load_ps( v.m );
 
-            ZP_ALIGN16 zp_float32_t m[4];
+            ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_store_ps( m, _mm_mul_ps( xyzw, invW ) );
             return { m[ 0 ], m[ 1 ], m[ 2 ] };
         }
@@ -439,8 +439,8 @@ namespace zp
             textents = _mm_fmadd_ps( _mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 2, 2, 2, 2 ) ), _mm_abs_ps( mcz ), textents );
             textents = _mm_fmadd_ps( _mm_shuffle_ps( mextents, mextents, _MM_SHUFFLE( 3, 3, 3, 3 ) ), _mm_abs_ps( mcw ), textents );
 
-            ZP_ALIGN16 zp_float32_t fmin[4];
-            ZP_ALIGN16 zp_float32_t fmax[4];
+            ZP_ALIGN16 zp_float32_t fmin[ 4 ];
+            ZP_ALIGN16 zp_float32_t fmax[ 4 ];
             _mm_storer_ps( fmin, _mm_sub_ps( tcenter, textents ) );
             _mm_storer_ps( fmax, _mm_add_ps( tcenter, textents ) );
 
@@ -490,7 +490,7 @@ namespace zp
 
             const __m128 x = _mm_sub_ps( s2, s5 );
 
-            ZP_ALIGN16 zp_float32_t m[4];
+            ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_storer_ps( m, x );
 
             Vector3f r { m[ 0 ], m[ 1 ], m[ 2 ] };
@@ -537,7 +537,7 @@ namespace zp
         {
             const __m128 v = _mm_setr_ps( lh.x, lh.y, 0, 0 );
 
-            ZP_ALIGN16 zp_float32_t m[4];
+            ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_storer_ps( m, _mm_normalize_ps( v ) );
 
             Vector2f r { .x = m[ 0 ], .y = m[ 1 ] };
@@ -548,7 +548,7 @@ namespace zp
         {
             const __m128 v = _mm_setr_ps( lh.x, lh.y, lh.z, 0 );
 
-            ZP_ALIGN16 zp_float32_t m[4];
+            ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_storer_ps( m, _mm_normalize_ps( v ) );
 
             Vector3f r { .x = m[ 0 ], .y = m[ 1 ], .z = m[ 2 ] };
@@ -573,8 +573,8 @@ namespace zp
             const __m128 veq = _mm_cmpeq_ps( vlh, vrh );
             const __m128 vlt = _mm_cmplt_ps( vlh, vrh );
 
-            ZP_ALIGN16 zp_uint32_t eq[4];
-            ZP_ALIGN16 zp_uint32_t lt[4];
+            ZP_ALIGN16 zp_uint32_t eq[ 4 ];
+            ZP_ALIGN16 zp_uint32_t lt[ 4 ];
             _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
             _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
 
@@ -592,8 +592,8 @@ namespace zp
             const __m128 veq = _mm_cmpeq_ps( vlh, vrh );
             const __m128 vlt = _mm_cmplt_ps( vlh, vrh );
 
-            ZP_ALIGN16 zp_uint32_t eq[4];
-            ZP_ALIGN16 zp_uint32_t lt[4];
+            ZP_ALIGN16 zp_uint32_t eq[ 4 ];
+            ZP_ALIGN16 zp_uint32_t lt[ 4 ];
             _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
             _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
 
@@ -612,8 +612,8 @@ namespace zp
             const __m128 veq = _mm_cmpeq_ps( vlh, vrh );
             const __m128 vlt = _mm_cmplt_ps( vlh, vrh );
 
-            ZP_ALIGN16 zp_uint32_t eq[4];
-            ZP_ALIGN16 zp_uint32_t lt[4];
+            ZP_ALIGN16 zp_uint32_t eq[ 4 ];
+            ZP_ALIGN16 zp_uint32_t lt[ 4 ];
             _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
             _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
 
@@ -660,7 +660,56 @@ namespace zp
 
         zp_uint32_t Log2( zp_uint32_t v )
         {
-            return static_cast<zp_uint32_t>( ::log2f( static_cast<zp_float32_t>( v ) ) );
+            return static_cast<zp_uint32_t>(::log2f( static_cast<zp_float32_t>(v) ));
         }
     }
 }
+
+#if ZP_USE_TESTS
+#include "Test/Test.h"
+
+using namespace zp;
+
+ZP_TEST_GROUP( Math )
+{
+    ZP_TEST_SUITE( Vector4f )
+    {
+        ZP_TEST( Length1 )
+        {
+            const Vector4f v { 1, 0, 0, 0 };
+            const zp_float32_t len = Math::Length( v );
+
+            ZP_CHECK_EQUALS( len, 1.0f );
+            ZP_CHECK_FLOAT32_APPROX( len, 1.0f, 0.000001f );
+        };
+
+        ZP_TEST( Length2 )
+        {
+            const Vector4f v { 1, 1, 0, 0 };
+            const zp_float32_t len = Math::Length( v );
+
+            ZP_CHECK_EQUALS( len, 1.4142135623730950488016887242097f );
+            ZP_CHECK_FLOAT32_APPROX( len, 1.4142135623730950488016887242097f, 0.000001f );
+        };
+
+        ZP_TEST( Length3 )
+        {
+            const Vector4f v { 1, 1, 1, 0 };
+            const zp_float32_t len = Math::Length( v );
+
+            ZP_CHECK_EQUALS( len, 1.7320508075688772935274463415059f );
+            ZP_CHECK_FLOAT32_APPROX( len, 1.7320508075688772935274463415059f, 0.000001f );
+        };
+
+        ZP_TEST( Length4 )
+        {
+            const Vector4f v { 1, 1, 1, 1 };
+            const zp_float32_t len = Math::Length( v );
+
+            ZP_CHECK_EQUALS( len, 2.0f );
+            ZP_CHECK_FLOAT32_APPROX( len, 2.0f, 0.000001f );
+        };
+    };
+};
+
+#endif
