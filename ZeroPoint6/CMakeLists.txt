@@ -1,11 +1,95 @@
 
+#
+# Vulkan SDK Setup
+#
+
 find_package(Vulkan REQUIRED COMPONENTS volk dxc)
+
+get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
+
+message(CHECK_START "Finding volk")
+if(Vulkan_volk_FOUND)
+    message(CHECK_PASS "Found volk ${Vulkan_volk_LIBRARY}")
+else()
+    message(CHECK_FAIL "Unable to find volk")
+endif()
+
+find_library(SLANG_LIB
+        NAMES slang
+        HINTS ${_Vulkan_LIB_DIR}
+)
+message(CHECK_START "Finding slang")
+if(SLANG_LIB)
+    message(CHECK_PASS "Found slang ${SLANG_LIB}")
+else()
+    message(CHECK_FAIL "Unable to find slang")
+endif()
+
+find_library(SLANGD_LIB
+        NAMES slangd
+        HINTS ${_Vulkan_LIB_DIR}
+)
+message(CHECK_START "Finding slangd")
+if(SLANGD_LIB)
+    message(CHECK_PASS "Found slangd ${SLANGD_LIB}")
+else()
+    message(CHECK_FAIL "Unable to find slangd")
+    set(SLANGD_LIB ${SLANG_LIB})
+endif()
+
+find_program(SLANGC_EXE
+        NAMES slangc
+        HINTS ${Vulkan_LIB_DIR}/../Bin
+)
+
+message(CHECK_START "Finding shader compilers")
+if(SLANGC_EXE)
+    message(CHECK_PASS "Found slangc: ${SLANGC_EXE}")
+
+    set(_SLANG_FLAGS
+            -I Assets/ShaderLibrary/
+            -profile sm_6_0+spirv_1_6
+            -capability spvInt64Atomics+spvShaderInvocationReorderNV+spvShaderClockKHR+spvRayTracingMotionBlurNV
+            -target spirv
+            -emit-spirv-directly
+            -force-glsl-scalar-layout
+            -fvk-use-entrypoint-name
+            -g2
+            -source-embed-style text
+    )
+
+    # Compile Slang shaders using slangc
+    file(GLOB_RECURSE SHADER_SLANG_FILES LIST_DIRECTORIES FALSE "Assets/Shaders/*.slang" "Assets/ShaderLibrary/*.slang")
+    cmake_path(APPEND SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR} generated Assets)
+    file(MAKE_DIRECTORY ${SHADER_OUTPUT_DIR})
+    foreach(SHADER ${SHADER_SLANG_FILES})
+        get_filename_component(SHADER_NAME ${SHADER} NAME)
+        string(REPLACE "." "_" EMBED_SHADER_NAME ${SHADER_NAME})
+        cmake_path(APPEND OUTPUT_FILE ${SHADER_OUTPUT_DIR} Shaders ${SHADER_NAME}.h)
+        get_filename_component(OUTPUT_NAME ${OUTPUT_FILE} NAME)
+        add_custom_command(
+                OUTPUT ${OUTPUT_FILE}
+                COMMAND ${SLANGC_EXE} ${_SLANG_FLAGS} -source-embed-name ${EMBED_SHADER_NAME} -o ${OUTPUT_FILE} ${SHADER}
+                MAIN_DEPENDENCY ${SHADER}
+                COMMENT "slangc: Compiling shader ${SHADER_NAME} -> ${OUTPUT_NAME}..."
+                VERBATIM
+        )
+        list(APPEND SHADER_HEADERS ${OUTPUT_FILE})
+    endforeach()
+else ()
+    message(CHECK_FAIL "Unable to find slangc")
+endif()
+
+#
+# ZeroPoint Engine
+#
 
 project(ZeroPoint VERSION ${ZP_VERSION} LANGUAGES CXX)
 
 set(ZP_TARGET ${PROJECT_NAME}_${PLATFORM_NAME}_${PLATFORM_ARCH})
 
 set(ZP_RENDERING_API Vulkan)
+set(ZP_INCLUDE_TESTS ON)
 
 # Source Files
 set(ZP_CORE_SRC
@@ -231,86 +315,12 @@ target_include_directories(${ZP_TARGET} PRIVATE
 #if (${ZP_RENDERING_API} EQUAL Vulkan)
 #cmake_path(SET VulkanSDK $ENV{VULKAN_SDK})
 
-get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
-
-message(CHECK_START "Finding volk")
-if(Vulkan_volk_FOUND)
-    message(CHECK_PASS "Found volk ${Vulkan_volk_LIBRARY}")
-else()
-    message(CHECK_FAIL "Unable to find volk")
-endif()
-
-find_library(SLANG_LIB
-    NAMES slang
-    HINTS ${_Vulkan_LIB_DIR}
-)
-message(CHECK_START "Finding slang")
-if(SLANG_LIB)
-    message(CHECK_PASS "Found slang ${SLANG_LIB}")
-else()
-    message(CHECK_FAIL "Unable to find slang")
-endif()
-
-find_library(SLANGD_LIB
-    NAMES slangd
-    HINTS ${_Vulkan_LIB_DIR}
-)
-message(CHECK_START "Finding slangd")
-if(SLANGD_LIB)
-    message(CHECK_PASS "Found slangd ${SLANGD_LIB}")
-else()
-    message(CHECK_FAIL "Unable to find slangd")
-endif()
-
 # Define VK_NO_PROTOTYPES to avoid including Vulkan prototypes
 # This is necessary because we are using volk to load Vulkan functions
 target_compile_definitions(${ZP_TARGET} PRIVATE VK_NO_PROTOTYPES)
 
 if(${PLATFORM_NAME} STREQUAL "Win")
     target_compile_definitions(${ZP_TARGET} PRIVATE VK_USE_PLATFORM_WIN32_KHR)
-endif()
-
-find_program(SLANGC_EXE
-    NAMES slangc
-    HINTS ${Vulkan_LIB_DIR}/../Bin
-)
-
-message(CHECK_START "Finding shader compilers")
-if(SLANGC_EXE)
-    message(CHECK_PASS "Found slangc: ${SLANGC_EXE}")
-
-    set(_SLANG_FLAGS
-        -I Assets/ShaderLibrary/
-        -profile sm_6_6+spirv_1_6
-        -capability spvInt64Atomics+spvShaderInvocationReorderNV+spvShaderClockKHR+spvRayTracingMotionBlurNV
-        -target spirv
-        -emit-spirv-directly
-        -force-glsl-scalar-layout
-        -fvk-use-entrypoint-name
-        -g3
-        -source-embed-style text
-        )
-
-    # Compile Slang shaders using slangc
-    file(GLOB_RECURSE SHADER_SLANG_FILES LIST_DIRECTORIES FALSE "Assets/Shaders/*.slang" "Assets/ShaderLibrary/*.slang")
-    cmake_path(APPEND SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR} generated Assets)
-    file(MAKE_DIRECTORY ${SHADER_OUTPUT_DIR})
-    foreach(SHADER ${SHADER_SLANG_FILES})
-        get_filename_component(SHADER_NAME ${SHADER} NAME)
-        string(REPLACE "." "_" EMBED_SHADER_NAME ${SHADER_NAME})
-        cmake_path(APPEND OUTPUT_FILE ${SHADER_OUTPUT_DIR} Shaders ${SHADER_NAME}.h)
-        get_filename_component(OUTPUT_NAME ${OUTPUT_FILE} NAME)
-        add_custom_command(
-            OUTPUT ${OUTPUT_FILE}
-            COMMAND ${SLANGC_EXE} ${_SLANG_FLAGS} -source-embed-name ${EMBED_SHADER_NAME} -o ${OUTPUT_FILE} ${SHADER}
-            MAIN_DEPENDENCY ${SHADER}
-            COMMENT "slangc: Compiling shader ${SHADER_NAME} -> ${OUTPUT_NAME}..."
-            VERBATIM
-        )
-        list(APPEND SHADER_HEADERS ${OUTPUT_FILE})
-    endforeach()
-else ()
-    message(CHECK_FAIL "Unable to find slangc")
 endif()
 
 target_sources(${ZP_TARGET} PRIVATE ${SHADER_HEADERS})
@@ -360,9 +370,8 @@ install(TARGETS ${ZP_TARGET}
 )
 
 #
+# AssetCompiler
 #
-#
-
 
 project(AssetCompiler VERSION ${ZP_VERSION} LANGUAGES CXX)
 

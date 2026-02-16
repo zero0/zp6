@@ -8,8 +8,8 @@
 #include <typeindex>
 
 #include "Core/Defines.h"
-#include "Core/Types.h"
 #include "Core/Macros.h"
+#include "Core/Types.h"
 
 #if ZP_MSC
 #include <intrin.h>
@@ -66,19 +66,19 @@ using zp_remove_pointer_t = typename zp_remove_pointer<T>::type;
 template<typename T>
 constexpr T&& zp_forward( zp_remove_reference_t<T>& val )
 {
-    return static_cast<T&&>(val);
+    return static_cast<T&&>( val );
 }
 
 template<typename T>
 constexpr T&& zp_forward( zp_remove_reference_t<T>&& val )
 {
-    return static_cast<T&&>(val);
+    return static_cast<T&&>( val );
 }
 
 template<typename T>
 constexpr zp_remove_reference_t<T>&& zp_move( T&& val )
 {
-    return static_cast<zp_remove_reference_t<T>&&>(val);
+    return static_cast<zp_remove_reference_t<T>&&>( val );
 }
 
 
@@ -93,13 +93,13 @@ zp_int32_t zp_error_printf( const char* format, ... );
 zp_int32_t zp_error_printfln( const char* format, ... );
 
 #else
-#define zp_printf(...)     (void)0
+#define zp_printf( ... ) (void)0
 
-#define zp_printfln(...)   (void)0
+#define zp_printfln( ... ) (void)0
 
-#define zp_error_printf(...)    (void)0
+#define zp_error_printf( ... ) (void)0
 
-#define zp_error_printfln(...)  (void)0
+#define zp_error_printfln( ... ) (void)0
 #endif
 
 zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... );
@@ -107,19 +107,19 @@ zp_int32_t zp_snprintf( char* dest, zp_size_t destSize, const char* format, ... 
 template<zp_size_t Size, typename... Args>
 zp_int32_t zp_snprintf( char ( &dest )[ Size ], const char* format, Args... args )
 {
-    return zp_snprintf( static_cast<char*>(dest), Size, format, args... );
+    return zp_snprintf( static_cast<char*>( dest ), Size, format, args... );
 }
 
 template<typename... Args>
 zp_int32_t zp_snprintf( zp_char8_t* dest, zp_size_t destSize, const char* format, Args... args )
 {
-    return zp_snprintf( reinterpret_cast<char*>(dest), destSize, format, args... );
+    return zp_snprintf( reinterpret_cast<char*>( dest ), destSize, format, args... );
 }
 
 template<zp_size_t Size, typename... Args>
 zp_int32_t zp_snprintf( zp_char8_t ( &dest )[ Size ], const char* format, Args... args )
 {
-    return zp_snprintf( reinterpret_cast<char*>(dest), Size, format, args... );
+    return zp_snprintf( reinterpret_cast<char*>( dest ), Size, format, args... );
 }
 
 
@@ -141,15 +141,15 @@ constexpr T zp_upper_pow2_generic( T val )
     return val;
 }
 
-#define zp_upper_pow2_8( x )      zp_upper_pow2_generic<zp_uint8_t, 3>( x )
-#define zp_upper_pow2_16( x )     zp_upper_pow2_generic<zp_uint16_t, 4>( x )
-#define zp_upper_pow2_32( x )     zp_upper_pow2_generic<zp_uint32_t, 5>( x )
-#define zp_upper_pow2_64( x )     zp_upper_pow2_generic<zp_uint64_t, 6>( x )
+#define zp_upper_pow2_8( x ) zp_upper_pow2_generic<zp_uint8_t, 3>( x )
+#define zp_upper_pow2_16( x ) zp_upper_pow2_generic<zp_uint16_t, 4>( x )
+#define zp_upper_pow2_32( x ) zp_upper_pow2_generic<zp_uint32_t, 5>( x )
+#define zp_upper_pow2_64( x ) zp_upper_pow2_generic<zp_uint64_t, 6>( x )
 
 #if ZP_PLATFORM_ARCH64
-#define zp_upper_pow2_size( x )   zp_upper_pow2_generic<zp_size_t, 6>( x )
+#define zp_upper_pow2_size( x ) zp_upper_pow2_generic<zp_size_t, 6>( x )
 #else
-#define zp_upper_pow2_size(x)   zp_upper_pow2_generic<zp_size_t, 5>( x )
+#define zp_upper_pow2_size( x ) zp_upper_pow2_generic<zp_size_t, 5>( x )
 #endif
 
 template<typename T, zp_size_t Size>
@@ -170,12 +170,12 @@ constexpr zp_size_t zp_align_size( zp_size_t size, zp_size_t alignment )
 
 constexpr void* zp_offset_ptr( void* ptr, zp_ptrdiff_t offset )
 {
-    return static_cast<void*>(static_cast<zp_uint8_t*>(ptr) + offset);
+    return static_cast<void*>( static_cast<zp_uint8_t*>( ptr ) + offset );
 }
 
 constexpr const void* zp_offset_ptr( const void* ptr, zp_ptrdiff_t offset )
 {
-    return static_cast<const void*>(static_cast<const zp_uint8_t*>(ptr) + offset);
+    return static_cast<const void*>( static_cast<const zp_uint8_t*>( ptr ) + offset );
 }
 
 void zp_memcpy( void* dst, zp_size_t dstLength, const void* src, zp_size_t srcLength );
@@ -202,7 +202,7 @@ zp_int32_t zp_memcmp( const T& lh, const T& rh )
     return zp_memcmp( &lh, sizeof( T ), &rh, sizeof( T ) );
 }
 
-#define ZP_STATIC_ASSERT( t )           static_assert( (t), #t )
+#define ZP_STATIC_ASSERT( t ) static_assert( ( t ), #t )
 
 #if ZP_USE_ASSERTIONS
 
@@ -215,23 +215,72 @@ constexpr void zp_assert( const char* msg, const char* file, zp_size_t line, Arg
     zp_error_printfln( "Assertion failed %s:%d - %s", file, line, assertMsg );
 }
 
-#define ZP_ASSERT( t )                                      do { if( !(t) ) [[unlikely]] { zp_assert( #t, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_RETURN( t )                               do { if( !(t) ) [[unlikely]] { zp_assert( #t, __FILE__, __LINE__ ); return; }} while( false )
-#define ZP_ASSERT_RETURN_VALUE( t, v )                      do { if( !(t) ) [[unlikely]] { zp_assert( #t, __FILE__, __LINE__ ); return v; }} while( false )
-#define ZP_ASSERT_MSG( t, msg )                             do { if( !(t) ) [[unlikely]] { zp_assert( #t ": " msg, __FILE__, __LINE__ ); }} while( false )
-#define ZP_ASSERT_MSG_ARGS( t, msg, args... )               do { if( !(t) ) [[unlikely]] { zp_assert( #t ": " msg, __FILE__, __LINE__, args ); }} while( false )
-#define ZP_INVALID_CODE_PATH()                              do { zp_assert( "Invalid Code Path", __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG( msg )                     do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__ ); } while( false )
-#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )       do { zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); } while( false )
+#define ZP_ASSERT( t )                           \
+    do                                           \
+    {                                            \
+        if( !( t ) ) [[unlikely]]                \
+        {                                        \
+            zp_assert( #t, __FILE__, __LINE__ ); \
+        }                                        \
+    } while( false )
+#define ZP_ASSERT_RETURN( t )                    \
+    do                                           \
+    {                                            \
+        if( !( t ) ) [[unlikely]]                \
+        {                                        \
+            zp_assert( #t, __FILE__, __LINE__ ); \
+            return;                              \
+        }                                        \
+    } while( false )
+#define ZP_ASSERT_RETURN_VALUE( t, v )           \
+    do                                           \
+    {                                            \
+        if( !( t ) ) [[unlikely]]                \
+        {                                        \
+            zp_assert( #t, __FILE__, __LINE__ ); \
+            return v;                            \
+        }                                        \
+    } while( false )
+#define ZP_ASSERT_MSG( t, msg )                           \
+    do                                                    \
+    {                                                     \
+        if( !( t ) ) [[unlikely]]                         \
+        {                                                 \
+            zp_assert( #t ": " msg, __FILE__, __LINE__ ); \
+        }                                                 \
+    } while( false )
+#define ZP_ASSERT_MSG_ARGS( t, msg, args... )                   \
+    do                                                          \
+    {                                                           \
+        if( !( t ) ) [[unlikely]]                               \
+        {                                                       \
+            zp_assert( #t ": " msg, __FILE__, __LINE__, args ); \
+        }                                                       \
+    } while( false )
+#define ZP_INVALID_CODE_PATH()                                \
+    do                                                        \
+    {                                                         \
+        zp_assert( "Invalid Code Path", __FILE__, __LINE__ ); \
+    } while( false )
+#define ZP_INVALID_CODE_PATH_MSG( msg )                             \
+    do                                                              \
+    {                                                               \
+        zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__ ); \
+    } while( false )
+#define ZP_INVALID_CODE_PATH_MSG_ARGS( msg, args... )                     \
+    do                                                                    \
+    {                                                                     \
+        zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); \
+    } while( false )
 #else // !ZP_USE_ASSERTIONS
-#define ZP_ASSERT(...)                      (void)0
-#define ZP_ASSERT_RETURN(...)               (void)0
-#define ZP_ASSERT_RETURN_VALUE(...)         (void)0
-#define ZP_ASSERT_MSG(...)                  (void)0
-#define ZP_ASSERT_MSG_ARGS(...)             (void)0
-#define ZP_INVALID_CODE_PATH()              (void)0
-#define ZP_INVALID_CODE_PATH_MSG(...)       (void)0
-#define ZP_INVALID_CODE_PATH_MSG_ARGS(...)  (void)0
+#define ZP_ASSERT( ... ) (void)0
+#define ZP_ASSERT_RETURN( ... ) (void)0
+#define ZP_ASSERT_RETURN_VALUE( ... ) (void)0
+#define ZP_ASSERT_MSG( ... ) (void)0
+#define ZP_ASSERT_MSG_ARGS( ... ) (void)0
+#define ZP_INVALID_CODE_PATH() (void)0
+#define ZP_INVALID_CODE_PATH_MSG( ... ) (void)0
+#define ZP_INVALID_CODE_PATH_MSG_ARGS( ... ) (void)0
 #endif // ZP_USE_ASSERTIONS
 
 template<typename T>
@@ -284,7 +333,7 @@ ZP_FORCEINLINE void zp_zero_memory_array( T ( &arr )[ Size ] )
 template<typename T>
 constexpr zp_hash64_t zp_type_hash()
 {
-    const zp_hash64_t hash { typeid( T ).hash_code() };
+    const zp_hash64_t hash{ typeid( T ).hash_code() };
     return hash;
 }
 
@@ -328,7 +377,7 @@ zp_guid128_t zp_generate_unique_guid128();
 
 zp_guid128_t zp_generate_guid128();
 
-zp_guid128_t zp_generate_guid128( const zp_uint8_t (&bytes)[16] );
+zp_guid128_t zp_generate_guid128( const zp_uint8_t ( &bytes )[ 16 ] );
 
 //
 //
@@ -337,19 +386,22 @@ zp_guid128_t zp_generate_guid128( const zp_uint8_t (&bytes)[16] );
 template<typename T>
 constexpr zp_int32_t zp_cmp( const T& lh, const T& rh )
 {
-    return lh < rh ? -1 : rh < lh ? 1 : 0;
+    return lh < rh ? -1 : rh < lh ? 1
+                                  : 0;
 }
 
 template<typename T>
 constexpr zp_int32_t zp_cmp_asc( const T& lh, const T& rh )
 {
-    return lh < rh ? -1 : rh < lh ? 1 : 0;
+    return lh < rh ? -1 : rh < lh ? 1
+                                  : 0;
 }
 
 template<typename T>
 constexpr zp_int32_t zp_cmp_dsc( const T& lh, const T& rh )
 {
-    return lh < rh ? 1 : rh < lh ? -1 : 0;
+    return lh < rh ? 1 : rh < lh ? -1
+                                 : 0;
 }
 
 //
@@ -414,9 +466,7 @@ template<typename T>
 constexpr const T* zp_find( const T* begin, const T* end, const T& value )
 {
     const T* found = zp_find( begin, end, value, []( const T& lh, const T& rh ) -> zp_bool_t
-    {
-        return lh == rh;
-    } );
+        { return lh == rh; } );
     return found;
 }
 
@@ -567,7 +617,7 @@ namespace zp
 
     constexpr SizeInfo GetSizeInfoFromBytes( zp_size_t bytes, zp_bool_t asBits = false )
     {
-        SizeInfo info {};
+        SizeInfo info{};
 
         if( asBits )
         {
@@ -632,6 +682,144 @@ namespace zp
 
         return info;
     }
-}
+} // namespace zp
 
-#endif //ZP_COMMON_H
+//
+//
+//
+
+namespace zp
+{
+    template<typename T>
+    struct IntrusiveListNode
+    {
+        T* next;
+        T* prev;
+    };
+
+    template<typename T, IntrusiveListNode<T> T::* Node>
+    class IntrusiveList
+    {
+    public:
+        IntrusiveList()
+            : m_head( nullptr ), m_tail( nullptr )
+        {
+        }
+
+        void push_front( T* element )
+        {
+            IntrusiveListNode<T>* node = get_node( element );
+
+            node->prev = nullptr;
+            node->next = m_head;
+
+            if( m_head != nullptr )
+            {
+                get_node( m_head )->prev = element;
+            }
+
+            m_head = element;
+
+            if( m_tail == nullptr )
+            {
+                m_tail = m_head;
+            }
+        }
+
+        void push_back( T* element )
+        {
+            if( m_tail == nullptr )
+            {
+                push_front( element );
+            }
+            else
+            {
+                IntrusiveListNode<T>* node = get_node( element );
+
+                get_node( m_tail )->next = element;
+                node->prev = m_tail;
+                node->next = nullptr;
+                m_tail = element;
+            }
+        }
+
+        [[nodiscard]] auto empty() const -> zp_bool_t
+        {
+            return m_head == nullptr;
+        }
+
+    private:
+        static IntrusiveListNode<T>* get_node( T* element )
+        {
+            return &( element->*Node );
+        }
+
+        T* m_head;
+        T* m_tail;
+
+    public:
+        class Iterator
+        {
+        public:
+            constexpr explicit Iterator( T* element )
+                : m_root( element )
+            {
+            }
+
+            constexpr auto operator==( const Iterator& other ) const -> zp_bool_t
+            {
+                return m_root == other.m_root;
+            }
+
+            constexpr auto operator==( Iterator&& other ) const -> zp_bool_t
+            {
+                return m_root == other.m_root;
+            }
+
+            constexpr auto operator++( int ) -> Iterator
+            {
+                return { get_node( m_root )->next };
+            }
+
+            constexpr auto operator++() -> Iterator&
+            {
+                m_root = get_node( m_root )->next;
+                return *this;
+            }
+
+            constexpr auto operator->() -> T*
+            {
+                return m_root;
+            }
+            constexpr auto operator->() const -> const T*
+            {
+                return m_root;
+            }
+
+            auto operator*() -> T&
+            {
+                return *m_root;
+            }
+
+            auto operator*() const -> const T&
+            {
+                return *m_root;
+            }
+
+        private:
+            T* m_root;
+        };
+
+        Iterator begin()
+        {
+            return Iterator { m_head };
+        }
+
+        Iterator end()
+        {
+            return Iterator { nullptr };
+        }
+    };
+} // namespace zp
+
+#endif // ZP_COMMON_H

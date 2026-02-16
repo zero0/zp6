@@ -2,14 +2,14 @@
 // Created by phosg on 2/14/2022.
 //
 
+#include "Core/Math.h"
 #include "Core/Defines.h"
 #include "Core/Types.h"
-#include "Core/Math.h"
 
 #include <cmath>
 #include <immintrin.h>
 
-#define _MM_SHUFFLER( fp0, fp1, fp2, fp3 )   _MM_SHUFFLE(fp3,fp2,fp1,fp0)
+#define _MM_SHUFFLER( fp0, fp1, fp2, fp3 ) _MM_SHUFFLE( fp3, fp2, fp1, fp0 )
 
 zp_float32_t zp_sinf( zp_float32_t v )
 {
@@ -25,120 +25,160 @@ namespace zp
 {
     template<>
     const Bounds3Df Bounds3Df::invalid = {
-        1, 1, 1,
-        -1, -1, -1,
+        1,
+        1,
+        1,
+        -1,
+        -1,
+        -1,
     };
 
     template<>
     const Bounds3Df Bounds3Df::empty = {
-        0, 0, 0,
-        0, 0, 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
     };
 
     template<>
     const Bounds3Di Bounds3Di::invalid = {
-        1, 1, 1,
-        -1, -1, -1,
+        1,
+        1,
+        1,
+        -1,
+        -1,
+        -1,
     };
 
     template<>
     const Bounds3Di Bounds3Di::empty = {
-        0, 0, 0,
-        0, 0, 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
     };
 
 
     template<>
-    const Vector2f Vector2f::zero { 0, 0 };
+    const Vector2f Vector2f::zero{ 0, 0 };
 
     template<>
-    const Vector2f Vector2f::one { 1, 1 };
+    const Vector2f Vector2f::one{ 1, 1 };
 
     template<>
-    const Vector2i Vector2i::zero { 0, 0 };
+    const Vector2i Vector2i::zero{ 0, 0 };
 
     template<>
-    const Vector2i Vector2i::one { 1, 1 };
-
-
-    template<>
-    const Vector3f Vector3f::zero { 0, 0, 0 };
-
-    template<>
-    const Vector3f Vector3f::one { 1, 1, 1 };
-
-    template<>
-    const Vector3i Vector3i::zero { 0, 0, 0 };
-
-    template<>
-    const Vector3i Vector3i::one { 1, 1, 1 };
+    const Vector2i Vector2i::one{ 1, 1 };
 
 
     template<>
-    const Vector4f Vector4f::zero { 0, 0, 0, 0 };
+    const Vector3f Vector3f::zero{ 0, 0, 0 };
 
     template<>
-    const Vector4f Vector4f::one { 1, 1, 1, 1 };
+    const Vector3f Vector3f::one{ 1, 1, 1 };
 
     template<>
-    const Vector4i Vector4i::zero { 0, 0, 0, 0 };
+    const Vector3i Vector3i::zero{ 0, 0, 0 };
 
     template<>
-    const Vector4i Vector4i::one { 1, 1, 1, 1 };
+    const Vector3i Vector3i::one{ 1, 1, 1 };
+
+
+    template<>
+    const Vector4f Vector4f::zero{ 0, 0, 0, 0 };
+
+    template<>
+    const Vector4f Vector4f::one{ 1, 1, 1, 1 };
+
+    template<>
+    const Vector4i Vector4i::zero{ 0, 0, 0, 0 };
+
+    template<>
+    const Vector4i Vector4i::one{ 1, 1, 1, 1 };
 
     //
     //
     //
 
-    const Quaternion Quaternion::identity { 0, 0, 0, 1 };
+    const Quaternion Quaternion::identity{ 0, 0, 0, 1 };
 
     //
     //
     //
 
     template<>
-    const Matrix4x4f Matrix4x4f::identity {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
+    const Matrix4x4f Matrix4x4f::identity{
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
     };
 
     template<>
-    const Matrix4x4f Matrix4x4f::zero {
-        0, 0, 0, 0,
-        0, 0, 0, 0,
-        0, 0, 0, 0,
-        0, 0, 0, 0,
+    const Matrix4x4f Matrix4x4f::zero{
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
     };
 
     //
     //
     //
 
-    const Color Color::clear { .r = 0, .g = 0, .b = 0, .a = 0 };
+    const Color Color::clear{ .r = 0, .g = 0, .b = 0, .a = 0 };
 
-    const Color Color::black { .r = 0, .g = 0, .b = 0, .a = 1 };
+    const Color Color::black{ .r = 0, .g = 0, .b = 0, .a = 1 };
 
-    const Color Color::white { .r = 1, .g = 1, .b = 1, .a = 1 };
+    const Color Color::white{ .r = 1, .g = 1, .b = 1, .a = 1 };
 
-    const Color Color::red { .r = 1, .g = 0, .b = 0, .a = 1 };
+    const Color Color::red{ .r = 1, .g = 0, .b = 0, .a = 1 };
 
-    const Color Color::green { .r = 0, .g = 1, .b = 0, .a = 1 };
+    const Color Color::green{ .r = 0, .g = 1, .b = 0, .a = 1 };
 
-    const Color Color::blue { .r = 0, .g = 0, .b = 1, .a = 1 };
+    const Color Color::blue{ .r = 0, .g = 0, .b = 1, .a = 1 };
 
-    const Color Color::yellow { .r = 1, .g = 1, .b = 0, .a = 1 };
+    const Color Color::yellow{ .r = 1, .g = 1, .b = 0, .a = 1 };
 
-    const Color Color::cyan { .r = 0, .g = 1, .b = 1, .a = 1 };
+    const Color Color::cyan{ .r = 0, .g = 1, .b = 1, .a = 1 };
 
-    const Color Color::magenta { .r = 1, .g = 0, .b = 1, .a = 1 };
+    const Color Color::magenta{ .r = 1, .g = 0, .b = 1, .a = 1 };
 
-    const Color Color::gray25 { .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
+    const Color Color::gray25{ .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
 
-    const Color Color::gray50 { .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
+    const Color Color::gray50{ .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
 
-    const Color Color::gray75 { .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
+    const Color Color::gray75{ .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
 
     //
     //
@@ -152,29 +192,29 @@ namespace zp
 
     constexpr zp_uint8_t q = 0x40;
 
-    const Color32 Color32::clear { .r = 0, .g = 0, .b = 0, .a = 0 };
+    const Color32 Color32::clear{ .r = 0, .g = 0, .b = 0, .a = 0 };
 
-    const Color32 Color32::black { .r = 0, .g = 0, .b = 0, .a = f };
+    const Color32 Color32::black{ .r = 0, .g = 0, .b = 0, .a = f };
 
-    const Color32 Color32::white { .r = f, .g = f, .b = f, .a = f };
+    const Color32 Color32::white{ .r = f, .g = f, .b = f, .a = f };
 
-    const Color32 Color32::red { .r = f, .g = 0, .b = 0, .a = f };
+    const Color32 Color32::red{ .r = f, .g = 0, .b = 0, .a = f };
 
-    const Color32 Color32::green { .r = 0, .g = f, .b = 0, .a = f };
+    const Color32 Color32::green{ .r = 0, .g = f, .b = 0, .a = f };
 
-    const Color32 Color32::blue { .r = 0, .g = 0, .b = f, .a = f };
+    const Color32 Color32::blue{ .r = 0, .g = 0, .b = f, .a = f };
 
-    const Color32 Color32::yellow { .r = f, .g = f, .b = 0, .a = f };
+    const Color32 Color32::yellow{ .r = f, .g = f, .b = 0, .a = f };
 
-    const Color32 Color32::cyan { .r = 0, .g = f, .b = f, .a = f };
+    const Color32 Color32::cyan{ .r = 0, .g = f, .b = f, .a = f };
 
-    const Color32 Color32::magenta { .r = f, .g = 0, .b = f, .a = f };
+    const Color32 Color32::magenta{ .r = f, .g = 0, .b = f, .a = f };
 
-    const Color32 Color32::gray25 { .r = q, .g = q, .b = q, .a = f };
+    const Color32 Color32::gray25{ .r = q, .g = q, .b = q, .a = f };
 
-    const Color32 Color32::gray50 { .r = h, .g = h, .b = h, .a = f };
+    const Color32 Color32::gray50{ .r = h, .g = h, .b = h, .a = f };
 
-    const Color32 Color32::gray75 { .r = c, .g = c, .b = c, .a = f };
+    const Color32 Color32::gray75{ .r = c, .g = c, .b = c, .a = f };
 
     //
     //
@@ -241,7 +281,7 @@ namespace zp
             {
                 return _mm_fmadd_ps( _mm_sub_ps( y, x ), _mm_set1_ps( a ), x );
             }
-        }
+        } // namespace
 
         Vector3f PerspectiveDivide( const Vector4f& v )
         {
@@ -258,7 +298,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r {};
+            ZP_ALIGN16 Color r{};
             _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, zp_clamp01( a ) ) );
             return r;
         }
@@ -268,7 +308,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r {};
+            ZP_ALIGN16 Color r{};
             _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, a ) );
             return r;
         }
@@ -278,7 +318,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r {};
+            ZP_ALIGN16 Color r{};
             _mm_store_ps( r.rgba, _mm_lerp_ps( mx, my, zp_clamp01( a ) ) );
             return r;
         }
@@ -288,7 +328,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r {};
+            ZP_ALIGN16 Color r{};
             _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -298,7 +338,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_set1_ps( y );
 
-            ZP_ALIGN16 Color r {};
+            ZP_ALIGN16 Color r{};
             _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -308,7 +348,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r {};
+            ZP_ALIGN16 Color r{};
             _mm_store_ps( r.rgba, _mm_add_ps( mx, my ) );
             return r;
         }
@@ -318,7 +358,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.m );
             const __m128 my = _mm_loadu_ps( y.m );
 
-            ZP_ALIGN16 Vector4f r {};
+            ZP_ALIGN16 Vector4f r{};
             _mm_store_ps( r.m, _mm_add_ps( mx, my ) );
             return r;
         }
@@ -328,7 +368,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.m );
             const __m128 my = _mm_loadu_ps( y.m );
 
-            ZP_ALIGN16 Vector4f r {};
+            ZP_ALIGN16 Vector4f r{};
             _mm_store_ps( r.m, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -338,7 +378,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.m );
             const __m128 my = _mm_set1_ps( y );
 
-            ZP_ALIGN16 Vector4f r {};
+            ZP_ALIGN16 Vector4f r{};
             _mm_store_ps( r.m, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -370,11 +410,11 @@ namespace zp
             col2 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c2.w ), col2 );
             col3 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c3.w ), col3 );
 
-            ZP_ALIGN16 Matrix4x4f r {};
-            _mm_storer_ps( r.c0.m, col0 );
-            _mm_storer_ps( r.c1.m, col1 );
-            _mm_storer_ps( r.c2.m, col2 );
-            _mm_storer_ps( r.c3.m, col3 );
+            ZP_ALIGN16 Matrix4x4f r{};
+            _mm_store_ps( r.c0.m, col0 );
+            _mm_store_ps( r.c1.m, col1 );
+            _mm_store_ps( r.c2.m, col2 );
+            _mm_store_ps( r.c3.m, col3 );
 
             return r;
         }
@@ -388,11 +428,11 @@ namespace zp
 
             _MM_TRANSPOSE4_PS( lc0, lc1, lc2, lc3 );
 
-            ZP_ALIGN16 Matrix4x4f r {};
-            _mm_storer_ps( r.m[ 0 ], lc0 );
-            _mm_storer_ps( r.m[ 1 ], lc1 );
-            _mm_storer_ps( r.m[ 2 ], lc2 );
-            _mm_storer_ps( r.m[ 3 ], lc3 );
+            ZP_ALIGN16 Matrix4x4f r{};
+            _mm_store_ps( r.m[ 0 ], lc0 );
+            _mm_store_ps( r.m[ 1 ], lc1 );
+            _mm_store_ps( r.m[ 2 ], lc2 );
+            _mm_store_ps( r.m[ 3 ], lc3 );
 
             return r;
         }
@@ -409,7 +449,7 @@ namespace zp
             col0 = _mm_fmadd_ps( _mm_set1_ps( rh.z ), lc2, col0 );
             col0 = _mm_fmadd_ps( _mm_set1_ps( rh.w ), lc3, col0 );
 
-            ZP_ALIGN16 Vector4f r {};
+            ZP_ALIGN16 Vector4f r{};
             _mm_store_ps( r.m, col0 );
 
             return r;
@@ -441,10 +481,10 @@ namespace zp
 
             ZP_ALIGN16 zp_float32_t fmin[ 4 ];
             ZP_ALIGN16 zp_float32_t fmax[ 4 ];
-            _mm_storer_ps( fmin, _mm_sub_ps( tcenter, textents ) );
-            _mm_storer_ps( fmax, _mm_add_ps( tcenter, textents ) );
+            _mm_store_ps( fmin, _mm_sub_ps( tcenter, textents ) );
+            _mm_store_ps( fmax, _mm_add_ps( tcenter, textents ) );
 
-            Bounds3Df r {
+            const Bounds3Df r{
                 .xMin = fmin[ 0 ],
                 .yMin = fmin[ 1 ],
                 .zMin = fmin[ 2 ],
@@ -493,7 +533,7 @@ namespace zp
             ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_storer_ps( m, x );
 
-            Vector3f r { m[ 0 ], m[ 1 ], m[ 2 ] };
+            Vector3f r{ m[ 0 ], m[ 1 ], m[ 2 ] };
             return r;
         }
 
@@ -538,9 +578,9 @@ namespace zp
             const __m128 v = _mm_setr_ps( lh.x, lh.y, 0, 0 );
 
             ZP_ALIGN16 zp_float32_t m[ 4 ];
-            _mm_storer_ps( m, _mm_normalize_ps( v ) );
+            _mm_store_ps( m, _mm_normalize_ps( v ) );
 
-            Vector2f r { .x = m[ 0 ], .y = m[ 1 ] };
+            Vector2f r{ .x = m[ 0 ], .y = m[ 1 ] };
             return r;
         }
 
@@ -549,9 +589,9 @@ namespace zp
             const __m128 v = _mm_setr_ps( lh.x, lh.y, lh.z, 0 );
 
             ZP_ALIGN16 zp_float32_t m[ 4 ];
-            _mm_storer_ps( m, _mm_normalize_ps( v ) );
+            _mm_store_ps( m, _mm_normalize_ps( v ) );
 
-            Vector3f r { .x = m[ 0 ], .y = m[ 1 ], .z = m[ 2 ] };
+            Vector3f r{ .x = m[ 0 ], .y = m[ 1 ], .z = m[ 2 ] };
             return r;
         }
 
@@ -560,7 +600,7 @@ namespace zp
             const __m128 v = _mm_setr_ps( lh.x, lh.y, lh.z, lh.w );
 
             ZP_ALIGN16 Vector4f r;
-            _mm_storer_ps( r.m, _mm_normalize_ps( v ) );
+            _mm_store_ps( r.m, _mm_normalize_ps( v ) );
 
             return r;
         }
@@ -575,12 +615,14 @@ namespace zp
 
             ZP_ALIGN16 zp_uint32_t eq[ 4 ];
             ZP_ALIGN16 zp_uint32_t lt[ 4 ];
-            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
-            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>( eq ), veq );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>( lt ), vlt );
 
             return {
-                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0 : 1,
-                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0 : 1,
+                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0
+                                            : 1,
+                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0
+                                            : 1,
             };
         }
 
@@ -594,13 +636,16 @@ namespace zp
 
             ZP_ALIGN16 zp_uint32_t eq[ 4 ];
             ZP_ALIGN16 zp_uint32_t lt[ 4 ];
-            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
-            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>( eq ), veq );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>( lt ), vlt );
 
             return {
-                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0 : 1,
-                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0 : 1,
-                .z = lt[ 2 ] ? -1 : eq[ 2 ] ? 0 : 1,
+                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0
+                                            : 1,
+                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0
+                                            : 1,
+                .z = lt[ 2 ] ? -1 : eq[ 2 ] ? 0
+                                            : 1,
             };
         }
 
@@ -614,23 +659,27 @@ namespace zp
 
             ZP_ALIGN16 zp_uint32_t eq[ 4 ];
             ZP_ALIGN16 zp_uint32_t lt[ 4 ];
-            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(eq), veq );
-            _mm_storer_ps( reinterpret_cast<zp_float32_t*>(lt), vlt );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>( eq ), veq );
+            _mm_storer_ps( reinterpret_cast<zp_float32_t*>( lt ), vlt );
 
             return {
-                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0 : 1,
-                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0 : 1,
-                .z = lt[ 2 ] ? -1 : eq[ 2 ] ? 0 : 1,
-                .w = lt[ 3 ] ? -1 : eq[ 3 ] ? 0 : 1,
+                .x = lt[ 0 ] ? -1 : eq[ 0 ] ? 0
+                                            : 1,
+                .y = lt[ 1 ] ? -1 : eq[ 1 ] ? 0
+                                            : 1,
+                .z = lt[ 2 ] ? -1 : eq[ 2 ] ? 0
+                                            : 1,
+                .w = lt[ 3 ] ? -1 : eq[ 3 ] ? 0
+                                            : 1,
             };
         }
 
         Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale )
         {
-            const zp_float32_t r = orthoRect.right(); //orthoRect.offset.x + ( orthoRect.size.width * 0.5f );
-            const zp_float32_t l = orthoRect.left(); //orthoRect.offset.x + ( orthoRect.size.width * -0.5f );
-            const zp_float32_t t = orthoRect.top(); //orthoRect.offset.y + ( orthoRect.size.height * 0.5f );
-            const zp_float32_t b = orthoRect.bottom(); //orthoRect.offset.y + ( orthoRect.size.height * -0.5f );
+            const zp_float32_t r = orthoRect.right(); // orthoRect.offset.x + ( orthoRect.size.width * 0.5f );
+            const zp_float32_t l = orthoRect.left(); // orthoRect.offset.x + ( orthoRect.size.width * -0.5f );
+            const zp_float32_t t = orthoRect.top(); // orthoRect.offset.y + ( orthoRect.size.height * 0.5f );
+            const zp_float32_t b = orthoRect.bottom(); // orthoRect.offset.y + ( orthoRect.size.height * -0.5f );
 
             const __m128 rtf = _mm_setr_ps( r, t, zFar, 1 );
             const __m128 lbn = _mm_setr_ps( l, b, zNear, 0 );
@@ -649,7 +698,7 @@ namespace zp
             const __m128 c3 = _mm_fmadd_ps( _mm_mul_ps( rtfPlbn, invRtfMlbn ), _mm_setr_ps( -1, -1, -1, 0 ), _mm_setr_ps( 0, 0, 0, 1 ) );
 
             // NOTE: c0..3 are set up properly, no need to store reverse
-            ZP_ALIGN16 Matrix4x4f matrix {};
+            ZP_ALIGN16 Matrix4x4f matrix{};
             _mm_store_ps( matrix.c0.m, c0 );
             _mm_store_ps( matrix.c1.m, c1 );
             _mm_store_ps( matrix.c2.m, c2 );
@@ -660,10 +709,10 @@ namespace zp
 
         zp_uint32_t Log2( zp_uint32_t v )
         {
-            return static_cast<zp_uint32_t>(::log2f( static_cast<zp_float32_t>(v) ));
+            return static_cast<zp_uint32_t>( ::log2f( static_cast<zp_float32_t>( v ) ) );
         }
-    }
-}
+    } // namespace Math
+} // namespace zp
 
 #if ZP_USE_TESTS
 #include "Test/Test.h"
@@ -672,20 +721,60 @@ using namespace zp;
 
 ZP_TEST_GROUP( Math )
 {
+    ZP_TEST_SUITE( Vector2f )
+    {
+        ZP_TEST( Length )
+        {
+            constexpr Vector2f v{ 1, 1 };
+            const zp_float32_t len = Math::Length( v );
+
+            ZP_CHECK_EQUALS( len, 1.4142135623730950488016887242097f );
+            ZP_CHECK_FLOAT32_APPROX( len, 1.4142135623730950488016887242097f, 0.000001f );
+        };
+
+        ZP_TEST( Normalize )
+        {
+            constexpr Vector2f v{ 10, 10 };
+            const Vector2f n = Math::Normalize( v );
+
+            ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
+        }
+    }
+
+    ZP_TEST_SUITE( Vector3f )
+    {
+        ZP_TEST( Length )
+        {
+            constexpr Vector3f v{ 1, 1, 1 };
+            const zp_float32_t len = Math::Length( v );
+
+            ZP_CHECK_EQUALS( len, 1.7320508075688772935274463415059f );
+            ZP_CHECK_FLOAT32_APPROX( len, 1.7320508075688772935274463415059f, 0.000001f );
+        };
+
+        ZP_TEST( Normalize )
+        {
+            constexpr Vector3f v{ 10, 10, 10 };
+            const Vector3f n = Math::Normalize( v );
+
+            ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
+        }
+    }
+
     ZP_TEST_SUITE( Vector4f )
     {
         ZP_TEST( Length1 )
         {
-            const Vector4f v { 1, 0, 0, 0 };
+            constexpr Vector4f v{ 1, 0, 0, 0 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.0f );
             ZP_CHECK_FLOAT32_APPROX( len, 1.0f, 0.000001f );
-        };
+        }
 
         ZP_TEST( Length2 )
         {
-            const Vector4f v { 1, 1, 0, 0 };
+            constexpr Vector4f v{ 1, 1, 0, 0 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.4142135623730950488016887242097f );
@@ -694,7 +783,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Length3 )
         {
-            const Vector4f v { 1, 1, 1, 0 };
+            constexpr Vector4f v{ 1, 1, 1, 0 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.7320508075688772935274463415059f );
@@ -703,13 +792,45 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Length4 )
         {
-            const Vector4f v { 1, 1, 1, 1 };
+            constexpr Vector4f v{ 1, 1, 1, 1 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 2.0f );
             ZP_CHECK_FLOAT32_APPROX( len, 2.0f, 0.000001f );
         };
-    };
-};
 
+        ZP_TEST( Normalize )
+        {
+            constexpr Vector4f v{ 10, 10, 10, 10 };
+            const Vector4f n = Math::Normalize( v );
+
+            ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
+        }
+    }
+
+
+    ZP_TEST_SUITE( Matrix4x4f )
+    {
+        ZP_TEST( IdentityEqualsCorrectValue )
+        {
+            constexpr Matrix4x4f matrix{ .v{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+
+            ZP_CHECK_EQUALS( matrix, Matrix4x4f::identity );
+        }
+
+        ZP_TEST( ZeroEqualsCorrectValue )
+        {
+            constexpr Matrix4x4f matrix{ .v{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+
+            ZP_CHECK_EQUALS( matrix, Matrix4x4f::zero );
+        }
+
+        ZP_TEST( MultiplyIdentity )
+        {
+            constexpr Matrix4x4f matrix{ .v{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 } };
+
+            ZP_CHECK_EQUALS( Math::Mul( matrix, Matrix4x4f::identity ), matrix );
+        }
+    }
+}
 #endif

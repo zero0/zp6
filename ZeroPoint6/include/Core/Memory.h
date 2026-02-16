@@ -5,13 +5,62 @@
 #ifndef ZP_MEMORY_H
 #define ZP_MEMORY_H
 
-#include "Core/Defines.h"
-#include "Core/Types.h"
 #include "Core/Common.h"
+#include "Core/Defines.h"
 #include "Core/Math.h"
+#include "Core/Types.h"
 
 namespace zp
 {
+    struct ReadOnlyMemory
+    {
+        ZP_FORCEINLINE constexpr ReadOnlyMemory()
+            : m_ptr( nullptr )
+            , m_size( 0 )
+        {
+        }
+
+        ZP_FORCEINLINE constexpr ReadOnlyMemory( const void* ptr, const zp_size_t size )
+            : m_ptr( ptr )
+            , m_size( size )
+        {
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto ptr() const -> const void*
+        {
+            return m_ptr;
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto size() const -> zp_size_t
+        {
+            return m_size;
+        }
+
+        template<typename T>
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto as() const -> const T*
+        {
+            ZP_ASSERT( sizeof( T ) <= m_size );
+            return static_cast<const T*>( m_ptr );
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto slice( const zp_size_t sliceSize ) const -> ReadOnlyMemory
+        {
+            ZP_ASSERT( sliceSize <= m_size );
+            return { m_ptr, sliceSize };
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto slice( const zp_size_t offset, const zp_size_t sliceSize ) const -> ReadOnlyMemory
+        {
+            ZP_ASSERT( offset < m_size );
+            ZP_ASSERT( sliceSize <= m_size - offset);
+            return { static_cast<const zp_uint8_t*>( m_ptr ) + offset, sliceSize };
+        }
+
+    private:
+        const void* m_ptr;
+        zp_size_t m_size;
+    };
+
     struct Memory
     {
         ZP_FORCEINLINE constexpr Memory()
@@ -20,7 +69,7 @@ namespace zp
         {
         }
 
-        ZP_FORCEINLINE constexpr Memory( void* ptr, zp_size_t size )
+        ZP_FORCEINLINE constexpr Memory( void* ptr, const zp_size_t size )
             : m_ptr( ptr )
             , m_size( size )
         {
@@ -45,24 +94,29 @@ namespace zp
         [[nodiscard]] ZP_FORCEINLINE constexpr auto as() -> T*
         {
             ZP_ASSERT( sizeof( T ) <= m_size );
-            return static_cast<T*>(m_ptr);
+            return static_cast<T*>( m_ptr );
         }
 
         template<typename T>
         [[nodiscard]] ZP_FORCEINLINE constexpr auto as() const -> const T*
         {
             ZP_ASSERT( sizeof( T ) <= m_size );
-            return static_cast<const T*>(m_ptr);
+            return static_cast<const T*>( m_ptr );
         }
 
-        [[nodiscard]] ZP_FORCEINLINE constexpr auto slice( zp_size_t sliceSize ) const -> Memory
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto slice( const zp_size_t sliceSize ) const -> Memory
         {
             return { m_ptr, sliceSize };
         }
 
-        [[nodiscard]] ZP_FORCEINLINE constexpr auto slice( zp_size_t offset, zp_size_t sliceSize ) const -> Memory
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto slice( const zp_size_t offset, const zp_size_t sliceSize ) const -> Memory
         {
-            return { static_cast<zp_uint8_t*>(m_ptr) + offset, sliceSize };
+            return { static_cast<zp_uint8_t*>( m_ptr ) + offset, sliceSize };
+        }
+
+        [[nodiscard]] ZP_FORCEINLINE constexpr auto asReadonly() const -> ReadOnlyMemory
+        {
+            return { m_ptr, m_size };
         }
 
     private:
@@ -70,29 +124,7 @@ namespace zp
         zp_size_t m_size;
     };
 
-    struct ReadOnlyMemory
-    {
-        const void* ptr;
-        zp_size_t size;
-
-        template<typename T>
-        [[nodiscard]] ZP_FORCEINLINE const T* as() const
-        {
-            ZP_ASSERT( sizeof( T ) <= size );
-            return static_cast<const T*>(ptr);
-        }
-
-        [[nodiscard]] ZP_FORCEINLINE ReadOnlyMemory slice( zp_size_t sliceSize ) const
-        {
-            return { .ptr = ptr, .size = sliceSize };
-        }
-
-        [[nodiscard]] ZP_FORCEINLINE ReadOnlyMemory slice( zp_size_t offset, zp_size_t sliceSize ) const
-        {
-            return { .ptr = static_cast<const zp_uint8_t*>(ptr) + offset, .size = sliceSize };
-        }
-    };
-}
+} // namespace zp
 
 namespace zp
 {
@@ -148,7 +180,7 @@ namespace zp
         pointer m_ptr;
         zp_size_t m_length;
     };
-}
+} // namespace zp
 
 namespace zp
 {
@@ -186,7 +218,7 @@ namespace zp
         const_pointer m_ptr;
         zp_size_t m_length;
     };
-}
+} // namespace zp
 
 namespace zp
 {
@@ -248,7 +280,7 @@ namespace zp
 
     template<typename T, typename... U>
     FixedArray( T, U... ) -> FixedArray<T, 1 + sizeof...( U )>;
-}
+} // namespace zp
 
 
 //
@@ -259,8 +291,7 @@ namespace zp
 {
     template<typename T>
     MemoryArray<T>::MemoryArray( pointer ptr, zp_size_t length )
-        : m_ptr( ptr )
-        , m_length( length )
+        : m_ptr( ptr ), m_length( length )
     {
     }
 
@@ -357,7 +388,7 @@ namespace zp
     {
         return { m_ptr, m_length * sizeof( T ) };
     }
-}
+} // namespace zp
 
 namespace zp
 {
@@ -376,7 +407,7 @@ namespace zp
     template<typename T, zp_size_t Size>
     template<typename... Args>
     constexpr FixedArray<T, Size>::FixedArray( Args... args )
-        : m_ptr { zp_forward<T>( args )... }
+        : m_ptr{ zp_forward<T>( args )... }
     {
     }
 
@@ -483,15 +514,14 @@ namespace zp
     {
         return { m_ptr, Size * sizeof( T ) };
     }
-}
+} // namespace zp
 
 
 namespace zp
 {
     template<typename T>
     ReadonlyMemoryArray<T>::ReadonlyMemoryArray( ReadonlyMemoryArray::const_pointer ptr, zp_size_t length )
-        : m_ptr( ptr )
-        , m_length( length )
+        : m_ptr( ptr ), m_length( length )
     {
     }
 
@@ -537,7 +567,7 @@ namespace zp
     {
         return m_length;
     }
-}
+} // namespace zp
 
 ZP_FORCEINLINE void zp_memcpy( zp::Memory dst, const zp::Memory& src )
 {
@@ -546,7 +576,7 @@ ZP_FORCEINLINE void zp_memcpy( zp::Memory dst, const zp::Memory& src )
 
 ZP_FORCEINLINE void zp_memcpy( zp::Memory dst, const zp::ReadOnlyMemory& src )
 {
-    zp_memcpy( dst.ptr(), dst.size(), src.ptr, src.size );
+    zp_memcpy( dst.ptr(), dst.size(), src.ptr(), src.size() );
 }
 
-#endif //ZP_MEMORY_H
+#endif // ZP_MEMORY_H

@@ -2,11 +2,13 @@
 // Created by phosg on 2/25/2025.
 //
 
+#include "Core/Defines.h"
+
+#if ZP_USE_TESTS
 #include "Test/Test.h"
 
 #include "Core/Log.h"
 #include "Core/Macros.h"
-#include "Core/Math.h"
 
 #include "Platform/Platform.h"
 
@@ -15,8 +17,7 @@ using namespace zp;
 namespace zp
 {
     ITest::ITest()
-        : m_next( nullptr )
-        , m_prev( nullptr )
+        : node()
     {
         TestRunner::Add( this );
     }
@@ -29,27 +30,15 @@ namespace zp
     {
         struct TestRunnerContext
         {
-            ITest* m_firstTest;
+            IntrusiveList<ITest, &ITest::node> testList;
         };
 
-        TestRunnerContext s_context {};
-    }
+        TestRunnerContext s_context{};
+    } // namespace
 
     void TestRunner::Add( ITest* test )
     {
-        if( s_context.m_firstTest == nullptr )
-        {
-            s_context.m_firstTest = test;
-            s_context.m_firstTest->m_next = test;
-            s_context.m_firstTest->m_prev = test;
-        }
-        else
-        {
-            test->m_next = s_context.m_firstTest;
-            test->m_prev = s_context.m_firstTest->m_prev;
-            test->m_prev->m_next = test;
-            test->m_next->m_prev = test;
-        }
+        s_context.testList.push_back( test );
     }
 
     void TestRunner::RunAll( TestResults& testResults )
@@ -57,8 +46,7 @@ namespace zp
         struct SetupTeardownFinallyBlock
         {
             SetupTeardownFinallyBlock( ITest* test, TestResults& testResults )
-                : test( test )
-                , results( &testResults )
+                : test( test ), results( &testResults )
             {
                 test->Setup( results );
             }
@@ -82,32 +70,30 @@ namespace zp
 
         const zp_time_t startTime = Platform::TimeNow();
 
-        ITest* currentTest = s_context.m_firstTest;
-        if( currentTest != nullptr )
+        auto it = s_context.testList.begin();
+        auto end = s_context.testList.end();
+
+        for( ; it != end; ++it )
         {
-            do
+            ITest* currentTest = &*it;
+            const zp_time_t startTestTime = Platform::TimeNow();
+
+            testResults.StartTest();
+
+            try
             {
-                const zp_time_t startTestTime = Platform::TimeNow();
+                const SetupTeardownFinallyBlock setupTeardown( currentTest, testResults );
 
-                testResults.StartTest();
+                currentTest->Run( &testResults );
+            }
+            catch( ... )
+            {
+            };
 
-                try
-                {
-                    const SetupTeardownFinallyBlock setupTeardown( currentTest, testResults );
+            testResults.EndTest();
 
-                    currentTest->Run( &testResults );
-                }
-                catch( ... )
-                {
-                };
-
-                testResults.EndTest();
-
-                const zp_time_t endTestTime = Platform::TimeNow();
-
-                currentTest = currentTest->m_next;
-            } while( currentTest != s_context.m_firstTest );
-        }
+            const zp_time_t endTestTime = Platform::TimeNow();
+        };
 
         testResults.EndRun();
     }
@@ -117,10 +103,7 @@ namespace zp
     //
 
     TestResults::TestResults( MemoryLabel memoryLabel )
-        : m_results( 8, memoryLabel )
-        , m_numTests( 0 )
-        , m_numPassed( 0 )
-        , m_numFailed( 0 )
+        : m_results( 8, memoryLabel ), m_numTests( 0 ), m_numPassed( 0 ), m_numFailed( 0 )
     {
     }
 
@@ -170,6 +153,7 @@ namespace zp
 
     void TestResults::EndTest()
     {
-
     }
-}
+} // namespace zp
+
+#endif // ZP_USE_TESTS

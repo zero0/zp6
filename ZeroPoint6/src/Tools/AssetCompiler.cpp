@@ -66,7 +66,7 @@ AssetCompilerApplication::AssetCompilerApplication( MemoryLabel memoryLabel )
 
 void AssetCompilerApplication::initialize( const String& commandLine )
 {
-    zp_size_t numJobThreads = 2;
+    zp_uint32_t numJobThreads = 2;
 
     CommandLine cmdLine( MemoryLabels::Default );
     if( cmdLine.parse( commandLine.c_str() ) )
@@ -153,11 +153,11 @@ void AssetCompilerApplication::initialize( const String& commandLine )
 
 #if ZP_USE_PROFILER
     Profiler::CreateProfiler( MemoryLabels::Profiling, {
-        .maxThreadCount = numJobThreads + 2, // main thread + socket thread
         .maxCPUEventsPerThread = 128,
         .maxMemoryEventsPerThread = 128,
         .maxGPUEventsPerThread = 4,
         .maxFramesToCapture = 120,
+        .maxThreadCount = numJobThreads + 2, // main thread + socket thread
     } );
 
     Profiler::InitializeProfilerThread();
@@ -242,7 +242,7 @@ zp_uint32_t AssetCompilerApplication::ReceiveInfoSocketThreadFunc( void* param )
             }
 
             const Memory requestMemory = requestWriter.memory();
-            Log::info() << requestMemory.m_size << ": " << (const char*)requestMemory.as<char*>() << Log::endl;
+            Log::info() << requestMemory.size() << ": " << (const char*)requestMemory.as<char*>() << Log::endl;
 
             Http::Request request {};
             Http::ParseRequest( requestMemory, request );
@@ -261,9 +261,9 @@ zp_uint32_t AssetCompilerApplication::ReceiveInfoSocketThreadFunc( void* param )
 
             const Memory sendMemory = responseWriter.memory();
 
-            Log::info() << sendMemory.m_size << ": " << (const char*)sendMemory.as<char*>() << Log::endl;
+            Log::info() << sendMemory.size() << ": " << (const char*)sendMemory.as<char*>() << Log::endl;
 
-            Platform::SendSocket( acceptedSocket, sendMemory.m_ptr, sendMemory.m_size );
+            Platform::SendSocket( acceptedSocket, sendMemory.ptr(), sendMemory.size() );
 
             Platform::CloseSocket( acceptedSocket );
         }

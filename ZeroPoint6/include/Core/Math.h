@@ -18,30 +18,39 @@ struct zp_limit
     static constexpr T max() noexcept;
 };
 
-#define LIMIT_DEF( t, mi, ma )                                  \
-template<>                                                      \
-struct zp_limit<t>                                              \
-{                                                               \
-    static constexpr zp_size_t size() { return sizeof(t); }     \
-    static constexpr t min() { return mi; }                     \
-    static constexpr t max() { return ma; }                     \
-}
+#define LIMIT_DEF( t, mi, ma )            \
+    template<>                            \
+    struct zp_limit<t>                    \
+    {                                     \
+        static constexpr zp_size_t size() \
+        {                                 \
+            return sizeof( t );           \
+        }                                 \
+        static constexpr t min()          \
+        {                                 \
+            return mi;                    \
+        }                                 \
+        static constexpr t max()          \
+        {                                 \
+            return ma;                    \
+        }                                 \
+    }
 
 // @formatter:off
 //        type          min                 max
-LIMIT_DEF(zp_bool_t,    false,              true );
+LIMIT_DEF( zp_bool_t, false, true );
 
-LIMIT_DEF(zp_char8_t,   0,                  0xFFU );
+LIMIT_DEF( zp_char8_t, 0, 0xFFU );
 
-LIMIT_DEF(zp_uint8_t,   0,                  0xFFU );
-LIMIT_DEF(zp_uint16_t,  0,                  0xFFFFU );
-LIMIT_DEF(zp_uint32_t,  0,                  0xFFFFFFFFU );
-LIMIT_DEF(zp_uint64_t,  0,                  0xFFFFFFFFFFFFFFFFULL );
+LIMIT_DEF( zp_uint8_t, 0, 0xFFU );
+LIMIT_DEF( zp_uint16_t, 0, 0xFFFFU );
+LIMIT_DEF( zp_uint32_t, 0, 0xFFFFFFFFU );
+LIMIT_DEF( zp_uint64_t, 0, 0xFFFFFFFFFFFFFFFFULL );
 
-LIMIT_DEF(zp_int8_t,    0x80,               0x7F );
-LIMIT_DEF(zp_int16_t,   0x8000,             0x7FFF );
-LIMIT_DEF(zp_int32_t,   0x80000000,         0x7FFFFFFF );
-LIMIT_DEF(zp_int64_t,   0x8000000000000000, 0x7FFFFFFFFFFFFFFFLL );
+LIMIT_DEF( zp_int8_t, 0x80, 0x7F );
+LIMIT_DEF( zp_int16_t, 0x8000, 0x7FFF );
+LIMIT_DEF( zp_int32_t, 0x80000000, 0x7FFFFFFF );
+LIMIT_DEF( zp_int64_t, 0x8000000000000000, 0x7FFFFFFFFFFFFFFFLL );
 // @formatter:on
 
 #undef LIMIT_DEF
@@ -84,26 +93,26 @@ constexpr zp_float32_t zp_clamp01( const zp_float32_t v )
 
 constexpr zp_float32_t zp_floor( const zp_float32_t v )
 {
-    const zp_int32_t vi { static_cast<zp_int32_t>( v ) };
-    return static_cast<zp_float32_t>( vi - ( static_cast<zp_float32_t >(vi) > v ? 1 : 0 ));
+    const zp_int32_t vi{ static_cast<zp_int32_t>( v ) };
+    return static_cast<zp_float32_t>( vi - ( static_cast<zp_float32_t>( vi ) > v ? 1 : 0 ) );
 }
 
 constexpr zp_int32_t zp_floor_to_int( const zp_float32_t v )
 {
-    const zp_int32_t vi { static_cast<zp_int32_t>( v ) };
-    return vi - ( static_cast<zp_float32_t>(vi) > v ? 1 : 0 );
+    const zp_int32_t vi{ static_cast<zp_int32_t>( v ) };
+    return vi - ( static_cast<zp_float32_t>( vi ) > v ? 1 : 0 );
 }
 
 constexpr zp_float32_t zp_ceil( const zp_float32_t v )
 {
-    const zp_int32_t vi { static_cast<zp_int32_t>( v ) };
-    return static_cast<zp_float32_t>( vi + ( static_cast<zp_float32_t>(vi) < v ? 1 : 0 ));
+    const zp_int32_t vi{ static_cast<zp_int32_t>( v ) };
+    return static_cast<zp_float32_t>( vi + ( static_cast<zp_float32_t>( vi ) < v ? 1 : 0 ) );
 }
 
 constexpr zp_int32_t zp_ceil_to_int( const zp_float32_t v )
 {
-    const zp_int32_t vi { static_cast<zp_int32_t>( v ) };
-    return vi + ( static_cast<zp_float32_t>(vi) < v ? 1 : 0 );
+    const zp_int32_t vi{ static_cast<zp_int32_t>( v ) };
+    return vi + ( static_cast<zp_float32_t>( vi ) < v ? 1 : 0 );
 }
 
 constexpr zp_int32_t zp_sign( const zp_int32_t v )
@@ -157,7 +166,7 @@ namespace zp
     {
         union
         {
-            T m[2];
+            T m[ 2 ];
             struct
             {
                 T x, y;
@@ -177,7 +186,7 @@ namespace zp
     {
         union
         {
-            T m[3];
+            T m[ 3 ];
             struct
             {
                 T x, y, z;
@@ -197,7 +206,7 @@ namespace zp
     {
         union
         {
-            T m[4];
+            T m[ 4 ];
             struct
             {
                 T x, y, z, w;
@@ -206,6 +215,16 @@ namespace zp
 
         static const Vector4 zero;
         static const Vector4 one;
+
+        constexpr auto operator==( Vector4&& other ) const -> zp_bool_t
+        {
+            return x == other.x && y == other.y && z == other.z && w == other.w;
+        }
+
+        constexpr auto operator==( const Vector4& other ) const -> zp_bool_t
+        {
+            return x == other.x && y == other.y && z == other.z && w == other.w;
+        }
     };
 
     typedef Vector4<zp_int32_t> Vector4i;
@@ -490,7 +509,7 @@ namespace zp
     {
         union
         {
-            zp_float32_t rgba[4];
+            zp_float32_t rgba[ 4 ];
             struct
             {
                 zp_float32_t r, g, b, a;
@@ -572,7 +591,7 @@ namespace zp
 
     struct Frustum
     {
-        Plane3Df planes[6];
+        Plane3Df planes[ 6 ];
     };
 
     template<typename T>
@@ -587,13 +606,23 @@ namespace zp
                 Vector4<T> c2;
                 Vector4<T> c3;
             };
-            Vector4<T> c[4];
-            T m[4][4];
-            T v[16];
+            Vector4<T> c[ 4 ];
+            T m[ 4 ][ 4 ];
+            T v[ 16 ];
         };
 
-        static const Matrix4x4<T> identity;
-        static const Matrix4x4<T> zero;
+        static const Matrix4x4 identity;
+        static const Matrix4x4 zero;
+
+        constexpr auto operator==( Matrix4x4&& other ) const -> zp_bool_t
+        {
+            return c0 == other.c0 && c1 == other.c1 && c2 == other.c2 && c3 == other.c3;
+        }
+
+        constexpr auto operator==( const Matrix4x4& other ) const -> zp_bool_t
+        {
+            return c0 == other.c0 && c1 == other.c1 && c2 == other.c2 && c3 == other.c3;
+        }
     };
 
     typedef Matrix4x4<zp_float32_t> Matrix4x4f;
@@ -709,8 +738,8 @@ namespace zp
         Matrix4x4f OrthoLH( const Rect2Df& orthoRect, zp_float32_t zNear, zp_float32_t zFar, zp_float32_t orthoScale = 2.f );
 
         zp_uint32_t Log2( zp_uint32_t v );
-    }
-}
+    } // namespace Math
+} // namespace zp
 
 //
 //
@@ -718,7 +747,7 @@ namespace zp
 
 constexpr zp::Color zp_debug_color( zp_size_t index, zp_size_t count )
 {
-    zp::Color c { .r = 0, .g = 0, .b = 0, .a = 1 };
+    zp::Color c{ .r = 0, .g = 0, .b = 0, .a = 1 };
 
     const zp_float32_t h = static_cast<zp_float32_t>( index + 1 ) / static_cast<zp_float32_t>( count );
     const zp_int32_t i = zp_floor_to_int( h * 6 );
@@ -770,13 +799,13 @@ constexpr zp::Color32 zp_debug_color32( zp_size_t index, zp_size_t count )
 {
     const zp::Color color = zp_debug_color( index, count );
 
-    zp::Color32 r {
-        .r = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.r * 0xFF )),
-        .g = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.g * 0xFF )),
-        .b = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.b * 0xFF )),
-        .a = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.a * 0xFF )),
+    zp::Color32 r{
+        .r = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.r * 0xFF ) ),
+        .g = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.g * 0xFF ) ),
+        .b = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.b * 0xFF ) ),
+        .a = static_cast<zp_uint8_t>( 0xFF & zp_floor_to_int( color.a * 0xFF ) ),
     };
     return r;
 }
 
-#endif //ZP_MATH_H
+#endif // ZP_MATH_H

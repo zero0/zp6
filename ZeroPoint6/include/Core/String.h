@@ -785,7 +785,7 @@ namespace zp
 
     constexpr ReadOnlyMemory String::asMemory() const
     {
-        return { .ptr = m_str, .size = m_length };
+        return { m_str, m_length };
     }
 
 

@@ -202,24 +202,18 @@ namespace zp
         zp_time_t m_startTime;
     };
 
-    class TestRunner final
+    namespace TestRunner
     {
-        ZP_NONCOPYABLE( TestRunner );
+        void Add( ITest* test );
 
-        ZP_NONMOVABLE( TestRunner );
-
-        ZP_STATIC_CLASS( TestRunner );
-
-    public:
-        static void Add( ITest* test );
-
-        static void RunAll( TestResults& testResults );
+        void RunAll( TestResults& testResults );
     };
 
     class ITest
     {
     public:
         ITest();
+        virtual ~ITest() = default;
 
         virtual void Run( ITestResults* result ) = 0;
 
@@ -227,11 +221,7 @@ namespace zp
 
         virtual void Teardown( ITestResults* result ) = 0;
 
-    private:
-        ITest* m_next;
-        ITest* m_prev;
-
-        friend class TestRunner;
+       IntrusiveListNode<ITest> node;
     };
 }
 

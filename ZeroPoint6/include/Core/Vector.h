@@ -359,7 +359,7 @@ namespace zp
     template<typename T, typename Allocator>
     zp_size_t Vector<T, Allocator>::sizeAtomic() const
     {
-        return Atomic::AddSizeT( m_length, 0 );
+        return m_length;
     }
 
     template<typename T, typename Allocator>
@@ -371,7 +371,7 @@ namespace zp
     template<typename T, typename Allocator>
     zp_bool_t Vector<T, Allocator>::isEmptyAtomic() const
     {
-        return Atomic::AddSizeT( m_length, 0 ) == 0;
+        return m_length == 0;
     }
 
     template<typename T, typename Allocator>

@@ -6,5 +6,6 @@
 #define ZP_CONFIG_H
 
 #cmakedefine ZP_RENDERING_API   @ZP_RENDERING_API@
+#cmakedefine ZP_INCLUDE_TESTS   @ZP_INCLUDE_TESTS@
 
 #endif //ZP_CONFIG_H

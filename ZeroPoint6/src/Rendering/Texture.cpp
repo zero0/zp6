@@ -296,7 +296,7 @@ namespace zp
             zp_int32_t height = 0;
             zp_int32_t channels = 0;
 
-            zp_uint8_t* rawImageData = stbi_load_from_memory( static_cast<const zp_uint8_t*>(textureData.ptr), static_cast<zp_int32_t>(textureData.size), &width, &height, &channels, 0 );
+            zp_uint8_t* rawImageData = stbi_load_from_memory( static_cast<const zp_uint8_t*>(textureData.ptr()), static_cast<zp_int32_t>(textureData.size()), &width, &height, &channels, 0 );
             ZP_ASSERT_MSG_ARGS( rawImageData != nullptr, "%s", stbi_failure_reason() );
 
             const zp_size_t componentSize = sizeof( zp_uint8_t );
