@@ -52,29 +52,29 @@ namespace zp
 
     void EntityManager::destroyEntity( Entity entity )
     {
-        m_componentSignatures[ entity ] = {};
+        m_componentSignatures[ entity.id() ] = {};
 
         m_freeList.pushBack( entity );
     }
 
     const ComponentSignature& EntityManager::getSignature( Entity entity ) const
     {
-        return m_componentSignatures[ entity ];
+        return m_componentSignatures[ entity.id() ];
     }
 
     void EntityManager::setSignature( Entity entity, const ComponentSignature& signature )
     {
-        m_componentSignatures[ entity ] = zp_move( signature );
+        m_componentSignatures[ entity.id() ] = zp_move( signature );
     }
 
     zp_bool_t EntityManager::nextEntity( EntityQueryIterator* entityQueryIterator ) const
     {
-        Entity entity = entityQueryIterator->m_current == ZP_NULL_ENTITY ? 0 : entityQueryIterator->m_current + 1;
+        Entity entity = entityQueryIterator->m_current == Entity() ? 0 : entityQueryIterator->m_current; // + 1;
         zp_bool_t found = false;
 
-        for( ; entity < m_componentSignatures.length(); ++entity )
+        //for( ; entity < m_componentSignatures.length(); ++entity )
         {
-            const ComponentSignature& componentSignature = m_componentSignatures[ entity ];
+            const ComponentSignature& componentSignature = m_componentSignatures[ entity.id() ];
             if( componentSignature.tagSignature != 0 && componentSignature.structuralSignature != 0 )
             {
                 EntityQuery& entityQuery = entityQueryIterator->m_query;
@@ -91,7 +91,7 @@ namespace zp
                 {
                     entityQueryIterator->m_current = entity;
                     found = true;
-                    break;
+                    //break;
                 }
             }
         }

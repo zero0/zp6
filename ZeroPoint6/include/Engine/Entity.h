@@ -19,8 +19,16 @@ namespace zp
     {
         enum
         {
-            ZP_NULL_ENTITY = ~0ULL
+            ZP_NULL_ENTITY = 0ULL
         };
+
+        constexpr Entity() : m_id( ZP_NULL_ENTITY )
+        {
+        }
+
+        constexpr Entity( const zp_uint64_t id ) : m_id( id )
+        {
+        }
 
         [[nodiscard]] constexpr auto id() const -> zp_uint64_t
         {
@@ -38,7 +46,7 @@ namespace zp
         }
 
     private:
-        zp_uint64_t m_id = ZP_NULL_ENTITY;
+        zp_uint64_t m_id;
     };
 
     typedef void ( *EntityQueryCallback )( Entity entity, const ComponentSignature& signature );

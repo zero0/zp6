@@ -76,6 +76,8 @@
 #define ZP_USE_PROFILER         1
 #define ZP_USE_MEMORY_PROFILER  1
 
-#define ZP_USE_TESTS            0
+#ifndef ZP_USE_TESTS
+#define ZP_USE_TESTS            1
+#endif // ZP_USE_TESTS
 
 #endif //ZP_DEFINES_H

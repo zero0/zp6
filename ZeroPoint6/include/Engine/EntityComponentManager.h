@@ -49,7 +49,7 @@ namespace zp
         }
 
     private:
-        Entity m_currentEntity;
+        zp_uint64_t m_currentEntity;
         zp_uint8_t* m_buffer;
         zp_size_t m_length;
         zp_size_t m_capacity;

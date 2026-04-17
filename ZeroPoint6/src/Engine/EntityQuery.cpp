@@ -9,7 +9,7 @@ namespace zp
 {
     void EntityQueryIterator::destroyEntity()
     {
-        if( m_current != ZP_NULL_ENTITY )
+        if( m_current != Entity() )
         {
             m_entityComponentManager->destroyEntity( m_current );
         }
@@ -17,12 +17,12 @@ namespace zp
 
     void* EntityQueryIterator::getComponentDataByType( zp_hash64_t componentTypeHash )
     {
-        return m_current == ZP_NULL_ENTITY ? nullptr : m_entityComponentManager->getComponentData( m_current, m_entityComponentManager->getComponentType( componentTypeHash ) );
+        return m_current == Entity() ? nullptr : m_entityComponentManager->getComponentData( m_current, m_entityComponentManager->getComponentType( componentTypeHash ) );
     }
 
     void EntityQueryIterator::addTagByType( zp_hash64_t tagTypeHash )
     {
-        if( m_current != ZP_NULL_ENTITY )
+        if( m_current != Entity() )
         {
             m_entityComponentManager->setEntityTag( m_current, m_entityComponentManager->getTagType( tagTypeHash ) );
         }
@@ -30,7 +30,7 @@ namespace zp
 
     void EntityQueryIterator::removeTagByType( zp_hash64_t tagTypeHash )
     {
-        if( m_current != ZP_NULL_ENTITY )
+        if( m_current != Entity() )
         {
             m_entityComponentManager->clearEntityTag( m_current, m_entityComponentManager->getTagType( tagTypeHash ) );
         }
@@ -38,7 +38,7 @@ namespace zp
 
     const void* EntityQueryIterator::getComponentDataReadOnlyByType( zp_hash64_t componentTypeHash ) const
     {
-        return m_current == ZP_NULL_ENTITY ? nullptr : m_entityComponentManager->getComponentDataReadOnly( m_current, m_entityComponentManager->getComponentType( componentTypeHash ) );
+        return m_current == Entity() ? nullptr : m_entityComponentManager->getComponentDataReadOnly( m_current, m_entityComponentManager->getComponentType( componentTypeHash ) );
     }
 
     zp_bool_t EntityQueryIterator::next()

@@ -81,7 +81,7 @@ namespace zp
     Entity EntityComponentCommandBuffer::createEntity()
     {
         ZP_ASSERT( m_length < m_capacity );
-        Entity entity = m_currentEntity++;
+        Entity entity = { m_currentEntity++ };
 
         EntityComponentCommandCreateEntity cmd {
             .entity = entity
@@ -144,7 +144,7 @@ namespace zp
 
                     Entity newEntity = entityComponentManager->createEntity();
 
-                    entityMap[ cmd.entity ] = newEntity;
+                    entityMap[ cmd.entity.id() ] = newEntity;
                 }
                     break;
 
@@ -155,7 +155,7 @@ namespace zp
 
                     Entity newEntity = entityComponentManager->createEntity( cmd.componentSignature );
 
-                    entityMap[ cmd.entity ] = newEntity;
+                    entityMap[ cmd.entity.id() ] = newEntity;
                 }
                     break;
 
@@ -168,7 +168,7 @@ namespace zp
                     ZP_ASSERT( size == cmd.size );
 
                     const void* data = read( m_buffer, position, size );
-                    entityComponentManager->setComponentData( entityMap[ cmd.entity ], cmd.componentType, data, size );
+                    entityComponentManager->setComponentData( entityMap[ cmd.entity.id() ], cmd.componentType, data, size );
                 }
                     break;
 
@@ -284,7 +284,7 @@ namespace zp
     void EntityComponentManager::iterateEntities( const EntityQuery& entityQuery, EntityQueryIterator* iterator )
     {
         iterator->m_query = entityQuery;
-        iterator->m_current = ZP_NULL_ENTITY;
+        iterator->m_current = Entity();
         iterator->m_entityComponentManager = this;
     }
 

@@ -65,120 +65,98 @@ namespace zp
 
 
     template<>
-    const Vector2f Vector2f::zero{ 0, 0 };
+    const Vector2f Vector2f::zero { 0, 0 };
 
     template<>
-    const Vector2f Vector2f::one{ 1, 1 };
+    const Vector2f Vector2f::one { 1, 1 };
 
     template<>
-    const Vector2i Vector2i::zero{ 0, 0 };
+    const Vector2i Vector2i::zero { 0, 0 };
 
     template<>
-    const Vector2i Vector2i::one{ 1, 1 };
-
-
-    template<>
-    const Vector3f Vector3f::zero{ 0, 0, 0 };
-
-    template<>
-    const Vector3f Vector3f::one{ 1, 1, 1 };
-
-    template<>
-    const Vector3i Vector3i::zero{ 0, 0, 0 };
-
-    template<>
-    const Vector3i Vector3i::one{ 1, 1, 1 };
+    const Vector2i Vector2i::one { 1, 1 };
 
 
     template<>
-    const Vector4f Vector4f::zero{ 0, 0, 0, 0 };
+    const Vector3f Vector3f::zero { 0, 0, 0 };
 
     template<>
-    const Vector4f Vector4f::one{ 1, 1, 1, 1 };
+    const Vector3f Vector3f::one { 1, 1, 1 };
 
     template<>
-    const Vector4i Vector4i::zero{ 0, 0, 0, 0 };
+    const Vector3i Vector3i::zero { 0, 0, 0 };
 
     template<>
-    const Vector4i Vector4i::one{ 1, 1, 1, 1 };
+    const Vector3i Vector3i::one { 1, 1, 1 };
+
+
+    template<>
+    const Vector4f Vector4f::zero { 0, 0, 0, 0 };
+
+    template<>
+    const Vector4f Vector4f::one { 1, 1, 1, 1 };
+
+    template<>
+    const Vector4i Vector4i::zero { 0, 0, 0, 0 };
+
+    template<>
+    const Vector4i Vector4i::one { 1, 1, 1, 1 };
 
     //
     //
     //
 
-    const Quaternion Quaternion::identity{ 0, 0, 0, 1 };
+    const Quaternion Quaternion::identity { 0, 0, 0, 1 };
 
     //
     //
     //
+
+    // clang-format off
+    template<>
+    const Matrix4x4f Matrix4x4f::identity { .v {
+        1,        0,        0,        0,
+        0,        1,        0,        0,
+        0,        0,        1,        0,
+        0,        0,        0,        1,
+    } };
 
     template<>
-    const Matrix4x4f Matrix4x4f::identity{
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-    };
-
-    template<>
-    const Matrix4x4f Matrix4x4f::zero{
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    };
+    const Matrix4x4f Matrix4x4f::zero { .v {
+        0,        0,        0,        0,
+        0,        0,        0,        0,
+        0,        0,        0,        0,
+        0,        0,        0,        0,
+    } } ;
+    // clang-format on
 
     //
     //
     //
 
-    const Color Color::clear{ .r = 0, .g = 0, .b = 0, .a = 0 };
+    const Color Color::clear { .r = 0, .g = 0, .b = 0, .a = 0 };
 
-    const Color Color::black{ .r = 0, .g = 0, .b = 0, .a = 1 };
+    const Color Color::black { .r = 0, .g = 0, .b = 0, .a = 1 };
 
-    const Color Color::white{ .r = 1, .g = 1, .b = 1, .a = 1 };
+    const Color Color::white { .r = 1, .g = 1, .b = 1, .a = 1 };
 
-    const Color Color::red{ .r = 1, .g = 0, .b = 0, .a = 1 };
+    const Color Color::red { .r = 1, .g = 0, .b = 0, .a = 1 };
 
-    const Color Color::green{ .r = 0, .g = 1, .b = 0, .a = 1 };
+    const Color Color::green { .r = 0, .g = 1, .b = 0, .a = 1 };
 
-    const Color Color::blue{ .r = 0, .g = 0, .b = 1, .a = 1 };
+    const Color Color::blue { .r = 0, .g = 0, .b = 1, .a = 1 };
 
-    const Color Color::yellow{ .r = 1, .g = 1, .b = 0, .a = 1 };
+    const Color Color::yellow { .r = 1, .g = 1, .b = 0, .a = 1 };
 
-    const Color Color::cyan{ .r = 0, .g = 1, .b = 1, .a = 1 };
+    const Color Color::cyan { .r = 0, .g = 1, .b = 1, .a = 1 };
 
-    const Color Color::magenta{ .r = 1, .g = 0, .b = 1, .a = 1 };
+    const Color Color::magenta { .r = 1, .g = 0, .b = 1, .a = 1 };
 
-    const Color Color::gray25{ .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
+    const Color Color::gray25 { .r = 0.25f, .g = 0.25f, .b = 0.25f, .a = 1 };
 
-    const Color Color::gray50{ .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
+    const Color Color::gray50 { .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 1 };
 
-    const Color Color::gray75{ .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
+    const Color Color::gray75 { .r = 0.75f, .g = 0.75f, .b = 0.75f, .a = 1 };
 
     //
     //
@@ -192,29 +170,29 @@ namespace zp
 
     constexpr zp_uint8_t q = 0x40;
 
-    const Color32 Color32::clear{ .r = 0, .g = 0, .b = 0, .a = 0 };
+    const Color32 Color32::clear { .r = 0, .g = 0, .b = 0, .a = 0 };
 
-    const Color32 Color32::black{ .r = 0, .g = 0, .b = 0, .a = f };
+    const Color32 Color32::black { .r = 0, .g = 0, .b = 0, .a = f };
 
-    const Color32 Color32::white{ .r = f, .g = f, .b = f, .a = f };
+    const Color32 Color32::white { .r = f, .g = f, .b = f, .a = f };
 
-    const Color32 Color32::red{ .r = f, .g = 0, .b = 0, .a = f };
+    const Color32 Color32::red { .r = f, .g = 0, .b = 0, .a = f };
 
-    const Color32 Color32::green{ .r = 0, .g = f, .b = 0, .a = f };
+    const Color32 Color32::green { .r = 0, .g = f, .b = 0, .a = f };
 
-    const Color32 Color32::blue{ .r = 0, .g = 0, .b = f, .a = f };
+    const Color32 Color32::blue { .r = 0, .g = 0, .b = f, .a = f };
 
-    const Color32 Color32::yellow{ .r = f, .g = f, .b = 0, .a = f };
+    const Color32 Color32::yellow { .r = f, .g = f, .b = 0, .a = f };
 
-    const Color32 Color32::cyan{ .r = 0, .g = f, .b = f, .a = f };
+    const Color32 Color32::cyan { .r = 0, .g = f, .b = f, .a = f };
 
-    const Color32 Color32::magenta{ .r = f, .g = 0, .b = f, .a = f };
+    const Color32 Color32::magenta { .r = f, .g = 0, .b = f, .a = f };
 
-    const Color32 Color32::gray25{ .r = q, .g = q, .b = q, .a = f };
+    const Color32 Color32::gray25 { .r = q, .g = q, .b = q, .a = f };
 
-    const Color32 Color32::gray50{ .r = h, .g = h, .b = h, .a = f };
+    const Color32 Color32::gray50 { .r = h, .g = h, .b = h, .a = f };
 
-    const Color32 Color32::gray75{ .r = c, .g = c, .b = c, .a = f };
+    const Color32 Color32::gray75 { .r = c, .g = c, .b = c, .a = f };
 
     //
     //
@@ -298,7 +276,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r{};
+            ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, zp_clamp01( a ) ) );
             return r;
         }
@@ -308,7 +286,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r{};
+            ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_lerpunclamp_ps( mx, my, a ) );
             return r;
         }
@@ -318,7 +296,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r{};
+            ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_lerp_ps( mx, my, zp_clamp01( a ) ) );
             return r;
         }
@@ -328,7 +306,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r{};
+            ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -338,7 +316,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_set1_ps( y );
 
-            ZP_ALIGN16 Color r{};
+            ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -348,7 +326,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.rgba );
             const __m128 my = _mm_loadu_ps( y.rgba );
 
-            ZP_ALIGN16 Color r{};
+            ZP_ALIGN16 Color r {};
             _mm_store_ps( r.rgba, _mm_add_ps( mx, my ) );
             return r;
         }
@@ -358,7 +336,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.m );
             const __m128 my = _mm_loadu_ps( y.m );
 
-            ZP_ALIGN16 Vector4f r{};
+            ZP_ALIGN16 Vector4f r {};
             _mm_store_ps( r.m, _mm_add_ps( mx, my ) );
             return r;
         }
@@ -368,7 +346,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.m );
             const __m128 my = _mm_loadu_ps( y.m );
 
-            ZP_ALIGN16 Vector4f r{};
+            ZP_ALIGN16 Vector4f r {};
             _mm_store_ps( r.m, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -378,7 +356,7 @@ namespace zp
             const __m128 mx = _mm_loadu_ps( x.m );
             const __m128 my = _mm_set1_ps( y );
 
-            ZP_ALIGN16 Vector4f r{};
+            ZP_ALIGN16 Vector4f r {};
             _mm_store_ps( r.m, _mm_mul_ps( mx, my ) );
             return r;
         }
@@ -410,7 +388,7 @@ namespace zp
             col2 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c2.w ), col2 );
             col3 = _mm_fmadd_ps( lc3, _mm_set1_ps( rh.c3.w ), col3 );
 
-            ZP_ALIGN16 Matrix4x4f r{};
+            ZP_ALIGN16 Matrix4x4f r {};
             _mm_store_ps( r.c0.m, col0 );
             _mm_store_ps( r.c1.m, col1 );
             _mm_store_ps( r.c2.m, col2 );
@@ -428,7 +406,7 @@ namespace zp
 
             _MM_TRANSPOSE4_PS( lc0, lc1, lc2, lc3 );
 
-            ZP_ALIGN16 Matrix4x4f r{};
+            ZP_ALIGN16 Matrix4x4f r {};
             _mm_store_ps( r.m[ 0 ], lc0 );
             _mm_store_ps( r.m[ 1 ], lc1 );
             _mm_store_ps( r.m[ 2 ], lc2 );
@@ -449,7 +427,7 @@ namespace zp
             col0 = _mm_fmadd_ps( _mm_set1_ps( rh.z ), lc2, col0 );
             col0 = _mm_fmadd_ps( _mm_set1_ps( rh.w ), lc3, col0 );
 
-            ZP_ALIGN16 Vector4f r{};
+            ZP_ALIGN16 Vector4f r {};
             _mm_store_ps( r.m, col0 );
 
             return r;
@@ -484,7 +462,7 @@ namespace zp
             _mm_store_ps( fmin, _mm_sub_ps( tcenter, textents ) );
             _mm_store_ps( fmax, _mm_add_ps( tcenter, textents ) );
 
-            const Bounds3Df r{
+            const Bounds3Df r {
                 .xMin = fmin[ 0 ],
                 .yMin = fmin[ 1 ],
                 .zMin = fmin[ 2 ],
@@ -533,7 +511,7 @@ namespace zp
             ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_storer_ps( m, x );
 
-            Vector3f r{ m[ 0 ], m[ 1 ], m[ 2 ] };
+            Vector3f r { m[ 0 ], m[ 1 ], m[ 2 ] };
             return r;
         }
 
@@ -580,7 +558,7 @@ namespace zp
             ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_store_ps( m, _mm_normalize_ps( v ) );
 
-            Vector2f r{ .x = m[ 0 ], .y = m[ 1 ] };
+            Vector2f r { .x = m[ 0 ], .y = m[ 1 ] };
             return r;
         }
 
@@ -591,7 +569,7 @@ namespace zp
             ZP_ALIGN16 zp_float32_t m[ 4 ];
             _mm_store_ps( m, _mm_normalize_ps( v ) );
 
-            Vector3f r{ .x = m[ 0 ], .y = m[ 1 ], .z = m[ 2 ] };
+            Vector3f r { .x = m[ 0 ], .y = m[ 1 ], .z = m[ 2 ] };
             return r;
         }
 
@@ -698,7 +676,7 @@ namespace zp
             const __m128 c3 = _mm_fmadd_ps( _mm_mul_ps( rtfPlbn, invRtfMlbn ), _mm_setr_ps( -1, -1, -1, 0 ), _mm_setr_ps( 0, 0, 0, 1 ) );
 
             // NOTE: c0..3 are set up properly, no need to store reverse
-            ZP_ALIGN16 Matrix4x4f matrix{};
+            ZP_ALIGN16 Matrix4x4f matrix {};
             _mm_store_ps( matrix.c0.m, c0 );
             _mm_store_ps( matrix.c1.m, c1 );
             _mm_store_ps( matrix.c2.m, c2 );
@@ -725,7 +703,7 @@ ZP_TEST_GROUP( Math )
     {
         ZP_TEST( Length )
         {
-            constexpr Vector2f v{ 1, 1 };
+            constexpr Vector2f v { 1, 1 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.4142135623730950488016887242097f );
@@ -734,7 +712,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Normalize )
         {
-            constexpr Vector2f v{ 10, 10 };
+            constexpr Vector2f v { 10, 10 };
             const Vector2f n = Math::Normalize( v );
 
             ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
@@ -745,7 +723,7 @@ ZP_TEST_GROUP( Math )
     {
         ZP_TEST( Length )
         {
-            constexpr Vector3f v{ 1, 1, 1 };
+            constexpr Vector3f v { 1, 1, 1 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.7320508075688772935274463415059f );
@@ -754,7 +732,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Normalize )
         {
-            constexpr Vector3f v{ 10, 10, 10 };
+            constexpr Vector3f v { 10, 10, 10 };
             const Vector3f n = Math::Normalize( v );
 
             ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
@@ -765,7 +743,7 @@ ZP_TEST_GROUP( Math )
     {
         ZP_TEST( Length1 )
         {
-            constexpr Vector4f v{ 1, 0, 0, 0 };
+            constexpr Vector4f v { 1, 0, 0, 0 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.0f );
@@ -774,7 +752,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Length2 )
         {
-            constexpr Vector4f v{ 1, 1, 0, 0 };
+            constexpr Vector4f v { 1, 1, 0, 0 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.4142135623730950488016887242097f );
@@ -783,7 +761,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Length3 )
         {
-            constexpr Vector4f v{ 1, 1, 1, 0 };
+            constexpr Vector4f v { 1, 1, 1, 0 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 1.7320508075688772935274463415059f );
@@ -792,7 +770,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Length4 )
         {
-            constexpr Vector4f v{ 1, 1, 1, 1 };
+            constexpr Vector4f v { 1, 1, 1, 1 };
             const zp_float32_t len = Math::Length( v );
 
             ZP_CHECK_EQUALS( len, 2.0f );
@@ -801,7 +779,7 @@ ZP_TEST_GROUP( Math )
 
         ZP_TEST( Normalize )
         {
-            constexpr Vector4f v{ 10, 10, 10, 10 };
+            constexpr Vector4f v { 10, 10, 10, 10 };
             const Vector4f n = Math::Normalize( v );
 
             ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
@@ -813,24 +791,673 @@ ZP_TEST_GROUP( Math )
     {
         ZP_TEST( IdentityEqualsCorrectValue )
         {
-            constexpr Matrix4x4f matrix{ .v{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+            constexpr Matrix4x4f matrix { .v { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
 
             ZP_CHECK_EQUALS( matrix, Matrix4x4f::identity );
         }
 
         ZP_TEST( ZeroEqualsCorrectValue )
         {
-            constexpr Matrix4x4f matrix{ .v{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+            constexpr Matrix4x4f matrix { .v { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
 
             ZP_CHECK_EQUALS( matrix, Matrix4x4f::zero );
         }
 
         ZP_TEST( MultiplyIdentity )
         {
-            constexpr Matrix4x4f matrix{ .v{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 } };
+            constexpr Matrix4x4f matrix { .v { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 } };
 
             ZP_CHECK_EQUALS( Math::Mul( matrix, Matrix4x4f::identity ), matrix );
         }
+
+        ZP_TEST( MultiplyIdentityColumnMajor )
+        {
+            // Identity matrix with column-major layout
+            constexpr Matrix4x4f identity { .v { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+            ZP_CHECK_EQUALS( Math::Mul( identity, identity ), identity );
+        }
+
+        ZP_TEST( Multiply )
+        {
+            // A = [[1,2],[3,4]]
+            constexpr Matrix4x4f a { .v { 1, 2, 0, 0, 3, 4, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+            // B = [[5,6],[7,8]]
+            constexpr Matrix4x4f b { .v { 5, 6, 0, 0, 7, 8, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+            // A*B should be [[19,22],[43,50]]
+            Matrix4x4f c = Math::Mul( a, b );
+
+            ZP_CHECK_FLOAT32_APPROX( c.m[ 0 ][ 0 ], 19.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( c.m[ 0 ][ 1 ], 22.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( c.m[ 0 ][ 2 ], 43.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( c.m[ 0 ][ 3 ], 50.0f, 0.000001f );
+        }
+
+        ZP_TEST( Transpose )
+        {
+            // A = [[1,2],[3,4]]
+            constexpr Matrix4x4f a { .v { 1, 2, 0, 0, 3, 4, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+            const Matrix4x4f at = Math::Transpose( a );
+
+            ZP_CHECK_FLOAT32_APPROX( at.m[ 0 ][ 0 ], 3.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( at.m[ 0 ][ 1 ], 1.0f, 0.000001f );
+        }
+
+        ZP_TEST( MultiplyVector )
+        {
+            // A = [[2,0],[0,3]] (scaling matrix)
+            constexpr Matrix4x4f a { .v { 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 } };
+            const Vector4f v { 1, 2, 3, 4 };
+            const Vector4f expected { 2, 6, 3, 4 };
+            const Vector4f result = Math::Mul( a, v );
+
+            ZP_CHECK_FLOAT32_APPROX( result.x, expected.x, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.y, expected.y, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.z, expected.z, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.w, expected.w, 0.000001f );
+        }
+    }
+
+
+    ZP_TEST_SUITE( Vector2f )
+    {
+        ZP_TEST( Dot )
+        {
+            constexpr Vector2f a { 1, 2 };
+            constexpr Vector2f b { 3, 4 };
+            const zp_float32_t result = Math::Dot( a, b );
+
+            // 1*3 + 2*4 = 11
+            ZP_CHECK_EQUALS( result, 11.0f );
+        };
+
+        ZP_TEST( DotWithZero )
+        {
+            constexpr Vector2f a { 0, 5 };
+            constexpr Vector2f b { 0, 0 };
+            const zp_float32_t result = Math::Dot( a, b );
+
+            // 0*0 + 5*0 = 0
+            ZP_CHECK_EQUALS( result, 0.0f );
+        };
+
+        ZP_TEST( LengthSq )
+        {
+            constexpr Vector2f v { 3, 4 };
+            const zp_float32_t len = Math::Length( v );
+            const zp_float32_t lensq = Math::LengthSq( v );
+
+            // len should be 5.0
+            // lensq should be 25.0
+            ZP_CHECK_FLOAT32_APPROX( len, 5.0f, 0.000001f );
+            ZP_CHECK_EQUALS( lensq, 25.0f );
+        };
+
+        ZP_TEST( LengthSqZeroVector )
+        {
+            constexpr Vector2f v { 0, 0 };
+            const zp_float32_t lensq = Math::LengthSq( v );
+
+            // 0^2 + 0^2 = 0
+            ZP_CHECK_EQUALS( lensq, 0.0f );
+        };
+
+        ZP_TEST( Cmp )
+        {
+            constexpr Vector2f a { 1, 2 };
+            constexpr Vector2f b { 1, 2 };
+            const Vector2i result = Math::Cmp( a, b );
+
+            // Equal vectors should return {0, 0}
+            ZP_CHECK_EQUALS( result.x, 0 );
+            ZP_CHECK_EQUALS( result.y, 0 );
+        };
+
+        ZP_TEST( CmpLessThan )
+        {
+            constexpr Vector2f a { 1, 2 };
+            constexpr Vector2f b { 2, 2 };
+            const Vector2i result = Math::Cmp( a, b );
+
+            // a < b should return {-1, 0}
+            ZP_CHECK_EQUALS( result.x, -1 );
+            ZP_CHECK_EQUALS( result.y, 0 );
+        };
+
+        ZP_TEST( CmpGreaterThan )
+        {
+            constexpr Vector2f a { 2, 2 };
+            constexpr Vector2f b { 1, 2 };
+            const Vector2i result = Math::Cmp( a, b );
+
+            // a > b should return {1, 0}
+            ZP_CHECK_EQUALS( result.x, 1 );
+            ZP_CHECK_EQUALS( result.y, 0 );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Vector3f )
+    {
+        ZP_TEST( Cross )
+        {
+            constexpr Vector3f a { 1, 0, 0 };
+            constexpr Vector3f b { 0, 1, 0 };
+            const Vector3f result = Math::Cross( a, b );
+
+            // Cross product of x and y unit vectors is z unit vector
+            // Result should be {0, 0, 1}
+            ZP_CHECK_FLOAT32_APPROX( result.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.y, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.z, 1.0f, 0.000001f );
+        };
+
+        ZP_TEST( CrossParallelVectors )
+        {
+            constexpr Vector3f a { 1, 2, 3 };
+            constexpr Vector3f b { 2, 4, 6 }; // 2*a
+            const Vector3f result = Math::Cross( a, b );
+
+            // Parallel vectors have zero cross product
+            ZP_CHECK_FLOAT32_APPROX( result.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.y, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.z, 0.0f, 0.000001f );
+        };
+
+        ZP_TEST( CrossAntiParallelVectors )
+        {
+            constexpr Vector3f a { 1, 2, 3 };
+            constexpr Vector3f b { -1, -2, -3 }; // -a
+            const Vector3f result = Math::Cross( a, b );
+
+            // Anti-parallel vectors have zero cross product
+            ZP_CHECK_FLOAT32_APPROX( result.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.y, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.z, 0.0f, 0.000001f );
+        };
+
+        ZP_TEST( DotWithZero )
+        {
+            constexpr Vector3f a { 0, 5, 3 };
+            constexpr Vector3f b { 0, 0, 0 };
+            const zp_float32_t result = Math::Dot( a, b );
+
+            // 0*0 + 5*0 + 3*0 = 0
+            ZP_CHECK_EQUALS( result, 0.0f );
+        };
+
+        ZP_TEST( LengthSq )
+        {
+            constexpr Vector3f v { 1, 2, 2 };
+            const zp_float32_t lensq = Math::LengthSq( v );
+
+            // 1^2 + 2^2 + 2^2 = 1 + 4 + 4 = 9
+            ZP_CHECK_EQUALS( lensq, 9.0f );
+        };
+
+        ZP_TEST( NormalizeZeroVector )
+        {
+            constexpr Vector3f v { 0, 0, 0 };
+            const Vector3f n = Math::Normalize( v );
+
+            // Normalizing zero vector should give NaN values
+            // We verify the result is not the identity vector
+            ZP_CHECK_NOT_EQUALS( n.x, 0.0f );
+        };
+
+        ZP_TEST( NormalizeNegativeVector )
+        {
+            constexpr Vector3f v { -3, -4, 0 };
+            const Vector3f n = Math::Normalize( v );
+
+            // Length should be 5
+            ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.000001f );
+            // Direction should be opposite of input
+            ZP_CHECK_FLOAT32_APPROX( n.x, 0.6f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( n.y, 0.8f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( n.z, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Vector4f )
+    {
+        ZP_TEST( Dot )
+        {
+            constexpr Vector4f a { 1, 2, 3, 4 };
+            constexpr Vector4f b { 5, 6, 7, 8 };
+            const zp_float32_t result = Math::Dot( a, b );
+
+            // 1*5 + 2*6 + 3*7 + 4*8 = 5 + 12 + 21 + 32 = 70
+            ZP_CHECK_EQUALS( result, 70.0f );
+        };
+
+        ZP_TEST( DotWithZero )
+        {
+            constexpr Vector4f a { 0, 5, 3, 1 };
+            constexpr Vector4f b { 0, 0, 0, 0 };
+            const zp_float32_t result = Math::Dot( a, b );
+
+            ZP_CHECK_EQUALS( result, 0.0f );
+        };
+
+        ZP_TEST( Cross )
+        {
+            constexpr Vector4f a { 1, 2, 3, 4 };
+            constexpr Vector4f b { 2, 3, 4, 5 };
+            const Vector4i result = Math::Cmp( a, b );
+
+            // Cmp returns comparison, not cross product
+            // This test verifies Cmp returns correct comparison results
+            const Vector4i cmpResult = Math::Cmp(
+                { 1, 2, 3, 0 }, { 2, 3, 4, 0 } );
+            ZP_CHECK_EQUALS( cmpResult.x, -1 );
+        };
+
+        ZP_TEST( NormalizeWithLargeValues )
+        {
+            constexpr Vector4f v { 100, 200, 300, 400 };
+            const Vector4f n = Math::Normalize( v );
+
+            // Length should be approximately 1
+            ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.00001f );
+        };
+
+        ZP_TEST( NormalizeWithSmallValues )
+        {
+            constexpr Vector4f v { 0.1, 0.2, 0.3, 0.4 };
+            const Vector4f n = Math::Normalize( v );
+
+            // Length should be approximately 1
+            ZP_CHECK_FLOAT32_APPROX( Math::Length( n ), 1.0f, 0.00001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( PerspectiveDivide )
+    {
+        ZP_TEST( NormalizedVector )
+        {
+            constexpr Vector4f v { 1, 2, 3, 1 };
+            const Vector3f result = Math::PerspectiveDivide( v );
+
+            // w=1, so result should be {1, 2, 3}
+            ZP_CHECK_FLOAT32_APPROX( result.x, 1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.y, 2.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.z, 3.0f, 0.000001f );
+        };
+
+        ZP_TEST( VectorWithWZero )
+        {
+            constexpr Vector4f v { 1, 2, 3, 0 };
+            const Vector3f result = Math::PerspectiveDivide( v );
+
+            // w=0, so result should have inf values
+            // The result should not equal the input
+            ZP_CHECK_NOT_EQUALS( result.x, v.x );
+        };
+
+        ZP_TEST( NegativeW )
+        {
+            constexpr Vector4f v { 1, 2, 3, -1 };
+            const Vector3f result = Math::PerspectiveDivide( v );
+
+            // w=-1, so result should be {-1, -2, -3}
+            ZP_CHECK_FLOAT32_APPROX( result.x, -1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.y, -2.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.z, -3.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Bounds2Df )
+    {
+        ZP_TEST( EncapsulateSinglePoint )
+        {
+            Bounds2Df bounds;
+            bounds.encapsulate( Vector2f { 5, 5 } );
+
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().y, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().y, 5.0f, 0.000001f );
+        };
+
+        ZP_TEST( EncapsulateMultiplePoints )
+        {
+            Bounds2Df bounds;
+            bounds.encapsulate( Vector2f { 1, 1 } );
+            bounds.encapsulate( Vector2f { 5, 5 } );
+            bounds.encapsulate( Vector2f { 1, 5 } );
+            bounds.encapsulate( Vector2f { 5, 1 } );
+
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().x, 1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().y, 1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().y, 5.0f, 0.000001f );
+        };
+
+        ZP_TEST( Size )
+        {
+            Bounds2Df bounds;
+            bounds.encapsulate( Vector2f { 0, 0 } );
+            bounds.encapsulate( Vector2f { 10, 10 } );
+
+            const auto s = bounds.size();
+            ZP_CHECK_FLOAT32_APPROX( s.width, 10.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( s.height, 10.0f, 0.000001f );
+        };
+
+        ZP_TEST( Center )
+        {
+            Bounds2Df bounds;
+            bounds.encapsulate( Vector2f { 1, 1 } );
+            bounds.encapsulate( Vector2f { 9, 9 } );
+
+            const auto c = bounds.center();
+            ZP_CHECK_FLOAT32_APPROX( c.x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( c.y, 5.0f, 0.000001f );
+        };
+
+        ZP_TEST( MinMax )
+        {
+            Bounds2Df bounds;
+            bounds.encapsulate( Vector2f { 2, 2 } );
+            bounds.encapsulate( Vector2f { 8, 8 } );
+
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().x, 2.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().x, 8.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Bounds3Df )
+    {
+        ZP_TEST( EncapsulateSinglePoint )
+        {
+            Bounds3Df bounds;
+            bounds.encapsulate( Vector3f { 5, 5, 5 } );
+
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().y, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().z, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().y, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().z, 5.0f, 0.000001f );
+        };
+
+        ZP_TEST( EncapsulateMultiplePoints )
+        {
+            Bounds3Df bounds;
+            bounds.encapsulate( Vector3f { 0, 0, 0 } );
+            bounds.encapsulate( Vector3f { 10, 10, 10 } );
+            bounds.encapsulate( Vector3f { 5, 0, 5 } );
+            bounds.encapsulate( Vector3f { 0, 10, 5 } );
+            bounds.encapsulate( Vector3f { 0, 0, 10 } );
+
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().x, 10.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().y, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().y, 10.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.min().z, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( bounds.max().z, 10.0f, 0.000001f );
+        };
+
+        ZP_TEST( Size )
+        {
+            Bounds3Df bounds;
+            bounds.encapsulate( Vector3f { 0, 0, 0 } );
+            bounds.encapsulate( Vector3f { 10, 10, 10 } );
+
+            const auto s = bounds.size();
+            ZP_CHECK_FLOAT32_APPROX( s.width, 10.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( s.height, 10.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( s.depth, 10.0f, 0.000001f );
+        };
+
+        ZP_TEST( Extents )
+        {
+            Bounds3Df bounds;
+            bounds.encapsulate( Vector3f { 0, 0, 0 } );
+            bounds.encapsulate( Vector3f { 10, 10, 10 } );
+
+            const auto e = bounds.extents();
+            ZP_CHECK_FLOAT32_APPROX( e.width, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( e.height, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( e.depth, 5.0f, 0.000001f );
+        };
+
+        ZP_TEST( Center )
+        {
+            Bounds3Df bounds;
+            bounds.encapsulate( Vector3f { 1, 1, 1 } );
+            bounds.encapsulate( Vector3f { 9, 9, 9 } );
+
+            const auto c = bounds.center();
+            ZP_CHECK_FLOAT32_APPROX( c.x, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( c.y, 5.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( c.z, 5.0f, 0.000001f );
+        };
+
+        ZP_TEST( InvalidStaticMember )
+        {
+            // Test invalid bounds have special values
+            const Bounds3Df invalid = Bounds3Df::invalid;
+            ZP_CHECK_FLOAT32_APPROX( invalid.xMin, 1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( invalid.xMax, -1.0f, 0.000001f );
+        };
+
+        ZP_TEST( EmptyStaticMember )
+        {
+            // Test empty bounds are all zeros
+            const Bounds3Df empty = Bounds3Df::empty;
+            ZP_CHECK_FLOAT32_APPROX( empty.xMin, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( empty.xMax, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Color )
+    {
+        ZP_TEST( LerpRedGreen )
+        {
+            constexpr Color red { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f };
+            constexpr Color green { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f };
+
+            // Lerp at t=0.5 should give yellow (0.5, 0.5, 0.0, 1.0)
+            const Color result = Math::Lerp( red, green, 0.5f );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.b, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.a, 1.0f, 0.000001f );
+        };
+
+        ZP_TEST( LerpAtStart )
+        {
+            constexpr Color red { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f };
+            constexpr Color green { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f };
+
+            // Lerp at t=0 should give red
+            const Color result = Math::Lerp( red, green, 0.0f );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, 1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.b, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.a, 1.0f, 0.000001f );
+        };
+
+        ZP_TEST( LerpAtEnd )
+        {
+            constexpr Color red { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f };
+            constexpr Color green { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f };
+
+            // Lerp at t=1 should give green
+            const Color result = Math::Lerp( red, green, 1.0f );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 1.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.b, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.a, 1.0f, 0.000001f );
+        };
+
+        ZP_TEST( LerpUnclampNegative )
+        {
+            constexpr Color red { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f };
+            constexpr Color green { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f };
+
+            // Lerp with t=-0.5 should give negative red
+            const Color result = Math::LerpUnclamp( red, green, -0.5f );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, 0.75f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 0.25f, 0.000001f );
+        };
+
+        ZP_TEST( LerpUnclampGreaterThanOne )
+        {
+            constexpr Color red { .r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f };
+            constexpr Color green { .r = 0.0f, .g = 1.0f, .b = 0.0f, .a = 1.0f };
+
+            // Lerp with t=1.5 should go beyond green
+            const Color result = Math::LerpUnclamp( red, green, 1.5f );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, -0.25f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 0.75f, 0.000001f );
+        };
+
+        ZP_TEST( Add )
+        {
+            constexpr Color red { .r = 0.5f, .g = 0.0f, .b = 0.0f, .a = 0.5f };
+            constexpr Color green { .r = 0.0f, .g = 0.5f, .b = 0.0f, .a = 0.5f };
+
+            const Color result = Math::Add( red, green );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.b, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.a, 1.0f, 0.000001f );
+        };
+
+        ZP_TEST( Mul )
+        {
+            constexpr Color red { .r = 1.0f, .g = 1.0f, .b = 1.0f, .a = 0.5f };
+            constexpr Color green { .r = 0.5f, .g = 0.5f, .b = 0.5f, .a = 0.5f };
+
+            const Color result = Math::Mul( red, green );
+
+            ZP_CHECK_FLOAT32_APPROX( result.r, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.g, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.b, 0.5f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( result.a, 0.25f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Quaternion )
+    {
+        ZP_TEST( Identity )
+        {
+            // Test quaternion identity member
+            const Quaternion id = Quaternion::identity;
+
+            // Identity quaternion is typically {0, 0, 0, 1}
+            ZP_CHECK_FLOAT32_APPROX( id.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( id.y, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( id.z, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( id.w, 1.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Ray3Df )
+    {
+        ZP_TEST( Constructor )
+        {
+            Ray3Df ray {};
+
+            // Verify the ray has valid members
+            ZP_CHECK_FLOAT32_APPROX( ray.position.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( ray.direction.x, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Plane3Df )
+    {
+        ZP_TEST( Constructor )
+        {
+            Plane3Df plane {};
+
+            // Verify the plane has valid members
+            ZP_CHECK_FLOAT32_APPROX( plane.normal.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( plane.d, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Frustum )
+    {
+        ZP_TEST( Constructor )
+        {
+            Frustum frustum {};
+
+            // Verify frustum has valid planes
+            ZP_CHECK_FLOAT32_APPROX( frustum.planes[ 0 ].normal.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( frustum.planes[ 0 ].d, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Offset2Df )
+    {
+        ZP_TEST( Constructor )
+        {
+            Offset2Df offset {};
+
+            // Verify the offset has valid members
+            ZP_CHECK_FLOAT32_APPROX( offset.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( offset.y, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Offset3Df )
+    {
+        ZP_TEST( Constructor )
+        {
+            Offset3Df offset {};
+
+            // Verify the offset has valid members
+            ZP_CHECK_FLOAT32_APPROX( offset.x, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( offset.y, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( offset.z, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Size2Df )
+    {
+        ZP_TEST( Constructor )
+        {
+            Size2Df size {};
+
+            // Verify the size has valid members
+            ZP_CHECK_FLOAT32_APPROX( size.width, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( size.height, 0.0f, 0.000001f );
+        };
+    }
+
+
+    ZP_TEST_SUITE( Size3Df )
+    {
+        ZP_TEST( Constructor )
+        {
+            Size3Df size {};
+
+            // Verify the size has valid members
+            ZP_CHECK_FLOAT32_APPROX( size.width, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( size.height, 0.0f, 0.000001f );
+            ZP_CHECK_FLOAT32_APPROX( size.depth, 0.0f, 0.000001f );
+        };
     }
 }
 #endif

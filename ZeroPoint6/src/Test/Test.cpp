@@ -103,7 +103,10 @@ namespace zp
     //
 
     TestResults::TestResults( MemoryLabel memoryLabel )
-        : m_results( 8, memoryLabel ), m_numTests( 0 ), m_numPassed( 0 ), m_numFailed( 0 )
+        : m_results( 8, memoryLabel )
+        , m_numTests( 0 )
+        , m_numPassed( 0 )
+        , m_numFailed( 0 )
     {
     }
 
