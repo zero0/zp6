@@ -5,12 +5,18 @@
 #ifndef ZP_PROPERTIES_H
 #define ZP_PROPERTIES_H
 
-#include "Core/Types.h"
-#include "Core/String.h"
 #include "Core/Map.h"
+#include "Core/String.h"
+#include "Core/Types.h"
 
 namespace zp
 {
+    namespace GlobalProperties
+    {
+        template<typename T>
+        zp_bool_t Parse( const String& configFile, const String& propertyName, T& property );
+    } // namespace GlobalProperties
+
     class Properties
     {
     public:
@@ -35,6 +41,6 @@ namespace zp
     public:
         MemoryLabel memoryLabel;
     };
-}
+} // namespace zp
 
-#endif //ZP_PROPERTIES_H
+#endif // ZP_PROPERTIES_H

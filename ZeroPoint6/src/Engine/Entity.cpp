@@ -25,7 +25,7 @@ namespace zp
 
     Entity EntityManager::createEntity()
     {
-        Entity entity = ZP_NULL_ENTITY;
+        Entity entity;
 
         if( !m_freeList.isEmpty() )
         {
@@ -34,7 +34,7 @@ namespace zp
         }
         else
         {
-            entity = m_componentSignatures.length();
+            entity = { m_componentSignatures.length() };
             m_componentSignatures.pushBackEmpty();
         }
 
@@ -45,7 +45,7 @@ namespace zp
     {
         Entity entity = createEntity();
 
-        m_componentSignatures[ entity ] = signature;
+        m_componentSignatures[ entity.id() ] = signature;
 
         return entity;
     }

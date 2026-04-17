@@ -672,6 +672,78 @@ constexpr auto zp_try_guid128_to_string( const zp_guid128_t& guid, char* str, zp
 
 namespace zp
 {
+    template<typename CharType>
+    class ZP_DECLSPEC_NOVTABLE BaseStringStorage
+    {
+    public:
+        using char_type = CharType;
+        using pointer_type = CharType*;
+        using const_char_pointer = const CharType*;
+        using const_c_str_pointer = const char*;
+
+        [[nodiscard]] constexpr zp_bool_t empty() const
+        {
+            return m_str == nullptr || m_length == 0;
+        }
+
+    protected:
+        pointer_type m_str;
+        zp_size_t m_length;
+    };
+
+    template<typename CharType>
+    class ZP_DECLSPEC_NOVTABLE BaseStringOperations
+    {
+    public:
+        using char_type = CharType;
+        using const_char_pointer = const CharType*;
+        using const_c_str_pointer = const char*;
+
+    protected:
+        static constexpr zp_size_t find( const_char_pointer str, zp_size_t strLength, char_type find )
+        {
+            return zp::npos;
+        }
+    };
+
+    template<typename CharType>
+    class ZP_DECLSPEC_NOVTABLE BaseStringView : public BaseStringOperations<CharType>
+    {
+    public:
+        using operations_type = BaseStringOperations<CharType>;
+        using char_type = CharType;
+        using const_char_pointer = const CharType*;
+        using const_c_str_pointer = const char*;
+
+        [[nodiscard]] constexpr zp_size_t find( const char_type find ) const
+        {
+            return operations_type::find( this->m_str, this->m_length, find );
+        }
+    };
+
+    template<typename CharType>
+    class ZP_DECLSPEC_NOVTABLE BaseString : public BaseStringOperations<CharType>, public BaseStringStorage<CharType>
+    {
+    public:
+        using operations_type = BaseStringOperations<CharType>;
+        using char_type = CharType;
+        using const_char_pointer = const CharType*;
+        using const_c_str_pointer = const char*;
+
+        [[nodiscard]] constexpr zp_size_t find( const char_type find ) const
+        {
+            return operations_type::find( this->m_str, this->m_length, find );
+        }
+    };
+
+    using CString = BaseString<char>;
+    using StringUtf8 = BaseString<char16_t>;
+    using WString = BaseString<wchar_t>;
+
+    template<typename CharType>
+    class ZP_DECLSPEC_NOVTABLE StringView final : public BaseStringView<CharType>
+    {};
+
     class String
     {
     public:
@@ -1143,6 +1215,16 @@ namespace zp
             return Size;
         }
 
+        [[nodiscard]] void* data()
+        {
+            return m_str;
+        }
+
+        [[nodiscard]] const void* data() const
+        {
+            return m_str;
+        }
+
         [[nodiscard]] const char* c_str() const
         {
             return reinterpret_cast<const char*>(m_str);
@@ -1443,4 +1525,8 @@ const char* zp_strnstr( const zp::String& str, const char ( &find )[ Size ] )
     return zp_strnstr( str, zp::String::As( find, zp_strlen( find ) ) );
 }
 
+constexpr zp::String zp_trim( const zp::String& str )
+{
+    return { zp_ltrim( str.str(), str.length() ), zp_rtrim( str.str(), str.length() ) };
+}
 #endif //ZP_STRING_H

@@ -5,30 +5,49 @@
 #ifndef ZP_ENTITY_H
 #define ZP_ENTITY_H
 
-#include "Core/Defines.h"
-#include "Core/Types.h"
-#include "Core/Macros.h"
 #include "Core/Allocator.h"
+#include "Core/Defines.h"
+#include "Core/Macros.h"
+#include "Core/Types.h"
 #include "Core/Vector.h"
 
 #include "Engine/ComponentSignature.h"
 
 namespace zp
 {
-    typedef zp_uint64_t Entity;
-
-    enum : Entity
+    struct Entity
     {
-        ZP_NULL_ENTITY = ~0ULL
+        enum
+        {
+            ZP_NULL_ENTITY = ~0ULL
+        };
+
+        [[nodiscard]] constexpr auto id() const -> zp_uint64_t
+        {
+            return m_id;
+        }
+
+        [[nodiscard]] constexpr auto valid() const -> bool
+        {
+            return m_id != ZP_NULL_ENTITY;
+        }
+
+        [[nodiscard]] constexpr auto operator==( const Entity& other ) const -> bool
+        {
+            return m_id == other.m_id;
+        }
+
+    private:
+        zp_uint64_t m_id = ZP_NULL_ENTITY;
     };
 
-    typedef void (*EntityQueryCallback)( Entity entity, const ComponentSignature& signature );
+    typedef void ( *EntityQueryCallback )( Entity entity, const ComponentSignature& signature );
 
     class EntityQueryIterator;
 
     class EntityManager
     {
-    ZP_NONCOPYABLE( EntityManager );
+        ZP_NONCOPYABLE( EntityManager );
 
     public:
         explicit EntityManager( MemoryLabel memoryLabel );
@@ -57,5 +76,5 @@ namespace zp
     public:
         const MemoryLabel memoryLabel;
     };
-}
-#endif //ZP_ENTITY_H
+} // namespace zp
+#endif // ZP_ENTITY_H

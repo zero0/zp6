@@ -2,18 +2,65 @@
 // Created by phosg on 1/2/2026.
 //
 
-#include "Core/Types.h"
-#include "Core/String.h"
 #include "Core/Properties.h"
+#include "Core/String.h"
+#include "Core/Types.h"
 
 namespace zp
 {
-    Properties::Properties( MemoryLabel memoryLabel )
-        : m_propertyString( {} )
-        , m_properties( memoryLabel )
-        , memoryLabel( memoryLabel )
+    template<>
+    zp_bool_t GlobalProperties::Parse( const String& configFile, const String& propertyName, zp_bool_t& property )
     {
+        zp_bool_t parsed = false;
 
+        Tokenizer lineTokenizer( configFile, "\n\r" );
+        String lineToken{};
+        while( lineTokenizer.next( lineToken ) && !parsed )
+        {
+            String line = zp_trim( lineToken );
+
+            if( line.empty() )
+            {
+                continue;
+            }
+
+            if( line[ 0 ] == '#' )
+            {
+                continue;
+            }
+
+            Tokenizer propertyTokenizer( line, "=" );
+
+            String name;
+            if( propertyTokenizer.next( name ) )
+            {
+                if( name == propertyName)
+                {
+                    parsed = true;
+                    String value = propertyTokenizer.remaining();
+
+                }
+            }
+        }
+
+        return parsed;
+    }
+
+    template<>
+    zp_bool_t GlobalProperties::Parse( const String& configFile, const String& propertyName, zp_int32_t& property )
+    {
+        return true;
+    }
+
+    template<>
+    zp_bool_t GlobalProperties::Parse( const String& configFile, const String& propertyName, zp_size_t& property )
+    {
+        return true;
+    }
+
+    Properties::Properties( MemoryLabel memoryLabel )
+        : m_propertyString( {} ), m_properties( memoryLabel ), memoryLabel( memoryLabel )
+    {
     }
 
     zp_bool_t Properties::TryParse( const String& properties )
@@ -117,9 +164,9 @@ namespace zp
         const zp_bool_t found = TryGetProperty( propertyName, propertyStrValue );
         if( found )
         {
-            propertyValue = static_cast<zp_size_t>(zp_atoi64( propertyStrValue.c_str() ));
+            propertyValue = static_cast<zp_size_t>( zp_atoi64( propertyStrValue.c_str() ) );
         }
 
         return found;
     }
-}
+} // namespace zp
