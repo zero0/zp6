@@ -143,8 +143,9 @@ namespace zp
 
         MutableFixedString256 log;
         log.append( "[Test Run Complete]" ).appendLine();
-        log.append( "  Passed: " ).appendFormat( "%d", m_numPassed ).appendLine();
-        log.append( "  Failed: " ).appendFormat( "%d", m_numFailed );
+        log.append( "  Passed:   " ).appendFormat( "%d", m_numPassed ).appendLine();
+        log.append( "  Failed:   " ).appendFormat( "%d", m_numFailed ).appendLine();
+        log.append( "  Duration: " ).appendFormat( "%d", endTime - m_startTime ).appendLine();
 
         zp_printfln( log.c_str() );
     }

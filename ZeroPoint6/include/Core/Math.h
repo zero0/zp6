@@ -36,7 +36,7 @@ struct zp_limit
         }                                 \
     }
 
-// @formatter:off
+// clang-format off
 //        type          min                 max
 LIMIT_DEF( zp_bool_t, false, true );
 
@@ -51,7 +51,7 @@ LIMIT_DEF( zp_int8_t, 0x80, 0x7F );
 LIMIT_DEF( zp_int16_t, 0x8000, 0x7FFF );
 LIMIT_DEF( zp_int32_t, 0x80000000, 0x7FFFFFFF );
 LIMIT_DEF( zp_int64_t, 0x8000000000000000, 0x7FFFFFFFFFFFFFFFLL );
-// @formatter:on
+// clang-format on
 
 #undef LIMIT_DEF
 

@@ -94,7 +94,7 @@
 //
 //
 
-// @formatter:off
+// clang-format off
 #define TEST_NAME zp_type_name<decltype( this )>()
 
 #define TEST_RESULT_TEMPLATE( t, tn, op, r, f, l ) \
@@ -136,7 +136,7 @@
         TEST_RESULT_TEMPLATE( fdiff >= -fep && fdiff <= fep, TEST_NAME, #lh " ~= " #rh " (" #ep ")", reason, __FILE__, __LINE__ ); \
     } while( false )
 #define ZP_CHECK_FLOAT32_APPROX( lh, rh, ep ) ZP_CHECK_FLOAT32_APPROX_REASON( lh, rh, ep, nullptr )
-// @formatter:on
+// clang-format on
 
 
 //

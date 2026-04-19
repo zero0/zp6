@@ -2,22 +2,22 @@
 #define ZP_PLATFORM_H
 
 #include "Core/Defines.h"
-#include "Core/Types.h"
+#include "Core/Math.h"
 #include "Core/Memory.h"
 #include "Core/String.h"
-#include "Core/Math.h"
+#include "Core/Types.h"
 
 namespace zp
 {
-    typedef zp_uint32_t (* __stdcall ThreadFunc)( void* );
+    typedef zp_uint32_t ( *__stdcall ThreadFunc )( void* );
 
-    typedef zp_int64_t (* ProcAddressFunc)();
+    typedef zp_int64_t ( *ProcAddressFunc )();
 
-    typedef void (* OnWindowGetMinMaxSizeFunc)( zp_handle_t windowHandle, zp_int32_t& minWidth, zp_int32_t& minHeight, zp_int32_t& maxWidth, zp_int32_t& maxHeight, void* userPtr );
+    typedef void ( *OnWindowGetMinMaxSizeFunc )( zp_handle_t windowHandle, Size2Di& minSize, Size2Di& maxSize, void* userPtr );
 
-    typedef void (* OnWindowResizeFunc)( zp_handle_t windowHandle, zp_int32_t width, zp_int32_t height, void* userPtr );
+    typedef void ( *OnWindowResizeFunc )( zp_handle_t windowHandle, const Size2Di& size, void* userPtr );
 
-    typedef void (* OnWindowFocusFunc)( zp_handle_t windowHandle, zp_bool_t isNowFocused, void* userPtr );
+    typedef void ( *OnWindowFocusFunc )( zp_handle_t windowHandle, zp_bool_t isNowFocused, void* userPtr );
 
     struct WindowKeyEvent
     {
@@ -30,7 +30,7 @@ namespace zp
         ZP_BOOL32( isKeyReleased );
     };
 
-    typedef void (* OnWindowKeyEvent)( zp_handle_t windowHandle, const WindowKeyEvent& windowKeyEvent, void* userPtr );
+    typedef void ( *OnWindowKeyEvent )( zp_handle_t windowHandle, const WindowKeyEvent& windowKeyEvent, void* userPtr );
 
     struct WindowMouseEvent
     {
@@ -41,15 +41,17 @@ namespace zp
         ZP_BOOL32( isShiftDown );
     };
 
-    typedef void (* OnWindowMouseEvent)( zp_handle_t windowHandle, const WindowMouseEvent& windowMouseEvent, void* userPtr );
+    typedef void ( *OnWindowMouseEvent )( zp_handle_t windowHandle, const WindowMouseEvent& windowMouseEvent, void* userPtr );
 
-    typedef void (* OnWindowClosed)( zp_handle_t windowHandle, void* userPtr );
+    typedef void ( *OnWindowClosed )( zp_handle_t windowHandle, void* userPtr );
 
-    typedef void (* OnWindowHelp)( zp_handle_t windowHandle, void* userPtr );
+    typedef void ( *OnWindowHelp )( zp_handle_t windowHandle, void* userPtr );
 
     struct WindowCallbacks
     {
-        zp_int32_t minWidth, minHeight, maxWidth, maxHeight;
+        Size2Di minSize;
+        Size2Di maxSize;
+
         OnWindowGetMinMaxSizeFunc onWindowGetMinMaxSize;
         OnWindowResizeFunc onWindowResize;
         OnWindowFocusFunc onWindowFocus;
@@ -64,9 +66,8 @@ namespace zp
     {
         zp_handle_t instanceHandle;
         WindowCallbacks* callbacks;
-        const char* title;
-        zp_int32_t width;
-        zp_int32_t height;
+        String title;
+        Rect2Di windowRect;
         zp_bool_t showWindow;
     };
 
@@ -76,7 +77,7 @@ namespace zp
         ZP_OPEN_FILE_MODE_WRITE,
         ZP_OPEN_FILE_MODE_READ_WRITE,
 
-        OpenFileMode_Count
+        OpenFileMode_Count,
     };
 
     enum OpenMemoryMappedFileMode
@@ -89,7 +90,7 @@ namespace zp
         ZP_OPEN_MEMORY_MAPPED_FILE_MODE_EXEC_WRITE,
         ZP_OPEN_MEMORY_MAPPED_FILE_MODE_EXEC_READ_WRITE,
 
-        OpenMemoryMappedFileMode_Count
+        OpenMemoryMappedFileMode_Count,
     };
 
     enum MapViewOfMemoryMappedFileMode
@@ -98,7 +99,7 @@ namespace zp
         ZP_MAP_VIEW_OF_MEMORY_MAPPED_FILE_MODE_WRITE,
         ZP_MAP_VIEW_OF_MEMORY_MAPPED_FILE_MODE_READ_WRITE,
 
-        MapViewOfMemoryMappedFileMode_Count
+        MapViewOfMemoryMappedFileMode_Count,
     };
 
     enum CreateFileMode
@@ -190,7 +191,7 @@ namespace zp
 
     struct IPAddress
     {
-        char addr[16];
+        char addr[ 16 ];
         zp_uint16_t port;
 
         static IPAddress Localhost( zp_uint16_t port )
@@ -204,13 +205,12 @@ namespace zp
 
     struct SocketDesc
     {
-        const char* name;
+        String name;
         IPAddress address;
         AddressFamily addressFamily;
         SocketType socketType;
         ConnectionProtocol connectionProtocol;
         SocketDirection socketDirection;
-
     };
 
     // Window
@@ -245,12 +245,14 @@ namespace zp
 
         void SetWindowTitle( WindowHandle windowHandle, const String& title );
 
-        void SetWindowSize( WindowHandle windowHandle, zp_int32_t width, zp_int32_t height, WindowFullscreenType windowFullscreenType = WindowFullscreenType::Window );
-    }
+        void SetWindowSize( WindowHandle windowHandle, const Size2Di& size, WindowFullscreenType windowFullscreenType = WindowFullscreenType::Window );
+    } // namespace Platform
 
     // System Tray
     struct OpenSystemTrayDesc
     {
+        String tip;
+        String info;
     };
 
     struct SystemTrayHandle
@@ -263,7 +265,7 @@ namespace zp
         SystemTrayHandle OpenSystemTray( const OpenSystemTrayDesc& desc );
 
         void CloseSystemTray( SystemTrayHandle systemTrayHandle );
-    }
+    } // namespace Platform
 
     // Console
     struct ConsoleHandle
@@ -283,7 +285,7 @@ namespace zp
         zp_bool_t CloseConsole( ConsoleHandle );
 
         zp_bool_t SetConsoleTitle( ConsoleHandle, const String& title );
-    }
+    } // namespace Platform
 
     // Memory
     namespace Platform
@@ -297,7 +299,7 @@ namespace zp
         void* CommitMemoryPage( void** ptr, zp_size_t size );
 
         void DecommitMemoryPage( void* ptr, zp_size_t size );
-    }
+    } // namespace Platform
 
     // File & Path
     struct FileHandle
@@ -317,17 +319,16 @@ namespace zp
         String GetCurrentDirStr( char* path, zp_size_t maxPathLength );
 
         template<zp_size_t Size>
-        zp_size_t GetCurrentDir( char (& path)[Size] )
+        zp_size_t GetCurrentDir( char ( &path )[ Size ] )
         {
             return GetCurrentDir( path, Size );
         }
 
         template<zp_size_t Size>
-        String GetCurrentDirStr( char (& path)[Size] )
+        String GetCurrentDirStr( char ( &path )[ Size ] )
         {
             return GetCurrentDirStr( path, Size );
         }
-
 
 
         enum class CreateDirResult
@@ -362,7 +363,7 @@ namespace zp
         zp_size_t WriteFile( FileHandle fileHandle, const void* data, zp_size_t size );
 
         extern zp_char8_t PathSep;
-    }
+    } // namespace Platform
 
     // Memory Mapped Files
     struct MemoryMappedFileHandle
@@ -392,7 +393,7 @@ namespace zp
 
         void UnmapViewOfMemoryMappedFile( MemoryMappedFileView view );
 
-    };
+    }; // namespace Platform
 
     // Process
     namespace Platform
@@ -410,7 +411,7 @@ namespace zp
         }
 
         void Exit( zp_int32_t exitCode );
-    }
+    } // namespace Platform
 
     // Threading
     struct ThreadHandle
@@ -453,12 +454,12 @@ namespace zp
 
         void CloseThread( ThreadHandle threadHandle );
 
-        void JoinThreads( ThreadHandle* threadHandles, zp_size_t threadHandleCount );
+        void JoinThreads( const ThreadHandle* threadHandles, zp_size_t threadHandleCount );
 
         [[nodiscard]] zp_uint32_t GetProcessorCount();
 
         zp_int32_t ExecuteProcess( const char* process, const char* arguments );
-    }
+    } // namespace Platform
 
     // Semaphore
     struct Semaphore
@@ -488,7 +489,7 @@ namespace zp
         zp_int32_t ReleaseSemaphore( Semaphore semaphore, zp_int32_t releaseCount = 1 );
 
         zp_bool_t CloseSemaphore( Semaphore semaphore );
-    };
+    }; // namespace Platform
 
     // Mutex
     struct Mutex
@@ -517,12 +518,12 @@ namespace zp
         zp_bool_t ReleaseMutex( Mutex mutex );
 
         zp_bool_t CloseMutex( Mutex mutex );
-    };
+    }; // namespace Platform
 
     // Critical Section
     struct CriticalSection
     {
-        zp_uint8_t data[40];
+        zp_uint8_t data[ 40 ];
     };
 
     namespace Platform
@@ -534,12 +535,12 @@ namespace zp
         void LeaveCriticalSection( CriticalSection& criticalSection );
 
         void CloseCriticalSection( CriticalSection& criticalSection );
-    };
+    }; // namespace Platform
 
     // Condition Variable
     struct ConditionVariable
     {
-        zp_uint8_t data[8];
+        zp_uint8_t data[ 8 ];
     };
 
     namespace Platform
@@ -553,7 +554,7 @@ namespace zp
         void NotifyAllConditionVariable( ConditionVariable& conditionVariable );
 
         void CloseConditionVariable( ConditionVariable& conditionVariable );
-    };
+    }; // namespace Platform
 
     // Time
     constexpr const char* kDefaultDateTimeFormat = "%Y-%m-%d %H:%M:%S";
@@ -587,11 +588,13 @@ namespace zp
         zp_size_t DateTimeToString( const DateTime& dateTime, char* str, zp_size_t length, const char* format = kDefaultDateTimeFormat ); //"%d-%m-%Y %H:%M:%S" );
 
         template<zp_size_t Size>
-        zp_size_t DateTimeToString( const DateTime& dateTime, char (& str)[Size], const char* format = kDefaultDateTimeFormat )
+        zp_size_t DateTimeToString( const DateTime& dateTime, char ( &str )[ Size ], const char* format = kDefaultDateTimeFormat )
         {
             return DateTimeToString( dateTime, str, Size, format );
         }
-    };
+
+        zp_float64_t TimeDurationMS( zp_time_t startTime );
+    }; // namespace Platform
 
     // Util
     namespace Platform
@@ -599,7 +602,7 @@ namespace zp
         MessageBoxResult ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton );
 
         void DebugBreak();
-    };
+    }; // namespace Platform
 
     // Networking
     constexpr zp_ptr_t ZP_INVALID_SOCKET = ~0;
@@ -629,7 +632,7 @@ namespace zp
         zp_size_t SendSocket( Socket socket, const void* src, zp_size_t srcSize );
 
         void CloseSocket( Socket socket );
-    };
+    }; // namespace Platform
 
     // Stack Trace
     namespace Platform
@@ -643,7 +646,7 @@ namespace zp
         void StackTraceToString( const StackTrace& stackTrace, MutableString& string );
 
         void DumpStackTrace( MutableString& string );
-    };
+    }; // namespace Platform
 
 #pragma region Path
 
@@ -652,7 +655,7 @@ namespace zp
     public:
         enum
         {
-            kMaxFilePath = 512
+            kMaxFilePath = 512,
         };
 
         FilePath() = default;
@@ -758,6 +761,6 @@ namespace zp
 
 #pragma endregion
 
-};
+}; // namespace zp
 
-#endif //ZP_PLATFORM_H
+#endif // ZP_PLATFORM_H

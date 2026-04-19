@@ -11,7 +11,7 @@ namespace zp
 {
     namespace
     {
-        // @formatter:off
+        // clang-format off
 #define CAPS( fmt, cct, dct, sct, cm, cs, pbw, pbh, bz, cc, rcz, gcz, bcz, acz )    \
         GraphicsFormatCapability {                                              \
             .colorComponentType =   GraphicsFormatComponentType(cct),             \
@@ -25,10 +25,10 @@ namespace zp
             .componentCount =       zp_uint8_t(cc),                                     \
             .componentSize          { rcz, gcz, bcz, acz },                                     \
         }
-        // @formatter:on
+        // clang-format on
 
 
-        // @formatter:off
+        // clang-format off
         const FixedArray kGraphicsFormatCapabilities {
             GraphicsFormatCapability {},
 
@@ -132,7 +132,7 @@ namespace zp
             CAPS(ZP_GRAPHICS_FORMAT_ASTCS_4x4_RGBA_UNORM,    ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_COMPRESSED,                                               ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_NONE,                                                     ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_NONE,                                             ZP_GRAPHICS_FORMAT_COMPONENT_MASK_R | ZP_GRAPHICS_FORMAT_COMPONENT_MASK_G | ZP_GRAPHICS_FORMAT_COMPONENT_MASK_B | ZP_GRAPHICS_FORMAT_COMPONENT_MASK_A,  ZP_GRAPHICS_FORMAT_COLOR_SPACE_LINEAR,      4, 4, 8,      4, 8, 8, 8, 8 ),
             CAPS(ZP_GRAPHICS_FORMAT_ASTCS_4x4_RGBA_SRGB,     ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_COMPRESSED,                                               ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_NONE,                                                     ZP_GRAPHICS_FORMAT_COMPONENT_TYPE_NONE,                                             ZP_GRAPHICS_FORMAT_COMPONENT_MASK_R | ZP_GRAPHICS_FORMAT_COMPONENT_MASK_G | ZP_GRAPHICS_FORMAT_COMPONENT_MASK_B | ZP_GRAPHICS_FORMAT_COMPONENT_MASK_A,  ZP_GRAPHICS_FORMAT_COLOR_SPACE_SRGB,        4, 4, 8,      4, 8, 8, 8, 8 ),
         };
-        // @formatter:on
+        // clang-format on
 
         ZP_STATIC_ASSERT( kGraphicsFormatCapabilities.length() == GraphicsFormat_Count );
 

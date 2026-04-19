@@ -330,7 +330,7 @@ constexpr zp_size_t zp_rtrim( const zp_char8_t* str, zp_size_t length )
     return i;
 }
 
-constexpr const zp_char8_t* zp_ltrim( const zp_char8_t* str, zp_size_t length )
+constexpr const zp_char8_t* zp_ltrim( const zp_char8_t* str, const zp_size_t length )
 {
     zp_size_t i;
     for( i = 0; i < length; ++i )
@@ -350,7 +350,7 @@ constexpr const zp_char8_t* zp_ltrim( const zp_char8_t* str, zp_size_t length )
     return str + i;
 }
 
-constexpr const char* zp_strnstr( const char* str, zp_size_t strLen, const char* find, zp_size_t findLen )
+constexpr const char* zp_strnstr( const char* str, const zp_size_t strLen, const char* find, const zp_size_t findLen )
 {
     const char* start = nullptr;
 

@@ -102,7 +102,6 @@ namespace zp
 
         zp_uint64_t m_frameCount;
         zp_time_t m_frameStartTime;
-        zp_time_t m_timeFrequencyS;
 
         ZP_BOOL32( m_shouldReload );
         ZP_BOOL32( m_shouldRestart );

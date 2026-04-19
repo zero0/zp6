@@ -5,64 +5,65 @@
 #define WIN32_LEAN_AND_MEAN
 #define _WIN32_WINNT _WIN32_WINNT_WIN10
 
-#include <windows.h>
-#include <uxtheme.h>
-#include <winuser.h>
-#include <processthreadsapi.h>
-#include <excpt.h>
-#include <winsock2.h>
-#include <dwmapi.h>
-#include <shellapi.h>
 #include <ctime>
+#include <dwmapi.h>
+#include <excpt.h>
+#include <processthreadsapi.h>
+#include <shellapi.h>
 #include <sys/time.h>
-#include <dbghelp.h>
+#include <windows.h>
+#include <winsock2.h>
 
-#pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "dwmapi.dll")
-#pragma comment(lib, "uxtheme.lib")
-#pragma comment(lib, "dbghelp.lib")
+#pragma comment( lib, "Ws2_32.lib" )
+#pragma comment( lib, "user32.lib" )
+#pragma comment( lib, "dwmapi.dll" )
+#pragma comment( lib, "uxtheme.lib" )
+#pragma comment( lib, "dbghelp.lib" )
 
-#include "Core/Defines.h"
-#include "Core/Macros.h"
-#include "Core/Types.h"
-#include "Core/Math.h"
 #include "Core/Common.h"
+#include "Core/Defines.h"
 #include "Core/Log.h"
-#include "Core/Vector.h"
+#include "Core/Macros.h"
+#include "Core/Math.h"
 #include "Core/Memory.h"
 #include "Core/String.h"
+#include "Core/Types.h"
+#include "Core/Vector.h"
 
 #include "Platform/Platform.h"
 
-#define TestFlag( a, f, t, r )      a |= ((f) & (t)) ? (r) : 0
+#if ZP_DEBUG
+#include <dbghelp.h>
+#endif // ZP_DEBUG
+
+#define TestFlag( a, f, t, r ) a |= ( ( f ) & ( t ) ) ? ( r ) : 0
 
 using namespace zp;
 
 //
 //
 //
-#define USE_CUSTOM_TOOLBAR_HEADER   0
+#define USE_CUSTOM_TOOLBAR_HEADER 0
 
 namespace
 {
-    const char* const kZeroPointClassName = "ZeroPoint::WindowClass";
-    const char* const kZeroPointSystemTrayClassName = "ZeroPoint::SystemTrayClass";
+    const auto kZeroPointClassName = "ZeroPoint::WindowClass";
+    const auto kZeroPointSystemTrayClassName = "ZeroPoint::SystemTrayClass";
 
     enum
     {
-        kMaxWindows = 4
+        kMaxWindows = 4,
     };
 
     FixedVector<HWND, kMaxWindows> s_windows {};
 
-    void TrackWindow( HWND hWnd )
+    void TrackWindow( const HWND hWnd )
     {
         ZP_ASSERT( s_windows.length() < kMaxWindows );
         s_windows.pushBack( hWnd );
     }
 
-    void UntrackWindow( HWND hWnd, zp_bool_t andPostQuit = true, zp_int32_t exitCode = 0 )
+    void UntrackWindow( const HWND hWnd, zp_bool_t andPostQuit = true, zp_int32_t exitCode = 0 )
     {
         s_windows.eraseSwapBack( hWnd );
 
@@ -73,9 +74,15 @@ namespace
         }
     }
 
-    LRESULT CALLBACK WinProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
+    enum
     {
-        WindowCallbacks* windowCallbacks = reinterpret_cast<WindowCallbacks*>(::GetWindowLongPtr( hWnd, GWLP_USERDATA ));
+        ZP_WINDOW_CMD = WM_USER,
+        ZP_WINDOW_CMD_EXIT,
+    };
+
+    LRESULT CALLBACK WindowProc( const HWND hWnd, const UINT uMessage, const WPARAM wParam, const LPARAM lParam )
+    {
+        const auto windowCallbacks = reinterpret_cast<WindowCallbacks*>( ::GetWindowLongPtr( hWnd, GWLP_USERDATA ) );
 
         switch( uMessage )
         {
@@ -84,12 +91,12 @@ namespace
                 TrackWindow( hWnd );
 #if USE_CUSTOM_TOOLBAR_HEADER
                 RECT rect;
-                ::GetWindowRect(hWnd, &rect);
+                ::GetWindowRect( hWnd, &rect );
 
-                ::SetWindowPos(hWnd, nullptr,
+                ::SetWindowPos( hWnd, nullptr,
                     rect.left, rect.top,
                     rect.right - rect.left, rect.bottom - rect.top,
-                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
+                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE );
 #endif
             }
             break;
@@ -119,43 +126,34 @@ namespace
                     return ::DefWindowProc( hWnd, uMessage, wParam, lParam );
                 }
 
-                zp_uint32_t dpi = ::GetDpiForWindow(hWnd);
+                zp_uint32_t dpi = ::GetDpiForWindow( hWnd );
 
-                zp_int32_t frameX = ::GetSystemMetricsForDpi(SM_CXFRAME, dpi);
-                zp_int32_t frameY = ::GetSystemMetricsForDpi(SM_CYFRAME, dpi);
-                zp_int32_t padding = ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+                zp_int32_t frameX = ::GetSystemMetricsForDpi( SM_CXFRAME, dpi );
+                zp_int32_t frameY = ::GetSystemMetricsForDpi( SM_CYFRAME, dpi );
+                zp_int32_t padding = ::GetSystemMetricsForDpi( SM_CXPADDEDBORDER, dpi );
 
-                auto lpNCCalcSizeParams = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
-                lpNCCalcSizeParams->rgrc[0].right -= frameX + padding;
-                lpNCCalcSizeParams->rgrc[0].left += frameX + padding;
-                lpNCCalcSizeParams->rgrc[0].bottom -= frameY + padding;
+                auto lpNCCalcSizeParams = reinterpret_cast<NCCALCSIZE_PARAMS*>( lParam );
+                lpNCCalcSizeParams->rgrc[ 0 ].right -= frameX + padding;
+                lpNCCalcSizeParams->rgrc[ 0 ].left += frameX + padding;
+                lpNCCalcSizeParams->rgrc[ 0 ].bottom -= frameY + padding;
             }
-                break;
+            break;
 #endif
             case WM_GETMINMAXINFO:
             {
                 if( windowCallbacks != nullptr )
                 {
-                    zp_int32_t minWidth;
-                    zp_int32_t minHeight;
-                    zp_int32_t maxWidth;
-                    zp_int32_t maxHeight;
+                    Size2Di minSize = windowCallbacks->minSize;
+                    Size2Di maxSize = windowCallbacks->maxSize;
                     if( windowCallbacks->onWindowGetMinMaxSize != nullptr )
                     {
-                        windowCallbacks->onWindowGetMinMaxSize( hWnd, minWidth, minHeight, maxWidth, maxHeight, windowCallbacks->userPtr );
-                    }
-                    else
-                    {
-                        minWidth = windowCallbacks->minWidth;
-                        minHeight = windowCallbacks->minHeight;
-                        maxWidth = windowCallbacks->maxWidth;
-                        maxHeight = windowCallbacks->maxHeight;
+                        windowCallbacks->onWindowGetMinMaxSize( hWnd, minSize, maxSize, windowCallbacks->userPtr );
                     }
 
-                    LPMINMAXINFO lpMMI = reinterpret_cast<LPMINMAXINFO>(lParam);
-                    lpMMI->ptMinTrackSize = { .x = minWidth, .y = minHeight };
-                    lpMMI->ptMaxSize = { .x = maxWidth, .y = maxHeight };
-                    lpMMI->ptMaxTrackSize = { .x = maxWidth, .y = maxHeight };
+                    auto lpMMI = reinterpret_cast<LPMINMAXINFO>( lParam );
+                    lpMMI->ptMinTrackSize = { .x = minSize.width, .y = minSize.height };
+                    lpMMI->ptMaxSize = { .x = maxSize.width, .y = maxSize.height };
+                    lpMMI->ptMaxTrackSize = { .x = maxSize.width, .y = maxSize.height };
                 }
             }
             break;
@@ -164,7 +162,7 @@ namespace
             {
                 if( windowCallbacks != nullptr && windowCallbacks->onWindowResize != nullptr )
                 {
-                    LPWINDOWPOS pos = reinterpret_cast<LPWINDOWPOS>(lParam);
+                    auto pos = reinterpret_cast<LPWINDOWPOS>( lParam );
                     if( ( ~pos->flags & SWP_NOSIZE ) == SWP_NOSIZE )
                     {
                         const DWORD style = ::GetWindowLong( hWnd, GWL_STYLE );
@@ -174,10 +172,11 @@ namespace
                         ::SetRectEmpty( &rect );
                         ::AdjustWindowRectEx( &rect, style, FALSE, exStyle );
 
-                        const zp_int32_t width = pos->cx - ( rect.right - rect.left );
-                        const zp_int32_t height = pos->cy - ( rect.bottom - rect.top );
-
-                        windowCallbacks->onWindowResize( hWnd, width, height, windowCallbacks->userPtr );
+                        const Size2Di size {
+                            .width = static_cast<zp_int32_t>( pos->cx - ( rect.right - rect.left ) ),
+                            .height = static_cast<zp_int32_t>( pos->cy - ( rect.bottom - rect.top ) )
+                        };
+                        windowCallbacks->onWindowResize( hWnd, size, windowCallbacks->userPtr );
                     }
                 }
             }
@@ -213,9 +212,8 @@ namespace
                     const WORD keyFlags = HIWORD( lParam );
 
                     WORD scanCode = LOBYTE( keyFlags ); // scan code
-                    const zp_bool_t isExtendedKey = ( keyFlags & KF_EXTENDED ) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
 
-                    if( isExtendedKey )
+                    if( ( keyFlags & KF_EXTENDED ) == KF_EXTENDED )
                     {
                         scanCode = MAKEWORD( scanCode, 0xE0 );
                     }
@@ -289,7 +287,6 @@ namespace
             case WM_MBUTTONDBLCLK:
             {
                 POINTS p = MAKEPOINTS( lParam );
-
             }
             break;
 
@@ -302,11 +299,60 @@ namespace
             }
             break;
 
+            case ZP_WINDOW_CMD:
+            {
+                switch( lParam )
+                {
+                    case WM_RBUTTONDOWN:
+                    case WM_CONTEXTMENU:
+                    {
+                        POINT point;
+                        ::GetCursorPos( &point );
+                        HMENU hMenu = ::CreatePopupMenu();
+                        if( hMenu != nullptr )
+                        {
+                            ::InsertMenu( hMenu, -1, MF_BYPOSITION, ZP_WINDOW_CMD_EXIT, "Exit" );
+
+                            // NOTE: must set to foreground or the menu won't disappear properly
+                            ::SetForegroundWindow( hWnd );
+
+                            ::TrackPopupMenu( hMenu, TPM_BOTTOMALIGN, point.x, point.y, 0, hWnd, nullptr );
+                            ::DestroyMenu( hMenu );
+                        }
+                    }
+                    break;
+
+                    default:
+                        return DefWindowProc( hWnd, uMessage, wParam, lParam );
+                }
+            }
+            break;
+
             case WM_COMMAND:
             {
                 switch( LOWORD( wParam ) )
                 {
+                    case WM_RBUTTONDOWN:
+                    case WM_CONTEXTMENU:
+                    {
+                        POINT point;
+                        ::GetCursorPos( &point );
+                        HMENU hMenu = ::CreatePopupMenu();
+                        if( hMenu != nullptr )
+                        {
+                            ::InsertMenu( hMenu, -1, MF_BYPOSITION, ZP_WINDOW_CMD_EXIT, "Exit" );
 
+                            // NOTE: must set to foreground or the menu won't disappear properly
+                            ::SetForegroundWindow( hWnd );
+
+                            ::TrackPopupMenu( hMenu, TPM_BOTTOMALIGN, point.x, point.y, 0, hWnd, nullptr );
+                            ::DestroyMenu( hMenu );
+                        }
+                    }
+                    break;
+
+                    default:
+                        return DefWindowProc( hWnd, uMessage, wParam, lParam );
                 }
             }
             break;
@@ -324,7 +370,7 @@ namespace
         ZP_SYSTRAY_CMD_EXIT,
     };
 
-    LRESULT CALLBACK SystemTrayProc( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
+    LRESULT CALLBACK SystemTrayProc( const HWND hWnd, const UINT uMessage, const WPARAM wParam, const LPARAM lParam )
     {
         switch( uMessage )
         {
@@ -342,7 +388,7 @@ namespace
 
             case WM_DESTROY:
             {
-                PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( ::GetWindowLongPtr( hWnd, GWLP_USERDATA ) );
+                auto notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( ::GetWindowLongPtr( hWnd, GWLP_USERDATA ) );
                 ZP_ASSERT( notifyIconData );
 
                 ::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
@@ -420,11 +466,11 @@ namespace
                 nullptr,
                 errorMessageID,
                 MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
-                reinterpret_cast<LPSTR>(&messageBuffer),
+                reinterpret_cast<LPSTR>( &messageBuffer ),
                 0,
                 nullptr );
 
-            Log::error() << msg << ": [" << (int)errorMessageID << "] " << messageBuffer << Log::endl;
+            Log::error() << msg << ": [" << static_cast<zp_uint64_t>( errorMessageID ) << "] " << messageBuffer << Log::endl;
 
             ::LocalFree( messageBuffer );
         }
@@ -442,7 +488,7 @@ namespace
                 nullptr,
                 errorMessageID,
                 MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
-                reinterpret_cast<LPSTR>(&messageBuffer),
+                reinterpret_cast<LPSTR>( &messageBuffer ),
                 0,
                 nullptr );
 
@@ -451,7 +497,7 @@ namespace
             ::LocalFree( messageBuffer );
         }
     }
-}
+} // namespace
 
 namespace zp
 {
@@ -464,39 +510,43 @@ namespace zp
 
     WindowHandle Platform::OpenWindow( const OpenWindowDesc& desc )
     {
-        HINSTANCE hInstance = desc.instanceHandle != nullptr ? static_cast<HINSTANCE>(desc.instanceHandle) : ::GetModuleHandle( nullptr );
+        HINSTANCE hInstance = desc.instanceHandle != nullptr ? static_cast<HINSTANCE>( desc.instanceHandle ) : ::GetModuleHandle( nullptr );
 
         if( g_windowClassReg == 0 )
         {
+            const auto icon = ::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR );
+            const auto backgroundBrush = ::GetStockObject( DKGRAY_BRUSH );
+
             const WNDCLASSEX wndClass {
                 .cbSize = sizeof( WNDCLASSEX ),
                 .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-                .lpfnWndProc = WinProc,
+                .lpfnWndProc = WindowProc,
                 .cbClsExtra = 0,
                 .cbWndExtra = 0,
                 .hInstance = hInstance,
                 .hIcon = ::LoadIcon( hInstance, MAKEINTRESOURCE( 101 ) ),
                 .hCursor = ::LoadCursor( hInstance, IDC_ARROW ),
-                .hbrBackground = static_cast<HBRUSH>(::GetStockObject( DKGRAY_BRUSH )),
+                .hbrBackground = static_cast<HBRUSH>( backgroundBrush ),
                 .lpszMenuName = nullptr,
                 .lpszClassName = kZeroPointClassName,
-                .hIconSm = static_cast<HICON>(::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR )),
+                .hIconSm = static_cast<HICON>( icon ),
             };
 
             g_windowClassReg = ::RegisterClassEx( &wndClass );
         }
 
-        const DWORD style = WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
-        DWORD exStyle = WS_EX_APPWINDOW;
+        constexpr DWORD style = WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
+        constexpr DWORD exStyle = WS_EX_APPWINDOW
 #if ZP_DEBUG
-        exStyle |= WS_EX_ACCEPTFILES;
+                                  | WS_EX_ACCEPTFILES
 #endif
+            ;
 
         RECT rect {
-            .left = 0,
-            .top = 0,
-            .right = desc.width,
-            .bottom = desc.height
+            .left = desc.windowRect.offset.x,
+            .top = desc.windowRect.offset.y,
+            .right = desc.windowRect.size.width,
+            .bottom = desc.windowRect.size.height
         };
         ::AdjustWindowRectEx( &rect, style, FALSE, exStyle );
 
@@ -506,7 +556,7 @@ namespace zp
         HWND hWnd = ::CreateWindowEx(
             exStyle,
             kZeroPointClassName,
-            desc.title,
+            desc.title.c_str(),
             style,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -515,30 +565,33 @@ namespace zp
             nullptr,
             nullptr,
             hInstance,
-            nullptr
-            );
+            nullptr );
         ZP_ASSERT( hWnd );
 
-        ::SetWindowLongPtr( hWnd, GWLP_USERDATA, (LONG_PTR)desc.callbacks );
-        /*
-                // set dark mode by default
-                const BOOL useDarkMode = true;
-                if( FAILED( ::DwmSetWindowAttribute( hWnd, 20, &useDarkMode, sizeof( BOOL ) ) ) )
-                {
-                    ::DwmSetWindowAttribute( hWnd, 19, &useDarkMode, sizeof( BOOL ) );
-                }
-        */
+        ::SetWindowLongPtr( hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( desc.callbacks ) );
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+        constexpr DWORD DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+#endif // DWMWA_USE_IMMERSIVE_DARK_MODE
+
+        // set dark mode by default
+        constexpr BOOL useDarkMode = true;
+        if( FAILED( ::DwmSetWindowAttribute( hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &useDarkMode, sizeof( BOOL ) ) ) )
+        {
+            FAILED( ::DwmSetWindowAttribute( hWnd, 19, &useDarkMode, sizeof( BOOL ) ) );
+        }
+
         ::ShowWindow( hWnd, desc.showWindow ? SW_SHOW : SW_HIDE );
         ::UpdateWindow( hWnd );
 
         return { .handle = hWnd };
     }
 
-    zp_bool_t Platform::DispatchWindowMessages( WindowHandle windowHandle, zp_int32_t& exitCode )
+    zp_bool_t Platform::DispatchWindowMessages( const WindowHandle windowHandle, zp_int32_t& exitCode )
     {
         zp_bool_t isClosed = false;
 
-        HWND hWnd = static_cast<HWND>(windowHandle.handle);
+        HWND hWnd = static_cast<HWND>( windowHandle.handle );
 
         MSG msg {};
         while( ::PeekMessage( &msg, hWnd, 0, 0, PM_REMOVE ) != FALSE )
@@ -548,7 +601,7 @@ namespace zp
 
             if( !isClosed && msg.message == WM_CLOSE )
             {
-                exitCode = static_cast<zp_int32_t>(msg.wParam);
+                exitCode = static_cast<zp_int32_t>( msg.wParam );
                 isClosed = true;
             }
         }
@@ -568,7 +621,7 @@ namespace zp
 
             if( isRunning && msg.message == WM_QUIT )
             {
-                exitCode = static_cast<zp_int32_t>(msg.wParam);
+                exitCode = static_cast<zp_int32_t>( msg.wParam );
                 isRunning = false;
             }
         }
@@ -576,9 +629,9 @@ namespace zp
         return isRunning;
     }
 
-    void Platform::ShowWindow( WindowHandle windowHandle, zp_bool_t show )
+    void Platform::ShowWindow( const WindowHandle windowHandle, zp_bool_t show )
     {
-        HWND hWnd = static_cast<HWND>(windowHandle.handle);
+        HWND hWnd = static_cast<HWND>( windowHandle.handle );
         if( ::IsWindow( hWnd ) != FALSE )
         {
             ::ShowWindow( hWnd, show ? SW_SHOW : SW_HIDE );
@@ -586,34 +639,39 @@ namespace zp
         }
     }
 
-    void Platform::CloseWindow( WindowHandle windowHandle )
+    void Platform::CloseWindow( const WindowHandle windowHandle )
     {
-        HWND hWnd = static_cast<HWND>(windowHandle.handle);
+        HWND hWnd = static_cast<HWND>( windowHandle.handle );
         if( ::IsWindow( hWnd ) != FALSE )
         {
             ::CloseWindow( hWnd );
         }
     }
 
-    void Platform::SetWindowTitle( WindowHandle windowHandle, const String& title )
+    void Platform::SetWindowTitle( const WindowHandle windowHandle, const String& title )
     {
-        HWND hWnd = static_cast<HWND>(windowHandle.handle);
+        HWND hWnd = static_cast<HWND>( windowHandle.handle );
         if( ::IsWindow( hWnd ) != FALSE )
         {
             ::SetWindowText( hWnd, title.c_str() );
         }
     }
 
-    void Platform::SetWindowSize( WindowHandle windowHandle, const zp_int32_t width, const zp_int32_t height, WindowFullscreenType windowFullscreenType )
+    void Platform::SetWindowSize( const WindowHandle windowHandle, const Size2Di& size, const WindowFullscreenType windowFullscreenType )
     {
-        HWND hWnd = static_cast<HWND>(windowHandle.handle);
+        HWND hWnd = static_cast<HWND>( windowHandle.handle );
         if( ::IsWindow( hWnd ) != FALSE )
         {
+            DWORD flags = 0;
             switch( windowFullscreenType )
             {
                 case WindowFullscreenType::Window:
                 case WindowFullscreenType::BorderlessWindow:
+                    break;
                 case WindowFullscreenType::Fullscreen:
+                    flags = CDS_FULLSCREEN;
+                    break;
+                default:
                     break;
             }
 
@@ -621,8 +679,6 @@ namespace zp
                 .dmSize = sizeof( DEVMODE ),
             };
             ::EnumDisplaySettingsEx( nullptr, ENUM_CURRENT_SETTINGS, &deviceMode, 0 );
-
-            const DWORD flags = CDS_FULLSCREEN;
 
             ::ChangeDisplaySettingsEx( nullptr, &deviceMode, nullptr, flags, nullptr );
 
@@ -632,8 +688,8 @@ namespace zp
             RECT rect {
                 .left = 0,
                 .top = 0,
-                .right = width,
-                .bottom = height
+                .right = size.width,
+                .bottom = size.height
             };
             ::AdjustWindowRectEx( &rect, style, FALSE, exStyle );
 
@@ -648,10 +704,11 @@ namespace zp
 
     SystemTrayHandle Platform::OpenSystemTray( const OpenSystemTrayDesc& desc )
     {
-        HINSTANCE hInstance = {};
+        HINSTANCE hInstance {};
 
         if( g_systemTrayClassReg == 0 )
         {
+            const auto icon = ::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR );
             const WNDCLASSEX wndClass {
                 .cbSize = sizeof( WNDCLASSEX ),
                 .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
@@ -661,17 +718,17 @@ namespace zp
                 .hInstance = hInstance,
                 .hIcon = ::LoadIcon( hInstance, MAKEINTRESOURCE( 101 ) ),
                 .hCursor = ::LoadCursor( hInstance, IDC_ARROW ),
-                .hbrBackground = static_cast<HBRUSH>(::GetStockObject( DKGRAY_BRUSH )),
+                .hbrBackground = static_cast<HBRUSH>( ::GetStockObject( DKGRAY_BRUSH ) ),
                 .lpszMenuName = nullptr,
                 .lpszClassName = kZeroPointSystemTrayClassName,
-                .hIconSm = static_cast<HICON>(::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, ::GetSystemMetrics( SM_CXSMICON ), ::GetSystemMetrics( SM_CYSMICON ), LR_DEFAULTCOLOR )),
+                .hIconSm = static_cast<HICON>( icon ),
             };
 
             g_systemTrayClassReg = ::RegisterClassEx( &wndClass );
         }
 
         void* mem = ::HeapAlloc( ::GetProcessHeap(), HEAP_NO_SERIALIZE, sizeof( NOTIFYICONDATA ) );
-        PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>(mem);
+        auto notifyIconData = static_cast<PNOTIFYICONDATA>( mem );
 
         HWND hWnd = ::CreateWindowEx(
             0,
@@ -685,29 +742,29 @@ namespace zp
             nullptr,
             nullptr,
             hInstance,
-            nullptr
-            );
+            nullptr );
         ZP_ASSERT( hWnd );
 
-        const zp_uint32_t cx = ::GetSystemMetrics( SM_CXSMICON );
-        const zp_uint32_t cy = ::GetSystemMetrics( SM_CYSMICON );
+        const zp_int32_t cx = ::GetSystemMetrics( SM_CXSMICON );
+        const zp_int32_t cy = ::GetSystemMetrics( SM_CYSMICON );
 
+        const auto icon = ::LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR );
         *notifyIconData = {
             .cbSize = sizeof( NOTIFYICONDATA ),
             .hWnd = hWnd,
-            .uID = *(UINT*)notifyIconData,
+            .uID = *reinterpret_cast<UINT*>( notifyIconData ),
             .uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP,
             .uCallbackMessage = ZP_SYSTRAY_CMD,
-            .hIcon = static_cast<HICON>(LoadImage( hInstance, MAKEINTRESOURCE( 101 ), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR )),
-            .szTip = "ZeroPoint AssetCompiler",
-            .szInfo = "AssetCompiler",
+            .hIcon = static_cast<HICON>( icon ),
             .uVersion = NOTIFYICON_VERSION_4,
         };
+        zp_strncpy( notifyIconData->szTip, desc.tip.c_str(), desc.tip.length() );
+        zp_strncpy( notifyIconData->szInfo, desc.info.c_str(), desc.info.length() );
 
         const WINBOOL ok = ::Shell_NotifyIcon( NIM_ADD, notifyIconData );
         if( ok != FALSE )
         {
-            ::SetWindowLongPtr( hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(notifyIconData) );
+            ::SetWindowLongPtr( hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( notifyIconData ) );
         }
         else
         {
@@ -722,11 +779,11 @@ namespace zp
         return { .handle = notifyIconData };
     }
 
-    void Platform::CloseSystemTray( SystemTrayHandle systemTrayHandle )
+    void Platform::CloseSystemTray( const SystemTrayHandle systemTrayHandle )
     {
         if( systemTrayHandle.handle )
         {
-            //PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.m_handle );
+            // PNOTIFYICONDATA notifyIconData = reinterpret_cast<PNOTIFYICONDATA>( systemTrayHandle.m_handle );
             //
             //::Shell_NotifyIcon( NIM_DELETE, notifyIconData );
             //
@@ -740,13 +797,13 @@ namespace zp
         return { .handle = ok != FALSE ? zp_handle_t( ~0 ) : nullptr };
     }
 
-    zp_bool_t Platform::CloseConsole( ConsoleHandle )
+    zp_bool_t Platform::CloseConsole( const ConsoleHandle )
     {
         const WINBOOL ok = ::FreeConsole();
         return ok != FALSE;
     }
 
-    zp_bool_t Platform::SetConsoleTitle( ConsoleHandle, const String& title )
+    zp_bool_t Platform::SetConsoleTitle( const ConsoleHandle, const String& title )
     {
         const WINBOOL ok = ::SetConsoleTitle( title.c_str() );
         return ok != FALSE;
@@ -782,7 +839,7 @@ namespace zp
         void* page = ::VirtualAlloc( *ptr, size, MEM_COMMIT, PAGE_READWRITE );
 
         const zp_size_t allocationInPageSize = GetMemoryPageSize( size );
-        *ptr = static_cast<zp_uint8_t*>(*ptr) + allocationInPageSize;
+        *ptr = static_cast<zp_uint8_t*>( *ptr ) + allocationInPageSize;
         return page;
     }
 
@@ -967,22 +1024,22 @@ namespace zp
     {
         LARGE_INTEGER fileSize;
         const BOOL ok = ::GetFileSizeEx( fileHandle.handle, &fileSize );
-        return ok != FALSE ? static_cast<zp_size_t>(fileSize.QuadPart) : 0;
+        return ok != FALSE ? static_cast<zp_size_t>( fileSize.QuadPart ) : 0;
     }
 
-    void Platform::CloseFileHandle( FileHandle fileHandle )
+    void Platform::CloseFileHandle( const FileHandle fileHandle )
     {
         ::CloseHandle( fileHandle.handle );
     }
 
-    zp_size_t Platform::ReadFile( FileHandle fileHandle, void* buffer, const zp_size_t bytesToRead )
+    zp_size_t Platform::ReadFile( const FileHandle fileHandle, void* buffer, const zp_size_t bytesToRead )
     {
         DWORD bytesRead = 0;
         const BOOL ok = ::ReadFile( fileHandle.handle, buffer, bytesToRead, &bytesRead, nullptr );
         return ok != FALSE ? bytesRead : 0;
     }
 
-    zp_size_t Platform::WriteFile( FileHandle fileHandle, const void* data, const zp_size_t size )
+    zp_size_t Platform::WriteFile( const FileHandle fileHandle, const void* data, const zp_size_t size )
     {
         DWORD bytesWritten = 0;
         const BOOL ok = ::WriteFile( fileHandle.handle, data, size, &bytesWritten, nullptr );
@@ -990,7 +1047,7 @@ namespace zp
         return ok != FALSE ? bytesWritten : 0;
     }
 
-    MemoryMappedFileHandle Platform::OpenMemoryMappedFileHandle( FileHandle fileHandle, OpenMemoryMappedFileMode openMemoryMappedFileMode, zp_size_t length )
+    MemoryMappedFileHandle Platform::OpenMemoryMappedFileHandle( const FileHandle fileHandle, OpenMemoryMappedFileMode openMemoryMappedFileMode, zp_size_t length )
     {
         constexpr FixedArray openFileMap {
             PAGE_READONLY,
@@ -1015,12 +1072,12 @@ namespace zp
         return { .handle = handle };
     }
 
-    void Platform::CloseMemoryMappedFileHandle( MemoryMappedFileHandle memoryMappedFileHandle )
+    void Platform::CloseMemoryMappedFileHandle( const MemoryMappedFileHandle memoryMappedFileHandle )
     {
         ::CloseHandle( memoryMappedFileHandle.handle );
     }
 
-    MemoryMappedFileView Platform::MapViewOfMemoryMappedFile( MemoryMappedFileHandle memoryMappedFileHandle, MapViewOfMemoryMappedFileMode viewMode, zp_size_t offset, zp_size_t length )
+    MemoryMappedFileView Platform::MapViewOfMemoryMappedFile( const MemoryMappedFileHandle memoryMappedFileHandle, MapViewOfMemoryMappedFileMode viewMode, const zp_size_t offset, const zp_size_t length )
     {
         constexpr FixedArray mapViewMap {
             FILE_MAP_READ,
@@ -1038,8 +1095,8 @@ namespace zp
         const DWORD flags = mapViewMap[ viewMode ];
         const DWORD hiOffset = DWORD( alignedOffset >> 32 );
         const DWORD loOffset = DWORD( alignedOffset );
-        LPVOID view = ::MapViewOfFile( memoryMappedFileHandle.handle, flags, hiOffset, loOffset, alignedLength );
 
+        LPVOID view = ::MapViewOfFile( memoryMappedFileHandle.handle, flags, hiOffset, loOffset, alignedLength );
         if( view == nullptr )
         {
             PrintLastErrorMsg( "Failed to Map View of Memory Mapped File" );
@@ -1072,14 +1129,14 @@ namespace zp
     {
         if( libraryHandle != nullptr )
         {
-            ::FreeLibrary( static_cast<HMODULE>(libraryHandle) );
+            ::FreeLibrary( static_cast<HMODULE>( libraryHandle ) );
         }
     }
 
     ProcAddressFunc Platform::GetProcAddress( zp_handle_t libraryHandle, const char* name )
     {
-        FARPROC procAddress = ::GetProcAddress( static_cast<HMODULE>(libraryHandle), name );
-        return static_cast<ProcAddressFunc>(procAddress);
+        FARPROC procAddress = ::GetProcAddress( static_cast<HMODULE>( libraryHandle ), name );
+        return static_cast<ProcAddressFunc>( procAddress );
     }
 
     void Platform::Exit( zp_int32_t exitCode )
@@ -1091,7 +1148,7 @@ namespace zp
     {
         void* mem = ::HeapAlloc( ::GetProcessHeap(), HEAP_NO_SERIALIZE, sizeof( TP_CALLBACK_ENVIRON ) );
 
-        PTP_CALLBACK_ENVIRON callbackEnviron = static_cast<PTP_CALLBACK_ENVIRON>(mem);
+        PTP_CALLBACK_ENVIRON callbackEnviron = static_cast<PTP_CALLBACK_ENVIRON>( mem );
         ::InitializeThreadpoolEnvironment( callbackEnviron );
 
         PTP_POOL pool = ::CreateThreadpool( nullptr );
@@ -1108,7 +1165,7 @@ namespace zp
 
     void Platform::FreeThreadPool( zp_handle_t threadPool )
     {
-        PTP_CALLBACK_ENVIRON callbackEnviron = static_cast<PTP_CALLBACK_ENVIRON>(threadPool);
+        PTP_CALLBACK_ENVIRON callbackEnviron = static_cast<PTP_CALLBACK_ENVIRON>( threadPool );
         ::CloseThreadpoolCleanupGroupMembers( callbackEnviron->CleanupGroup, FALSE, nullptr );
         ::CloseThreadpoolCleanupGroup( callbackEnviron->CleanupGroup );
         ::CloseThreadpool( callbackEnviron->Pool );
@@ -1122,7 +1179,7 @@ namespace zp
         HANDLE threadHandle = ::CreateThread(
             nullptr,
             stackSize,
-            (LPTHREAD_START_ROUTINE)threadFunc,
+            reinterpret_cast<LPTHREAD_START_ROUTINE>( threadFunc ),
             param,
             THREAD_SET_INFORMATION,
             &threadId );
@@ -1139,13 +1196,13 @@ namespace zp
     ThreadHandle Platform::GetCurrentThread()
     {
         HANDLE threadHandle = ::GetCurrentThread();
-        return { .handle = static_cast<zp_handle_t>(threadHandle) };
+        return { .handle = threadHandle };
     }
 
     zp_uint32_t Platform::GetCurrentThreadId()
     {
         const DWORD threadId = ::GetCurrentThreadId();
-        return static_cast<zp_uint32_t>(threadId);
+        return static_cast<zp_uint32_t>( threadId );
     }
 
     void Platform::YieldCurrentThread()
@@ -1160,8 +1217,8 @@ namespace zp
 
     zp_uint32_t Platform::GetThreadId( ThreadHandle threadHandle )
     {
-        const DWORD threadId = ::GetThreadId( static_cast<HANDLE>(threadHandle.handle) );
-        return static_cast<zp_uint32_t>(threadId);
+        const DWORD threadId = ::GetThreadId( static_cast<HANDLE>( threadHandle.handle ) );
+        return static_cast<zp_uint32_t>( threadId );
     }
 
     void Platform::SetThreadName( ThreadHandle threadHandle, const String& threadName )
@@ -1169,7 +1226,7 @@ namespace zp
         //::SetThreadDescription();
 
         // Code from: https://docs.microsoft.com/en-us/archive/blogs/stevejs/naming-threads-in-win32-and-net
-#pragma pack(push, 8)
+#pragma pack( push, 8 )
         typedef struct tagTHREADNAME_INFO
         {
             DWORD dwType; // Must be 0x1000.
@@ -1177,45 +1234,45 @@ namespace zp
             DWORD dwThreadID; // Thread ID (-1=caller thread).
             DWORD dwFlags; // Reserved for future use, must be zero.
         } THREADNAME_INFO;
-#pragma pack(pop)
+#pragma pack( pop )
 
         THREADNAME_INFO info {
             .dwType = 0x1000,
             .szName = threadName.c_str(),
-            .dwThreadID = ::GetThreadId( static_cast<HANDLE>(threadHandle.handle) ),
+            .dwThreadID = ::GetThreadId( static_cast<HANDLE>( threadHandle.handle ) ),
             .dwFlags = 0,
         };
 
-#pragma warning(push)
-#pragma warning(disable: 6320 6322)
+#pragma warning( push )
+#pragma warning( disable : 6320 6322 )
         try
         {
-            const DWORD MS_VC_EXCEPTION = 0x406D1388;
-            RaiseException( MS_VC_EXCEPTION, 0, sizeof( THREADNAME_INFO ) / sizeof( const ULONG_PTR* ), (const ULONG_PTR*)&info );
+            constexpr DWORD MS_VC_EXCEPTION = 0x406D1388;
+            RaiseException( MS_VC_EXCEPTION, 0, sizeof( THREADNAME_INFO ) / sizeof( const ULONG_PTR* ), reinterpret_cast<const ULONG_PTR*>( &info ) );
         }
         catch( ... )
         {
         }
-#pragma warning(pop)
+#pragma warning( pop )
     }
 
-    void Platform::SetThreadPriority( ThreadHandle threadHandle, zp_int32_t priority )
+    void Platform::SetThreadPriority( const ThreadHandle threadHandle, zp_int32_t priority )
     {
-        ::SetThreadPriority( static_cast<HANDLE>(threadHandle.handle), priority );
+        ::SetThreadPriority( threadHandle.handle, priority );
     }
 
-    zp_int32_t Platform::GetThreadPriority( ThreadHandle threadHandle )
+    zp_int32_t Platform::GetThreadPriority( const ThreadHandle threadHandle )
     {
-        const zp_int32_t priority = ::GetThreadPriority( static_cast<HANDLE>(threadHandle.handle) );
+        const zp_int32_t priority = ::GetThreadPriority( threadHandle.handle );
         return priority;
     }
 
-    void Platform::SetThreadAffinity( ThreadHandle threadHandle, zp_uint64_t affinityMask )
+    void Platform::SetThreadAffinity( const ThreadHandle threadHandle, zp_uint64_t affinityMask )
     {
-        ::SetThreadAffinityMask( static_cast<HANDLE>(threadHandle.handle), affinityMask );
+        ::SetThreadAffinityMask( threadHandle.handle, affinityMask );
     }
 
-    void Platform::SetThreadIdealProcessor( ThreadHandle threadHandle, zp_uint32_t processorIndex )
+    void Platform::SetThreadIdealProcessor( const ThreadHandle threadHandle, zp_uint32_t processorIndex )
     {
         SYSTEM_INFO systemInfo;
         ::GetSystemInfo( &systemInfo );
@@ -1226,19 +1283,19 @@ namespace zp
         if( ( systemInfo.dwActiveProcessorMask & requestedMask ) == requestedMask )
         {
             PROCESSOR_NUMBER processorNumber {
-                .Number = static_cast<BYTE>(processorIndex & zp_limit<zp_uint8_t>::max())
+                .Number = static_cast<BYTE>( processorIndex & zp_limit<zp_uint8_t>::max() )
             };
 
-            ::SetThreadIdealProcessorEx( static_cast<HANDLE>(threadHandle.handle), &processorNumber, nullptr );
+            ::SetThreadIdealProcessorEx( threadHandle.handle, &processorNumber, nullptr );
         }
     }
 
-    void Platform::CloseThread( ThreadHandle threadHandle )
+    void Platform::CloseThread( const ThreadHandle threadHandle )
     {
         ::CloseHandle( threadHandle.handle );
     }
 
-    void Platform::JoinThreads( ThreadHandle* threadHandles, zp_size_t threadHandleCount )
+    void Platform::JoinThreads( const ThreadHandle* threadHandles, const zp_size_t threadHandleCount )
     {
         HANDLE handles[ threadHandleCount ];
         for( zp_size_t i = 0; i < threadHandleCount; ++i )
@@ -1280,7 +1337,7 @@ namespace zp
     {
         thread_local tm t_tm;
         const zp_uint16_t kBaseYear = 1900;
-    }
+    } // namespace
 
     DateTime Platform::DateTimeNowLocal()
     {
@@ -1288,7 +1345,7 @@ namespace zp
         ::gettimeofday( &currentTimeOfDay, nullptr );
 
         const time_t seconds = currentTimeOfDay.tv_sec;
-        auto err = ::localtime_s( &t_tm, &seconds );
+        const auto err = ::localtime_s( &t_tm, &seconds );
         ZP_ASSERT_MSG( err == 0, "" );
 
         return {
@@ -1298,7 +1355,7 @@ namespace zp
             .hour = t_tm.tm_hour,
             .minute = t_tm.tm_min,
             .second = t_tm.tm_sec,
-            .microseconds = currentTimeOfDay.tv_usec,
+            .microseconds = static_cast<zp_int32_t>( currentTimeOfDay.tv_usec ),
             .year_day = t_tm.tm_yday,
             .week_day = t_tm.tm_wday,
             .is_dst = t_tm.tm_isdst
@@ -1311,7 +1368,7 @@ namespace zp
         ::gettimeofday( &currentTimeOfDay, nullptr );
 
         const time_t seconds = currentTimeOfDay.tv_sec;
-        auto err = ::gmtime_s( &t_tm, &seconds );
+        const auto err = ::gmtime_s( &t_tm, &seconds );
         ZP_ASSERT_MSG( err == 0, "" );
 
         return {
@@ -1321,14 +1378,14 @@ namespace zp
             .hour = t_tm.tm_hour,
             .minute = t_tm.tm_min,
             .second = t_tm.tm_sec,
-            .microseconds = currentTimeOfDay.tv_usec,
+            .microseconds = static_cast<zp_int32_t>( currentTimeOfDay.tv_usec ),
             .year_day = t_tm.tm_yday,
             .week_day = t_tm.tm_wday,
             .is_dst = t_tm.tm_isdst
         };
     }
 
-    zp_size_t Platform::DateTimeToString( const DateTime& dateTime, char* str, zp_size_t length, const char* format )
+    zp_size_t Platform::DateTimeToString( const DateTime& dateTime, char* str, const zp_size_t length, const char* format )
     {
         const tm time {
             .tm_sec = dateTime.second,
@@ -1341,7 +1398,6 @@ namespace zp
             .tm_yday = dateTime.year_day,
             .tm_isdst = dateTime.is_dst,
         };
-
 
         zp_size_t end;
 
@@ -1365,7 +1421,13 @@ namespace zp
         return end;
     }
 
-    MessageBoxResult Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, MessageBoxType messageBoxType, MessageBoxButton messageBoxButton )
+    zp_float64_t Platform::TimeDurationMS( const zp_time_t startTime )
+    {
+        const zp_float64_t durationMS = static_cast<zp_float64_t>( 1000 * ( TimeNow() - startTime ) ) / static_cast<zp_float64_t>( TimeFrequency() );
+        return durationMS;
+    }
+
+    MessageBoxResult Platform::ShowMessageBox( zp_handle_t windowHandle, const char* title, const char* message, const MessageBoxType messageBoxType, const MessageBoxButton messageBoxButton )
     {
         constexpr FixedArray buttonMap {
             MB_OK,
@@ -1383,7 +1445,7 @@ namespace zp
             MB_ICONERROR,
         };
 
-        HWND hWnd = static_cast<HWND>(windowHandle);
+        HWND hWnd = static_cast<HWND>( windowHandle );
         const UINT type = typeMap[ messageBoxType ] | buttonMap[ messageBoxButton ];
 
         const int msgResult = ::MessageBoxEx( hWnd, message, title, type, 0 );
@@ -1454,10 +1516,10 @@ namespace zp
             PrintLastErrorMsg( "Failed to create process" );
         }
 
-        return static_cast<zp_int32_t>(returnCode);
+        return static_cast<zp_int32_t>( returnCode );
     }
 
-    Semaphore Platform::CreateSemaphore( zp_int32_t initialCount, zp_int32_t maxCount, const char* name )
+    Semaphore Platform::CreateSemaphore( const zp_int32_t initialCount, const zp_int32_t maxCount, const char* name )
     {
         ZP_ASSERT( initialCount <= maxCount );
 
@@ -1470,9 +1532,9 @@ namespace zp
         return { .handle = hSemaphore };
     }
 
-    Platform::AcquireSemaphoreResult Platform::AcquireSemaphore( Semaphore semaphore, zp_time_t millisecondTimeout )
+    Platform::AcquireSemaphoreResult Platform::AcquireSemaphore( const Semaphore semaphore, const zp_time_t millisecondTimeout )
     {
-        HANDLE hSemaphore = static_cast<HANDLE>(semaphore.handle);
+        HANDLE hSemaphore = static_cast<HANDLE>( semaphore.handle );
 
         const DWORD result = ::WaitForSingleObject( hSemaphore, millisecondTimeout );
         switch( result )
@@ -1496,9 +1558,9 @@ namespace zp
         }
     }
 
-    zp_int32_t Platform::ReleaseSemaphore( Semaphore semaphore, zp_int32_t releaseCount )
+    zp_int32_t Platform::ReleaseSemaphore( const Semaphore semaphore, const zp_int32_t releaseCount )
     {
-        HANDLE hSemaphore = static_cast<HANDLE>(semaphore.handle);
+        HANDLE hSemaphore = static_cast<HANDLE>( semaphore.handle );
 
         LONG prevReleaseCount;
         const WINBOOL ok = ::ReleaseSemaphore( hSemaphore, releaseCount, &prevReleaseCount );
@@ -1510,9 +1572,9 @@ namespace zp
         return prevReleaseCount;
     }
 
-    zp_bool_t Platform::CloseSemaphore( Semaphore semaphore )
+    zp_bool_t Platform::CloseSemaphore( const Semaphore semaphore )
     {
-        HANDLE hSemaphore = static_cast<HANDLE>(semaphore.handle);
+        HANDLE hSemaphore = static_cast<HANDLE>( semaphore.handle );
 
         const WINBOOL ok = ::CloseHandle( hSemaphore );
         if( ok == FALSE )
@@ -1523,7 +1585,7 @@ namespace zp
         return ok;
     }
 
-    Mutex Platform::CreateMutex( zp_bool_t initialOwner, const char* name )
+    Mutex Platform::CreateMutex( const zp_bool_t initialOwner, const char* name )
     {
         HANDLE hMutex = ::CreateMutex( nullptr, initialOwner, name );
         if( hMutex == nullptr )
@@ -1534,9 +1596,9 @@ namespace zp
         return { .handle = hMutex };
     }
 
-    AcquireMutexResult Platform::AcquireMutex( Mutex mutex, zp_time_t millisecondTimeout )
+    AcquireMutexResult Platform::AcquireMutex( const Mutex mutex, const zp_time_t millisecondTimeout )
     {
-        HANDLE hSemaphore = static_cast<HANDLE>(mutex.handle);
+        HANDLE hSemaphore = mutex.handle;
 
         const DWORD result = ::WaitForSingleObject( hSemaphore, millisecondTimeout );
         switch( result )
@@ -1557,9 +1619,9 @@ namespace zp
         }
     }
 
-    zp_bool_t Platform::ReleaseMutex( Mutex mutex )
+    zp_bool_t Platform::ReleaseMutex( const Mutex mutex )
     {
-        HANDLE hMutex = static_cast<HANDLE>(mutex.handle);
+        HANDLE hMutex = mutex.handle;
 
         const WINBOOL ok = ::ReleaseMutex( hMutex );
         if( ok == FALSE )
@@ -1570,9 +1632,9 @@ namespace zp
         return ok != FALSE;
     }
 
-    zp_bool_t Platform::CloseMutex( Mutex mutex )
+    zp_bool_t Platform::CloseMutex( const Mutex mutex )
     {
-        HANDLE hMutex = static_cast<HANDLE>(mutex.handle);
+        HANDLE hMutex = mutex.handle;
 
         const WINBOOL ok = ::CloseHandle( hMutex );
         if( ok == FALSE )
@@ -1588,7 +1650,7 @@ namespace zp
     CriticalSection Platform::CreateCriticalSection()
     {
         CriticalSection criticalSection {};
-        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>(criticalSection.data);
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
 
         ::InitializeCriticalSection( pCriticalSection );
 
@@ -1597,20 +1659,22 @@ namespace zp
 
     void Platform::EnterCriticalSection( CriticalSection& criticalSection )
     {
-        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>(criticalSection.data);
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
         ::EnterCriticalSection( pCriticalSection );
     }
 
     void Platform::LeaveCriticalSection( CriticalSection& criticalSection )
     {
-        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>(criticalSection.data);
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
         ::LeaveCriticalSection( pCriticalSection );
     }
 
     void Platform::CloseCriticalSection( CriticalSection& criticalSection )
     {
-        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>(criticalSection.data);
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
         ::DeleteCriticalSection( pCriticalSection );
+
+        criticalSection = {};
     }
 
     ZP_STATIC_ASSERT( sizeof( ConditionVariable ) >= sizeof( CONDITION_VARIABLE ) );
@@ -1619,37 +1683,36 @@ namespace zp
     {
         ConditionVariable conditionVariable {};
 
-        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>(conditionVariable.data);
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
         ::InitializeConditionVariable( pConditionVariable );
 
         return conditionVariable;
     }
 
-    void Platform::WaitConditionVariable( ConditionVariable& conditionVariable, CriticalSection& criticalSection, zp_uint32_t timeout )
+    void Platform::WaitConditionVariable( ConditionVariable& conditionVariable, CriticalSection& criticalSection, const zp_uint32_t timeout )
     {
-        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>(conditionVariable.data);
-        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>(criticalSection.data);
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
+        LPCRITICAL_SECTION pCriticalSection = reinterpret_cast<LPCRITICAL_SECTION>( criticalSection.data );
 
         ::SleepConditionVariableCS( pConditionVariable, pCriticalSection, timeout );
     }
 
     void Platform::NotifyOneConditionVariable( ConditionVariable& conditionVariable )
     {
-        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>(conditionVariable.data);
-
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
         ::WakeConditionVariable( pConditionVariable );
     }
 
     void Platform::NotifyAllConditionVariable( ConditionVariable& conditionVariable )
     {
-        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>(conditionVariable.data);
-
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
         ::WakeAllConditionVariable( pConditionVariable );
     }
 
     void Platform::CloseConditionVariable( ConditionVariable& conditionVariable )
     {
-        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>(conditionVariable.data);
+        PCONDITION_VARIABLE pConditionVariable = reinterpret_cast<PCONDITION_VARIABLE>( conditionVariable.data );
+        ::CloseHandle( pConditionVariable );
     }
 
     zp_bool_t Platform::InitializeNetworking()
@@ -1677,7 +1740,7 @@ namespace zp
         int protocol = IPPROTO_TCP;
         DWORD flags = 0;
 
-        //SOCKET openSocket = ::WSASocket( addressFamily, socketType, protocol, nullptr, 0, flags );
+        // SOCKET openSocket = ::WSASocket( addressFamily, socketType, protocol, nullptr, 0, flags );
         SOCKET openSocket = ::socket( addressFamily, socketType, protocol );
         if( openSocket == INVALID_SOCKET )
         {
@@ -1686,7 +1749,7 @@ namespace zp
         else
         {
             sockaddr_in addr {
-                .sin_family = static_cast<short>(addressFamily),
+                .sin_family = static_cast<short>( addressFamily ),
                 .sin_port = htons( desc.address.port ),
             };
             addr.sin_addr.s_addr = inet_addr( desc.address.addr );
@@ -1697,7 +1760,7 @@ namespace zp
             {
                 case SocketDirection::Connect:
                 {
-                    result = ::connect( openSocket, reinterpret_cast<SOCKADDR*>(&addr), sizeof( addr ) );
+                    result = ::connect( openSocket, reinterpret_cast<SOCKADDR*>( &addr ), sizeof( addr ) );
                     if( result == SOCKET_ERROR )
                     {
                         PrintLastWSAErrorMsg( "Failed to connect socket" );
@@ -1707,8 +1770,8 @@ namespace zp
 
                 case SocketDirection::Listen:
                 {
-                    //int result = ::WSAConnect( openSocket, &addr, sizeof(sockaddr), nullptr, nullptr, nullptr, nullptr );
-                    result = ::bind( openSocket, reinterpret_cast<SOCKADDR*>(&addr), sizeof( addr ) );
+                    // int result = ::WSAConnect( openSocket, &addr, sizeof(sockaddr), nullptr, nullptr, nullptr, nullptr );
+                    result = ::bind( openSocket, reinterpret_cast<SOCKADDR*>( &addr ), sizeof( addr ) );
                     if( result == SOCKET_ERROR )
                     {
                         PrintLastWSAErrorMsg( "Failed to bind socket" );
@@ -1732,7 +1795,6 @@ namespace zp
                     ZP_INVALID_CODE_PATH_MSG( "Unknown " ZP_NAMEOF( SocketDirection ) );
                     break;
             }
-
         }
 
         return { .handle = openSocket };
@@ -1758,38 +1820,38 @@ namespace zp
         ZP_ASSERT( socket.handle != ZP_INVALID_SOCKET );
         ZP_ASSERT( dstSize < zp_limit<int>::max() );
 
-        const int flags = MSG_PEEK;
-        int result = ::recv( socket.handle, static_cast<char*>(dst), static_cast<int>(dstSize), flags );
+        constexpr int flags = MSG_PEEK;
+        int result = ::recv( socket.handle, static_cast<char*>( dst ), static_cast<int>( dstSize ), flags );
         if( result == SOCKET_ERROR )
         {
             PrintLastWSAErrorMsg( "Failed to receive socket" );
 
             result = 0;
         }
-/*
-        fd_set readSet;
-        FD_ZERO( &readSet );
-        FD_SET( socket.handle, &readSet );
+        /*
+                fd_set readSet;
+                FD_ZERO( &readSet );
+                FD_SET( socket.handle, &readSet );
 
-        const int r = ::select( 0, nullptr, nullptr, 0, nullptr );
-        if( r > 0 )
-        {
+                const int r = ::select( 0, nullptr, nullptr, 0, nullptr );
+                if( r > 0 )
+                {
 
-        }
-        else if( r == 0 )
-        {
+                }
+                else if( r == 0 )
+                {
 
-        }
-        else
-        {
-            PrintLastWSAErrorMsg( "" );
-        }
+                }
+                else
+                {
+                    PrintLastWSAErrorMsg( "" );
+                }
 
-        if( FD_ISSET( socket.handle, &readSet ) )
-        {
+                if( FD_ISSET( socket.handle, &readSet ) )
+                {
 
-        }
-*/
+                }
+        */
         return result;
     }
 
@@ -1798,8 +1860,8 @@ namespace zp
         ZP_ASSERT( socket.handle != ZP_INVALID_SOCKET );
         ZP_ASSERT( srcSize < zp_limit<int>::max() );
 
-        const int flags = 0;
-        int result = ::send( socket.handle, static_cast<const char*>(src), static_cast<int>(srcSize), flags );
+        constexpr int flags = 0;
+        int result = ::send( socket.handle, static_cast<const char*>( src ), static_cast<int>( srcSize ), flags );
         if( result == SOCKET_ERROR )
         {
             PrintLastWSAErrorMsg( "Failed to send socket" );
@@ -1828,7 +1890,7 @@ namespace zp
 #if ZP_DEBUG
         const HANDLE process = ::GetCurrentProcess();
 
-        const DWORD flags = SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES;
+        constexpr DWORD flags = SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES;
         ::SymSetOptions( flags );
 
         const WINBOOL init = ::SymInitialize( process, nullptr, true ? TRUE : FALSE );
@@ -1852,7 +1914,7 @@ namespace zp
 #endif
     }
 
-    void Platform::GetStackTrace( StackTrace& stackTrace, zp_uint32_t framesToSkip )
+    void Platform::GetStackTrace( StackTrace& stackTrace, const zp_uint32_t framesToSkip )
     {
 #if ZP_DEBUG
         DWORD hash {};
@@ -1872,7 +1934,7 @@ namespace zp
 
         for( void* addr : stackTrace.stack )
         {
-            const WINBOOL ok = ::SymFromAddr( process, reinterpret_cast<DWORD64>(addr), 0, &info );
+            const WINBOOL ok = ::SymFromAddr( process, reinterpret_cast<DWORD64>( addr ), 0, &info );
             if( !ok )
             {
                 PrintLastErrorMsg( "" );
@@ -1882,7 +1944,6 @@ namespace zp
             string.append( info.Name, info.NameLen );
             string.append( '\n' );
         }
-
 #endif
     }
 
@@ -1894,4 +1955,4 @@ namespace zp
         StackTraceToString( stackTrace, string );
 #endif
     }
-}
+} // namespace zp

@@ -9,7 +9,7 @@
 #include <cmath>
 #include <immintrin.h>
 
-#define _MM_SHUFFLER( fp0, fp1, fp2, fp3 ) _MM_SHUFFLE( fp3, fp2, fp1, fp0 )
+#define ZP_MM_SHUFFLER( fp0, fp1, fp2, fp3 ) _MM_SHUFFLE( fp3, fp2, fp1, fp0 )
 
 zp_float32_t zp_sinf( zp_float32_t v )
 {
@@ -670,9 +670,9 @@ namespace zp
             const __m128 s = _mm_mul_ps( scale, invRtfMlbn );
 
             const __m128 z = _mm_setzero_ps();
-            const __m128 c0 = _mm_shuffle_ps( s, z, _MM_SHUFFLER( 0, 3, 0, 0 ) );
-            const __m128 c1 = _mm_shuffle_ps( s, z, _MM_SHUFFLER( 3, 1, 0, 0 ) );
-            const __m128 c2 = _mm_shuffle_ps( z, s, _MM_SHUFFLER( 0, 0, 2, 3 ) );
+            const __m128 c0 = _mm_shuffle_ps( s, z, ZP_MM_SHUFFLER( 0, 3, 0, 0 ) );
+            const __m128 c1 = _mm_shuffle_ps( s, z, ZP_MM_SHUFFLER( 3, 1, 0, 0 ) );
+            const __m128 c2 = _mm_shuffle_ps( z, s, ZP_MM_SHUFFLER( 0, 0, 2, 3 ) );
             const __m128 c3 = _mm_fmadd_ps( _mm_mul_ps( rtfPlbn, invRtfMlbn ), _mm_setr_ps( -1, -1, -1, 0 ), _mm_setr_ps( 0, 0, 0, 1 ) );
 
             // NOTE: c0..3 are set up properly, no need to store reverse

@@ -39,18 +39,18 @@ namespace zp
         zp_size_t pageSize;
     };
 
-    // @formatter:off
+    // clang-format off
     struct EntryPointDesc
     {
         zp_size_t totalMemorySize = 512 MB;
-        MemoryConfig defaultAllocator = { .totalSize = 0 MB, .pageSize = 16 MB };
-        MemoryConfig tempAllocator = { .totalSize = 32 MB, .pageSize = 2 MB };
-        MemoryConfig threadSafeAllocator = { .totalSize = 16 MB, .pageSize = 2 MB };
-        MemoryConfig profilerAllocator = { .totalSize = 64 MB, .pageSize = 0 };
-        MemoryConfig debugAllocator = { .totalSize = 16 MB, .pageSize = 2 MB };
-        MemoryConfig graphicsAllocator = { .totalSize = 0 MB, .pageSize = 4 MB };
+        MemoryConfig defaultAllocator       { .totalSize = 0 MB,  .pageSize = 16 MB };
+        MemoryConfig tempAllocator          { .totalSize = 32 MB, .pageSize = 2 MB };
+        MemoryConfig threadSafeAllocator    { .totalSize = 16 MB, .pageSize = 2 MB };
+        MemoryConfig profilerAllocator      { .totalSize = 64 MB, .pageSize = 0 };
+        MemoryConfig debugAllocator         { .totalSize = 16 MB, .pageSize = 2 MB };
+        MemoryConfig graphicsAllocator      { .totalSize = 0 MB,  .pageSize = 4 MB };
     };
-    // @formatter:on
+    // clang-format on
 
     template<typename T>
     ZP_FORCEINLINE zp_int32_t EntryPointMain( const String& commandLine, const EntryPointDesc& desc )
@@ -68,13 +68,13 @@ namespace zp
 
             if( fileSize > 0 )
             {
-                MutableFixedString1024 bootConfigBuffer;
+                FixedArray<zp_uint8_t, 1024> bootConfigBuffer;
                 ZP_ASSERT( fileSize < bootConfigBuffer.length() );
 
-                Platform::ReadFile( bootConfigFile, bootConfigBuffer.mutable_str(), fileSize );
+                const zp_size_t readBytes = Platform::ReadFile( bootConfigFile, bootConfigBuffer.data(), fileSize );
 
-                const String bootConfig = static_cast<String>( bootConfigBuffer );
-                GlobalProperties::Parse( bootConfig, String::As("total-memory-size"), entryPointDesc.totalMemorySize );
+                const String bootConfig = String::As( reinterpret_cast<const char*>( bootConfigBuffer.data() ), readBytes );
+                GlobalProperties::Parse( bootConfig, String::As( "total-memory-size" ), entryPointDesc.totalMemorySize );
                 GlobalProperties::Parse( bootConfig, String::As( "disable-networking" ), disableNetworking );
                 GlobalProperties::Parse( bootConfig, String::As( "max-job-threads" ), maxJobThreads );
             }
@@ -145,7 +145,6 @@ namespace zp
             NullMemoryProfiler );
 #endif
 
-        // @formatter:off
         // register allocators
         RegisterAllocator( MemoryLabels::Default, &s_defaultAllocator );
         RegisterAllocator( MemoryLabels::String, &s_defaultAllocator );
@@ -159,7 +158,6 @@ namespace zp
 
         RegisterAllocator( MemoryLabels::Profiling, &s_profilingAllocator );
         RegisterAllocator( MemoryLabels::Debug, &s_debugAllocator );
-        // @formatter:on
 
         // initialize networking (if needed)
         if( !disableNetworking )
@@ -184,21 +182,26 @@ namespace zp
         Platform::SetThreadIdealProcessor( mainThreadHandle, 0 );
 
 #if ZP_USE_PROFILER
-        Profiler::CreateProfiler( MemoryLabels::Profiling, {
-                                                               .maxCPUEventsPerThread = 128,
-                                                               .maxMemoryEventsPerThread = 128,
-                                                               .maxGPUEventsPerThread = 4,
-                                                               .maxFramesToCapture = 120,
-                                                               .maxThreadCount = static_cast<zp_uint32_t>( numJobThreads ) + 1,
-                                                           } );
+        {
+            const ProfilerCreateDesc profilerDesc {
+                .maxCPUEventsPerThread = 128,
+                .maxMemoryEventsPerThread = 128,
+                .maxGPUEventsPerThread = 4,
+                .maxFramesToCapture = 120,
+                .maxThreadCount = static_cast<zp_uint32_t>( numJobThreads ) + 1,
+            };
+            Profiler::CreateProfiler( MemoryLabels::Profiling, profilerDesc );
 
-        Profiler::InitializeProfilerThread();
-#endif
+            Profiler::InitializeProfilerThread();
+        }
+#endif // ZP_USE_PROFILER
 
         // initialize job system
-        JobSystem::Setup( MemoryLabels::Default, numJobThreads );
+        {
+            JobSystem::Setup( MemoryLabels::Default, numJobThreads );
 
-        JobSystem::InitializeJobThreads();
+            JobSystem::InitializeJobThreads();
+        }
 
         //
         //
@@ -233,9 +236,11 @@ namespace zp
         }
 
 #if ZP_USE_PROFILER
-        Profiler::DestroyProfilerThread();
+        {
+            Profiler::DestroyProfilerThread();
 
-        Profiler::DestroyProfiler();
+            Profiler::DestroyProfiler();
+        }
 #endif
 
         JobSystem::Teardown();

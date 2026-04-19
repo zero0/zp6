@@ -517,7 +517,7 @@ namespace
 
     constexpr ShaderOutputReflectionInputOutputName Convert( D3D_NAME value )
     {
-        // @formatter:off
+        // clang-format off
         switch(value)
         {
             case D3D_NAME_UNDEFINED:                            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
@@ -547,7 +547,7 @@ namespace
             case D3D_NAME_DEPTH_LESS_EQUAL:                     return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_DEPTH_LESS_EQUAL;
             default:                                            return ZP_SHADER_OUTPUT_REFLECTION_INPUT_OUTPUT_NAME_UNDEFINED;
         }
-        // @formatter:on
+        // clang-format on
     }
 
     constexpr ShaderOutputReflectionMask Convert( BYTE mask )

@@ -6,9 +6,10 @@
 #define ZP_LOG_H
 
 #include "Core/Defines.h"
-#include "Core/Types.h"
 #include "Core/String.h"
+#include "Core/Types.h"
 
+// clang-format off
 #define ZP_USE_LOG_MESSAGE      ( ZP_DEBUG_BUILD )
 #define ZP_USE_LOG_INFO         ( ZP_DEBUG_BUILD || ZP_RELEASE_BUILD )
 #define ZP_USE_LOG_PERFORMANCE  ( ZP_DEBUG_BUILD || ZP_RELEASE_BUILD )
@@ -16,14 +17,13 @@
 #define ZP_USE_LOG_ERROR        ( ZP_DEBUG_BUILD || ZP_RELEASE_BUILD )
 #define ZP_USE_LOG_FATAL        ( ZP_DEBUG_BUILD || ZP_RELEASE_BUILD || ZP_DISTRIBUTION_BUILD )
 
-// @formatter:off
-#define ZP_LOG_MSG(x)       do { zp::Log::message()  << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
-#define ZP_LOG_INFO(x)      do { zp::Log::info()     << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
-#define ZP_LOG_PERF(x)      do { zp::Log::perf()     << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
-#define ZP_LOG_WARN(x)      do { zp::Log::warning()  << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
-#define ZP_LOG_ERROR(x)     do { zp::Log::error()    << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
-#define ZP_LOG_FATAL(x)     do { zp::Log::fatal()    << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
-// @formatter:on
+#define ZP_LOG_MSG(x)           do { zp::Log::message()  << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
+#define ZP_LOG_INFO(x)          do { zp::Log::info()     << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
+#define ZP_LOG_PERF(x)          do { zp::Log::perf()     << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
+#define ZP_LOG_WARN(x)          do { zp::Log::warning()  << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
+#define ZP_LOG_ERROR(x)         do { zp::Log::error()    << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
+#define ZP_LOG_FATAL(x)         do { zp::Log::fatal()    << __FILE__ << ":" << __LINE__ << " " << x << zp::Log::endl; } while(0)
+// clang-format on
 
 namespace zp
 {
@@ -39,26 +39,26 @@ namespace zp
         Count,
     };
 
-    // @formatter:off
+    // clang-format off
     constexpr LogType LogMessageType =      ZP_USE_LOG_MESSAGE ?        LogType::Message : LogType::Null;
     constexpr LogType LogInfoType =         ZP_USE_LOG_INFO ?           LogType::Info : LogType::Null;
     constexpr LogType LogPerformanceType =  ZP_USE_LOG_PERFORMANCE ?    LogType::Performance : LogType::Null;
     constexpr LogType LogWarningType =      ZP_USE_LOG_WARNING ?        LogType::Warning : LogType::Null;
     constexpr LogType LogErrorType =        ZP_USE_LOG_ERROR ?          LogType::Error : LogType::Null;
     constexpr LogType LogFatalType =        ZP_USE_LOG_FATAL ?          LogType::Fatal : LogType::Null;
-    // @formatter:on
+    // clang-format on
 
     template<LogType Type>
     struct LogEntry;
 
-    // @formatter:off
+    // clang-format off
     using LogEntryMessage =     LogEntry<LogMessageType>;
     using LogEntryInfo =        LogEntry<LogInfoType>;
     using LogEntryPerformance = LogEntry<LogPerformanceType>;
     using LogEntryWarning =     LogEntry<LogWarningType>;
     using LogEntryError =       LogEntry<LogErrorType>;
     using LogEntryFatal =       LogEntry<LogFatalType>;
-    // @formatter:on
+    // clang-format on
 
 
     namespace Log
@@ -79,7 +79,7 @@ namespace zp
         auto error() -> LogEntryError;
 
         auto fatal() -> LogEntryFatal;
-    }
+    } // namespace Log
 
     template<LogType Type>
     struct LogEntry
@@ -233,6 +233,6 @@ namespace zp
     inline void LogEntry<LogType::Null>::operator<<( Log::EndToken )
     {
     }
-}
+} // namespace zp
 
-#endif //ZP_LOG_H
+#endif // ZP_LOG_H

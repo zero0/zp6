@@ -2,23 +2,23 @@
 // Created by phosg on 7/28/2023.
 //
 
-#include "Core/Defines.h"
-#include "Core/Macros.h"
-#include "Core/Types.h"
-#include "Core/Common.h"
-#include "Core/Math.h"
 #include "Core/Job.h"
-#include "Core/Vector.h"
-#include "Core/Atomic.h"
 #include "Core/Allocator.h"
-#include "Core/Profiler.h"
-#include "Core/Log.h"
-#include "Core/String.h"
+#include "Core/Atomic.h"
+#include "Core/Common.h"
+#include "Core/Defines.h"
 #include "Core/Function.h"
+#include "Core/Log.h"
+#include "Core/Macros.h"
+#include "Core/Math.h"
+#include "Core/Profiler.h"
+#include "Core/String.h"
+#include "Core/Types.h"
+#include "Core/Vector.h"
 
 #include "Platform/Platform.h"
 
-#define USE_JOB_STATE_TRACKING  ZP_DEBUG
+#define USE_JOB_STATE_TRACKING ZP_DEBUG
 
 namespace zp
 {
@@ -47,7 +47,7 @@ namespace zp
 
         ZP_STATIC_ASSERT( zp_is_pow2( kJobQueueCount ) );
         ZP_STATIC_ASSERT( zp_is_pow2( kJobsPerThread ) );
-    };
+    }; // namespace
 
     struct Job
     {
@@ -165,7 +165,7 @@ namespace zp
             m_front = 0;
             m_back = 0;
         }
-    }
+    } // namespace
 #pragma endregion
 
     namespace
@@ -198,13 +198,13 @@ namespace zp
             zp_int32_t isRunning;
         };
 
-        JobSystemContext g_context;
+        JobSystemContext g_context {};
 
         //
         //
         //
 
-        void InitializeLocalThreadInfo( zp_size_t index )
+        void InitializeLocalThreadInfo( const zp_size_t index )
         {
             JobThreadInfo& info = t_threadInfo;
             info = {};
@@ -270,7 +270,7 @@ namespace zp
             job->batchId = 0;
             job->jobStart = 0;
             job->jobEnd = 1;
-            zp_zero_memory_array( job->data.data(), job->data.length() );
+            zp_zero_memory( job->data.data(), job->data.length() );
 
             return job;
         }
@@ -469,7 +469,7 @@ namespace zp
             Profiler::InitializeProfilerThread();
 #endif
 
-            const zp_size_t index = static_cast<zp_size_t>(reinterpret_cast<zp_ptr_t>(threadData));
+            const zp_size_t index = static_cast<zp_size_t>( reinterpret_cast<zp_ptr_t>( threadData ) );
 
             Log::info() << "Entering Worker Thread..." << Log::endl;
 
@@ -497,7 +497,7 @@ namespace zp
 
             return 0;
         }
-    };
+    }; // namespace
 
     void JobSystem::Setup( MemoryLabel memoryLabel, zp_uint32_t threadCount )
     {
@@ -542,7 +542,7 @@ namespace zp
             g_context.allBatchJobQueues.pushBackEmpty();
 
             zp_uint32_t threadID;
-            const ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>(static_cast<zp_ptr_t>(i)), stackSize, &threadID );
+            const ThreadHandle threadHandle = Platform::CreateThread( WorkerThreadFunc, reinterpret_cast<void*>( static_cast<zp_ptr_t>( i ) ), stackSize, &threadID );
 
             Platform::SetThreadIdealProcessor( threadHandle, 1 + ( i % numAvailableProcessors ) ); // proc 0 is used for main thread
 
@@ -767,7 +767,7 @@ namespace zp
             job = RequestQueuedJob();
         }
     }
-};
+}; // namespace zp
 
 #if 0
 using namespace zp;

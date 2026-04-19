@@ -96,7 +96,7 @@ namespace zp
 
     enum ShaderOutputReflectionMask : zp_uint8_t
     {
-        // @formatter:off
+        // clang-format off
         ZP_SHADER_OUTPUT_REFLECTION_MASK_NONE = 0,
         ZP_SHADER_OUTPUT_REFLECTION_MASK_X = 1 << 0,
         ZP_SHADER_OUTPUT_REFLECTION_MASK_Y = 1 << 1,
@@ -119,7 +119,7 @@ namespace zp
         ZP_SHADER_OUTPUT_REFLECTION_MASK_ZW =  ZP_SHADER_OUTPUT_REFLECTION_MASK_Z | ZP_SHADER_OUTPUT_REFLECTION_MASK_W,
 
         ZP_SHADER_OUTPUT_REFLECTION_MASK_ALL = 0xFF,
-        // @formatter:on
+        // clang-format on
     };
 
     struct ShaderOutputReflectionHeader

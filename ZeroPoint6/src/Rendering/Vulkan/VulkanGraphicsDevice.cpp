@@ -224,14 +224,14 @@ namespace zp
             return VK_OBJECT_TYPE_UNKNOWN;
         }
 
-        // @formatter:off
+        // clang-format off
 #define MAKE_OBJECT_TYPE( vk, ot )                                \
     template<>                                                    \
     constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType \
     {                                                             \
         return ot;                                                \
     }
-        // @formatter:on
+        // clang-format on
 
         MAKE_OBJECT_TYPE( VkInstance, VK_OBJECT_TYPE_INSTANCE );
 
@@ -2471,7 +2471,7 @@ namespace zp
             {
                 const zp_uint32_t kDefaultDescriptorCount = 32;
 
-                // @formatter:off
+                // clang-format off
                 const FixedArray poolSizes{
                     VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = kDefaultDescriptorCount },
                     VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = kDefaultDescriptorCount },
@@ -2485,7 +2485,7 @@ namespace zp
                     VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, .descriptorCount = kDefaultDescriptorCount },
                     VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = kDefaultDescriptorCount }
                 };
-                // @formatter:on
+                // clang-format on
 
                 const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -3139,7 +3139,7 @@ namespace zp
 
             HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
 
-            // @formatter:off
+            // clang-format off
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Buffer %c%c%c%c%c%c%c (%d)",
                 zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_TRANSFER_SRC_BIT ) ? 'S' : '-',
                 zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_TRANSFER_DST_BIT ) ? 'D' : '-',
@@ -3149,7 +3149,7 @@ namespace zp
                 zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT ) ? 'U' : '-',
                 zp_flag32_all_set( vkBufferUsage, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT ) ? 'T' : '-',
                 memoryAllocateInfo.allocationSize );
-            // @formatter:on
+            // clang-format on
 
             zp_uint32_t index;
             // if( m_vkFreeBuffers.isEmpty() )

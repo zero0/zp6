@@ -2,15 +2,17 @@
 Language: Cpp
 BasedOnStyle: LLVM
 AccessModifierOffset: -4
-AlignAfterOpenBracket: DontAlign
+AlignAfterOpenBracket: false
+AlignConsecutiveMacros: true
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignOperands: true
 AlignTrailingComments: false
 AllowShortBlocksOnASingleLine: Never
+AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
 AlwaysBreakTemplateDeclarations: Yes
-BraceWrapping: 
+BraceWrapping:
   AfterCaseLabel: true
   AfterClass: true
   AfterControlStatement: true
@@ -33,6 +35,7 @@ BreakBeforeBraces: Custom
 BreakTemplateDeclarations: Yes
 ColumnLimit: 0
 Cpp11BracedListStyle: false
+EnumTrailingComma: Insert
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
@@ -45,8 +48,8 @@ IndentCaseLabels: true
 IndentWidth: 4
 InsertNewlineAtEOF: true
 LineEnding: LF
-MacroBlockBegin: ''
-MacroBlockEnd: ''
+MacroBlockBegin: '.*_BEGIN$'
+MacroBlockEnd: '.*_END$'
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
 PointerAlignment: Left
@@ -59,5 +62,7 @@ SpacesInCStyleCastParentheses: false
 SpacesInParentheses: true
 SpacesInSquareBrackets: true
 SpaceBeforeCpp11BracedList: true
+PackConstructorInitializers: Never
+BreakConstructorInitializersBeforeComma: true
 TabWidth: 4
 ...
