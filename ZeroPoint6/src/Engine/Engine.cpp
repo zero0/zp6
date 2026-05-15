@@ -179,7 +179,7 @@ namespace zp
         }
 
         // graphics device
-        const zp_bool_t createGraphicsDevice = false; //! headless;
+        const zp_bool_t createGraphicsDevice = !headless;
         if( createGraphicsDevice )
         {
             ZP_PROFILE_CPU_BLOCK_E( Create Graphics Device );
@@ -196,7 +196,6 @@ namespace zp
             };
 
             m_graphicsDevice = CreateGraphicsDevice( MemoryLabels::Graphics, desc );
-            // m_graphicsDevice->createSwapchain( m_windowHandle.m_handle, windowSize.size.width, windowSize.size.height, 0, ZP_COLOR_SPACE_REC_709_LINEAR );
         }
 
         // show window when graphics device is created

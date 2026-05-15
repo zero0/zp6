@@ -141,7 +141,7 @@ constexpr T zp_upper_pow2_generic( T val )
     return val;
 }
 
-#define zp_upper_pow2_8( x ) zp_upper_pow2_generic<zp_uint8_t, 3>( x )
+#define zp_upper_pow2_8( x )  zp_upper_pow2_generic<zp_uint8_t, 3>( x )
 #define zp_upper_pow2_16( x ) zp_upper_pow2_generic<zp_uint16_t, 4>( x )
 #define zp_upper_pow2_32( x ) zp_upper_pow2_generic<zp_uint32_t, 5>( x )
 #define zp_upper_pow2_64( x ) zp_upper_pow2_generic<zp_uint64_t, 6>( x )
@@ -273,13 +273,13 @@ constexpr void zp_assert( const char* msg, const char* file, zp_size_t line, Arg
         zp_assert( "Invalid Code Path: " msg, __FILE__, __LINE__, args ); \
     } while( false )
 #else // !ZP_USE_ASSERTIONS
-#define ZP_ASSERT( ... ) (void)0
-#define ZP_ASSERT_RETURN( ... ) (void)0
-#define ZP_ASSERT_RETURN_VALUE( ... ) (void)0
-#define ZP_ASSERT_MSG( ... ) (void)0
-#define ZP_ASSERT_MSG_ARGS( ... ) (void)0
-#define ZP_INVALID_CODE_PATH() (void)0
-#define ZP_INVALID_CODE_PATH_MSG( ... ) (void)0
+#define ZP_ASSERT( ... )                     (void)0
+#define ZP_ASSERT_RETURN( ... )              (void)0
+#define ZP_ASSERT_RETURN_VALUE( ... )        (void)0
+#define ZP_ASSERT_MSG( ... )                 (void)0
+#define ZP_ASSERT_MSG_ARGS( ... )            (void)0
+#define ZP_INVALID_CODE_PATH()               (void)0
+#define ZP_INVALID_CODE_PATH_MSG( ... )      (void)0
 #define ZP_INVALID_CODE_PATH_MSG_ARGS( ... ) (void)0
 #endif // ZP_USE_ASSERTIONS
 
@@ -333,7 +333,7 @@ ZP_FORCEINLINE void zp_zero_memory_array( T ( &arr )[ Size ] )
 template<typename T>
 constexpr zp_hash64_t zp_type_hash()
 {
-    const zp_hash64_t hash{ typeid( T ).hash_code() };
+    const zp_hash64_t hash { typeid( T ).hash_code() };
     return hash;
 }
 
@@ -615,36 +615,37 @@ namespace zp
         zp_char8_t mem[ 4 ];
     };
 
-    constexpr SizeInfo GetSizeInfoFromBytes( zp_size_t bytes, zp_bool_t asBits = false )
+    template<zp_bool_t asBits = false>
+    constexpr SizeInfo GetSizeInfoFromBytes( const zp_size_t bytes )
     {
-        SizeInfo info{};
+        SizeInfo info {};
 
-        if( asBits )
+        if constexpr( asBits )
         {
             info.mem[ 1 ] = 'b';
             if( bytes > 1 Tb )
             {
-                info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 Tb ) );
+                info.size = static_cast<zp_float32_t>( static_cast<zp_float64_t>( bytes ) / ( 1 Tb ) );
                 info.mem[ 0 ] = 't';
             }
             else if( bytes > 1 Gb )
             {
-                info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 Gb );
+                info.size = static_cast<zp_float32_t>( bytes ) / static_cast<zp_float32_t>( 1 Gb );
                 info.mem[ 0 ] = 'g';
             }
             else if( bytes > 1 Mb )
             {
-                info.size = (zp_float32_t)bytes / ( 1 Mb );
+                info.size = static_cast<zp_float32_t>( bytes ) / ( 1 Mb );
                 info.mem[ 0 ] = 'm';
             }
             else if( bytes > 1 Kb )
             {
-                info.size = (zp_float32_t)bytes / ( 1 Kb );
+                info.size = static_cast<zp_float32_t>( bytes ) / ( 1 Kb );
                 info.mem[ 0 ] = 'k';
             }
             else
             {
-                info.size = (zp_float32_t)bytes;
+                info.size = static_cast<zp_float32_t>( bytes );
                 info.mem[ 0 ] = 'b';
                 info.mem[ 1 ] = '\0';
             }
@@ -654,27 +655,27 @@ namespace zp
             info.mem[ 1 ] = 'B';
             if( bytes > 1 TB )
             {
-                info.size = (zp_float32_t)( (zp_float64_t)bytes / ( 1 TB ) );
+                info.size = static_cast<zp_float32_t>( static_cast<zp_float64_t>( bytes ) / ( 1 TB ) );
                 info.mem[ 0 ] = 'T';
             }
             else if( bytes > 1 GB )
             {
-                info.size = (zp_float32_t)bytes / (zp_float32_t)( 1 GB );
+                info.size = static_cast<zp_float32_t>( bytes ) / static_cast<zp_float32_t>( 1 GB );
                 info.mem[ 0 ] = 'G';
             }
             else if( bytes > 1 MB )
             {
-                info.size = (zp_float32_t)bytes / ( 1 MB );
+                info.size = static_cast<zp_float32_t>( bytes ) / ( 1 MB );
                 info.mem[ 0 ] = 'M';
             }
             else if( bytes > 1 KB )
             {
-                info.size = (zp_float32_t)bytes / ( 1 KB );
+                info.size = static_cast<zp_float32_t>( bytes ) / ( 1 KB );
                 info.mem[ 0 ] = 'K';
             }
             else
             {
-                info.size = (zp_float32_t)bytes;
+                info.size = static_cast<zp_float32_t>( bytes );
                 info.mem[ 0 ] = 'B';
                 info.mem[ 1 ] = '\0';
             }
@@ -702,7 +703,8 @@ namespace zp
     {
     public:
         IntrusiveList()
-            : m_head( nullptr ), m_tail( nullptr )
+            : m_head( nullptr )
+            , m_tail( nullptr )
         {
         }
 
