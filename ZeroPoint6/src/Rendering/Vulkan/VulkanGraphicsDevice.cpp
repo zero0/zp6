@@ -29,30 +29,43 @@
 
 #include "Volk/volk.h"
 
-// ZP_CONCAT(_vkResult_,__LINE__)
+#if ZP_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include "Windows.h"
+#endif // ZP_PLATFORM_WINDOWS
+
 #if ZP_DEBUG
-#define HR( r )                                                   \
-    do                                                            \
-    {                                                             \
-        if( const VkResult result = ( r ); result != VK_SUCCESS ) \
-        {                                                         \
-            ZP_LOG_ERROR( #r );                                   \
-            Platform::DebugBreak();                               \
-        }                                                         \
+#define VK_HR( r )                      \
+    do                                  \
+    {                                   \
+        const VkResult result = r;      \
+        if( result != VK_SUCCESS )      \
+        {                               \
+            ZP_LOG_ERROR( #r );         \
+            zp::Platform::DebugBreak(); \
+        }                               \
     } while( false )
+
 #else
-#define HR( r ) r
+#define VK_HR( r ) r
 #endif
 
 #define FlagBits( f, z, t, v ) f |= ( ( z ) & ( t ) ) ? ( v ) : 0
+
 #define USE_DYNAMIC_RENDERING 1
 
-const zp_uint32_t ZP_VULKAN_API_VERSION_1_0 = VK_API_VERSION_1_0;
-const zp_uint32_t ZP_VULKAN_API_VERSION_1_1 = VK_API_VERSION_1_1;
-const zp_uint32_t ZP_VULKAN_API_VERSION_1_2 = VK_API_VERSION_1_2;
-const zp_uint32_t ZP_VULKAN_API_VERSION_1_3 = VK_API_VERSION_1_3;
+enum
+{
+    ZP_VULKAN_API_VERSION_1_0 = VK_API_VERSION_1_0,
+    ZP_VULKAN_API_VERSION_1_1 = VK_API_VERSION_1_1,
+    ZP_VULKAN_API_VERSION_1_2 = VK_API_VERSION_1_2,
+    ZP_VULKAN_API_VERSION_1_3 = VK_API_VERSION_1_3,
+    ZP_VULKAN_API_VERSION_1_4 = VK_API_VERSION_1_4,
 
-const zp_uint32_t ZP_VULKAN_API_VERSION = ZP_VULKAN_API_VERSION_1_3;
+    // Current API version
+    ZP_VULKAN_API_VERSION = ZP_VULKAN_API_VERSION_1_3,
+};
+
 
 namespace zp
 {
@@ -70,14 +83,14 @@ namespace zp
         };
 
 #if ZP_DEBUG
-        const FixedArray kDebugLabelColors{
+        const FixedArray kDebugLabelColors {
             Color::clear,
             Color::green,
             Color::red,
             Color::blue,
         };
 
-        ZP_STATIC_ASSERT( kDebugLabelColors.length() == (zp_size_t)DebugLabelColor::Count );
+        ZP_STATIC_ASSERT( kDebugLabelColors.length() == static_cast<zp_size_t>( DebugLabelColor::Count ) );
 #endif
 
         enum
@@ -224,14 +237,12 @@ namespace zp
             return VK_OBJECT_TYPE_UNKNOWN;
         }
 
-        // clang-format off
 #define MAKE_OBJECT_TYPE( vk, ot )                                \
     template<>                                                    \
     constexpr auto GetObjectType( vk /*unused*/ ) -> VkObjectType \
     {                                                             \
         return ot;                                                \
     }
-        // clang-format on
 
         MAKE_OBJECT_TYPE( VkInstance, VK_OBJECT_TYPE_INSTANCE );
 
@@ -277,20 +288,20 @@ namespace zp
 
         constexpr VkIndexType Convert( const IndexBufferFormat indexBufferFormat )
         {
-            constexpr VkIndexType indexTypeMap[]{
+            constexpr FixedArray indexTypeMap {
                 VK_INDEX_TYPE_UINT16,
                 VK_INDEX_TYPE_UINT32,
                 VK_INDEX_TYPE_UINT8_EXT,
                 VK_INDEX_TYPE_NONE_KHR,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( indexTypeMap ) == IndexBufferFormat_Count );
+            ZP_STATIC_ASSERT( indexTypeMap.length() == IndexBufferFormat_Count );
             return indexTypeMap[ indexBufferFormat ];
         }
 
         constexpr VkBufferUsageFlags Convert( const GraphicsBufferUsageFlags graphicsBufferUsageFlags )
         {
-            VkBufferUsageFlags bufferUsageFlagBits{};
+            VkBufferUsageFlags bufferUsageFlagBits {};
 
             FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_SRC, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
             FlagBits( bufferUsageFlagBits, graphicsBufferUsageFlags, ZP_GRAPHICS_BUFFER_USAGE_TRANSFER_DST, VK_BUFFER_USAGE_TRANSFER_DST_BIT );
@@ -305,9 +316,9 @@ namespace zp
             return bufferUsageFlagBits;
         }
 
-        constexpr VkMemoryPropertyFlags Convert( MemoryPropertyFlags memoryPropertyFlags )
+        constexpr VkMemoryPropertyFlags Convert( const MemoryPropertyFlags memoryPropertyFlags )
         {
-            VkMemoryPropertyFlags propertyFlags{};
+            VkMemoryPropertyFlags propertyFlags {};
 
             FlagBits( propertyFlags, memoryPropertyFlags, ZP_MEMORY_PROPERTY_DEVICE_LOCAL, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
             FlagBits( propertyFlags, memoryPropertyFlags, ZP_MEMORY_PROPERTY_HOST_VISIBLE, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
@@ -315,9 +326,9 @@ namespace zp
             return propertyFlags;
         }
 
-        constexpr VkPrimitiveTopology Convert( Topology topology )
+        constexpr VkPrimitiveTopology Convert( const Topology topology )
         {
-            constexpr VkPrimitiveTopology primitiveTopologyMap[]{
+            constexpr FixedArray primitiveTopologyMap {
                 VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
                 VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
                 VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
@@ -326,49 +337,49 @@ namespace zp
                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( primitiveTopologyMap ) == Topology_Count );
+            ZP_STATIC_ASSERT( primitiveTopologyMap.length() == Topology_Count );
             return primitiveTopologyMap[ topology ];
         }
 
-        constexpr VkPolygonMode Convert( PolygonFillMode polygonFillMode )
+        constexpr VkPolygonMode Convert( const PolygonFillMode polygonFillMode )
         {
-            constexpr VkPolygonMode polygonModeMap[]{
+            constexpr FixedArray polygonModeMap {
                 VK_POLYGON_MODE_FILL,
                 VK_POLYGON_MODE_LINE,
                 VK_POLYGON_MODE_POINT,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( polygonModeMap ) == PolygonFillMode_Count );
+            ZP_STATIC_ASSERT( polygonModeMap.length() == PolygonFillMode_Count );
             return polygonModeMap[ polygonFillMode ];
         }
 
-        constexpr VkCullModeFlags Convert( CullMode cullMode )
+        constexpr VkCullModeFlags Convert( const CullMode cullMode )
         {
-            constexpr VkCullModeFlags cullModeFlagsMap[]{
+            constexpr FixedArray cullModeFlagsMap {
                 VK_CULL_MODE_NONE,
                 VK_CULL_MODE_FRONT_BIT,
                 VK_CULL_MODE_BACK_BIT,
                 VK_CULL_MODE_FRONT_AND_BACK,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( cullModeFlagsMap ) == CullMode_Count );
+            ZP_STATIC_ASSERT( cullModeFlagsMap.length() == CullMode_Count );
             return cullModeFlagsMap[ cullMode ];
         }
 
-        constexpr VkFrontFace Convert( FrontFaceMode frontFaceMode )
+        constexpr VkFrontFace Convert( const FrontFaceMode frontFaceMode )
         {
-            constexpr VkFrontFace frontFaceMap[]{
+            constexpr FixedArray frontFaceMap {
                 VK_FRONT_FACE_COUNTER_CLOCKWISE,
                 VK_FRONT_FACE_CLOCKWISE,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( frontFaceMap ) == FrontFaceMode_Count );
+            ZP_STATIC_ASSERT( frontFaceMap.length() == FrontFaceMode_Count );
             return frontFaceMap[ frontFaceMode ];
         }
 
-        constexpr VkSampleCountFlagBits Convert( SampleCount sampleCount )
+        constexpr VkSampleCountFlagBits Convert( const SampleCount sampleCount )
         {
-            constexpr FixedArray sampleCountFlagsMap{
+            constexpr FixedArray sampleCountFlagsMap {
                 VK_SAMPLE_COUNT_1_BIT,
                 VK_SAMPLE_COUNT_2_BIT,
                 VK_SAMPLE_COUNT_4_BIT,
@@ -382,9 +393,9 @@ namespace zp
             return sampleCountFlagsMap[ sampleCount ];
         }
 
-        constexpr VkCompareOp Convert( CompareOp compareOp )
+        constexpr VkCompareOp Convert( const CompareOp compareOp )
         {
-            constexpr FixedArray compareOpMap{
+            constexpr FixedArray compareOpMap {
                 VK_COMPARE_OP_NEVER,
                 VK_COMPARE_OP_EQUAL,
                 VK_COMPARE_OP_NOT_EQUAL,
@@ -399,9 +410,9 @@ namespace zp
             return compareOpMap[ compareOp ];
         }
 
-        constexpr VkStencilOp Convert( StencilOp stencilOp )
+        constexpr VkStencilOp Convert( const StencilOp stencilOp )
         {
-            constexpr FixedArray stencilOpMap{
+            constexpr FixedArray stencilOpMap {
                 VK_STENCIL_OP_KEEP,
                 VK_STENCIL_OP_ZERO,
                 VK_STENCIL_OP_REPLACE,
@@ -416,9 +427,9 @@ namespace zp
             return stencilOpMap[ stencilOp ];
         }
 
-        constexpr VkLogicOp Convert( LogicOp logicOp )
+        constexpr VkLogicOp Convert( const LogicOp logicOp )
         {
-            constexpr FixedArray logicOpMap{
+            constexpr FixedArray logicOpMap {
                 VK_LOGIC_OP_NO_OP,
                 VK_LOGIC_OP_CLEAR,
                 VK_LOGIC_OP_AND,
@@ -441,9 +452,9 @@ namespace zp
             return logicOpMap[ logicOp ];
         }
 
-        constexpr VkBlendOp Convert( BlendOp blendOp )
+        constexpr VkBlendOp Convert( const BlendOp blendOp )
         {
-            constexpr FixedArray blendOpMap{
+            constexpr FixedArray blendOpMap {
                 VK_BLEND_OP_ADD,
                 VK_BLEND_OP_SUBTRACT,
                 VK_BLEND_OP_REVERSE_SUBTRACT,
@@ -455,9 +466,9 @@ namespace zp
             return blendOpMap[ blendOp ];
         }
 
-        constexpr VkBlendFactor Convert( BlendFactor blendFactor )
+        constexpr VkBlendFactor Convert( const BlendFactor blendFactor )
         {
-            constexpr FixedArray blendFactorMap{
+            constexpr FixedArray blendFactorMap {
                 VK_BLEND_FACTOR_ZERO,
                 VK_BLEND_FACTOR_ONE,
                 VK_BLEND_FACTOR_SRC_COLOR,
@@ -483,9 +494,9 @@ namespace zp
             return blendFactorMap[ blendFactor ];
         }
 
-        constexpr VkColorComponentFlags Convert( ColorComponent colorComponent )
+        constexpr VkColorComponentFlags Convert( const ColorComponent colorComponent )
         {
-            VkColorComponentFlags colorComponentFlags{};
+            VkColorComponentFlags colorComponentFlags {};
 
             FlagBits( colorComponentFlags, colorComponent, ZP_COLOR_COMPONENT_R, VK_COLOR_COMPONENT_R_BIT );
             FlagBits( colorComponentFlags, colorComponent, ZP_COLOR_COMPONENT_G, VK_COLOR_COMPONENT_G_BIT );
@@ -495,9 +506,9 @@ namespace zp
             return colorComponentFlags;
         }
 
-        constexpr VkVertexInputRate Convert( VertexInputRate vertexInputRate )
+        constexpr VkVertexInputRate Convert( const VertexInputRate vertexInputRate )
         {
-            constexpr FixedArray vertexInputRateMap{
+            constexpr FixedArray vertexInputRateMap {
                 VK_VERTEX_INPUT_RATE_VERTEX,
                 VK_VERTEX_INPUT_RATE_INSTANCE
             };
@@ -506,9 +517,9 @@ namespace zp
             return vertexInputRateMap[ vertexInputRate ];
         }
 
-        constexpr VkFormat Convert( GraphicsFormat graphicsFormat )
+        constexpr VkFormat Convert( const GraphicsFormat graphicsFormat )
         {
-            constexpr FixedArray formatMap{
+            constexpr FixedArray formatMap {
                 VK_FORMAT_UNDEFINED,
 
                 // 8
@@ -616,9 +627,9 @@ namespace zp
             return formatMap[ graphicsFormat ];
         }
 
-        constexpr VkShaderStageFlagBits Convert( ShaderStage shaderStage )
+        constexpr VkShaderStageFlagBits Convert( const ShaderStage shaderStage )
         {
-            constexpr FixedArray shaderStageMap{
+            constexpr FixedArray shaderStageMap {
                 VK_SHADER_STAGE_VERTEX_BIT,
                 VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
                 VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
@@ -633,9 +644,9 @@ namespace zp
             return shaderStageMap[ shaderStage ];
         }
 
-        constexpr VkPipelineBindPoint Convert( PipelineBindPoint bindPoint )
+        constexpr VkPipelineBindPoint Convert( const PipelineBindPoint bindPoint )
         {
-            constexpr FixedArray bindPointMap{
+            constexpr FixedArray bindPointMap {
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                 VK_PIPELINE_BIND_POINT_COMPUTE,
             };
@@ -644,9 +655,9 @@ namespace zp
             return bindPointMap[ bindPoint ];
         }
 
-        constexpr VkImageType Convert( TextureDimension textureDimension )
+        constexpr VkImageType Convert( const TextureDimension textureDimension )
         {
-            constexpr FixedArray imageTypeMap{
+            constexpr FixedArray imageTypeMap {
                 VK_IMAGE_TYPE_1D,
                 VK_IMAGE_TYPE_1D,
                 VK_IMAGE_TYPE_2D,
@@ -660,9 +671,9 @@ namespace zp
             return imageTypeMap[ textureDimension ];
         }
 
-        constexpr VkImageViewType ConvertImageView( TextureDimension textureDimension )
+        constexpr VkImageViewType ConvertImageView( const TextureDimension textureDimension )
         {
-            constexpr FixedArray imageViewTypeMap{
+            constexpr FixedArray imageViewTypeMap {
                 VK_IMAGE_VIEW_TYPE_1D,
                 VK_IMAGE_VIEW_TYPE_1D_ARRAY,
                 VK_IMAGE_VIEW_TYPE_2D,
@@ -676,9 +687,9 @@ namespace zp
             return imageViewTypeMap[ textureDimension ];
         }
 
-        constexpr zp_bool_t IsTextureArray( TextureDimension textureDimension )
+        constexpr zp_bool_t IsTextureArray( const TextureDimension textureDimension )
         {
-            constexpr FixedArray imageTypeMap{
+            constexpr FixedArray imageTypeMap {
                 false,
                 true,
                 false,
@@ -692,9 +703,9 @@ namespace zp
             return imageTypeMap[ textureDimension ];
         }
 
-        constexpr VkImageUsageFlags Convert( TextureUsage usage )
+        constexpr VkImageUsageFlags Convert( const TextureUsage usage )
         {
-            VkImageUsageFlags imageUsage{};
+            VkImageUsageFlags imageUsage {};
 
             FlagBits( imageUsage, usage, ZP_TEXTURE_USAGE_TRANSFER_SRC, VK_IMAGE_USAGE_TRANSFER_SRC_BIT );
             FlagBits( imageUsage, usage, ZP_TEXTURE_USAGE_TRANSFER_DST, VK_IMAGE_USAGE_TRANSFER_DST_BIT );
@@ -707,9 +718,9 @@ namespace zp
             return imageUsage;
         }
 
-        constexpr VkImageAspectFlags ConvertAspect( TextureUsage textureUsage )
+        constexpr VkImageAspectFlags ConvertAspect( const TextureUsage textureUsage )
         {
-            VkImageAspectFlags aspectFlags{};
+            VkImageAspectFlags aspectFlags {};
 
             FlagBits( aspectFlags, textureUsage, ZP_TEXTURE_USAGE_COLOR_ATTACHMENT, VK_IMAGE_ASPECT_COLOR_BIT );
             FlagBits( aspectFlags, textureUsage, ZP_TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT );
@@ -717,9 +728,9 @@ namespace zp
             return aspectFlags;
         }
 
-        constexpr VkFilter Convert( FilterMode filterMode )
+        constexpr VkFilter Convert( const FilterMode filterMode )
         {
-            constexpr FixedArray filterMap{
+            constexpr FixedArray filterMap {
                 VK_FILTER_NEAREST,
                 VK_FILTER_LINEAR,
             };
@@ -728,9 +739,9 @@ namespace zp
             return filterMap[ filterMode ];
         }
 
-        constexpr VkSamplerMipmapMode Convert( MipmapMode mipmapMode )
+        constexpr VkSamplerMipmapMode Convert( const MipmapMode mipmapMode )
         {
-            constexpr FixedArray mipmapModeMap{
+            constexpr FixedArray mipmapModeMap {
                 VK_SAMPLER_MIPMAP_MODE_NEAREST,
                 VK_SAMPLER_MIPMAP_MODE_LINEAR,
             };
@@ -739,9 +750,9 @@ namespace zp
             return mipmapModeMap[ mipmapMode ];
         }
 
-        constexpr VkSamplerAddressMode Convert( SamplerAddressMode samplerAddressMode )
+        constexpr VkSamplerAddressMode Convert( const SamplerAddressMode samplerAddressMode )
         {
-            constexpr VkSamplerAddressMode samplerAddressModeMap[]{
+            constexpr FixedArray samplerAddressModeMap {
                 VK_SAMPLER_ADDRESS_MODE_REPEAT,
                 VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
                 VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -749,13 +760,13 @@ namespace zp
                 VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( samplerAddressModeMap ) == SamplerAddressMode_Count );
+            ZP_STATIC_ASSERT( samplerAddressModeMap.length() == SamplerAddressMode_Count );
             return samplerAddressModeMap[ samplerAddressMode ];
         }
 
-        constexpr VkBorderColor Convert( BorderColor borderColor )
+        constexpr VkBorderColor Convert( const BorderColor borderColor )
         {
-            constexpr VkBorderColor borderColorMap[]{
+            constexpr FixedArray borderColorMap {
                 VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
                 VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
                 VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
@@ -764,13 +775,13 @@ namespace zp
                 VK_BORDER_COLOR_INT_OPAQUE_WHITE,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( borderColorMap ) == BorderColor_Count );
+            ZP_STATIC_ASSERT( borderColorMap.length() == BorderColor_Count );
             return borderColorMap[ borderColor ];
         }
 
-        constexpr VkColorSpaceKHR Convert( ColorSpace colorSpace )
+        constexpr VkColorSpaceKHR Convert( const ColorSpace colorSpace )
         {
-            constexpr VkColorSpaceKHR colorSpaceMap[]{
+            constexpr FixedArray colorSpaceMap {
                 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
                 VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
                 VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
@@ -779,30 +790,30 @@ namespace zp
                 VK_COLOR_SPACE_BT2020_LINEAR_EXT
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( colorSpaceMap ) == ColorSpace_Count );
+            ZP_STATIC_ASSERT( colorSpaceMap.length() == ColorSpace_Count );
             return colorSpaceMap[ colorSpace ];
         }
 
-        constexpr VkAttachmentLoadOp Convert( AttachmentLoadOp loadOp )
+        constexpr VkAttachmentLoadOp Convert( const AttachmentLoadOp loadOp )
         {
-            constexpr VkAttachmentLoadOp loadOpMap[]{
+            constexpr FixedArray loadOpMap {
                 VK_ATTACHMENT_LOAD_OP_LOAD,
                 VK_ATTACHMENT_LOAD_OP_CLEAR,
                 VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( loadOpMap ) == AttachmentLoadOp_Count );
+            ZP_STATIC_ASSERT( loadOpMap.length() == AttachmentLoadOp_Count );
             return loadOpMap[ loadOp ];
         }
 
-        constexpr VkAttachmentStoreOp Convert( AttachmentStoreOp storeOp )
+        constexpr VkAttachmentStoreOp Convert( const AttachmentStoreOp storeOp )
         {
-            constexpr VkAttachmentStoreOp storeOpMap[]{
+            constexpr FixedArray storeOpMap {
                 VK_ATTACHMENT_STORE_OP_STORE,
                 VK_ATTACHMENT_STORE_OP_DONT_CARE,
             };
 
-            ZP_STATIC_ASSERT( ZP_ARRAY_SIZE( storeOpMap ) == AttachmentStoreOp_Count );
+            ZP_STATIC_ASSERT( storeOpMap.length() == AttachmentStoreOp_Count );
             return storeOpMap[ storeOp ];
         }
 
@@ -929,13 +940,13 @@ namespace zp
             const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
             void* pUserData )
         {
-            const zp_uint32_t messageMask = 0
+            constexpr zp_uint32_t kMessageMask = 0
 #if ZP_DEBUG
-                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
-#endif
-                                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+                                                 | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+#endif // ZP_DEBUG
+                                                 | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 
-            if( zp_flag32_any_set( messageSeverity, messageMask ) )
+            if( zp_flag32_any_set( messageSeverity, kMessageMask ) )
             {
                 if( zp_flag32_all_set( messageSeverity, VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT ) )
                 {
@@ -974,10 +985,10 @@ namespace zp
 
         void CmdBeginDebugLabel( VkCommandBuffer vkCommandBuffer, const char* name, const Color& color )
         {
-            const VkDebugUtilsLabelEXT debugUtilsLabel{
+            const VkDebugUtilsLabelEXT debugUtilsLabel {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
                 .pLabelName = name,
-                .color{ color.r, color.g, color.b, color.a },
+                .color { color.r, color.g, color.b, color.a },
             };
             vkCmdBeginDebugUtilsLabelEXT( vkCommandBuffer, &debugUtilsLabel );
         }
@@ -995,10 +1006,10 @@ namespace zp
 
         void CmdMarkDebugLabel( VkCommandBuffer vkCommandBuffer, const char* name, const Color& color )
         {
-            const VkDebugUtilsLabelEXT debugUtilsLabel{
+            const VkDebugUtilsLabelEXT debugUtilsLabel {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
                 .pLabelName = name,
-                .color{ color.r, color.g, color.b, color.a },
+                .color { color.r, color.g, color.b, color.a },
             };
             vkCmdInsertDebugUtilsLabelEXT( vkCommandBuffer, &debugUtilsLabel );
         }
@@ -1011,16 +1022,16 @@ namespace zp
 
         void SetDebugObjectName( VkInstance vkInstance, VkDevice vkDevice, VkObjectType objectType, void* objectHandle, const char* name )
         {
-            if( name != nullptr )
+            if( !zp_strempty( name ) )
             {
-                const VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt{
+                const VkDebugUtilsObjectNameInfoEXT debugUtilsObjectNameInfoExt {
                     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                     .objectType = objectType,
                     .objectHandle = reinterpret_cast<uint64_t>( objectHandle ),
                     .pObjectName = name,
                 };
 
-                HR( vkSetDebugUtilsObjectNameEXT( vkDevice, &debugUtilsObjectNameInfoExt ) );
+                VK_HR( vkSetDebugUtilsObjectNameEXT( vkDevice, &debugUtilsObjectNameInfoExt ) );
             }
         }
 
@@ -1045,16 +1056,16 @@ namespace zp
 #else // !ZP_DEBUG
 #define SetDebugObjectName( ... ) (void)0
 #define CmdBeginDebugLabel( ... ) (void)0
-#define CmdEndDebugLabel( ... ) (void)0
-#define CmdMarkDebugLabel( ... ) (void)0
+#define CmdEndDebugLabel( ... )   (void)0
+#define CmdMarkDebugLabel( ... )  (void)0
 #endif // ZP_DEBUG
 
 #pragma endregion
 
 #pragma region Physical Device Utils
-        enum VenderIDs
+        enum VendorIDs
         {
-            kNVidiaVenderID = 4318,
+            kNVidiaVendorID = 4318,
         };
 
         void PrintPhysicalDeviceInfo( const VkPhysicalDeviceProperties& properties, const VkPhysicalDeviceMemoryProperties& memoryProperties )
@@ -1099,7 +1110,7 @@ namespace zp
             }
             info.append( ' ' );
 
-            if( properties.vendorID == kNVidiaVenderID ) // NVidia
+            if( properties.vendorID == kNVidiaVendorID ) // NVidia
             {
                 info.appendFormat( "%d.%d.%d.%d",
                     ( properties.driverVersion >> 22 ) & 0x03FFU,
@@ -1138,7 +1149,7 @@ namespace zp
         {
             zp_bool_t isSuitable = true;
 
-            VkPhysicalDeviceProperties2 physicalDeviceProperties{
+            VkPhysicalDeviceProperties2 physicalDeviceProperties {
                 .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
             };
             vkGetPhysicalDeviceProperties2( physicalDevice, &physicalDeviceProperties );
@@ -1161,10 +1172,10 @@ namespace zp
             if( surface != VK_NULL_HANDLE )
             {
                 uint32_t formatCount = 0;
-                HR( vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE ) );
+                VK_HR( vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, VK_NULL_HANDLE ) );
 
                 uint32_t presentModeCount = 0;
-                HR( vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE ) );
+                VK_HR( vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentModeCount, VK_NULL_HANDLE ) );
 
                 isSuitable &= formatCount != 0 && presentModeCount != 0;
             }
@@ -1325,7 +1336,7 @@ namespace zp
                 const VkPipelineStageFlags2 srcStage = MakePipelineStageAccess( srcAccess );
                 const VkPipelineStageFlags2 dstStage = MakePipelineStageAccess( dstAccess );
 
-                const VkBufferMemoryBarrier2 memoryBarrier{
+                const VkBufferMemoryBarrier2 memoryBarrier {
                     .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
                     .srcStageMask = srcStage,
                     .srcAccessMask = srcAccess,
@@ -1338,7 +1349,7 @@ namespace zp
                     .size = size,
                 };
 
-                const VkDependencyInfo dependencyInfo{
+                const VkDependencyInfo dependencyInfo {
                     .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                     .bufferMemoryBarrierCount = 1,
                     .pBufferMemoryBarriers = &memoryBarrier,
@@ -1365,7 +1376,7 @@ namespace zp
             const auto [ srcStage, srcAccess ] = MakePipelineStageAccess( srcLayout );
             const auto [ dstStage, dstAccess ] = MakePipelineStageAccess( dstLayout );
 
-            const VkImageMemoryBarrier2 imageMemoryBarrier{
+            const VkImageMemoryBarrier2 imageMemoryBarrier {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .srcStageMask = srcStage,
                 .srcAccessMask = srcAccess,
@@ -1379,7 +1390,7 @@ namespace zp
                 .subresourceRange = subresourceRange,
             };
 
-            const VkDependencyInfo dependencyInfo{
+            const VkDependencyInfo dependencyInfo {
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                 .imageMemoryBarrierCount = 1,
                 .pImageMemoryBarriers = &imageMemoryBarrier,
@@ -1418,7 +1429,7 @@ namespace zp
                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .image = texture.vkImage,
-                        .subresourceRange{
+                        .subresourceRange {
                             .aspectMask = subresourceRange.aspectMask,
                             .baseMipLevel = mip,
                             .levelCount = maxMip - mip,
@@ -1450,7 +1461,7 @@ namespace zp
                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .image = texture.vkImage,
-                        .subresourceRange{
+                        .subresourceRange {
                             .aspectMask = subresourceRange.aspectMask,
                             .baseMipLevel = currentMip,
                             .levelCount = mip - currentMip,
@@ -1480,7 +1491,7 @@ namespace zp
                     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                     .image = texture.vkImage,
-                    .subresourceRange{
+                    .subresourceRange {
                         .aspectMask = subresourceRange.aspectMask,
                         .baseMipLevel = currentMip,
                         .levelCount = maxMip - currentMip,
@@ -1493,7 +1504,7 @@ namespace zp
 
             if( !imageMemoryBarriers.isEmpty() )
             {
-                const VkDependencyInfo dependencyInfo{
+                const VkDependencyInfo dependencyInfo {
                     .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                     .imageMemoryBarrierCount = static_cast<zp_uint32_t>( imageMemoryBarriers.length() ),
                     .pImageMemoryBarriers = imageMemoryBarriers.data(),
@@ -1515,50 +1526,50 @@ namespace zp
 
         VkCommandBuffer RequestSingleUseCommandBuffer( VkDevice device, VkCommandPool cmdPool )
         {
-            const VkCommandBufferAllocateInfo allocateInfo{
+            const VkCommandBufferAllocateInfo allocateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                 .commandPool = cmdPool,
                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 .commandBufferCount = 1,
             };
 
-            VkCommandBuffer cmdBuffer{};
-            HR( vkAllocateCommandBuffers( device, &allocateInfo, &cmdBuffer ) );
+            VkCommandBuffer cmdBuffer {};
+            VK_HR( vkAllocateCommandBuffers( device, &allocateInfo, &cmdBuffer ) );
 
-            const VkCommandBufferBeginInfo beginInfo{
+            const VkCommandBufferBeginInfo beginInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             };
 
-            HR( vkBeginCommandBuffer( cmdBuffer, &beginInfo ) );
+            VK_HR( vkBeginCommandBuffer( cmdBuffer, &beginInfo ) );
 
             return cmdBuffer;
         }
 
         void ReleaseSingleUseCommandBuffer( VkDevice device, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkQueue queue, const VkAllocationCallbacks* allocationCallbacks )
         {
-            HR( vkEndCommandBuffer( cmdBuffer ) );
+            VK_HR( vkEndCommandBuffer( cmdBuffer ) );
 
-            const VkFenceCreateInfo fenceCreateInfo{
+            const VkFenceCreateInfo fenceCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
             };
 
-            VkFence fence{};
-            HR( vkCreateFence( device, &fenceCreateInfo, allocationCallbacks, &fence ) );
+            VkFence fence {};
+            VK_HR( vkCreateFence( device, &fenceCreateInfo, allocationCallbacks, &fence ) );
 
-            const VkCommandBufferSubmitInfo cmdBufferInfo{
+            const VkCommandBufferSubmitInfo cmdBufferInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
                 .commandBuffer = cmdBuffer
             };
 
-            const VkSubmitInfo2 submitInfo{
+            const VkSubmitInfo2 submitInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                 .commandBufferInfoCount = 1,
                 .pCommandBufferInfos = &cmdBufferInfo
             };
 
-            HR( vkQueueSubmit2( queue, 1, &submitInfo, fence ) );
-            HR( vkWaitForFences( device, 1, &fence, VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
+            VK_HR( vkQueueSubmit2( queue, 1, &submitInfo, fence ) );
+            VK_HR( vkWaitForFences( device, 1, &fence, VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
 
             vkDestroyFence( device, fence, allocationCallbacks );
             vkFreeCommandBuffers( device, cmdPool, 1, &cmdBuffer );
@@ -1926,10 +1937,14 @@ namespace zp
         };
 
         VulkanContext::VulkanContext()
-            : m_delayedDestroyed( 8, MemoryLabels::Graphics ), m_vkBuffers( 16, MemoryLabels::Graphics )
-              //, m_vkFreeBuffers( 16, MemoryLabels::Graphics )
-              ,
-              m_vkFreeBuffer( ~0U ), m_vkRenderTargets( 8, MemoryLabels::Graphics ), m_vkFreeRenderTargets( 8, MemoryLabels::Graphics ), m_vkPipelines( 16, MemoryLabels::Graphics ), m_vkFreePipelines( 16, MemoryLabels::Graphics )
+            : m_delayedDestroyed( 8, MemoryLabels::Graphics )
+            , m_vkBuffers( 16, MemoryLabels::Graphics )
+            //, m_vkFreeBuffers( 16, MemoryLabels::Graphics )
+            , m_vkFreeBuffer( ~0U )
+            , m_vkRenderTargets( 8, MemoryLabels::Graphics )
+            , m_vkFreeRenderTargets( 8, MemoryLabels::Graphics )
+            , m_vkPipelines( 16, MemoryLabels::Graphics )
+            , m_vkFreePipelines( 16, MemoryLabels::Graphics )
         {
         }
 
@@ -1952,39 +1967,9 @@ namespace zp
                 .pfnInternalFree = FreeNotificationCallback,
             };
 
-            HR( volkInitialize() );
+            VK_HR( volkInitialize() );
 
-            //
-            if( 0 )
-            {
-                zp_uint32_t count{};
-                vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr );
-
-                Vector<VkExtensionProperties> availableInstanceExtensionProperties( count, MemoryLabels::Temp );
-                availableInstanceExtensionProperties.resize_unsafe( count );
-
-                vkEnumerateInstanceExtensionProperties( nullptr, &count, availableInstanceExtensionProperties.data() );
-
-                for( const auto& ext : availableInstanceExtensionProperties )
-                {
-                    zp_printfln( "%s: %d", ext.extensionName, ext.specVersion );
-                }
-            }
-
-            // TODO: filter out available extensions with requested extensions
-            // Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
-
-            const FixedArray kInstanceExtensionNames{
-                VK_KHR_SURFACE_EXTENSION_NAME,
-#if ZP_PLATFORM_WINDOWS
-                VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#endif
-#if ZP_DEBUG
-                VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-#endif
-            };
-
-            const FixedArray kDeviceExtensions{
+            const FixedArray kDeviceExtensions {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                 VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
                 VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
@@ -2003,103 +1988,140 @@ namespace zp
                 VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
                 VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
             };
+#pragma region Create Instance
+            // Create Instance
+            {
+                ZP_PROFILE_CPU_BLOCK_E( Create Instance );
 
-            // app info
-            const VkApplicationInfo applicationInfo{
-                .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                .pApplicationName = graphicsDeviceDesc.appName.empty() ? "ZeroPoint Application" : graphicsDeviceDesc.appName.c_str(),
-                .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
-                .pEngineName = "ZeroPoint",
-                .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
-                .apiVersion = ZP_VULKAN_API_VERSION,
-            };
+                if( 1 )
+                {
+                    zp_uint32_t count {};
+                    VK_HR( vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr ) );
 
-            // create instance
-            VkInstanceCreateInfo instanceCreateInfo{
-                .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-                .pApplicationInfo = &applicationInfo,
-                .enabledExtensionCount = kInstanceExtensionNames.length(),
-                .ppEnabledExtensionNames = kInstanceExtensionNames.data(),
-            };
+                    Vector<VkExtensionProperties> availableInstanceExtensionProperties( count, MemoryLabels::Temp );
+                    availableInstanceExtensionProperties.resize_unsafe( count );
+
+                    vkEnumerateInstanceExtensionProperties( nullptr, &count, availableInstanceExtensionProperties.data() );
+
+                    for( const auto& ext : availableInstanceExtensionProperties )
+                    {
+                        zp_printfln( "%s: %d", ext.extensionName, ext.specVersion );
+                    }
+                }
+
+                // TODO: filter out available extensions with requested extensions
+                // Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
+
+                const FixedArray kInstanceExtensionNames {
+                    VK_KHR_SURFACE_EXTENSION_NAME,
+                    VK_KHR_DISPLAY_EXTENSION_NAME,
+#if ZP_PLATFORM_WINDOWS
+                    VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
+#if ZP_DEBUG
+                    VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
+                };
+
+
+                // app info
+                const VkApplicationInfo applicationInfo {
+                    .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                    .pApplicationName = graphicsDeviceDesc.appName.empty() ? "ZeroPoint Application" : graphicsDeviceDesc.appName.c_str(),
+                    .applicationVersion = VK_MAKE_VERSION( 1, 0, 0 ),
+                    .pEngineName = "ZeroPoint",
+                    .engineVersion = VK_MAKE_VERSION( ZP_VERSION_MAJOR, ZP_VERSION_MINOR, ZP_VERSION_PATCH ),
+                    .apiVersion = ZP_VULKAN_API_VERSION,
+                };
+
+                // create instance
+                VkInstanceCreateInfo instanceCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                    .pApplicationInfo = &applicationInfo,
+                    .enabledExtensionCount = kInstanceExtensionNames.length(),
+                    .ppEnabledExtensionNames = kInstanceExtensionNames.data(),
+                };
 
 #if ZP_DEBUG
-            const char* VK_LAYER_KHRONOS_validation = ZP_NAMEOF( VK_LAYER_KHRONOS_validation );
+                const char* VK_LAYER_KHRONOS_validation = ZP_NAMEOF( VK_LAYER_KHRONOS_validation );
 
-            const FixedArray kValidationLayers{
-                VK_LAYER_KHRONOS_validation,
-            };
+                const FixedArray kValidationLayers {
+                    VK_LAYER_KHRONOS_validation,
+                };
 
-            instanceCreateInfo.enabledLayerCount = static_cast<zp_uint32_t>( kValidationLayers.length() );
-            instanceCreateInfo.ppEnabledLayerNames = kValidationLayers.data();
+                instanceCreateInfo.enabledLayerCount = static_cast<zp_uint32_t>( kValidationLayers.length() );
+                instanceCreateInfo.ppEnabledLayerNames = kValidationLayers.data();
 
-            const VkBool32 validate_core = VK_TRUE;
-            const VkBool32 validate_sync = VK_TRUE;
-            const VkBool32 thread_safety = VK_TRUE;
-            const VkBool32 validate_best_practices = VK_TRUE;
-            const VkBool32 validate_best_practices_nvidia = VK_TRUE;
-            // const FixedArray debug_action { "VK_DBG_LAYER_ACTION_LOG_MSG" };
-            const FixedArray report_flags{ "info", "warn", "perf", "error", "debug" };
-            const VkBool32 enable_message_limit = VK_TRUE;
-            const int32_t duplicate_message_limit = 3;
+                const VkBool32 validate_core = VK_TRUE;
+                const VkBool32 validate_sync = VK_TRUE;
+                const VkBool32 thread_safety = VK_TRUE;
+                const VkBool32 validate_best_practices = VK_TRUE;
+                const VkBool32 validate_best_practices_nvidia = VK_TRUE;
+                // const FixedArray debug_action { "VK_DBG_LAYER_ACTION_LOG_MSG" };
+                const FixedArray report_flags { "info", "warn", "perf", "error", "debug" };
+                const VkBool32 enable_message_limit = VK_TRUE;
+                const int32_t duplicate_message_limit = 3;
 
-            const FixedArray layerSettings{
-                VkLayerSettingEXT{
-                    .pLayerName = VK_LAYER_KHRONOS_validation,
-                    .pSettingName = ZP_NAMEOF( validate_core ),
-                    .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-                    .valueCount = 1,
-                    .pValues = &validate_core,
-                },
-                VkLayerSettingEXT{
-                    .pLayerName = VK_LAYER_KHRONOS_validation,
-                    .pSettingName = ZP_NAMEOF( validate_best_practices ),
-                    .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-                    .valueCount = 1,
-                    .pValues = &validate_best_practices,
-                },
-                VkLayerSettingEXT{
-                    .pLayerName = VK_LAYER_KHRONOS_validation,
-                    .pSettingName = ZP_NAMEOF( validate_best_practices_nvidia ),
-                    .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-                    .valueCount = 1,
-                    .pValues = &validate_best_practices_nvidia,
-                },
-            };
+                const FixedArray layerSettings {
+                    VkLayerSettingEXT {
+                        .pLayerName = VK_LAYER_KHRONOS_validation,
+                        .pSettingName = ZP_NAMEOF( validate_core ),
+                        .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+                        .valueCount = 1,
+                        .pValues = &validate_core,
+                    },
+                    VkLayerSettingEXT {
+                        .pLayerName = VK_LAYER_KHRONOS_validation,
+                        .pSettingName = ZP_NAMEOF( validate_best_practices ),
+                        .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+                        .valueCount = 1,
+                        .pValues = &validate_best_practices,
+                    },
+                    VkLayerSettingEXT {
+                        .pLayerName = VK_LAYER_KHRONOS_validation,
+                        .pSettingName = ZP_NAMEOF( validate_best_practices_nvidia ),
+                        .type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+                        .valueCount = 1,
+                        .pValues = &validate_best_practices_nvidia,
+                    },
+                };
 
-            VkLayerSettingsCreateInfoEXT layerSettingsCreateInfo{
-                .sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
-                .settingCount = static_cast<zp_uint32_t>( layerSettings.length() ),
-                .pSettings = layerSettings.data(),
-            };
-            pNextPushFront( instanceCreateInfo, layerSettingsCreateInfo );
+                VkLayerSettingsCreateInfoEXT layerSettingsCreateInfo {
+                    .sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
+                    .settingCount = static_cast<zp_uint32_t>( layerSettings.length() ),
+                    .pSettings = layerSettings.data(),
+                };
+                pNextPushFront( instanceCreateInfo, layerSettingsCreateInfo );
 #endif // ZP_DEBUG
 
 #if ZP_DEBUG
-            // add debug info to create instance
-            VkDebugUtilsMessengerCreateInfoEXT createInstanceDebugMessengerInfo{
-                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-                .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-                .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-                .pfnUserCallback = DebugCallback,
-                .pUserData = nullptr,
-            };
+                // add debug info to create instance
+                VkDebugUtilsMessengerCreateInfoEXT createInstanceDebugMessengerInfo {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                    .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                    .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                    .pfnUserCallback = DebugCallback,
+                    .pUserData = nullptr,
+                };
 
-            // TODO: does this need to be here twice?
-            pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
+                // TODO: does this need to be here twice?
+                pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
 #endif // ZP_DEBUG
 
-            HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
+                VK_HR( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance ) );
 
-            volkLoadInstanceOnly( m_vkInstance );
+                volkLoadInstanceOnly( m_vkInstance );
+            }
+#pragma endregion
 
             // create debug messenger
             if constexpr( ZP_DEBUG )
             {
-                const VkDebugUtilsMessengerCreateInfoEXT createDebugMessengerInfo{
+                const VkDebugUtilsMessengerCreateInfoEXT createDebugMessengerInfo {
                     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
                     .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -2111,7 +2133,7 @@ namespace zp
                     .pUserData = nullptr, // Optional
                 };
 
-                HR( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger ) );
+                VK_HR( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger ) );
                 // HR( CreateDebugUtilsMessengerEXT( m_vkInstance, &createDebugMessengerInfo, nullptr, &m_vkDebugMessenger ));
             }
 
@@ -2119,30 +2141,29 @@ namespace zp
             {
 #if ZP_PLATFORM_WINDOWS
                 HWND hWnd = static_cast<HWND>( graphicsDeviceDesc.windowHandle.handle );
-                HINSTANCE hInstance = nullptr; // reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
+                HINSTANCE hInstance = reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
 
                 // create surface
-                const VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo{
+                const VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
                     .hinstance = hInstance,
                     .hwnd = hWnd,
                 };
-
-                HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface ) );
+                VK_HR( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface ) );
 #else
-#error "Platform not defined to create VkSurface"
+#error Unsupported platform
 #endif
             }
 
             // select a physical device
             {
                 uint32_t physicalDeviceCount = 0;
-                HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, VK_NULL_HANDLE ) );
+                VK_HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, VK_NULL_HANDLE ) );
 
                 Vector<VkPhysicalDevice> physicalDevices( physicalDeviceCount, MemoryLabels::Temp );
                 physicalDevices.resize_unsafe( physicalDeviceCount );
 
-                HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, physicalDevices.data() ) );
+                VK_HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, physicalDevices.data() ) );
 
                 for( const VkPhysicalDevice& physicalDevice : physicalDevices )
                 {
@@ -2158,7 +2179,7 @@ namespace zp
 
             // get physical device info
             {
-                VkPhysicalDeviceMemoryProperties2 physicalDeviceMemoryProperties{
+                VkPhysicalDeviceMemoryProperties2 physicalDeviceMemoryProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
                 };
                 vkGetPhysicalDeviceMemoryProperties2( m_vkPhysicalDevice, &physicalDeviceMemoryProperties );
@@ -2168,7 +2189,7 @@ namespace zp
 
             // create local device and queue families
             {
-                const QueueInfo kDefaultQueueInfo{
+                const QueueInfo kDefaultQueueInfo {
                     .familyIndex = VK_QUEUE_FAMILY_IGNORED,
                     .queueIndex = 0,
                     .vkQueue = VK_NULL_HANDLE
@@ -2202,7 +2223,7 @@ namespace zp
                         m_queues.graphics.familyIndex = i;
 
                         VkBool32 presentSupport = VK_FALSE;
-                        HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
+                        VK_HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
 
                         if( m_queues.present.familyIndex == VK_QUEUE_FAMILY_IGNORED && presentSupport == VK_TRUE )
                         {
@@ -2266,42 +2287,42 @@ namespace zp
 
                 //
                 uint32_t extensionCount = 0;
-                HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE ) );
+                VK_HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, VK_NULL_HANDLE ) );
 
                 Vector<VkExtensionProperties> availableDeviceExtensions( extensionCount, MemoryLabels::Temp );
                 availableDeviceExtensions.resize_unsafe( extensionCount );
 
-                HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, availableDeviceExtensions.data() ) );
+                VK_HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, availableDeviceExtensions.data() ) );
 
                 //
                 Vector<const char*> supportedExtensions( kDeviceExtensions.length(), MemoryLabels::Temp );
 
-                VkPhysicalDeviceFeatures2 deviceFeatures{
+                VkPhysicalDeviceFeatures2 deviceFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
                 };
 
 #if ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_1
-                VkPhysicalDeviceVulkan11Features deviceFeaturesVulkan11{
+                VkPhysicalDeviceVulkan11Features deviceFeaturesVulkan11 {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
                 };
                 pNextPushFront( deviceFeatures, deviceFeaturesVulkan11 );
 #endif // ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_1
 
 #if ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_2
-                VkPhysicalDeviceVulkan12Features deviceFeaturesVulkan12{
+                VkPhysicalDeviceVulkan12Features deviceFeaturesVulkan12 {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
                 };
                 pNextPushFront( deviceFeatures, deviceFeaturesVulkan12 );
 #endif // ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_2
 
 #if ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_3
-                VkPhysicalDeviceVulkan13Features deviceFeaturesVulkan13{
+                VkPhysicalDeviceVulkan13Features deviceFeaturesVulkan13 {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
                 };
                 pNextPushFront( deviceFeatures, deviceFeaturesVulkan13 );
 #endif // ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_3
 
-                VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features{
+                VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
                 };
 
@@ -2311,7 +2332,7 @@ namespace zp
                     supportedExtensions.pushBack( VK_KHR_MAINTENANCE_5_EXTENSION_NAME );
                 }
 
-                VkPhysicalDeviceMaintenance6FeaturesKHR maintenance6Features{
+                VkPhysicalDeviceMaintenance6FeaturesKHR maintenance6Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES_KHR,
                 };
 
@@ -2322,7 +2343,7 @@ namespace zp
                 }
 
 #if ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
-                VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures{
+                VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
                 };
 
@@ -2334,7 +2355,7 @@ namespace zp
 #endif // ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
 
 #if ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
-                VkPhysicalDeviceExtendedDynamicState2FeaturesEXT extendedDynamicState2Features{
+                VkPhysicalDeviceExtendedDynamicState2FeaturesEXT extendedDynamicState2Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT,
                 };
 
@@ -2345,7 +2366,7 @@ namespace zp
                 }
 #endif // ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
 
-                VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extendedDynamicState3Features{
+                VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extendedDynamicState3Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT,
                 };
 
@@ -2365,7 +2386,7 @@ namespace zp
                     supportedExtensions.pushBack( VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME );
                 }
 
-                VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphicsPipelineLibraryFeatures{
+                VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphicsPipelineLibraryFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT,
                 };
 
@@ -2375,7 +2396,7 @@ namespace zp
                     supportedExtensions.pushBack( VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME );
                 }
 
-                VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableDeviceLocalMemoryFeatures{
+                VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableDeviceLocalMemoryFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT
                 };
 
@@ -2385,7 +2406,7 @@ namespace zp
                     supportedExtensions.pushBack( VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME );
                 }
 
-                VkPhysicalDeviceMemoryPriorityFeaturesEXT memoryPriorityFeatures{
+                VkPhysicalDeviceMemoryPriorityFeaturesEXT memoryPriorityFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT,
                 };
 
@@ -2407,16 +2428,16 @@ namespace zp
                 ZP_ASSERT( memoryPriorityFeatures.memoryPriority );
 
                 //
-                VkPhysicalDeviceProperties2 deviceProperties{
+                VkPhysicalDeviceProperties2 deviceProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
                 };
 
-                VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties{
+                VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR,
                 };
                 pNextPushFront( deviceProperties, pushDescriptorProperties );
 
-                VkPhysicalDeviceGraphicsPipelineLibraryPropertiesEXT graphicsPipelineLibraryProperties{
+                VkPhysicalDeviceGraphicsPipelineLibraryPropertiesEXT graphicsPipelineLibraryProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_PROPERTIES_EXT,
                 };
                 pNextPushFront( deviceProperties, graphicsPipelineLibraryProperties );
@@ -2426,7 +2447,7 @@ namespace zp
                 PrintPhysicalDeviceInfo( deviceProperties.properties, m_vkPhysicalDeviceMemoryProperties );
 
                 //
-                const VkDeviceCreateInfo localDeviceCreateInfo{
+                const VkDeviceCreateInfo localDeviceCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
                     .pNext = &deviceFeatures,
                     .queueCreateInfoCount = static_cast<uint32_t>( deviceQueueCreateInfos.length() ),
@@ -2435,7 +2456,7 @@ namespace zp
                     .ppEnabledExtensionNames = supportedExtensions.data(),
                 };
 
-                HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
+                VK_HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
 
                 volkLoadDevice( m_vkLocalDevice );
 
@@ -2454,15 +2475,15 @@ namespace zp
             // create pipeline cache
             {
                 // TODO: load cached pipeline cache
-                const Memory loadedPipelineCache{};
+                const Memory loadedPipelineCache {};
 
-                const VkPipelineCacheCreateInfo pipelineCacheCreateInfo{
+                const VkPipelineCacheCreateInfo pipelineCacheCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
                     .initialDataSize = loadedPipelineCache.size(),
                     .pInitialData = loadedPipelineCache.ptr(),
                 };
 
-                HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
+                VK_HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
 
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkPipelineCache, "Pipeline Cache" );
             }
@@ -2487,7 +2508,7 @@ namespace zp
                 };
                 // clang-format on
 
-                const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
+                const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                     .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
                     .maxSets = 128,
@@ -2495,33 +2516,33 @@ namespace zp
                     .pPoolSizes = poolSizes.data(),
                 };
 
-                HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
+                VK_HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
 
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkDescriptorPool, "Descriptor Pool" );
             }
 
             // create transient command pool
             {
-                const VkCommandPoolCreateInfo transientCommandPoolCreateInfo{
+                const VkCommandPoolCreateInfo transientCommandPoolCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                     .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
                     .queueFamilyIndex = m_queues.graphics.familyIndex,
                 };
 
-                HR( vkCreateCommandPool( m_vkLocalDevice, &transientCommandPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkTransientCommandPool ) );
+                VK_HR( vkCreateCommandPool( m_vkLocalDevice, &transientCommandPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkTransientCommandPool ) );
 
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkTransientCommandPool, "Transient Command Pool" );
             }
 
             // create per frame command pools
             {
-                const VkCommandPoolCreateInfo poolCreateInfoGraphics{
+                const VkCommandPoolCreateInfo poolCreateInfoGraphics {
                     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                     .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                     .queueFamilyIndex = m_queues.graphics.familyIndex,
                 };
 
-                const VkCommandPoolCreateInfo poolCreateInfoCompute{
+                const VkCommandPoolCreateInfo poolCreateInfoCompute {
                     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                     .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                     .queueFamilyIndex = m_queues.compute.familyIndex,
@@ -2531,17 +2552,17 @@ namespace zp
                 {
                     FrameResources& frameResources = m_frameResources[ i ];
 
-                    HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfoGraphics, &m_vkAllocationCallbacks, &frameResources.vkCommandPools[ ZP_RENDER_QUEUE_GRAPHICS ] ) );
+                    VK_HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfoGraphics, &m_vkAllocationCallbacks, &frameResources.vkCommandPools[ ZP_RENDER_QUEUE_GRAPHICS ] ) );
                     SetDebugObjectName( m_vkInstance, m_vkLocalDevice, frameResources.vkCommandPools[ ZP_RENDER_QUEUE_GRAPHICS ], "Graphics Command Pool %d", i );
 
-                    HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfoCompute, &m_vkAllocationCallbacks, &frameResources.vkCommandPools[ ZP_RENDER_QUEUE_COMPUTE ] ) );
+                    VK_HR( vkCreateCommandPool( m_vkLocalDevice, &poolCreateInfoCompute, &m_vkAllocationCallbacks, &frameResources.vkCommandPools[ ZP_RENDER_QUEUE_COMPUTE ] ) );
                     SetDebugObjectName( m_vkInstance, m_vkLocalDevice, frameResources.vkCommandPools[ ZP_RENDER_QUEUE_COMPUTE ], "Compute Command Pool %d", i );
                 }
             }
 
             // create staging buffers
             {
-                const VkBufferCreateInfo stagingBufferCreateInfo{
+                const VkBufferCreateInfo stagingBufferCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                     .flags = 0,
                     .size = graphicsDeviceDesc.stagingBufferSize,
@@ -2553,29 +2574,29 @@ namespace zp
 
                 for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
                 {
-                    VkBuffer vkBuffer{};
-                    HR( vkCreateBuffer( m_vkLocalDevice, &stagingBufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
+                    VkBuffer vkBuffer {};
+                    VK_HR( vkCreateBuffer( m_vkLocalDevice, &stagingBufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
 
-                    VkMemoryRequirements memoryRequirements{};
+                    VkMemoryRequirements memoryRequirements {};
                     vkGetBufferMemoryRequirements( m_vkLocalDevice, vkBuffer, &memoryRequirements );
 
-                    const VkMemoryAllocateInfo memoryAllocateInfo{
+                    const VkMemoryAllocateInfo memoryAllocateInfo {
                         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                         .allocationSize = memoryRequirements.size,
                         .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
                     };
 
                     // TODO: allocate single block of memory for all staging buffers to use?
-                    VkDeviceMemory vkDeviceMemory{};
-                    HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+                    VkDeviceMemory vkDeviceMemory {};
+                    VK_HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
                     // TODO: set better priorities
-                    vkSetDeviceMemoryPriorityEXT(m_vkLocalDevice, vkDeviceMemory, 1);
+                    vkSetDeviceMemoryPriorityEXT( m_vkLocalDevice, vkDeviceMemory, 1 );
 
-                    HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
+                    VK_HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
                     SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Staging Buffer %d", i );
 
-                    m_frameResources[ i ].stagingBuffer = StagingBuffer{
+                    m_frameResources[ i ].stagingBuffer = StagingBuffer {
                         .vkBuffer = vkBuffer,
                         .vkDeviceMemory = vkDeviceMemory,
                         .position = 0,
@@ -2589,20 +2610,20 @@ namespace zp
 
             // create bindless setup
             {
-                const FixedArray bindings{
-                    VkDescriptorSetLayoutBinding{
+                const FixedArray bindings {
+                    VkDescriptorSetLayoutBinding {
                         .binding = 0,
                         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                         .descriptorCount = 16,
                         .stageFlags = VK_SHADER_STAGE_ALL,
                     },
-                    VkDescriptorSetLayoutBinding{
+                    VkDescriptorSetLayoutBinding {
                         .binding = 1,
                         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                         .descriptorCount = 64,
                         .stageFlags = VK_SHADER_STAGE_ALL,
                     },
-                    VkDescriptorSetLayoutBinding{
+                    VkDescriptorSetLayoutBinding {
                         .binding = 2,
                         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                         .descriptorCount = 64,
@@ -2610,20 +2631,20 @@ namespace zp
                     },
                 };
 
-                const FixedArray flags{
-                    VkDescriptorBindingFlags{ VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
-                    VkDescriptorBindingFlags{ VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
-                    VkDescriptorBindingFlags{ VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
+                const FixedArray flags {
+                    VkDescriptorBindingFlags { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
+                    VkDescriptorBindingFlags { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
+                    VkDescriptorBindingFlags { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT },
                 };
                 ZP_STATIC_ASSERT( bindings.length() == flags.length() );
 
-                const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+                const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
                     .bindingCount = static_cast<zp_uint32_t>( flags.length() ),
                     .pBindingFlags = flags.data(),
                 };
 
-                const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+                const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                     .pNext = &bindingFlagsCreateInfo,
                     .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
@@ -2631,7 +2652,7 @@ namespace zp
                     .pBindings = bindings.data(),
                 };
 
-                HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &descriptorSetLayoutCreateInfo, &m_vkAllocationCallbacks, &m_vkBindlessLayout ) );
+                VK_HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &descriptorSetLayoutCreateInfo, &m_vkAllocationCallbacks, &m_vkBindlessLayout ) );
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkBindlessLayout, "Bindless Layout" );
 
                 constexpr FixedArray poolSizes {
@@ -2641,7 +2662,7 @@ namespace zp
                     }
                 };
 
-                const VkDescriptorPoolCreateInfo poolInfo{
+                const VkDescriptorPoolCreateInfo poolInfo {
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                     .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
                     .maxSets = 512,
@@ -2649,10 +2670,10 @@ namespace zp
                     .pPoolSizes = poolSizes.data(),
                 };
 
-                HR( vkCreateDescriptorPool( m_vkLocalDevice, &poolInfo, &m_vkAllocationCallbacks, &m_vkBindlessDescriptorPool ) );
+                VK_HR( vkCreateDescriptorPool( m_vkLocalDevice, &poolInfo, &m_vkAllocationCallbacks, &m_vkBindlessDescriptorPool ) );
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_vkBindlessDescriptorPool, "Bindless Descriptor Pool" );
 
-                const VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
+                const VkDescriptorSetAllocateInfo descriptorSetAllocateInfo {
                     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
                     .descriptorPool = m_vkBindlessDescriptorPool,
                     .descriptorSetCount = 1,
@@ -2661,7 +2682,7 @@ namespace zp
 
                 for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
                 {
-                    HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &m_frameResources[ i ].vkBindlessDescriptorSet ) );
+                    VK_HR( vkAllocateDescriptorSets( m_vkLocalDevice, &descriptorSetAllocateInfo, &m_frameResources[ i ].vkBindlessDescriptorSet ) );
                     SetDebugObjectName( m_vkInstance, m_vkLocalDevice, m_frameResources[ i ].vkBindlessDescriptorSet, "Bindless Descriptor Set %d", i );
                 }
             };
@@ -2673,7 +2694,7 @@ namespace zp
 
             ZP_ASSERT( m_vkLocalDevice );
 
-            HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
+            VK_HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
 
             ForceFlushDestroyQueue();
 
@@ -2745,7 +2766,7 @@ namespace zp
             {
                 if( frameResources.vkCommandPools[ i ] != VK_NULL_HANDLE )
                 {
-                    HR( vkResetCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[ i ], 0 ) );
+                    VK_HR( vkResetCommandPool( m_vkLocalDevice, frameResources.vkCommandPools[ i ], 0 ) );
                 }
             }
 
@@ -2760,8 +2781,8 @@ namespace zp
             FrameResources& frameResources = m_frameResources[ m_frameIndex ];
             const Vector<VulkanCommandBuffer>& commandBuffers = frameResources.cachedCommandBuffers;
 
-            FixedVector<VkCommandBufferSubmitInfo, 1> graphicsCommandBufferSubmitInfo{};
-            FixedVector<VkCommandBufferSubmitInfo, 1> computeCommandBufferSubmitInfo{};
+            FixedVector<VkCommandBufferSubmitInfo, 1> graphicsCommandBufferSubmitInfo {};
+            FixedVector<VkCommandBufferSubmitInfo, 1> computeCommandBufferSubmitInfo {};
 
             for( const VulkanCommandBuffer& commandBuffer : commandBuffers )
             {
@@ -2771,7 +2792,7 @@ namespace zp
                     {
                         if( graphicsCommandBufferSubmitInfo.isEmpty() )
                         {
-                            const VkCommandBufferAllocateInfo commandBufferAllocateInfo{
+                            const VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                                 .commandPool = frameResources.vkCommandPools[ ZP_RENDER_QUEUE_GRAPHICS ],
                                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
@@ -2779,13 +2800,13 @@ namespace zp
                             };
 
                             VkCommandBuffer vkGraphicsCommandBuffer;
-                            HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkGraphicsCommandBuffer ) );
+                            VK_HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkGraphicsCommandBuffer ) );
 
-                            const VkCommandBufferBeginInfo commandBufferBeginInfo{
+                            const VkCommandBufferBeginInfo commandBufferBeginInfo {
                                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                             };
-                            HR( vkBeginCommandBuffer( vkGraphicsCommandBuffer, &commandBufferBeginInfo ) );
+                            VK_HR( vkBeginCommandBuffer( vkGraphicsCommandBuffer, &commandBufferBeginInfo ) );
 
                             graphicsCommandBufferSubmitInfo.pushBack( {
                                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -2812,7 +2833,7 @@ namespace zp
                     {
                         if( computeCommandBufferSubmitInfo.isEmpty() )
                         {
-                            const VkCommandBufferAllocateInfo commandBufferAllocateInfo{
+                            const VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                                 .commandPool = frameResources.vkCommandPools[ ZP_RENDER_QUEUE_GRAPHICS ],
                                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
@@ -2820,13 +2841,13 @@ namespace zp
                             };
 
                             VkCommandBuffer vkComputeCommandBuffer;
-                            HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkComputeCommandBuffer ) );
+                            VK_HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkComputeCommandBuffer ) );
 
-                            const VkCommandBufferBeginInfo commandBufferBeginInfo{
+                            const VkCommandBufferBeginInfo commandBufferBeginInfo {
                                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                             };
-                            HR( vkBeginCommandBuffer( vkComputeCommandBuffer, &commandBufferBeginInfo ) );
+                            VK_HR( vkBeginCommandBuffer( vkComputeCommandBuffer, &commandBufferBeginInfo ) );
 
                             computeCommandBufferSubmitInfo.pushBack( {
                                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -2856,12 +2877,12 @@ namespace zp
 
             if( !graphicsCommandBufferSubmitInfo.isEmpty() )
             {
-                HR( vkEndCommandBuffer( graphicsCommandBufferSubmitInfo[ 0 ].commandBuffer ) );
+                VK_HR( vkEndCommandBuffer( graphicsCommandBufferSubmitInfo[ 0 ].commandBuffer ) );
             }
 
             if( !computeCommandBufferSubmitInfo.isEmpty() )
             {
-                HR( vkEndCommandBuffer( computeCommandBufferSubmitInfo[ 0 ].commandBuffer ) );
+                VK_HR( vkEndCommandBuffer( computeCommandBufferSubmitInfo[ 0 ].commandBuffer ) );
             }
 #if 0
             // TODO: add cycling fences when queue changes
@@ -2890,16 +2911,16 @@ namespace zp
                 } );
             }
 #endif
-            const FixedArray waitSemaphores{
-                VkSemaphoreSubmitInfo{
+            const FixedArray waitSemaphores {
+                VkSemaphoreSubmitInfo {
                     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                     .semaphore = waitSemaphore,
                     .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                 },
             };
 
-            const FixedArray signalSemaphores{
-                VkSemaphoreSubmitInfo{
+            const FixedArray signalSemaphores {
+                VkSemaphoreSubmitInfo {
                     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                     .semaphore = signalSemaphore,
                     .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2908,7 +2929,7 @@ namespace zp
 
             if( graphicsCommandBufferSubmitInfo.isEmpty() && computeCommandBufferSubmitInfo.isEmpty() )
             {
-                const VkSubmitInfo2 submitInfo{
+                const VkSubmitInfo2 submitInfo {
                     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                     .waitSemaphoreInfoCount = static_cast<uint32_t>( waitSemaphores.length() ),
                     .pWaitSemaphoreInfos = waitSemaphores.data(),
@@ -2918,13 +2939,13 @@ namespace zp
                     .pSignalSemaphoreInfos = signalSemaphores.data(),
                 };
 
-                HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
+                VK_HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
             }
             else
             {
                 if( !graphicsCommandBufferSubmitInfo.isEmpty() )
                 {
-                    const VkSubmitInfo2 submitInfo{
+                    const VkSubmitInfo2 submitInfo {
                         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                         .waitSemaphoreInfoCount = static_cast<uint32_t>( waitSemaphores.length() ),
                         .pWaitSemaphoreInfos = waitSemaphores.data(),
@@ -2934,12 +2955,12 @@ namespace zp
                         .pSignalSemaphoreInfos = signalSemaphores.data(),
                     };
 
-                    HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
+                    VK_HR( vkQueueSubmit2( m_queues.graphics.vkQueue, 1, &submitInfo, fence ) );
                 }
 
                 if( !computeCommandBufferSubmitInfo.isEmpty() )
                 {
-                    const VkSubmitInfo2 submitInfo{
+                    const VkSubmitInfo2 submitInfo {
                         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                         .waitSemaphoreInfoCount = static_cast<uint32_t>( waitSemaphores.length() ),
                         .pWaitSemaphoreInfos = waitSemaphores.data(),
@@ -2949,7 +2970,7 @@ namespace zp
                         .pSignalSemaphoreInfos = signalSemaphores.data(),
                     };
 
-                    HR( vkQueueSubmit2( m_queues.compute.vkQueue, 1, &submitInfo, fence ) );
+                    VK_HR( vkQueueSubmit2( m_queues.compute.vkQueue, 1, &submitInfo, fence ) );
                 }
             }
         }
@@ -3018,7 +3039,7 @@ namespace zp
 
             ZP_ASSERT( ( stagingBuffer.position + allocationSize ) < stagingBuffer.size );
 
-            const StagingBufferAllocation allocation{
+            const StagingBufferAllocation allocation {
                 .vkBuffer = stagingBuffer.vkBuffer,
                 .vkDeviceMemory = stagingBuffer.vkDeviceMemory,
                 .vkAccess = VK_ACCESS_2_HOST_WRITE_BIT,
@@ -3038,7 +3059,7 @@ namespace zp
             FrameResources& frameResources = m_frameResources[ m_frameIndex ];
             VkCommandPool vkCommandPool = frameResources.vkCommandPools[ queue ];
 
-            const VkCommandBufferAllocateInfo commandBufferAllocateInfo{
+            const VkCommandBufferAllocateInfo commandBufferAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                 .commandPool = vkCommandPool,
                 .level = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
@@ -3046,18 +3067,18 @@ namespace zp
             };
 
             VkCommandBuffer vkCommandBuffer;
-            HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkCommandBuffer ) );
+            VK_HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &vkCommandBuffer ) );
 
-            const VkCommandBufferInheritanceInfo inheritanceInfo{
+            const VkCommandBufferInheritanceInfo inheritanceInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
             };
 
-            const VkCommandBufferBeginInfo commandBufferBeginInfo{
+            const VkCommandBufferBeginInfo commandBufferBeginInfo {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                 .pInheritanceInfo = &inheritanceInfo,
             };
-            HR( vkBeginCommandBuffer( vkCommandBuffer, &commandBufferBeginInfo ) );
+            VK_HR( vkBeginCommandBuffer( vkCommandBuffer, &commandBufferBeginInfo ) );
 
             const zp_uint32_t index = frameResources.cachedCommandBuffers.pushBackEmptyRange( 1, false );
             // SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkCommandBuffer, "Secondary CommandBuffer (%d) [%d]", index, frameResources.frame );
@@ -3085,7 +3106,7 @@ namespace zp
             const VulkanCommandBuffer& commandBuffer = frameResources.cachedCommandBuffers[ commandBufferHandle.index ];
             ZP_ASSERT( commandBuffer.hash == commandBufferHandle.hash );
 
-            HR( vkEndCommandBuffer( commandBuffer.vkCommandBuffer ) );
+            VK_HR( vkEndCommandBuffer( commandBuffer.vkCommandBuffer ) );
         }
 
         BufferHandle VulkanContext::RequestBuffer( zp_size_t size )
@@ -3113,7 +3134,7 @@ namespace zp
 
             const VkBufferCreateFlags vkFlags = 0;
 
-            const VkBufferCreateInfo bufferCreateInfo{
+            const VkBufferCreateInfo bufferCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 .flags = vkFlags,
                 .size = alignedSize,
@@ -3121,23 +3142,23 @@ namespace zp
                 .sharingMode = vkSharingMode,
             };
 
-            VkBuffer vkBuffer{};
-            HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
+            VkBuffer vkBuffer {};
+            VK_HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &vkBuffer ) );
 
             // allocate memory
-            VkMemoryRequirements memoryRequirements{};
+            VkMemoryRequirements memoryRequirements {};
             vkGetBufferMemoryRequirements( m_vkLocalDevice, vkBuffer, &memoryRequirements );
 
-            const VkMemoryAllocateInfo memoryAllocateInfo{
+            const VkMemoryAllocateInfo memoryAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                 .allocationSize = memoryRequirements.size,
                 .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
             };
 
-            VkDeviceMemory vkDeviceMemory{};
-            HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+            VkDeviceMemory vkDeviceMemory {};
+            VK_HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
-            HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
+            VK_HR( vkBindBufferMemory( m_vkLocalDevice, vkBuffer, vkDeviceMemory, 0 ) );
 
             // clang-format off
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, vkBuffer, "Buffer %c%c%c%c%c%c%c (%d)",
@@ -3169,7 +3190,7 @@ namespace zp
             hash = zp_fnv32_1a( memoryAllocateInfo.allocationSize, hash );
             hash = zp_fnv32_1a( vkBufferUsage, hash );
 
-            m_vkBuffers[ index ] = VulkanBuffer{
+            m_vkBuffers[ index ] = VulkanBuffer {
                 .vkBuffer = vkBuffer,
                 .vkDeviceMemory = vkDeviceMemory,
                 .vkBufferUsage = vkBufferUsage,
@@ -3223,22 +3244,22 @@ namespace zp
 
             // copy srcData to staging vkBuffer
             {
-                void* dstMemory{};
-                HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+                void* dstMemory {};
+                VK_HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
                 zp_memcpy( dstMemory, allocation.size, srcData.ptr(), srcData.size() );
 
                 vkUnmapMemory( m_vkLocalDevice, allocation.vkDeviceMemory );
 
-                const VkMappedMemoryRange flushMemoryRange{
+                const VkMappedMemoryRange flushMemoryRange {
                     .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
                     .memory = allocation.vkDeviceMemory,
                     .offset = allocation.offset,
                     .size = allocation.size,
                 };
-                HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+                VK_HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
 
-                HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+                VK_HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
             }
 
             // transfer from CPU to GPU memory
@@ -3286,14 +3307,14 @@ namespace zp
 
             // copy staging vkBuffer to dst vkBuffer
             {
-                const VkBufferCopy2 region{
+                const VkBufferCopy2 region {
                     .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
                     .srcOffset = allocation.offset,
                     .dstOffset = dstBuffer.offset,
                     .size = allocation.size,
                 };
 
-                const VkCopyBufferInfo2 copyBufferInfo{
+                const VkCopyBufferInfo2 copyBufferInfo {
                     .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
                     .srcBuffer = allocation.vkBuffer,
                     .dstBuffer = dstBuffer.vkBuffer,
@@ -3345,14 +3366,14 @@ namespace zp
 
             // copy region
             {
-                const VkBufferCopy2 bufferCopy{
+                const VkBufferCopy2 bufferCopy {
                     .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
                     .srcOffset = cmd.srcOffset,
                     .dstOffset = cmd.dstOffset,
                     .size = cmd.size,
                 };
 
-                const VkCopyBufferInfo2 copyBufferInfo{
+                const VkCopyBufferInfo2 copyBufferInfo {
                     .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
                     .srcBuffer = srcBuffer.vkBuffer,
                     .dstBuffer = dstBuffer.vkBuffer,
@@ -3375,6 +3396,7 @@ namespace zp
             }
         }
 
+        // TODO: fill in request texture desc
         TextureHandle VulkanContext::RequestTexture()
         {
             ZP_PROFILE_CPU_BLOCK();
@@ -3382,7 +3404,7 @@ namespace zp
             const VkFormat vkFormat = VK_FORMAT_R8G8B8A8_SRGB;
             const VkImageType vkImageType = VK_IMAGE_TYPE_2D;
             const VkImageViewType vkImageViewType = VK_IMAGE_VIEW_TYPE_2D;
-            const Size3Du size{ .width = 64, .height = 64, .depth = 1 };
+            const Size3Du size { .width = 64, .height = 64, .depth = 1 };
             const uint32_t mipLevels = 1;
             const zp_bool_t allowAutoMipGen = true;
             const zp_bool_t allowBlit = true;
@@ -3406,7 +3428,7 @@ namespace zp
 
 #if ZP_DEBUG
             // make sure format is supported properly
-            VkFormatProperties formatProperties{};
+            VkFormatProperties formatProperties {};
             vkGetPhysicalDeviceFormatProperties( m_vkPhysicalDevice, vkFormat, &formatProperties );
 
             const VkFormatFeatureFlags formatFeatures = vkImageTiling == VK_IMAGE_TILING_OPTIMAL ? formatProperties.optimalTilingFeatures : formatProperties.linearTilingFeatures;
@@ -3417,12 +3439,12 @@ namespace zp
             }
 #endif // ZP_DEBUG
 
-            const VkImageCreateInfo imageCreateInfo{
+            const VkImageCreateInfo imageCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 .flags = 0,
                 .imageType = vkImageType,
                 .format = vkFormat,
-                .extent{
+                .extent {
                     .width = size.width,
                     .height = size.height,
                     .depth = size.depth,
@@ -3437,40 +3459,40 @@ namespace zp
             };
 
             VkImage vkImage;
-            HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, &m_vkAllocationCallbacks, &vkImage ) );
+            VK_HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, &m_vkAllocationCallbacks, &vkImage ) );
 
             // allocate memory
-            VkMemoryRequirements memoryRequirements{};
+            VkMemoryRequirements memoryRequirements {};
             vkGetImageMemoryRequirements( m_vkLocalDevice, vkImage, &memoryRequirements );
 
-            const VkMemoryAllocateInfo memoryAllocateInfo{
+            const VkMemoryAllocateInfo memoryAllocateInfo {
                 .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                 .allocationSize = memoryRequirements.size,
                 .memoryTypeIndex = FindMemoryTypeIndex( m_vkPhysicalDeviceMemoryProperties, memoryRequirements.memoryTypeBits, Convert( ZP_MEMORY_PROPERTY_DEVICE_LOCAL ) ),
             };
 
             VkDeviceMemory vkDeviceMemory;
-            HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+            VK_HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
-            HR( vkBindImageMemory( m_vkLocalDevice, vkImage, vkDeviceMemory, 0 ) );
+            VK_HR( vkBindImageMemory( m_vkLocalDevice, vkImage, vkDeviceMemory, 0 ) );
 
             // create image views for reach mip level
             FixedArray<VkImageView, kMaxMipLevels> vkImageViews;
             FixedArray<VkImageLayout, kMaxMipLevels> vkImageLayouts;
             for( zp_uint32_t i = 0; i < mipLevels; ++i )
             {
-                const VkImageViewCreateInfo imageViewCreateInfo{
+                const VkImageViewCreateInfo imageViewCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                     .image = vkImage,
                     .viewType = vkImageViewType,
                     .format = vkFormat,
-                    .components{
+                    .components {
                         .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                         .g = VK_COMPONENT_SWIZZLE_IDENTITY,
                         .b = VK_COMPONENT_SWIZZLE_IDENTITY,
                         .a = VK_COMPONENT_SWIZZLE_IDENTITY,
                     },
-                    .subresourceRange{
+                    .subresourceRange {
                         .aspectMask = vkImageAspect,
                         .baseMipLevel = i,
                         .levelCount = mipLevels - i,
@@ -3479,7 +3501,7 @@ namespace zp
                     },
                 };
 
-                HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &vkImageViews[ i ] ) );
+                VK_HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &vkImageViews[ i ] ) );
                 vkImageLayouts[ i ] = vkImageLayout;
             }
 
@@ -3500,7 +3522,7 @@ namespace zp
             hash = zp_fnv32_1a( vkImageType, hash );
             hash = zp_fnv32_1a( vkFormat, hash );
 
-            m_vkTextures[ index ] = VulkanTexture{
+            m_vkTextures[ index ] = VulkanTexture {
                 .vkImage = vkImage,
                 .vkImageViews = vkImageViews,
                 .vkImageLayouts = vkImageLayouts,
@@ -3542,7 +3564,7 @@ namespace zp
 
         Size2Du CalculateMipSize( zp_uint32_t mipLevel, const Size2Du& size )
         {
-            const Size2Du mipSize{
+            const Size2Du mipSize {
                 .width = zp_max( 1U, size.width >> mipLevel ),
                 .height = zp_max( 1U, size.height >> mipLevel ),
             };
@@ -3563,22 +3585,22 @@ namespace zp
 
             // copy srcData to staging vkBuffer
             {
-                void* dstMemory{};
-                HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+                void* dstMemory {};
+                VK_HR( vkMapMemory( m_vkLocalDevice, allocation.vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
                 zp_memcpy( dstMemory, allocation.size, srcData.ptr(), srcData.size() );
 
                 vkUnmapMemory( m_vkLocalDevice, allocation.vkDeviceMemory );
 
-                const VkMappedMemoryRange flushMemoryRange{
+                const VkMappedMemoryRange flushMemoryRange {
                     .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
                     .memory = allocation.vkDeviceMemory,
                     .offset = allocation.offset,
                     .size = allocation.size,
                 };
-                HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+                VK_HR( vkFlushMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
 
-                HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
+                VK_HR( vkInvalidateMappedMemoryRanges( m_vkLocalDevice, 1, &flushMemoryRange ) );
             }
 
             // transfer staging buffer
@@ -3586,7 +3608,7 @@ namespace zp
                 CmdTransitionBufferAccess( commandBuffer.vkCommandBuffer, allocation.vkBuffer, allocation.offset, allocation.size, allocation.vkAccess, VK_ACCESS_2_TRANSFER_READ_BIT );
             }
 
-            const VkImageSubresourceRange subresourceRange{
+            const VkImageSubresourceRange subresourceRange {
                 .aspectMask = texture.vkImageAspect,
                 .baseMipLevel = dstMipLevel,
                 .levelCount = 1,
@@ -3603,30 +3625,30 @@ namespace zp
             {
                 const Size2Du mipSize = CalculateMipSize( dstMipLevel, Size3Dto2D( texture.size ) );
 
-                const VkBufferImageCopy2 region{
+                const VkBufferImageCopy2 region {
                     .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
                     .bufferOffset = allocation.offset,
                     .bufferRowLength = 0,
                     .bufferImageHeight = 0,
-                    .imageSubresource{
+                    .imageSubresource {
                         .aspectMask = subresourceRange.aspectMask,
                         .mipLevel = dstMipLevel,
                         .baseArrayLayer = subresourceRange.baseArrayLayer,
                         .layerCount = subresourceRange.layerCount,
                     },
-                    .imageOffset{
+                    .imageOffset {
                         .x = 0,
                         .y = 0,
                         .z = 0,
                     },
-                    .imageExtent{
+                    .imageExtent {
                         .width = mipSize.width,
                         .height = mipSize.height,
                         .depth = 1,
                     },
                 };
 
-                const VkCopyBufferToImageInfo2 copyBufferToImageInfo{
+                const VkCopyBufferToImageInfo2 copyBufferToImageInfo {
                     .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
                     .srcBuffer = allocation.vkBuffer,
                     .dstImage = texture.vkImage,
@@ -3700,31 +3722,31 @@ namespace zp
                                                                                                                             } );
 
                     // blip previous mip to current mip
-                    const VkImageBlit2 region{
+                    const VkImageBlit2 region {
                         .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
-                        .srcSubresource{
+                        .srcSubresource {
                             .aspectMask = texture.vkImageAspect,
                             .mipLevel = srcMip,
                             .baseArrayLayer = 0,
                             .layerCount = 1,
                         },
-                        .srcOffsets{
+                        .srcOffsets {
                             { 0, 0, 0 },
                             { width, height, 1 },
                         },
-                        .dstSubresource{
+                        .dstSubresource {
                             .aspectMask = texture.vkImageAspect,
                             .mipLevel = dstMip,
                             .baseArrayLayer = 0,
                             .layerCount = 1,
                         },
-                        .dstOffsets{
+                        .dstOffsets {
                             { 0, 0, 0 },
                             { mipWidth, mipHeight, 1 },
                         },
                     };
 
-                    const VkBlitImageInfo2 blitImageInfo{
+                    const VkBlitImageInfo2 blitImageInfo {
                         .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
                         .srcImage = texture.vkImage,
                         .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -3771,8 +3793,8 @@ namespace zp
             const VulkanCommandBuffer& commandBuffer = frameResources.cachedCommandBuffers[ commandBufferHandle.index ];
             ZP_ASSERT( commandBufferHandle.hash == commandBuffer.hash );
 
-            const FixedArray subresourceRange{
-                VkImageSubresourceRange{
+            const FixedArray subresourceRange {
+                VkImageSubresourceRange {
                     .aspectMask = texture.vkImageAspect,
                     .baseMipLevel = 0,
                     .levelCount = texture.mipCount,
@@ -3785,14 +3807,14 @@ namespace zp
 
             CmdTransitionImageLayout( commandBuffer.vkCommandBuffer, texture, VK_IMAGE_LAYOUT_UNDEFINED, subresourceRange[ 0 ] );
 
-            const VkClearDepthStencilValue clearDepthStencil{
+            const VkClearDepthStencilValue clearDepthStencil {
                 .depth = 1.0f,
                 .stencil = 0,
             };
             vkCmdClearDepthStencilImage( commandBuffer.vkCommandBuffer, texture.vkImage, texture.vkImageLayouts[ 0 ], &clearDepthStencil, subresourceRange.length(), subresourceRange.begin() );
 
-            const VkClearColorValue clearColor{
-                .float32{ 0, 0, 0, 0 }
+            const VkClearColorValue clearColor {
+                .float32 { 0, 0, 0, 0 }
             };
             vkCmdClearColorImage( commandBuffer.vkCommandBuffer, texture.vkImage, texture.vkImageLayouts[ 0 ], &clearColor, subresourceRange.length(), subresourceRange.begin() );
 
@@ -3806,16 +3828,16 @@ namespace zp
             const FrameResources& frameResources = m_frameResources[ m_frameIndex ];
 
             // shader module
-            const MemoryArray<zp_uint32_t> shaderData{};
+            const MemoryArray<zp_uint32_t> shaderData {};
 
-            const VkShaderModuleCreateInfo shaderModuleCreateInfo{
+            const VkShaderModuleCreateInfo shaderModuleCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 .codeSize = shaderData.size(),
                 .pCode = shaderData.data(),
             };
 
             // specialization
-            const Memory specializationData{};
+            const Memory specializationData {};
 
             FixedVector<VkSpecializationMapEntry, 4> specializationMapEntries;
             specializationMapEntries.pushBack( {
@@ -3824,14 +3846,14 @@ namespace zp
                 .size = 0,
             } );
 
-            const VkSpecializationInfo specializationInfo{
+            const VkSpecializationInfo specializationInfo {
                 .mapEntryCount = static_cast<zp_uint32_t>( specializationMapEntries.length() ),
                 .pMapEntries = specializationMapEntries.data(),
                 .dataSize = specializationData.size(),
                 .pData = specializationData.ptr(),
             };
 
-            constexpr FixedArray kDefaultShaderStageName{
+            constexpr FixedArray kDefaultShaderStageName {
                 "vs_main",
                 "tc_main",
                 "te_main",
@@ -3854,7 +3876,7 @@ namespace zp
                     const VkShaderStageFlagBits stage = Convert( static_cast<ShaderStage>( i ) );
                     const VkShaderStageFlags stageFlags = stage;
 
-                    pipelineShaderStageCreateInfos.pushBack( VkPipelineShaderStageCreateInfo{
+                    pipelineShaderStageCreateInfos.pushBack( VkPipelineShaderStageCreateInfo {
                         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                         .pNext = &shaderModuleCreateInfo,
                         .stage = stage,
@@ -3862,7 +3884,7 @@ namespace zp
                         .pSpecializationInfo = &specializationInfo,
                     } );
 
-                    pushConstantRanges.pushBack( VkPushConstantRange{
+                    pushConstantRanges.pushBack( VkPushConstantRange {
                         .stageFlags = stageFlags,
                         .offset = 0,
                         .size = 0,
@@ -3870,16 +3892,16 @@ namespace zp
                 }
             }
 
-            VkDescriptorSetLayoutBinding bings{
+            VkDescriptorSetLayoutBinding bings {
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
                 .descriptorCount = 1,
                 .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             };
 
-            VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+            VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {};
 
-            const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+            const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .setLayoutCount = 1,
                 .pSetLayouts = &m_vkBindlessLayout,
@@ -3888,9 +3910,9 @@ namespace zp
             };
 
             VkPipelineLayout vkPipelineLayout;
-            HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, &m_vkAllocationCallbacks, &vkPipelineLayout ) );
+            VK_HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, &m_vkAllocationCallbacks, &vkPipelineLayout ) );
 
-            VkRenderPass vkRenderPass{};
+            VkRenderPass vkRenderPass {};
 
 #if USE_DYNAMIC_RENDERING
             FixedVector<VkFormat, 8> colorAttachmentFormats;
@@ -3898,7 +3920,7 @@ namespace zp
             VkFormat depthFormat = VK_FORMAT_UNDEFINED;
             VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
 
-            VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+            VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
                 .viewMask = 0,
                 .colorAttachmentCount = static_cast<zp_uint32_t>( colorAttachmentFormats.length() ),
@@ -3930,9 +3952,9 @@ namespace zp
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             } );
 
-            FixedVector<VkAttachmentReference2, 8> inputAttachmentReferences{};
+            FixedVector<VkAttachmentReference2, 8> inputAttachmentReferences {};
 
-            VkAttachmentReference2 depthStencilAttachmentReference{
+            VkAttachmentReference2 depthStencilAttachmentReference {
                 .sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2,
                 .attachment = 0,
                 .layout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -3961,7 +3983,7 @@ namespace zp
                 .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
             } );
 
-            const VkRenderPassCreateInfo2 renderPassCreateInfo{
+            const VkRenderPassCreateInfo2 renderPassCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2,
                 .attachmentCount = static_cast<zp_uint32_t>( attachmentDescriptions.length() ),
                 .pAttachments = attachmentDescriptions.data(),
@@ -3971,30 +3993,30 @@ namespace zp
                 .pDependencies = subpassDependencies.data(),
             };
 
-            HR( vkCreateRenderPass2( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
+            VK_HR( vkCreateRenderPass2( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
 #endif
 
             // TODO: load from shader file
-            FixedArray vertexInputBindingDescriptions{
-                VkVertexInputBindingDescription{
+            FixedArray vertexInputBindingDescriptions {
+                VkVertexInputBindingDescription {
                     .binding = 0,
                     .stride = sizeof( Vector3f ),
                     .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
                 },
-                VkVertexInputBindingDescription{
+                VkVertexInputBindingDescription {
                     .binding = 1,
                     .stride = sizeof( Vector2f ),
                     .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
                 },
             };
-            FixedArray vertexInputAttributeDescriptions{
-                VkVertexInputAttributeDescription{
+            FixedArray vertexInputAttributeDescriptions {
+                VkVertexInputAttributeDescription {
                     .location = 0,
                     .binding = 0,
                     .format = VK_FORMAT_R32G32B32_SFLOAT,
                     .offset = 0,
                 },
-                VkVertexInputAttributeDescription{
+                VkVertexInputAttributeDescription {
                     .location = 0,
                     .binding = 1,
                     .format = VK_FORMAT_R32G32_SFLOAT,
@@ -4002,7 +4024,7 @@ namespace zp
                 },
             };
 
-            const VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
+            const VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
                 .vertexBindingDescriptionCount = vertexInputBindingDescriptions.length(),
                 .pVertexBindingDescriptions = vertexInputBindingDescriptions.data(),
@@ -4012,7 +4034,7 @@ namespace zp
 
             // TODO: load from shader file
             const VkPrimitiveTopology vkTopology = Convert( ZP_TOPOLOGY_TRIANGLE_LIST );
-            const VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{
+            const VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
                 .topology = vkTopology,
                 .primitiveRestartEnable = VK_FALSE,
@@ -4022,7 +4044,7 @@ namespace zp
             const VkCullModeFlags vkCullMode = Convert( ZP_CULL_MODE_BACK );
             const VkFrontFace vkFrontFace = Convert( ZP_FRONT_FACE_MODE_CCW );
             const VkPolygonMode vkPolygonMode = Convert( ZP_POLYGON_FILL_MODE_FILL );
-            const VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo{
+            const VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
                 .rasterizerDiscardEnable = VK_TRUE,
                 .polygonMode = vkPolygonMode,
@@ -4034,7 +4056,7 @@ namespace zp
             const VkSampleCountFlagBits vkSampleCount = Convert( ZP_SAMPLE_COUNT_1 );
             const zp_bool_t enableAlphaToCoverage = false;
             const zp_bool_t enableAlphaToOne = false;
-            const VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{
+            const VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
                 .rasterizationSamples = vkSampleCount,
                 .alphaToCoverageEnable = enableAlphaToCoverage,
@@ -4042,19 +4064,19 @@ namespace zp
             };
 
             // TODO: read from shader file
-            const DepthStencilState depthStencilState{
+            const DepthStencilState depthStencilState {
                 .depthCompareOp = ZP_COMPARE_OP_LESS_OR_EQUAL,
                 .depthTestEnabled = VK_TRUE,
                 .depthWriteEnabled = VK_TRUE,
             };
-            const VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo{
+            const VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
                 .depthTestEnable = depthStencilState.depthTestEnabled,
                 .depthWriteEnable = depthStencilState.depthWriteEnabled,
                 .depthCompareOp = Convert( depthStencilState.depthCompareOp ),
                 .depthBoundsTestEnable = depthStencilState.depthBoundsTestEnabled,
                 .stencilTestEnable = depthStencilState.stencilTestEnabled,
-                .front{
+                .front {
                     .failOp = Convert( depthStencilState.front.failOp ),
                     .passOp = Convert( depthStencilState.front.passOp ),
                     .depthFailOp = Convert( depthStencilState.front.depthFailOp ),
@@ -4063,7 +4085,7 @@ namespace zp
                     .writeMask = depthStencilState.front.writeMask,
                     .reference = depthStencilState.front.reference,
                 },
-                .back{
+                .back {
                     .failOp = Convert( depthStencilState.back.failOp ),
                     .passOp = Convert( depthStencilState.back.passOp ),
                     .depthFailOp = Convert( depthStencilState.back.depthFailOp ),
@@ -4077,8 +4099,8 @@ namespace zp
             };
 
             // TODO: read from shader file
-            const FixedArray blendStates{
-                VkPipelineColorBlendAttachmentState{
+            const FixedArray blendStates {
+                VkPipelineColorBlendAttachmentState {
                     .blendEnable = VK_FALSE,
                     .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
                     .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
@@ -4089,22 +4111,22 @@ namespace zp
                     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
                 },
             };
-            const VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{
+            const VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
                 .logicOpEnable = VK_FALSE,
                 .logicOp = VK_LOGIC_OP_SET,
                 .attachmentCount = static_cast<zp_uint32_t>( blendStates.length() ),
                 .pAttachments = blendStates.data(),
-                .blendConstants{
+                .blendConstants {
                     1, 1, 1, 1 },
             };
 
-            const FixedArray dynamicStates{
+            const FixedArray dynamicStates {
                 VK_DYNAMIC_STATE_VIEWPORT,
                 VK_DYNAMIC_STATE_SCISSOR,
             };
 
-            const VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{
+            const VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
                 .dynamicStateCount = static_cast<zp_uint32_t>( dynamicStates.length() ),
                 .pDynamicStates = dynamicStates.data(),
@@ -4116,33 +4138,33 @@ namespace zp
 #endif // ZP_DEBUG
             flags |= VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
 
-            VkGraphicsPipelineLibraryCreateInfoEXT graphicsPipelineLibraryCreateInfo{
+            VkGraphicsPipelineLibraryCreateInfoEXT graphicsPipelineLibraryCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
                 .flags = VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT,
             };
 
-            FixedArray<VkPipeline, 4> libraries{
+            FixedArray<VkPipeline, 4> libraries {
                 VK_NULL_HANDLE,
                 VK_NULL_HANDLE,
                 VK_NULL_HANDLE,
                 VK_NULL_HANDLE,
             };
 
-            VkPipelineLibraryCreateInfoKHR pipelineLibraryCreateInfo{
+            VkPipelineLibraryCreateInfoKHR pipelineLibraryCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
                 .libraryCount = static_cast<uint32_t>( libraries.length() ),
                 .pLibraries = libraries.data(),
             };
 
-            VkGraphicsPipelineCreateInfo linkedGraphicsPipelineCreateInfo{
+            VkGraphicsPipelineCreateInfo linkedGraphicsPipelineCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
                 .pNext = &pipelineLibraryCreateInfo,
                 .flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT,
             };
 
-            VkPipeline vkBasePipeline{};
+            VkPipeline vkBasePipeline {};
 
-            VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
+            VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
                 .flags = flags,
                 .stageCount = static_cast<zp_uint32_t>( pipelineShaderStageCreateInfos.length() ),
@@ -4167,9 +4189,9 @@ namespace zp
 
 
             VkPipeline vkPipeline;
-            HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
+            VK_HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
 
-            zp_uint32_t index{};
+            zp_uint32_t index {};
 
             zp_hash32_t hash = zp_fnv32_1a( frameResources.frame );
             hash = zp_fnv32_1a( index, hash );
@@ -4184,25 +4206,25 @@ namespace zp
             const FrameResources& frameResources = m_frameResources[ m_frameIndex ];
 
             // shader moducle
-            const MemoryArray<zp_uint32_t> shaderData{};
+            const MemoryArray<zp_uint32_t> shaderData {};
 
-            const VkShaderModuleCreateInfo shaderModuleCreateInfo{
+            const VkShaderModuleCreateInfo shaderModuleCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 .codeSize = shaderData.size(),
                 .pCode = shaderData.data(),
             };
 
             VkShaderModule shaderModule;
-            HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
+            VK_HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
 
             // create pipeline
-            VkPipeline vkBasePipeline{};
+            VkPipeline vkBasePipeline {};
 
-            VkPipelineLayout vkPipelineLayout{};
+            VkPipelineLayout vkPipelineLayout {};
 
-            const VkSpecializationInfo vkSpecializationInfo{};
+            const VkSpecializationInfo vkSpecializationInfo {};
 
-            const VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo{
+            const VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .stage = VK_SHADER_STAGE_COMPUTE_BIT,
                 .module = shaderModule,
@@ -4216,7 +4238,7 @@ namespace zp
             const VkPipelineCreateFlags flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
 #endif // ZP_DEBUG
 
-            const VkComputePipelineCreateInfo computePipelineCreateInfo{
+            const VkComputePipelineCreateInfo computePipelineCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
                 .flags = flags,
                 .stage = pipelineShaderStageCreateInfo,
@@ -4226,11 +4248,11 @@ namespace zp
             };
 
             VkPipeline vkPipeline;
-            HR( vkCreateComputePipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
+            VK_HR( vkCreateComputePipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, &m_vkAllocationCallbacks, &vkPipeline ) );
 
             vkDestroyShaderModule( m_vkLocalDevice, shaderModule, &m_vkAllocationCallbacks );
 
-            zp_uint32_t index{};
+            zp_uint32_t index {};
 
             zp_hash32_t hash = zp_fnv32_1a( frameResources.frame );
             hash = zp_fnv32_1a( index, hash );
@@ -4246,7 +4268,7 @@ namespace zp
         {
             const FrameResources& frameResources = m_frameResources[ m_frameIndex ];
 
-            zp_uint32_t index{};
+            zp_uint32_t index {};
 
             zp_hash32_t hash = zp_fnv32_1a( frameResources.frame );
             hash = zp_fnv32_1a( index, hash );
@@ -4320,9 +4342,9 @@ namespace zp
                     .imageLayout = colorRT.vkImageLayouts[ m_frameIndex ],
                     .loadOp = Convert( colorAttachment.loadOp ),
                     .storeOp = Convert( colorAttachment.storeOp ),
-                    .clearValue{
-                        .color{
-                            .float32{
+                    .clearValue {
+                        .color {
+                            .float32 {
                                 colorAttachment.clearColor.r,
                                 colorAttachment.clearColor.g,
                                 colorAttachment.clearColor.b,
@@ -4333,14 +4355,14 @@ namespace zp
             const VulkanRenderTarget& depthStencilRT = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
             ZP_ASSERT( depthStencilRT.hash == cmd.depthAttachment.attachment.hash );
 
-            const VkRenderingAttachmentInfo depthStencilAttachment{
+            const VkRenderingAttachmentInfo depthStencilAttachment {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .imageView = depthStencilRT.vkImageViews[ m_frameIndex ],
                 .imageLayout = depthStencilRT.vkImageLayouts[ m_frameIndex ],
                 .loadOp = Convert( cmd.depthAttachment.loadOp ),
                 .storeOp = Convert( cmd.depthAttachment.storeOp ),
-                .clearValue{
-                    .depthStencil{
+                .clearValue {
+                    .depthStencil {
                         .depth = cmd.depthAttachment.clearDepth,
                         .stencil = cmd.stencilAttachment.clearStencil,
                     } },
@@ -4349,14 +4371,14 @@ namespace zp
             const VulkanRenderTarget& depthRT = m_vkRenderTargets[ cmd.depthAttachment.attachment.index ];
             ZP_ASSERT( depthRT.hash == cmd.depthAttachment.attachment.hash );
 
-            const VkRenderingAttachmentInfo depthAttachment{
+            const VkRenderingAttachmentInfo depthAttachment {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .imageView = depthRT.vkImageViews[ m_frameIndex ],
                 .imageLayout = depthRT.vkImageLayouts[ m_frameIndex ],
                 .loadOp = Convert( cmd.depthAttachment.loadOp ),
                 .storeOp = Convert( cmd.depthAttachment.storeOp ),
-                .clearValue{
-                    .depthStencil{
+                .clearValue {
+                    .depthStencil {
                         .depth = cmd.depthAttachment.clearDepth,
                     } },
             };
@@ -4364,28 +4386,28 @@ namespace zp
             const VulkanRenderTarget& stencilRT = m_vkRenderTargets[ cmd.stencilAttachment.attachment.index ];
             ZP_ASSERT( stencilRT.hash == cmd.stencilAttachment.attachment.hash );
 
-            const VkRenderingAttachmentInfo stencilAttachment{
+            const VkRenderingAttachmentInfo stencilAttachment {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .imageView = stencilRT.vkImageViews[ m_frameIndex ],
                 .imageLayout = stencilRT.vkImageLayouts[ m_frameIndex ],
                 .loadOp = Convert( cmd.stencilAttachment.loadOp ),
                 .storeOp = Convert( cmd.stencilAttachment.storeOp ),
-                .clearValue{
-                    .depthStencil{
+                .clearValue {
+                    .depthStencil {
                         .stencil = cmd.stencilAttachment.clearStencil,
                     } },
             };
 
             const zp_bool_t useDepthStencil = cmd.depthAttachment.attachment == cmd.stencilAttachment.attachment;
 
-            const VkRenderingInfo renderingInfo{
+            const VkRenderingInfo renderingInfo {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-                .renderArea{
-                    .offset{
+                .renderArea {
+                    .offset {
                         .x = renderArea.offset.x,
                         .y = renderArea.offset.y,
                     },
-                    .extent{
+                    .extent {
                         .width = renderArea.size.width,
                         .height = renderArea.size.height,
                     },
@@ -4401,18 +4423,18 @@ namespace zp
             vkCmdBeginRendering( commandBuffer.vkCommandBuffer, &renderingInfo );
 #else
             FixedVector<VkClearValue, 8> clearValues;
-            clearValues.pushBack( { .color{ 0, 0, 0, 0 } } );
+            clearValues.pushBack( { .color { 0, 0, 0, 0 } } );
 
-            const VkRenderPassBeginInfo renderPassBeginInfo{
+            const VkRenderPassBeginInfo renderPassBeginInfo {
                 .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
                 .renderPass = renderPass.vkRenderPass,
                 .framebuffer = renderPass.vkFramebuffer,
-                .renderArea{
-                    .offset{
+                .renderArea {
+                    .offset {
                         .x = renderArea.offset.x,
                         .y = renderArea.offset.y,
                     },
-                    .extent{
+                    .extent {
                         .width = renderArea.size.width,
                         .height = renderArea.size.height,
                     },
@@ -4421,7 +4443,7 @@ namespace zp
                 .pClearValues = clearValues.data(),
             };
 
-            const VkSubpassBeginInfo subpassBeginInfo{
+            const VkSubpassBeginInfo subpassBeginInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO,
                 .contents = VK_SUBPASS_CONTENTS_INLINE,
             };
@@ -4440,8 +4462,8 @@ namespace zp
             ZP_ASSERT( commandBuffer.hash == cmd.commandBuffer.hash );
 
 #if USE_DYNAMIC_RENDERING
-            const FixedArray memoryBarriers{
-                VkMemoryBarrier2{
+            const FixedArray memoryBarriers {
+                VkMemoryBarrier2 {
                     .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
                     .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                     .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -4450,7 +4472,7 @@ namespace zp
                 },
             };
 
-            const VkDependencyInfo dependencyInfo{
+            const VkDependencyInfo dependencyInfo {
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                 .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
                 .memoryBarrierCount = static_cast<zp_uint32_t>( memoryBarriers.length() ),
@@ -4461,12 +4483,12 @@ namespace zp
 
             vkCmdPipelineBarrier2( commandBuffer.vkCommandBuffer, &dependencyInfo );
 #else
-            const VkSubpassBeginInfo subpassBeginInfo{
+            const VkSubpassBeginInfo subpassBeginInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO,
                 .contents = VK_SUBPASS_CONTENTS_INLINE,
             };
 
-            const VkSubpassEndInfo subpassEndInfo{
+            const VkSubpassEndInfo subpassEndInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_END_INFO,
             };
 
@@ -4486,7 +4508,7 @@ namespace zp
 #if USE_DYNAMIC_RENDERING
             vkCmdEndRendering( commandBuffer.vkCommandBuffer );
 #else
-            const VkSubpassEndInfo subpassEndInfo{
+            const VkSubpassEndInfo subpassEndInfo {
                 .sType = VK_STRUCTURE_TYPE_SUBPASS_END_INFO,
             };
 
@@ -4613,14 +4635,14 @@ namespace zp
             const VkImageLayout dstLayout = dstTexture.vkImageLayouts[ cmd.dstMip ];
 
             // blit subregions
-            const VkImageSubresourceRange srcImageSubresourceRange{
+            const VkImageSubresourceRange srcImageSubresourceRange {
                 .aspectMask = srcTexture.vkImageAspect,
                 .baseMipLevel = cmd.srcMip,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
                 .layerCount = 1,
             };
-            const VkImageSubresourceRange dstImageSubresourceRange{
+            const VkImageSubresourceRange dstImageSubresourceRange {
                 .aspectMask = dstTexture.vkImageAspect,
                 .baseMipLevel = cmd.dstMip,
                 .levelCount = 1,
@@ -4659,30 +4681,30 @@ namespace zp
                     dstRegion.size.height = dstTexture.size.height;
                 }
 
-                const VkImageBlit2 region{
-                    .srcSubresource{
+                const VkImageBlit2 region {
+                    .srcSubresource {
                         .aspectMask = srcTexture.vkImageAspect,
                         .mipLevel = cmd.srcMip,
                         .baseArrayLayer = 0,
                         .layerCount = 1,
                     },
-                    .srcOffsets{
+                    .srcOffsets {
                         { .x = srcRegion.min().x, .y = srcRegion.min().y, .z = 1 },
                         { .x = srcRegion.max().x, .y = srcRegion.max().y, .z = 1 },
                     },
-                    .dstSubresource{
+                    .dstSubresource {
                         .aspectMask = srcTexture.vkImageAspect,
                         .mipLevel = cmd.dstMip,
                         .baseArrayLayer = 0,
                         .layerCount = 1,
                     },
-                    .dstOffsets{
+                    .dstOffsets {
                         { .x = dstRegion.min().x, .y = dstRegion.min().y, .z = 1 },
                         { .x = dstRegion.max().x, .y = dstRegion.max().y, .z = 1 },
                     },
                 };
 
-                const VkBlitImageInfo2 blitImageInfo{
+                const VkBlitImageInfo2 blitImageInfo {
                     .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
                     .srcImage = srcTexture.vkImage,
                     .srcImageLayout = srcTexture.vkImageLayouts[ cmd.srcMip ],
@@ -4712,7 +4734,7 @@ namespace zp
 
             VkDescriptorSet vkDescriptorSet = m_frameResources[ m_frameIndex ].vkBindlessDescriptorSet;
 
-            const VkDescriptorBufferInfo bufferInfo{
+            const VkDescriptorBufferInfo bufferInfo {
                 .buffer = buffer.vkBuffer,
                 .offset = buffer.offset,
                 .range = buffer.size,
@@ -4754,20 +4776,20 @@ namespace zp
             const VulkanTexture& texture = m_vkTextures[ textureHandle.index ];
             ZP_ASSERT( texture.hash == textureHandle.hash );
 
-            const VulkanSampler sampler{};
+            const VulkanSampler sampler {};
 
             VkDescriptorSet vkDescriptorSet = m_frameResources[ m_frameIndex ].vkBindlessDescriptorSet;
 
             // get the lowest loaded mip
             const zp_uint32_t lowestLoadedMip = zp_bitscan_forward( texture.loadedMipFlag );
 
-            const VkDescriptorImageInfo imageInfo{
+            const VkDescriptorImageInfo imageInfo {
                 .sampler = sampler.vkSampler,
                 .imageView = texture.vkImageViews[ lowestLoadedMip ],
                 .imageLayout = texture.vkImageLayouts[ lowestLoadedMip ],
             };
 
-            const VkWriteDescriptorSet descriptorSetWrite{
+            const VkWriteDescriptorSet descriptorSetWrite {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = vkDescriptorSet,
                 .dstArrayElement = textureHandle.index,
@@ -4872,21 +4894,21 @@ namespace zp
             m_windowHandle = windowHandle;
 
             //
-            const VkSemaphoreCreateInfo semaphoreCreateInfo{
+            const VkSemaphoreCreateInfo semaphoreCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
             };
 
-            const VkFenceCreateInfo fenceCreateInfo{
+            const VkFenceCreateInfo fenceCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
                 .flags = VK_FENCE_CREATE_SIGNALED_BIT,
             };
 
             for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
             {
-                HR( vkCreateSemaphore( m_context->GetLocalDevice(), &semaphoreCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainAcquireSemaphores[ i ] ) );
-                HR( vkCreateSemaphore( m_context->GetLocalDevice(), &semaphoreCreateInfo, m_context->GetAllocationCallbacks(), &m_vkRenderFinishedSemaphores[ i ] ) );
-                HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkFrameInFlightFences[ i ] ) );
-                HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageAcquiredFences[ i ] ) );
+                VK_HR( vkCreateSemaphore( m_context->GetLocalDevice(), &semaphoreCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainAcquireSemaphores[ i ] ) );
+                VK_HR( vkCreateSemaphore( m_context->GetLocalDevice(), &semaphoreCreateInfo, m_context->GetAllocationCallbacks(), &m_vkRenderFinishedSemaphores[ i ] ) );
+                VK_HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkFrameInFlightFences[ i ] ) );
+                VK_HR( vkCreateFence( m_context->GetLocalDevice(), &fenceCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageAcquiredFences[ i ] ) );
 
                 SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainAcquireSemaphores[ i ], "Swapchain Acquire Semaphore %d", i );
                 SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkRenderFinishedSemaphores[ i ], "Render Finished Semaphore %d", i );
@@ -4921,14 +4943,14 @@ namespace zp
 
             if( m_requiresRebuild )
             {
-                HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
+                VK_HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
 
                 CreateSwapchain();
 
                 m_requiresRebuild = false;
             }
 
-            HR( vkWaitForFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ], VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
+            VK_HR( vkWaitForFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ], VK_TRUE, zp_limit<zp_uint64_t>::max() ) );
 
             const VkResult acquireNextImageResult = vkAcquireNextImageKHR( m_context->GetLocalDevice(), m_vkSwapchain, zp_limit<zp_uint64_t>::max(), m_vkSwapchainAcquireSemaphores[ frameIndex ], VK_NULL_HANDLE, &m_swapchainImageIndices[ frameIndex ] );
             if( acquireNextImageResult != VK_SUCCESS )
@@ -4940,20 +4962,20 @@ namespace zp
                         m_requiresRebuild = true;
                         break;
                     default:
-                        HR( acquireNextImageResult );
+                        VK_HR( acquireNextImageResult );
                         break;
                 }
             }
 
-            HR( vkResetFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ] ) );
+            VK_HR( vkResetFences( m_context->GetLocalDevice(), 1, &m_vkFrameInFlightFences[ frameIndex ] ) );
         }
 
         void VulkanSwapchain::Present( zp_size_t frameIndex, VkSemaphore waitSemaphore )
         {
             ZP_PROFILE_CPU_BLOCK();
 
-            VkResult swapchainResult{};
-            const VkPresentInfoKHR presentInfo{
+            VkResult swapchainResult {};
+            const VkPresentInfoKHR presentInfo {
                 .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                 .waitSemaphoreCount = 1,
                 .pWaitSemaphores = &waitSemaphore,
@@ -4973,7 +4995,7 @@ namespace zp
                 }
                 else
                 {
-                    HR( presentResult );
+                    VK_HR( presentResult );
                 }
             }
         }
@@ -4986,8 +5008,8 @@ namespace zp
         void VulkanSwapchain::CreateSwapchain()
         {
             //
-            VkSurfaceCapabilitiesKHR surfaceCapabilities{};
-            HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &surfaceCapabilities ) );
+            VkSurfaceCapabilitiesKHR surfaceCapabilities {};
+            VK_HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &surfaceCapabilities ) );
 
             m_vkSwapchainExtent = ChooseSwapchainExtent( surfaceCapabilities, surfaceCapabilities.currentExtent );
             if( m_vkSwapchainExtent.width == 0 && m_vkSwapchainExtent.height == 0 )
@@ -4997,28 +5019,28 @@ namespace zp
 
             //
             uint32_t formatCount = 0;
-            HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &formatCount, VK_NULL_HANDLE ) );
+            VK_HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &formatCount, VK_NULL_HANDLE ) );
 
             Vector<VkSurfaceFormatKHR> supportedSurfaceFormats( formatCount, MemoryLabels::Temp );
             supportedSurfaceFormats.resize_unsafe( formatCount );
 
-            HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &formatCount, supportedSurfaceFormats.data() ) );
+            VK_HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &formatCount, supportedSurfaceFormats.data() ) );
 
             //
             uint32_t presentModeCount = 0;
-            HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &presentModeCount, VK_NULL_HANDLE ) );
+            VK_HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &presentModeCount, VK_NULL_HANDLE ) );
 
             Vector<VkPresentModeKHR> presentModes( presentModeCount, MemoryLabels::Temp );
             presentModes.resize_unsafe( presentModeCount );
 
-            HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &presentModeCount, presentModes.data() ) );
+            VK_HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_context->GetPhysicalDevice(), m_context->GetSurface(), &presentModeCount, presentModes.data() ) );
 
             const VkPresentModeKHR presentMode = ChooseSwapChainPresentMode( presentModes, m_vSync );
 
             // TODO: make configurable?
-            const FixedArray preferredSurfaceFormats{
-                VkSurfaceFormatKHR{ .format = VK_FORMAT_B8G8R8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
-                VkSurfaceFormatKHR{ .format = VK_FORMAT_R8G8B8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
+            const FixedArray preferredSurfaceFormats {
+                VkSurfaceFormatKHR { .format = VK_FORMAT_B8G8R8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
+                VkSurfaceFormatKHR { .format = VK_FORMAT_R8G8B8A8_SNORM, .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR },
             };
 
             m_vkSwapChainFormat = ChooseSwapChainSurfaceFormat( supportedSurfaceFormats, preferredSurfaceFormats.asReadonly() );
@@ -5039,12 +5061,12 @@ namespace zp
             const Queues& queues = m_context->GetQueues();
             const bool useConcurrentSharingMode = queues.graphics.familyIndex != queues.present.familyIndex;
 
-            const FixedArray indices{
+            const FixedArray indices {
                 queues.graphics.familyIndex,
                 queues.present.familyIndex,
             };
 
-            const VkSwapchainCreateInfoKHR swapChainCreateInfo{
+            const VkSwapchainCreateInfoKHR swapChainCreateInfo {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
                 .surface = m_context->GetSurface(),
                 .minImageCount = static_cast<zp_uint32_t>( m_maxFramesInFlight ),
@@ -5063,7 +5085,7 @@ namespace zp
                 .oldSwapchain = m_vkSwapchain,
             };
 
-            HR( vkCreateSwapchainKHR( m_context->GetLocalDevice(), &swapChainCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchain ) );
+            VK_HR( vkCreateSwapchainKHR( m_context->GetLocalDevice(), &swapChainCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchain ) );
 
             SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchain, "Swapchain" );
 
@@ -5074,10 +5096,10 @@ namespace zp
 
             //
             zp_uint32_t swapchainImageCount = 0;
-            HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, VK_NULL_HANDLE ) );
+            VK_HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, VK_NULL_HANDLE ) );
             ZP_ASSERT_MSG( m_maxFramesInFlight == swapchainImageCount, "Mismatch swapchain images and frames in flight" );
 
-            HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, m_vkSwapchainImages.data() ) );
+            VK_HR( vkGetSwapchainImagesKHR( m_context->GetLocalDevice(), m_vkSwapchain, &swapchainImageCount, m_vkSwapchainImages.data() ) );
 
 #if !USE_DYNAMIC_RENDERING
             {
@@ -5098,7 +5120,7 @@ namespace zp
                     m_swapchainData.vkSwapchainDefaultRenderPass = VK_NULL_HANDLE;
                 }
 
-                VkAttachmentDescription colorAttachments[]{
+                VkAttachmentDescription colorAttachments[] {
                     {
                         .format = m_vkSwapChainFormat,
                         .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -5111,14 +5133,14 @@ namespace zp
                     }
                 };
 
-                VkAttachmentReference colorAttachmentRefs[]{
+                VkAttachmentReference colorAttachmentRefs[] {
                     {
                         .attachment = 0,
                         .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                     }
                 };
 
-                VkSubpassDescription subPassDescriptions[]{
+                VkSubpassDescription subPassDescriptions[] {
                     {
                         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
                         .colorAttachmentCount = ZP_ARRAY_SIZE( colorAttachmentRefs ),
@@ -5126,7 +5148,7 @@ namespace zp
                     }
                 };
 
-                VkSubpassDependency subPassDependencies[]{
+                VkSubpassDependency subPassDependencies[] {
                     {
                         .srcSubpass = VK_SUBPASS_EXTERNAL,
                         .dstSubpass = 0,
@@ -5137,7 +5159,7 @@ namespace zp
                     }
                 };
 
-                VkRenderPassCreateInfo renderPassInfo{
+                VkRenderPassCreateInfo renderPassInfo {
                     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
                     .attachmentCount = ZP_ARRAY_SIZE( colorAttachments ),
                     .pAttachments = colorAttachments,
@@ -5147,25 +5169,25 @@ namespace zp
                     .pDependencies = subPassDependencies,
                 };
 
-                HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchainDefaultRenderPass ) );
+                VK_HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchainDefaultRenderPass ) );
 
                 SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_RENDER_PASS, m_swapchainData.vkSwapchainDefaultRenderPass, "Swapchain Default Render Pass" );
             }
 #endif
             for( zp_size_t i = 0; i < m_maxFramesInFlight; ++i )
             {
-                const VkImageViewCreateInfo imageViewCreateInfo{
+                const VkImageViewCreateInfo imageViewCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                     .image = m_vkSwapchainImages[ i ],
                     .viewType = VK_IMAGE_VIEW_TYPE_2D,
                     .format = m_vkSwapChainFormat.format,
-                    .components{
+                    .components {
                         .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                         .g = VK_COMPONENT_SWIZZLE_IDENTITY,
                         .b = VK_COMPONENT_SWIZZLE_IDENTITY,
                         .a = VK_COMPONENT_SWIZZLE_IDENTITY,
                     },
-                    .subresourceRange{
+                    .subresourceRange {
                         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                         .baseMipLevel = 0,
                         .levelCount = 1,
@@ -5180,15 +5202,15 @@ namespace zp
                     m_vkSwapchainImageViews[ i ] = VK_NULL_HANDLE;
                 };
 
-                HR( vkCreateImageView( m_context->GetLocalDevice(), &imageViewCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageViews[ i ] ) );
+                VK_HR( vkCreateImageView( m_context->GetLocalDevice(), &imageViewCreateInfo, m_context->GetAllocationCallbacks(), &m_vkSwapchainImageViews[ i ] ) );
 
                 SetDebugObjectName( m_context->GetInstance(), m_context->GetLocalDevice(), m_vkSwapchainImageViews[ i ], "Swapchain ImageView %d", i );
 
 #if !USE_DYNAMIC_RENDERING
                 //
-                VkImageView attachments[]{ m_vkSwapchainImageViews[ i ] };
+                VkImageView attachments[] { m_vkSwapchainImageViews[ i ] };
 
-                const VkFramebufferCreateInfo framebufferCreateInfo{
+                const VkFramebufferCreateInfo framebufferCreateInfo {
                     .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                     .renderPass = nullptr, // m_swapchainData.vkSwapchainDefaultRenderPass,
                     .attachmentCount = ZP_ARRAY_SIZE( attachments ),
@@ -5230,7 +5252,7 @@ namespace zp
         {
             ZP_ASSERT( m_context != nullptr );
 
-            HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
+            VK_HR( vkDeviceWaitIdle( m_context->GetLocalDevice() ) );
 
 #if !USE_DYNAMIC_RENDERING
             vkDestroyRenderPass( m_context->GetLocalDevice(), m_vkSwapchainDefaultRenderPass, m_context->GetAllocationCallbacks() );
@@ -5304,7 +5326,8 @@ namespace zp
         };
 
         VulkanGraphicsDevice::VulkanGraphicsDevice( MemoryLabel memoryLabel )
-            : m_frame( 0 ), memoryLabel( memoryLabel )
+            : m_frame( 0 )
+            , memoryLabel( memoryLabel )
         {
         }
 
@@ -5314,7 +5337,7 @@ namespace zp
 
         void VulkanGraphicsDevice::Initialize( const GraphicsDeviceDesc& graphicsDeviceDesc )
         {
-            for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
+            for( zp_size_t i = 0; i < graphicsDeviceDesc.bufferedFrameCount; ++i )
             {
                 m_frameCommandBuffers[ i ] = ZP_NEW_ARGS( memoryLabel, GraphicsCommandBuffer, graphicsDeviceDesc.commandBufferPageSize );
             }
@@ -5332,7 +5355,7 @@ namespace zp
 
             for( zp_size_t i = 0; i < kMaxBufferedFrameCount; ++i )
             {
-                ZP_DELETE( GraphicsCommandBuffer, m_frameCommandBuffers[ i ] );
+                ZP_SAFE_DELETE( GraphicsCommandBuffer, m_frameCommandBuffers[ i ] );
             }
         }
 
@@ -5362,7 +5385,7 @@ namespace zp
                 {
                     const JobHandle parentJob = JobSystem::PrepareEmpty();
 
-                    job->graphicsDevice->ExecuteCommandBuffer( job->cmdBuffer, parentJob );
+                    //job->graphicsDevice->ExecuteCommandBuffer( job->cmdBuffer, parentJob );
 
                     JobSystem::ScheduleBatchJobs();
 
@@ -5387,7 +5410,7 @@ namespace zp
 
         void VulkanGraphicsDevice::SubmitCommandBuffer( GraphicsCommandBuffer* cmdBuffer )
         {
-            m_frameJob = JobSystem::Run( SubmitCommandBufferJob{ .cmdBuffer = cmdBuffer, .graphicsDevice = this, .frame = cmdBuffer->frame } );
+            m_frameJob = JobSystem::Run( SubmitCommandBufferJob { .cmdBuffer = cmdBuffer, .graphicsDevice = this, .frame = cmdBuffer->frame } );
 
             ++m_frame;
         }
@@ -5420,7 +5443,7 @@ namespace zp
 
                     case CommandType::UpdateBufferData:
                     {
-                        CommandUpdateBufferData updateBufferData{};
+                        CommandUpdateBufferData updateBufferData {};
                         dataStreamReader.read( updateBufferData );
 
                         const Memory srcData = dataStreamReader.readMemory( updateBufferData.srcLength );
@@ -5432,7 +5455,7 @@ namespace zp
 
                     case CommandType::UpdateBufferDataExternal:
                     {
-                        CommandUpdateBufferDataExternal updateBufferDataExternal{};
+                        CommandUpdateBufferDataExternal updateBufferDataExternal {};
                         dataStreamReader.read( updateBufferDataExternal );
 
                         m_context.UpdateBufferData( updateBufferDataExternal.commandBuffer, updateBufferDataExternal.dstBuffer, updateBufferDataExternal.dstOffset, updateBufferDataExternal.srcData );
@@ -5457,7 +5480,7 @@ namespace zp
 
                     case CommandType::UpdateTextureData:
                     {
-                        CommandUpdateTextureData updateTextureData{};
+                        CommandUpdateTextureData updateTextureData {};
                         dataStreamReader.read( updateTextureData );
 
                         m_context.UpdateTextureMipData( updateTextureData.commandBuffer, updateTextureData.srcData, updateTextureData.dstTexture, updateTextureData.dstMipLevel, updateTextureData.dstArrayLayer );
@@ -5531,7 +5554,7 @@ namespace zp
 
                     case CommandType::BeginCommandBuffer:
                     {
-                        CommandBeginCommandBuffer beginCommandBuffer{};
+                        CommandBeginCommandBuffer beginCommandBuffer {};
                         dataStreamReader.read( beginCommandBuffer );
 
                         CommandBufferHandle& commandBuffer = commandBufferMap[ beginCommandBuffer.commandBuffer.index ];
@@ -5543,7 +5566,7 @@ namespace zp
 
                     case CommandType::SubmitCommandBuffer:
                     {
-                        CommandSubmitCommandBuffer submitCommandBuffer{};
+                        CommandSubmitCommandBuffer submitCommandBuffer {};
                         dataStreamReader.read( submitCommandBuffer );
 
                         const CommandBufferHandle& commandBuffer = commandBufferMap[ submitCommandBuffer.commandBuffer.index ];
@@ -5578,16 +5601,16 @@ namespace zp
 
     namespace internal
     {
-        GraphicsDevice* CreateVulkanGraphicsDevice( MemoryLabel memoryLabel, const GraphicsDeviceDesc& desc )
+        GraphicsDevice* CreateVulkanGraphicsDevice( const MemoryLabel memoryLabel, const GraphicsDeviceDesc& desc )
         {
-            VulkanGraphicsDevice* vk = ZP_NEW( memoryLabel, VulkanGraphicsDevice );
+            auto* vk = ZP_NEW( memoryLabel, VulkanGraphicsDevice );
             vk->Initialize( desc );
             return vk;
         }
 
         void DestroyVulkanGraphicsDevice( GraphicsDevice* graphicsDevice )
         {
-            VulkanGraphicsDevice* vk = reinterpret_cast<VulkanGraphicsDevice*>( graphicsDevice );
+            auto* vk = reinterpret_cast<VulkanGraphicsDevice*>( graphicsDevice );
             vk->Destroy();
 
             ZP_SAFE_DELETE( VulkanGraphicsDevice, vk );
@@ -5689,7 +5712,7 @@ namespace zp
     //instanceCreateInfo.pNext = &createInstanceDebugMessengerInfo;
     pNextPushFront( instanceCreateInfo, createInstanceDebugMessengerInfo );
 #endif
-    HR ( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance) );
+    VK_HR ( vkCreateInstance( &instanceCreateInfo, &m_vkAllocationCallbacks, &m_vkInstance) );
 
 #if ZP_DEBUG
     // create debug messenger
@@ -5705,19 +5728,19 @@ namespace zp
         .pUserData = nullptr, // Optional
     };
 
-    HR ( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger) );
+    VK_HR ( CallDebugUtilResult( vkCreateDebugUtilsMessengerEXT, m_vkInstance, m_vkInstance, &createDebugMessengerInfo, &m_vkAllocationCallbacks, &m_vkDebugMessenger) );
     //HR( CreateDebugUtilsMessengerEXT( m_vkInstance, &createDebugMessengerInfo, nullptr, &m_vkDebugMessenger ));
 #endif
 
     // select physical device
     {
             uint32_t physicalDeviceCount = 0;
-            HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, VK_NULL_HANDLE ) );
+            VK_HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, VK_NULL_HANDLE ) );
 
             Vector<VkPhysicalDevice> physicalDevices( physicalDeviceCount, MemoryLabels::Temp );
             physicalDevices.resize_unsafe( physicalDeviceCount );
 
-            HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, physicalDevices.data() ) );
+            VK_HR( vkEnumeratePhysicalDevices( m_vkInstance, &physicalDeviceCount, physicalDevices.data() ) );
 
             for( const VkPhysicalDevice& physicalDevice : physicalDevices )
             {
@@ -5747,7 +5770,7 @@ namespace zp
         .hwnd = hWnd,
     };
 
-    HR ( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface) );
+    VK_HR ( vkCreateWin32SurfaceKHR( m_vkInstance, &win32SurfaceCreateInfo, &m_vkAllocationCallbacks, &m_vkSurface) );
 #else
 #error "Platform not defined to create VkSurface"
 #endif
@@ -5775,7 +5798,7 @@ namespace zp
                     m_queueFamilies.graphicsQueue = i;
 
                     VkBool32 presentSupport = VK_FALSE;
-                    HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
+                    VK_HR( vkGetPhysicalDeviceSurfaceSupportKHR( m_vkPhysicalDevice, i, m_vkSurface, &presentSupport ) );
 
                     if( m_queueFamilies.presentQueue == VK_QUEUE_FAMILY_IGNORED && presentSupport )
                     {
@@ -5864,7 +5887,7 @@ namespace zp
                 .pEnabledFeatures = &deviceFeatures,
             };
 
-            HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
+            VK_HR( vkCreateDevice( m_vkPhysicalDevice, &localDeviceCreateInfo, &m_vkAllocationCallbacks, &m_vkLocalDevice ) );
 
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.graphicsQueue, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ] );
             vkGetDeviceQueue( m_vkLocalDevice, m_queueFamilies.transferQueue, 0, &m_vkRenderQueues[ ZP_RENDER_QUEUE_TRANSFER ] );
@@ -5885,7 +5908,7 @@ namespace zp
                 .pInitialData = nullptr,
             };
 
-            HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
+            VK_HR( vkCreatePipelineCache( m_vkLocalDevice, &pipelineCacheCreateInfo, &m_vkAllocationCallbacks, &m_vkPipelineCache ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_PIPELINE_CACHE, m_vkPipelineCache, "Pipeline Cache" );
         }
@@ -5946,7 +5969,7 @@ namespace zp
                 .pPoolSizes = poolSizes,
             };
 
-            HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
+            VK_HR( vkCreateDescriptorPool( m_vkLocalDevice, &descriptorPoolCreateInfo, &m_vkAllocationCallbacks, &m_vkDescriptorPool ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_vkDescriptorPool, "Descriptor Pool" );
         }
@@ -5956,7 +5979,7 @@ namespace zp
 
     VulkanGraphicsDevice::~VulkanGraphicsDevice()
     {
-        HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
+        VK_HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
 
         destroySwapchain();
 
@@ -6015,7 +6038,7 @@ namespace zp
         m_swapchainData.windowHandle = windowHandle;
 
         VkSurfaceCapabilitiesKHR swapChainSupportDetails;
-        HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_vkPhysicalDevice, m_vkSurface, &swapChainSupportDetails ) );
+        VK_HR( vkGetPhysicalDeviceSurfaceCapabilitiesKHR( m_vkPhysicalDevice, m_vkSurface, &swapChainSupportDetails ) );
 
         m_swapchainData.m_vkSwapchainExtent = ChooseSwapChainExtent( swapChainSupportDetails, width, height );
         if( m_swapchainData.m_vkSwapchainExtent.width == 0 && m_swapchainData.m_vkSwapchainExtent.height == 0 )
@@ -6024,20 +6047,20 @@ namespace zp
         }
 
         uint32_t formatCount = 0;
-        HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, VK_NULL_HANDLE ) );
+        VK_HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, VK_NULL_HANDLE ) );
 
         Vector<VkSurfaceFormatKHR> supportedSurfaceFormats( formatCount, MemoryLabels::Temp );
         supportedSurfaceFormats.resize_unsafe( formatCount );
 
-        HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, supportedSurfaceFormats.data() ) );
+        VK_HR( vkGetPhysicalDeviceSurfaceFormatsKHR( m_vkPhysicalDevice, m_vkSurface, &formatCount, supportedSurfaceFormats.data() ) );
 
         uint32_t presentModeCount = 0;
-        HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_vkPhysicalDevice, m_vkSurface, &presentModeCount, VK_NULL_HANDLE ) );
+        VK_HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_vkPhysicalDevice, m_vkSurface, &presentModeCount, VK_NULL_HANDLE ) );
 
         Vector<VkPresentModeKHR> presentModes( presentModeCount, MemoryLabels::Temp );
         presentModes.resize_unsafe( presentModeCount );
 
-        HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_vkPhysicalDevice, m_vkSurface, &presentModeCount, presentModes.data() ) );
+        VK_HR( vkGetPhysicalDeviceSurfacePresentModesKHR( m_vkPhysicalDevice, m_vkSurface, &presentModeCount, presentModes.data() ) );
 
         // TODO: remove when enums are created
         displayFormat = VK_FORMAT_B8G8R8A8_SNORM;
@@ -6085,7 +6108,7 @@ namespace zp
             swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
         }
 
-        HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchain ) );
+        VK_HR( vkCreateSwapchainKHR( m_vkLocalDevice, &swapChainCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchain ) );
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_SWAPCHAIN_KHR, m_swapchainData.vkSwapchain, "Swapchain" );
 
@@ -6095,10 +6118,10 @@ namespace zp
         }
 
         m_swapchainData.swapchainImageCount = 0;
-        HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, &m_swapchainData.swapchainImageCount, VK_NULL_HANDLE ) );
+        VK_HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, &m_swapchainData.swapchainImageCount, VK_NULL_HANDLE ) );
 
         m_swapchainData.swapchainImageCount = zp_min( m_swapchainData.swapchainImageCount, static_cast<zp_uint32_t>(m_swapchainData.swapchainImages.length()) );
-        HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, &m_swapchainData.swapchainImageCount, m_swapchainData.swapchainImages.data() ) );
+        VK_HR( vkGetSwapchainImagesKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, &m_swapchainData.swapchainImageCount, m_swapchainData.swapchainImages.data() ) );
 
         {
             if( m_swapchainData.vkSwapchainDefaultRenderPass )
@@ -6167,7 +6190,7 @@ namespace zp
                 .pDependencies = subPassDependencies,
             };
 
-            HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchainDefaultRenderPass ) );
+            VK_HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassInfo, &m_vkAllocationCallbacks, &m_swapchainData.vkSwapchainDefaultRenderPass ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_RENDER_PASS, m_swapchainData.vkSwapchainDefaultRenderPass, "Swapchain Default Render Pass" );
         }
@@ -6211,7 +6234,7 @@ namespace zp
                 m_swapchainData.swapchainImageViews[ i ] = VK_NULL_HANDLE;
             };
 
-            HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapchainImageViews[ i ] ) );
+            VK_HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapchainImageViews[ i ] ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_IMAGE_VIEW, m_swapchainData.swapchainImageViews[ i ], "Swapchain Image View %d", i );
 
@@ -6244,7 +6267,7 @@ namespace zp
                 m_swapchainData.swapchainFrameBuffers[ i ] = VK_NULL_HANDLE;
             }
 
-            HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapchainFrameBuffers[ i ] ) );
+            VK_HR( vkCreateFramebuffer( m_vkLocalDevice, &framebufferCreateInfo, &m_vkAllocationCallbacks, &m_swapchainData.swapchainFrameBuffers[ i ] ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_FRAMEBUFFER, m_swapchainData.swapchainFrameBuffers[ i ], "Swapchain Framebuffer %d", i );
         }
@@ -6314,13 +6337,13 @@ namespace zp
         for( zp_size_t i =0; i<kMaxBufferedFrameCount;++i)
         {
             PerFrameData& perFrameData = m_perFrameData[ i ];
-            HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainAcquireSemaphore ) );
-            HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkRenderFinishedSemaphore ) );
-            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkInFlightFence ) );
-            HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainImageAcquiredFence ) );
+            VK_HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainAcquireSemaphore ) );
+            VK_HR( vkCreateSemaphore( m_vkLocalDevice, &semaphoreCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkRenderFinishedSemaphore ) );
+            VK_HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkInFlightFence ) );
+            VK_HR( vkCreateFence( m_vkLocalDevice, &fenceCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkSwapChainImageAcquiredFence ) );
 #if ZP_USE_PROFILER
-    HR ( vkCreateQueryPool( m_vkLocalDevice, &pipelineStatsQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkPipelineStatisticsQueryPool) );
-    HR ( vkCreateQueryPool( m_vkLocalDevice, &timestampQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkTimestampQueryPool) );
+    VK_HR ( vkCreateQueryPool( m_vkLocalDevice, &pipelineStatsQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkPipelineStatisticsQueryPool) );
+    VK_HR ( vkCreateQueryPool( m_vkLocalDevice, &timestampQueryPoolCreateInfo, &m_vkAllocationCallbacks, &perFrameData.vkTimestampQueryPool) );
 #endif
     perFrameData.perFrameStagingBuffer.graphicsBuffer= m_stagingBuffer.splitBuffer( perFrameStagingBufferOffset, perFrameStagingBufferSize );
     perFrameData.perFrameStagingBuffer.allocated=0;
@@ -6388,13 +6411,13 @@ namespace zp
 
         PerFrameData& currentFrameData = getCurrentFrameData();
 
-        HR( vkWaitForFences( m_vkLocalDevice, 1, &currentFrameData.vkInFlightFence, VK_TRUE, UINT64_MAX ) );
+        VK_HR( vkWaitForFences( m_vkLocalDevice, 1, &currentFrameData.vkInFlightFence, VK_TRUE, UINT64_MAX ) );
 
         processDelayedDestroy();
 
         for( zp_size_t i = 0; i < currentFrameData.commandBufferCount; ++i )
         {
-            HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>(currentFrameData.commandBuffers[ i ].commandBuffer), 0 ) );
+            VK_HR( vkResetCommandBuffer( static_cast<VkCommandBuffer>(currentFrameData.commandBuffers[ i ].commandBuffer), 0 ) );
         }
 
         const VkResult result = vkAcquireNextImageKHR( m_vkLocalDevice, m_swapchainData.vkSwapchain, UINT64_MAX, currentFrameData.vkSwapChainAcquireSemaphore, VK_NULL_HANDLE, &currentFrameData.swapChainImageIndex );
@@ -6408,7 +6431,7 @@ namespace zp
             ZP_INVALID_CODE_PATH();
         }
 
-        HR( vkResetFences( m_vkLocalDevice, 1, &currentFrameData.vkInFlightFence ) );
+        VK_HR( vkResetFences( m_vkLocalDevice, 1, &currentFrameData.vkInFlightFence ) );
 
 #if ZP_USE_PROFILER && false
     {
@@ -6491,7 +6514,7 @@ namespace zp
         .pSignalSemaphores = signalSemaphores,
     };
 
-    HR ( vkQueueSubmit( m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], 1, &submitInfo, currentFrameData.vkInFlightFence) );
+    VK_HR ( vkQueueSubmit( m_vkRenderQueues[ ZP_RENDER_QUEUE_GRAPHICS ], 1, &submitInfo, currentFrameData.vkInFlightFence) );
     }
 
     void VulkanGraphicsDevice::present()
@@ -6535,7 +6558,7 @@ namespace zp
     {
         ZP_PROFILE_CPU_BLOCK();
 
-        HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
+        VK_HR( vkDeviceWaitIdle( m_vkLocalDevice ) );
     }
 
     void VulkanGraphicsDevice::createRenderPass( const RenderPassDesc* renderPassDesc, RenderPass* renderPass )
@@ -6585,7 +6608,7 @@ namespace zp
         };
 
         VkRenderPass vkRenderPass;
-        HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
+        VK_HR( vkCreateRenderPass( m_vkLocalDevice, &renderPassCreateInfo, &m_vkAllocationCallbacks, &vkRenderPass ) );
 
         renderPass->internalRenderPass = vkRenderPass;
 
@@ -6843,7 +6866,7 @@ namespace zp
         };
 
         VkPipeline pipeline;
-        HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &pipeline ) );
+        VK_HR( vkCreateGraphicsPipelines( m_vkLocalDevice, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, &m_vkAllocationCallbacks, &pipeline ) );
         graphicsPipelineState->pipelineState = pipeline;
         graphicsPipelineState->pipelineHash = zp_fnv128_1a( graphicsPipelineCreateInfo );
 
@@ -6896,7 +6919,7 @@ namespace zp
         };
 
         VkDescriptorSetLayout setLayout;
-        HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &descriptorSetLayoutCreateInfo, &m_vkAllocationCallbacks, &setLayout ) );
+        VK_HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &descriptorSetLayoutCreateInfo, &m_vkAllocationCallbacks, &setLayout ) );
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, setLayout );
 
@@ -6923,7 +6946,7 @@ namespace zp
         };
 
         VkPipelineLayout layout;
-        HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, &m_vkAllocationCallbacks, &layout ) );
+        VK_HR( vkCreatePipelineLayout( m_vkLocalDevice, &pipelineLayoutCreateInfo, &m_vkAllocationCallbacks, &layout ) );
         pipelineLayout->layout = layout;
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, pipelineLayoutDesc->name, VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout );
@@ -6959,7 +6982,7 @@ namespace zp
         };
 
         VkBuffer dstbuffer;
-        HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &dstbuffer ) );
+        VK_HR( vkCreateBuffer( m_vkLocalDevice, &bufferCreateInfo, &m_vkAllocationCallbacks, &dstbuffer ) );
 
         VkMemoryRequirements memoryRequirements;
         vkGetBufferMemoryRequirements( m_vkLocalDevice, dstbuffer, &memoryRequirements );
@@ -6971,9 +6994,9 @@ namespace zp
         };
 
         VkDeviceMemory vkDeviceMemory;
-        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+        VK_HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
-        HR( vkBindBufferMemory( m_vkLocalDevice, dstbuffer, vkDeviceMemory, 0 ) );
+        VK_HR( vkBindBufferMemory( m_vkLocalDevice, dstbuffer, vkDeviceMemory, 0 ) );
 
         *graphicsBuffer = {
             .dstbuffer = dstbuffer,
@@ -7027,7 +7050,7 @@ namespace zp
         };
 
         VkShaderModule shaderModule;
-        HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
+        VK_HR( vkCreateShaderModule( m_vkLocalDevice, &shaderModuleCreateInfo, &m_vkAllocationCallbacks, &shaderModule ) );
         shader->shaderHandle = shaderModule;
         shader->shaderStage = shaderDesc.shaderStage;
         shader->shaderHash = zp_fnv128_1a( shaderDesc.codeData, shaderDesc.codeSizeInBytes );
@@ -7076,7 +7099,7 @@ namespace zp
         };
 
         VkImage image;
-        HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, &m_vkAllocationCallbacks, &image ) );
+        VK_HR( vkCreateImage( m_vkLocalDevice, &imageCreateInfo, &m_vkAllocationCallbacks, &image ) );
 
         SetDebugObjectName( m_vkInstance, m_vkLocalDevice, "Image", VK_OBJECT_TYPE_IMAGE, image );
 
@@ -7090,9 +7113,9 @@ namespace zp
         };
 
         VkDeviceMemory vkDeviceMemory;
-        HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
+        VK_HR( vkAllocateMemory( m_vkLocalDevice, &memoryAllocateInfo, &m_vkAllocationCallbacks, &vkDeviceMemory ) );
 
-        HR( vkBindImageMemory( m_vkLocalDevice, image, vkDeviceMemory, 0 ) );
+        VK_HR( vkBindImageMemory( m_vkLocalDevice, image, vkDeviceMemory, 0 ) );
 
         VkImageViewCreateInfo imageViewCreateInfo {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -7115,7 +7138,7 @@ namespace zp
         };
 
         VkImageView imageView;
-        HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &imageView ) );
+        VK_HR( vkCreateImageView( m_vkLocalDevice, &imageViewCreateInfo, &m_vkAllocationCallbacks, &imageView ) );
 
         *texture = {
             .textureDimension = textureCreateDesc->textureDimension,
@@ -7187,7 +7210,7 @@ namespace zp
         };
 
         VkSampler vkSampler;
-        HR( vkCreateSampler( m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &vkSampler ) );
+        VK_HR( vkCreateSampler( m_vkLocalDevice, &samplerCreateInfo, &m_vkAllocationCallbacks, &vkSampler ) );
 
         *sampler = {
             .samplerHandle = vkSampler,
@@ -7215,7 +7238,7 @@ namespace zp
     void VulkanGraphicsDevice::mapBuffer( zp_size_t offset, zp_size_t size, const GraphicsBuffer& graphicsBuffer, void** memory )
     {
         VkDeviceMemory vkDeviceMemory = static_cast<VkDeviceMemory>(graphicsBuffer.vkDeviceMemory);
-        HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, offset + graphicsBuffer.offset, size, 0, memory ) );
+        VK_HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, offset + graphicsBuffer.offset, size, 0, memory ) );
     }
 
     void VulkanGraphicsDevice::unmapBuffer( const GraphicsBuffer& graphicsBuffer )
@@ -7271,7 +7294,7 @@ namespace zp
                     //vkCmdEndQuery( commandBuffer, frameData.vkPipelineStatisticsQueryPool, 0 );
                 }
 #endif
-    HR ( vkEndCommandBuffer( commandBuffer ));
+    VK_HR ( vkEndCommandBuffer( commandBuffer ));
             }
         }
 
@@ -7302,7 +7325,7 @@ namespace zp
             };
 
             VkCommandBuffer commandBuffer;
-            HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &commandBuffer ) );
+            VK_HR( vkAllocateCommandBuffers( m_vkLocalDevice, &commandBufferAllocateInfo, &commandBuffer ) );
             commandBuffer->commandBuffer = commandBuffer;
 
 #if ZP_DEBUG
@@ -7324,7 +7347,7 @@ namespace zp
     };
 
     VkCommandBuffer dstbuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
-    HR ( vkBeginCommandBuffer( dstbuffer, &commandBufferBeginInfo) );
+    VK_HR ( vkBeginCommandBuffer( dstbuffer, &commandBufferBeginInfo) );
 
 #if ZP_USE_PROFILER
     if( queue!= ZP_RENDER_QUEUE_TRANSFER)
@@ -7349,7 +7372,7 @@ namespace zp
         if( commandBuffer )
         {
             VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(commandBuffer->commandBuffer);
-            HR( vkEndCommandBuffer( commandBuffer ) );
+            VK_HR( vkEndCommandBuffer( commandBuffer ) );
         }
     }
 
@@ -7428,7 +7451,7 @@ namespace zp
             auto vkDeviceMemory = static_cast<VkDeviceMemory>(allocation.vkDeviceMemory);
 
             void* dstMemory {};
-            HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+            VK_HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
             zp_memcpy( dstMemory, allocation.size, textureUpdateDesc->textureData, textureUpdateDesc->textureDataSize );
 
@@ -7554,7 +7577,7 @@ namespace zp
             VkDeviceMemory vkDeviceMemory = static_cast<VkDeviceMemory>(allocation.vkDeviceMemory);
 
             void* dstMemory {};
-            HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
+            VK_HR( vkMapMemory( m_vkLocalDevice, vkDeviceMemory, allocation.offset, allocation.size, 0, &dstMemory ) );
 
             zp_memcpy( dstMemory, allocation.size, graphicsBufferUpdateDesc->data, graphicsBufferUpdateDesc->size );
 
@@ -7766,13 +7789,13 @@ namespace zp
             };
 
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.graphicsQueue;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkGraphicsCommandPool ) );
+            VK_HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkGraphicsCommandPool ) );
 
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.transferQueue;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkTransferCommandPool ) );
+            VK_HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkTransferCommandPool ) );
 
             commandPoolCreateInfo.queueFamilyIndex = m_queueFamilies.computeQueue;
-            HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkComputeCommandPool ) );
+            VK_HR( vkCreateCommandPool( m_vkLocalDevice, &commandPoolCreateInfo, &m_vkAllocationCallbacks, &t_vkComputeCommandPool ) );
 
             const zp_size_t index = Atomic::AddSizeT( &m_commandPoolCount, 3 ) - 3;
             m_vkCommandPools[ index + 0 ] = t_vkGraphicsCommandPool;
@@ -7801,7 +7824,7 @@ namespace zp
         VkDescriptorSetLayout layout;
         if( !m_descriptorSetLayoutCache.tryGet( hash, &layout ) )
         {
-            HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &createInfo, &m_vkAllocationCallbacks, &layout ) );
+            VK_HR( vkCreateDescriptorSetLayout( m_vkLocalDevice, &createInfo, &m_vkAllocationCallbacks, &layout ) );
 
             SetDebugObjectName( m_vkInstance, m_vkLocalDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, layout, "Descriptor Set Layout #%d (%d)", m_descriptorSetLayoutCache.size(), Platform::GetCurrentThreadId() );
 

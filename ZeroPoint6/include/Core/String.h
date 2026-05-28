@@ -5,14 +5,14 @@
 #ifndef ZP_STRING_H
 #define ZP_STRING_H
 
-#include "Core/String.h"
-#include "Core/Defines.h"
-#include "Core/Macros.h"
-#include "Core/Types.h"
 #include "Core/Allocator.h"
 #include "Core/Common.h"
+#include "Core/Defines.h"
 #include "Core/Hash.h"
+#include "Core/Macros.h"
 #include "Core/Math.h"
+#include "Core/String.h"
+#include "Core/Types.h"
 
 constexpr zp_bool_t zp_strempty( const char* str );
 
@@ -161,9 +161,9 @@ zp_int32_t zp_strcmp( const char ( &lh )[ LHSize ], const char* rh, zp_size_t rh
     return zp_strcmp( lh, zp_strlen( lh ), rh, rhSize );
 }
 
-//zp_size_t zp_strlen( const char* str );
+// zp_size_t zp_strlen( const char* str );
 
-//zp_size_t zp_strnlen( const char* str, zp_size_t maxSize );
+// zp_size_t zp_strnlen( const char* str, zp_size_t maxSize );
 
 constexpr void zp_strcpy( char* dstStr, zp_size_t dstLength, const char* srcStr )
 {
@@ -220,7 +220,7 @@ constexpr void zp_strncpy( zp_char8_t ( &dstStr )[ Size ], const zp_char8_t* src
 template<zp_size_t Size>
 constexpr void zp_strncpy( zp_char8_t ( &dstStr )[ Size ], const char* srcStr, zp_size_t srcLen )
 {
-    zp_strncpy( dstStr, Size, reinterpret_cast<const zp_char8_t*>(srcStr), srcLen );
+    zp_strncpy( dstStr, Size, reinterpret_cast<const zp_char8_t*>( srcStr ), srcLen );
 }
 
 constexpr zp_bool_t zp_strempty( const zp_char8_t* str );
@@ -492,7 +492,7 @@ constexpr auto zp_try_parse_generic( const char* str, zp_size_t length, T& outVa
             return false;
         }
 
-        value |= static_cast<T>(v & 0x0F) << ( ( ( length - 1 ) - i ) * 4 );
+        value |= static_cast<T>( v & 0x0F ) << ( ( ( length - 1 ) - i ) * 4 );
     }
 
     outValue = value;
@@ -540,7 +540,7 @@ constexpr zp_bool_t zp_try_uint32_to_char( const zp_uint32_t value, char& outCha
         case 7:
         case 8:
         case 9:
-            lit = static_cast<char>('0' + mask);
+            lit = static_cast<char>( '0' + mask );
             break;
 
         case 10:
@@ -549,7 +549,7 @@ constexpr zp_bool_t zp_try_uint32_to_char( const zp_uint32_t value, char& outCha
         case 13:
         case 14:
         case 15:
-            lit = static_cast<char>(( useCapital ? 'A' : 'a' ) + ( mask - 10 ));
+            lit = static_cast<char>( ( useCapital ? 'A' : 'a' ) + ( mask - 10 ) );
             break;
 
         default:
@@ -569,7 +569,7 @@ constexpr zp_bool_t zp_try_generic_to_string( const T& value, char* str, zp_size
 
     for( zp_size_t i = 0; i < length && i < kNumByteChars; ++i )
     {
-        const zp_uint32_t cur = static_cast<zp_uint32_t>(value >> ( ( ( kNumByteChars - 1 ) - i ) * 4 ));
+        const zp_uint32_t cur = static_cast<zp_uint32_t>( value >> ( ( ( kNumByteChars - 1 ) - i ) * 4 ) );
         if( !zp_try_uint32_to_char( cur, lit ) )
         {
             return false;
@@ -677,13 +677,33 @@ namespace zp
     {
     public:
         using char_type = CharType;
-        using pointer_type = CharType*;
-        using const_char_pointer = const CharType*;
+        using pointer_type = char_type*;
+        using const_char_pointer = const char_type*;
         using const_c_str_pointer = const char*;
 
         [[nodiscard]] constexpr zp_bool_t empty() const
         {
             return m_str == nullptr || m_length == 0;
+        }
+
+        [[nodiscard]] constexpr zp_size_t length() const
+        {
+            return m_length;
+        }
+
+        [[nodiscard]] constexpr zp_size_t size() const
+        {
+            return m_length * size_of_v<char_type>;
+        }
+
+        [[nodiscard]] constexpr const_char_pointer str() const
+        {
+            return m_str;
+        }
+
+        [[nodiscard]] constexpr const_c_str_pointer c_str() const
+        {
+            return reinterpret_cast<const_c_str_pointer>( m_str );
         }
 
     protected:
@@ -696,53 +716,128 @@ namespace zp
     {
     public:
         using char_type = CharType;
-        using const_char_pointer = const CharType*;
+        using const_char_pointer = const char_type*;
         using const_c_str_pointer = const char*;
 
-    protected:
-        static constexpr zp_size_t find( const_char_pointer str, zp_size_t strLength, char_type find )
+        [[nodiscard]] static constexpr zp_bool_t is_empty( const_char_pointer str, zp_size_t length )
         {
-            return zp::npos;
+            return str == nullptr || length == 0;
+        }
+
+        static constexpr zp_int32_t strcmp( const_char_pointer str1, const zp_size_t length1, const_char_pointer str2, const zp_size_t length2, const zp_size_t offset )
+        {
+            zp_int32_t cmp = zp_cmp( length1, length2 );
+            if( cmp == 0 )
+            {
+                const zp_size_t len = length1 < length2 ? length1 : length2;
+                for( zp_size_t i = offset; i < len && cmp == 0; ++i )
+                {
+                    cmp = zp_cmp( str1[ i ], str2[ i ] );
+                }
+            }
+
+            return cmp;
+        }
+
+        static constexpr zp_size_t strlen( const_char_pointer str )
+        {
+            zp_size_t length = 0;
+
+            if( str != nullptr )
+            {
+                const_char_pointer begin = str;
+                for( ; *begin != '\0'; ++begin )
+                {
+                    // no-op
+                }
+
+                length = static_cast<zp_size_t>( begin - str );
+            }
+
+            return length;
+        }
+
+        static constexpr zp_size_t find( const_char_pointer str, const zp_size_t length, const zp_size_t offset, const char_type find )
+        {
+            zp_size_t pos = npos;
+
+            if( str != nullptr && length > 0 )
+            {
+                for( zp_size_t i = offset; i < length; ++i )
+                {
+                    if( str[ i ] == find )
+                    {
+                        pos = i;
+                        break;
+                    }
+                }
+            }
+
+            return pos;
+        }
+
+        static constexpr zp_size_t rfind( const_char_pointer str, const zp_size_t length, const zp_size_t offset, const char_type find )
+        {
+            zp_size_t pos = npos;
+
+            if( str != nullptr && length > 0 && offset < length )
+            {
+                for( zp_size_t i = length - offset; i > 0; --i )
+                {
+                    if( str[ i - 1 ] == find )
+                    {
+                        pos = i;
+                        break;
+                    }
+                }
+            }
+
+            return pos;
         }
     };
 
     template<typename CharType>
-    class ZP_DECLSPEC_NOVTABLE BaseStringView : public BaseStringOperations<CharType>
+    class ZP_DECLSPEC_NOVTABLE BaseStringView final : public BaseStringStorage<CharType>
     {
     public:
-        using operations_type = BaseStringOperations<CharType>;
         using char_type = CharType;
-        using const_char_pointer = const CharType*;
+        using operations_type = BaseStringOperations<char_type>;
+        using const_char_pointer = const char_type*;
         using const_c_str_pointer = const char*;
 
         [[nodiscard]] constexpr zp_size_t find( const char_type find ) const
         {
-            return operations_type::find( this->m_str, this->m_length, find );
+            return operations_type::find( this->m_str, this->m_length, 0, find );
         }
     };
 
     template<typename CharType>
-    class ZP_DECLSPEC_NOVTABLE BaseString : public BaseStringOperations<CharType>, public BaseStringStorage<CharType>
+    class ZP_DECLSPEC_NOVTABLE BaseString final : public BaseStringStorage<CharType>
     {
     public:
-        using operations_type = BaseStringOperations<CharType>;
         using char_type = CharType;
-        using const_char_pointer = const CharType*;
+        using operations_type = BaseStringOperations<char_type>;
+        using const_char_pointer = const char_type*;
         using const_c_str_pointer = const char*;
 
         [[nodiscard]] constexpr zp_size_t find( const char_type find ) const
         {
-            return operations_type::find( this->m_str, this->m_length, find );
+            return operations_type::find( this->m_str, this->m_length, 0, find );
         }
+
+    private:
+        zp_size_t m_capacity;
     };
 
     using CString = BaseString<char>;
-    using StringUtf8 = BaseString<char16_t>;
-    using WString = BaseString<wchar_t>;
+    using StringUtf8 = BaseString<zp_char8_t>;
+    using WString = BaseString<zp_wchar_t>;
 
-    template<typename CharType>
-    class ZP_DECLSPEC_NOVTABLE StringView final : public BaseStringView<CharType>
-    {};
+    using CStringView = BaseStringView<char>;
+    using StringViewUtf8 = BaseStringView<zp_char8_t>;
+    using WStringView = BaseStringView<zp_wchar_t>;
+
+    using StringView = StringUtf8;
 
     class String
     {
@@ -793,7 +888,7 @@ namespace zp
         const_str_pointer m_str;
         zp_size_t m_length;
     };
-}
+} // namespace zp
 
 namespace zp
 {
@@ -832,7 +927,7 @@ namespace zp
 
     constexpr const char* String::c_str() const
     {
-        return static_cast<const char*>(static_cast<const void*>(m_str));
+        return static_cast<const char*>( static_cast<const void*>( m_str ) );
     }
 
     constexpr String::const_str_pointer String::str() const
@@ -863,17 +958,17 @@ namespace zp
 
     constexpr String String::As( const char* c_str )
     {
-        return { static_cast<const_str_pointer>(static_cast<const void*>(c_str)), zp_strlen( c_str ) };
+        return { static_cast<const_str_pointer>( static_cast<const void*>( c_str ) ), zp_strlen( c_str ) };
     }
 
     constexpr String String::As( const char* c_str, zp_size_t length )
     {
-        return { static_cast<const_str_pointer>(static_cast<const void*>(c_str)), length };
+        return { static_cast<const_str_pointer>( static_cast<const void*>( c_str ) ), length };
     }
 
     constexpr String String::As( const Memory& memory )
     {
-        return { static_cast<const_str_pointer>(memory.ptr()), memory.size() };
+        return { static_cast<const_str_pointer>( memory.ptr() ), memory.size() };
     }
 
     constexpr zp_bool_t String::operator==( const String& other ) const
@@ -885,7 +980,7 @@ namespace zp
     {
         return !( *this == other );
     }
-}
+} // namespace zp
 
 //
 //
@@ -965,7 +1060,7 @@ namespace zp
         zp_size_t m_length;
         zp_size_t m_capacity;
     };
-}
+} // namespace zp
 
 //
 //
@@ -1016,7 +1111,7 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>(str) );
+                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>( str ) );
             }
         }
 
@@ -1028,7 +1123,7 @@ namespace zp
             if( m_length > 0 )
             {
                 m_str = ZP_MALLOC_T_ARRAY( memoryLabel, zp_char8_t, m_length + 1 );
-                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>(str) );
+                zp_strcpy( m_str, m_length, reinterpret_cast<const zp_char8_t*>( str ) );
             }
         }
 
@@ -1102,7 +1197,7 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return reinterpret_cast<const char*>(m_str);
+            return reinterpret_cast<const char*>( m_str );
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -1227,7 +1322,7 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return reinterpret_cast<const char*>(m_str);
+            return reinterpret_cast<const char*>( m_str );
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -1348,12 +1443,12 @@ namespace zp
 
         [[nodiscard]] const char* c_str() const
         {
-            return reinterpret_cast<const char*>(m_str);
+            return reinterpret_cast<const char*>( m_str );
         }
 
         [[nodiscard]] char* mutable_str()
         {
-            return reinterpret_cast<char*>(m_str);
+            return reinterpret_cast<char*>( m_str );
         }
 
         [[nodiscard]] const zp_char8_t* str() const
@@ -1438,7 +1533,7 @@ namespace zp
         }
 
         //
-        //explicit operator MutableString()
+        // explicit operator MutableString()
         //{
         //    return { .str = m_path, .length = length, .capacity = Size };
         //}
@@ -1464,7 +1559,6 @@ namespace zp
     class PooledString
     {
     public:
-
     private:
         zp_char8_t* m_str;
 
@@ -1479,7 +1573,6 @@ namespace zp
 
     class ConstantString
     {
-
     };
 
     class Tokenizer
@@ -1503,7 +1596,7 @@ namespace zp
 
         zp_size_t m_next;
     };
-};
+}; // namespace zp
 
 //
 //
@@ -1529,4 +1622,4 @@ constexpr zp::String zp_trim( const zp::String& str )
 {
     return { zp_ltrim( str.str(), str.length() ), zp_rtrim( str.str(), str.length() ) };
 }
-#endif //ZP_STRING_H
+#endif // ZP_STRING_H

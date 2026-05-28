@@ -158,7 +158,7 @@ namespace zp
 
         BindPipeline,
 
-        PushConstant,
+        PushConstantInline,
         PushConstantExternal,
 
         BeginRenderPass,

@@ -167,13 +167,13 @@ namespace zp
         }
 
     private:
-        class _UndefinedClass;
+        class UndefinedClass;
 
         union Callable
         {
             void* m_objPtr;
             const void* m_constObjPtr;
-            void (_UndefinedClass::*m_memberPtr)();
+            void (UndefinedClass::*m_memberPtr)();
             func_t m_functionPtr;
         };
 
@@ -221,7 +221,7 @@ namespace zp
         static R stub_lambda( const Callable* callable, P... args )
         {
             using TLambda = zp_remove_reference_t<T>;
-            TLambda* func = reinterpret_cast<TLambda*>( callable->m_functionPtr );
+            auto func = reinterpret_cast<TLambda*>( callable->m_functionPtr );
             return ( *func )( args... );
         }
     };

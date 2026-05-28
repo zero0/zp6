@@ -127,7 +127,7 @@ namespace zp
     {
         if( srcMemory.size() < kPushConstantInlineMaxSize )
         {
-            m_data.write( CommandHeader { .type = CommandType::PushConstant } );
+            m_data.write( CommandHeader { .type = CommandType::PushConstantInline } );
             m_data.write( CommandPushConstant {
                 .commandBuffer = commandBuffer,
                 .pipeline = pipline,
