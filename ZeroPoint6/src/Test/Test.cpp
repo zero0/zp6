@@ -33,7 +33,7 @@ namespace zp
             IntrusiveList<ITest, &ITest::node> testList;
         };
 
-        TestRunnerContext s_context{};
+        TestRunnerContext s_context {};
     } // namespace
 
     void TestRunner::Add( ITest* test )
@@ -46,7 +46,8 @@ namespace zp
         struct SetupTeardownFinallyBlock
         {
             SetupTeardownFinallyBlock( ITest* test, TestResults& testResults )
-                : test( test ), results( &testResults )
+                : test( test )
+                , results( &testResults )
             {
                 test->Setup( results );
             }
@@ -107,25 +108,33 @@ namespace zp
         , m_numTests( 0 )
         , m_numPassed( 0 )
         , m_numFailed( 0 )
+        , m_startTime( 0 )
+        , m_display( TestResultDisplay::FinalResults )
     {
     }
 
     void TestResults::Pass( const TestResultDesc& result )
     {
         ++m_numPassed;
-        zp_printfln( ZP_CC_B( GREEN, DEFAULT ) "[PASS]" ZP_CC_RESET " %s %s:%d %s", result.testName, result.file, result.line, result.operation );
+        if( zp_flag32_any_set( m_display, TestResultDisplay::PassResult ) )
+        {
+            zp_printfln( ZP_CC_B( GREEN, DEFAULT ) "[PASS]" ZP_CC_RESET " %s %s:%d %s", result.testName, result.file, result.line, result.operation );
+        }
     }
 
     void TestResults::Fail( const TestResultDesc& result )
     {
         ++m_numFailed;
-        if( result.reason )
+        if( zp_flag32_any_set( m_display, TestResultDisplay::FailResult ) )
         {
-            zp_printfln( ZP_CC_B( RED, DEFAULT ) "[FAIL]" ZP_CC_RESET " %s %s:%d %s - %s", result.testName, result.file, result.line, result.operation, result.reason );
-        }
-        else
-        {
-            zp_printfln( ZP_CC_B( RED, DEFAULT ) "[FAIL]" ZP_CC_RESET " %s %s:%d %s", result.testName, result.file, result.line, result.operation );
+            if( result.reason )
+            {
+                zp_printfln( ZP_CC_B( RED, DEFAULT ) "[FAIL]" ZP_CC_RESET " %s %s:%d %s - %s", result.testName, result.file, result.line, result.operation, result.reason );
+            }
+            else
+            {
+                zp_printfln( ZP_CC_B( RED, DEFAULT ) "[FAIL]" ZP_CC_RESET " %s %s:%d %s", result.testName, result.file, result.line, result.operation );
+            }
         }
     }
 
@@ -139,15 +148,18 @@ namespace zp
 
     void TestResults::EndRun()
     {
-        const zp_time_t endTime = Platform::TimeNow();
+        const zp_float64_t durationMS = Platform::TimeDurationMS( m_startTime );
 
-        MutableFixedString256 log;
-        log.append( "[Test Run Complete]" ).appendLine();
-        log.append( "  Passed:   " ).appendFormat( "%d", m_numPassed ).appendLine();
-        log.append( "  Failed:   " ).appendFormat( "%d", m_numFailed ).appendLine();
-        log.append( "  Duration: " ).appendFormat( "%d", endTime - m_startTime ).appendLine();
+        if( zp_flag32_any_set( m_display, TestResultDisplay::FinalResults ) )
+        {
+            MutableFixedString256 log;
+            log.append( ZP_CC_B( BLUE, DEFAULT ) "[Test Run Complete]" ZP_CC_RESET ).appendLine();
+            log.append( "  Passed:   " ).appendFormat( "%d", m_numPassed ).appendLine();
+            log.append( "  Failed:   " ).appendFormat( "%d", m_numFailed ).appendLine();
+            log.append( "  Duration: " ).appendFormat( "%lf ms", durationMS ).appendLine();
 
-        zp_printfln( log.c_str() );
+            zp_printfln( log.c_str() );
+        }
     }
 
     void TestResults::StartTest()

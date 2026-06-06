@@ -221,6 +221,8 @@ namespace zp
     public:
         virtual TextureHandle RequestTexture( const RequestTextureDesc& requestTextureDesc ) = 0;
 
+        virtual void ReleaseTexture( const TextureHandle& textureHandle ) = 0;
+
         virtual GraphicsCommandBuffer* RequestCommandBuffer() = 0;
 
         virtual void SubmitCommandBuffer( GraphicsCommandBuffer* cmdBuffer ) = 0;

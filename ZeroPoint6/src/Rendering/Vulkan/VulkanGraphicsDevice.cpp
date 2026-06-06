@@ -54,17 +54,37 @@
 
 #define USE_DYNAMIC_RENDERING 1
 
-enum
-{
-    ZP_VULKAN_API_VERSION_1_0 = VK_API_VERSION_1_0,
-    ZP_VULKAN_API_VERSION_1_1 = VK_API_VERSION_1_1,
-    ZP_VULKAN_API_VERSION_1_2 = VK_API_VERSION_1_2,
-    ZP_VULKAN_API_VERSION_1_3 = VK_API_VERSION_1_3,
-    ZP_VULKAN_API_VERSION_1_4 = VK_API_VERSION_1_4,
+// Custom VK_MAKE_API_VERSION to work with macros
+#define ZP_VK_MAKE_API_VERSION( variant, major, minor, patch ) \
+    ( ( variant ) << 29U ) | ( ( major ) << 22U ) | ( ( minor ) << 12U ) | ( ( patch ) << 0 )
 
-    // Current API version
-    ZP_VULKAN_API_VERSION = ZP_VULKAN_API_VERSION_1_3,
-};
+#define ZP_VULKAN_API_VERSION_1_0 ( ZP_VK_MAKE_API_VERSION( 0, 1, 0, 0 ) )
+#define ZP_VULKAN_API_VERSION_1_1 ( ZP_VK_MAKE_API_VERSION( 0, 1, 1, 0 ) )
+#define ZP_VULKAN_API_VERSION_1_2 ( ZP_VK_MAKE_API_VERSION( 0, 1, 2, 0 ) )
+#define ZP_VULKAN_API_VERSION_1_3 ( ZP_VK_MAKE_API_VERSION( 0, 1, 3, 0 ) )
+#define ZP_VULKAN_API_VERSION_1_4 ( ZP_VK_MAKE_API_VERSION( 0, 1, 4, 0 ) )
+
+ZP_STATIC_ASSERT( ZP_VULKAN_API_VERSION_1_0 == VK_API_VERSION_1_0 );
+ZP_STATIC_ASSERT( ZP_VULKAN_API_VERSION_1_1 == VK_API_VERSION_1_1 );
+ZP_STATIC_ASSERT( ZP_VULKAN_API_VERSION_1_2 == VK_API_VERSION_1_2 );
+ZP_STATIC_ASSERT( ZP_VULKAN_API_VERSION_1_3 == VK_API_VERSION_1_3 );
+ZP_STATIC_ASSERT( ZP_VULKAN_API_VERSION_1_4 == VK_API_VERSION_1_4 );
+
+// Current API version
+#define ZP_VULKAN_API_VERSION ( ZP_VULKAN_API_VERSION_1_4 )
+
+// Helper API versions
+#define ZP_VULKAN_API_VERSION_1_0_OR_LATER ( ( ZP_VULKAN_API_VERSION ) >= ( ZP_VULKAN_API_VERSION_1_0 ) )
+#define ZP_VULKAN_API_VERSION_1_1_OR_LATER ( ( ZP_VULKAN_API_VERSION ) >= ( ZP_VULKAN_API_VERSION_1_1 ) )
+#define ZP_VULKAN_API_VERSION_1_2_OR_LATER ( ( ZP_VULKAN_API_VERSION ) >= ( ZP_VULKAN_API_VERSION_1_2 ) )
+#define ZP_VULKAN_API_VERSION_1_3_OR_LATER ( ( ZP_VULKAN_API_VERSION ) >= ( ZP_VULKAN_API_VERSION_1_3 ) )
+#define ZP_VULKAN_API_VERSION_1_4_OR_LATER ( ( ZP_VULKAN_API_VERSION ) >= ( ZP_VULKAN_API_VERSION_1_4 ) )
+
+#define ZP_VULKAN_API_VERSION_BEFORE_1_0 ( ( ZP_VULKAN_API_VERSION ) < ( ZP_VULKAN_API_VERSION_1_0 ) )
+#define ZP_VULKAN_API_VERSION_BEFORE_1_1 ( ( ZP_VULKAN_API_VERSION ) < ( ZP_VULKAN_API_VERSION_1_1 ) )
+#define ZP_VULKAN_API_VERSION_BEFORE_1_2 ( ( ZP_VULKAN_API_VERSION ) < ( ZP_VULKAN_API_VERSION_1_2 ) )
+#define ZP_VULKAN_API_VERSION_BEFORE_1_3 ( ( ZP_VULKAN_API_VERSION ) < ( ZP_VULKAN_API_VERSION_1_3 ) )
+#define ZP_VULKAN_API_VERSION_BEFORE_1_4 ( ( ZP_VULKAN_API_VERSION ) < ( ZP_VULKAN_API_VERSION_1_4 ) )
 
 
 namespace zp
@@ -1062,6 +1082,14 @@ namespace zp
 
 #pragma endregion
 
+        void PrintExtensionProperties( const Vector<VkExtensionProperties>& properties )
+        {
+            for( const auto& [ extensionName, specVersion ] : properties )
+            {
+                zp_printfln( " %s: %d", extensionName, specVersion );
+            }
+        }
+
 #pragma region Physical Device Utils
         enum VendorIDs
         {
@@ -1133,13 +1161,13 @@ namespace zp
                 VK_API_VERSION_MINOR( properties.apiVersion ),
                 VK_API_VERSION_PATCH( properties.apiVersion ),
                 VK_API_VERSION_VARIANT( properties.apiVersion ) );
+            info.append( ' ' );
 
             const zp_guid128_t pipelineCacheUUID = zp_generate_guid128( properties.pipelineCacheUUID );
 
             MutableFixedString64 guidStr;
             zp_try_guid128_to_string( pipelineCacheUUID, guidStr.mutable_str(), guidStr.length() );
 
-            info.append( ' ' );
             info.appendFormat( "[%s]", guidStr.c_str() );
 
             ZP_LOG_MSG( info.c_str() );
@@ -1969,31 +1997,12 @@ namespace zp
 
             VK_HR( volkInitialize() );
 
-            const FixedArray kDeviceExtensions {
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
-                VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
-                VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
-                VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-#if ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
-                VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
-#endif // ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
-#if ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
-                VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
-#endif // ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
-                VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
-                VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-                VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
-                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-                VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-                VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
-            };
 #pragma region Create Instance
             // Create Instance
             {
                 ZP_PROFILE_CPU_BLOCK_E( Create Instance );
 
-                if( 1 )
+                if constexpr( ZP_DEBUG )
                 {
                     zp_uint32_t count {};
                     VK_HR( vkEnumerateInstanceExtensionProperties( nullptr, &count, nullptr ) );
@@ -2003,18 +2012,15 @@ namespace zp
 
                     vkEnumerateInstanceExtensionProperties( nullptr, &count, availableInstanceExtensionProperties.data() );
 
-                    for( const auto& ext : availableInstanceExtensionProperties )
-                    {
-                        zp_printfln( "%s: %d", ext.extensionName, ext.specVersion );
-                    }
+                    zp_printfln( "Available Instance Extensions:" );
+                    PrintExtensionProperties( availableInstanceExtensionProperties );
                 }
 
                 // TODO: filter out available extensions with requested extensions
                 // Vector<VkExtensionProperties> instanceExtensionProperties( count, MemoryLabels::Temp );
 
-                const FixedArray kInstanceExtensionNames {
+                constexpr FixedArray kInstanceExtensionNames {
                     VK_KHR_SURFACE_EXTENSION_NAME,
-                    VK_KHR_DISPLAY_EXTENSION_NAME,
 #if ZP_PLATFORM_WINDOWS
                     VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #endif
@@ -2141,7 +2147,7 @@ namespace zp
             {
 #if ZP_PLATFORM_WINDOWS
                 HWND hWnd = static_cast<HWND>( graphicsDeviceDesc.windowHandle.handle );
-                HINSTANCE hInstance = reinterpret_cast<HINSTANCE>(::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ));
+                HINSTANCE hInstance = reinterpret_cast<HINSTANCE>( ::GetWindowLongPtr( hWnd, GWLP_HINSTANCE ) );
 
                 // create surface
                 const VkWin32SurfaceCreateInfoKHR win32SurfaceCreateInfo {
@@ -2177,7 +2183,7 @@ namespace zp
                 ZP_ASSERT( m_vkPhysicalDevice );
             }
 
-            // get physical device info
+            // get physical device memory info
             {
                 VkPhysicalDeviceMemoryProperties2 physicalDeviceMemoryProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
@@ -2189,7 +2195,7 @@ namespace zp
 
             // create local device and queue families
             {
-                const QueueInfo kDefaultQueueInfo {
+                constexpr QueueInfo kDefaultQueueInfo {
                     .familyIndex = VK_QUEUE_FAMILY_IGNORED,
                     .queueIndex = 0,
                     .vkQueue = VK_NULL_HANDLE
@@ -2274,16 +2280,35 @@ namespace zp
 
                 FixedVector<VkDeviceQueueCreateInfo, 4> deviceQueueCreateInfos;
 
-                const zp_float32_t queuePriority = 1.0F;
+                constexpr zp_float32_t kDefaultQueuePriority = 1.0F;
                 for( const zp_uint32_t& queueFamily : uniqueFamilyIndices )
                 {
                     deviceQueueCreateInfos.pushBack( {
                         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                         .queueFamilyIndex = queueFamily,
                         .queueCount = 1,
-                        .pQueuePriorities = &queuePriority,
+                        .pQueuePriorities = &kDefaultQueuePriority,
                     } );
                 }
+
+                //
+                constexpr FixedArray kDeviceExtensions {
+                    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                    VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+                    VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
+                    VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
+                    VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+#if ZP_VULKAN_API_VERSION_BEFORE_1_3
+                    VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+                    VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
+#endif // ZP_VULKAN_API_VERSION_BEFORE_1_3
+                    VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+                    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+                    VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
+                    VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+                    VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+                    VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
+                };
 
                 //
                 uint32_t extensionCount = 0;
@@ -2294,34 +2319,51 @@ namespace zp
 
                 VK_HR( vkEnumerateDeviceExtensionProperties( m_vkPhysicalDevice, nullptr, &extensionCount, availableDeviceExtensions.data() ) );
 
+                if constexpr( ZP_DEBUG )
+                {
+                    zp_printfln( "Available Physical Device Extensions:" );
+                    PrintExtensionProperties( availableDeviceExtensions );
+                }
+
                 //
                 Vector<const char*> supportedExtensions( kDeviceExtensions.length(), MemoryLabels::Temp );
 
+                // TODO: clean up device feature requirements
+                // Vulkan device features for each version
                 VkPhysicalDeviceFeatures2 deviceFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
                 };
 
-#if ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_1
+#if ZP_VULKAN_API_VERSION_1_1_OR_LATER
                 VkPhysicalDeviceVulkan11Features deviceFeaturesVulkan11 {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
                 };
                 pNextPushFront( deviceFeatures, deviceFeaturesVulkan11 );
-#endif // ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_1
+#endif // ZP_VULKAN_API_VERSION_1_1_OR_LATER
 
-#if ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_2
+#if ZP_VULKAN_API_VERSION_1_2_OR_LATER
                 VkPhysicalDeviceVulkan12Features deviceFeaturesVulkan12 {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
                 };
                 pNextPushFront( deviceFeatures, deviceFeaturesVulkan12 );
-#endif // ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_2
+#endif // ZP_VULKAN_API_VERSION_1_2_OR_LATER
 
-#if ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_3
+#if ZP_VULKAN_API_VERSION_1_3_OR_LATER
                 VkPhysicalDeviceVulkan13Features deviceFeaturesVulkan13 {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
                 };
                 pNextPushFront( deviceFeatures, deviceFeaturesVulkan13 );
-#endif // ZP_VULKAN_API_VERSION >= ZP_VULKAN_API_VERSION_1_3
+#endif // ZP_VULKAN_API_VERSION_1_3_OR_LATER
 
+#if ZP_VULKAN_API_VERSION_1_4_OR_LATER
+                VkPhysicalDeviceVulkan14Features deviceFeaturesVulkan14 {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+                };
+                pNextPushFront( deviceFeatures, deviceFeaturesVulkan14 );
+#endif // ZP_VULKAN_API_VERSION_1_4_OR_LATER
+
+                //
+#if ZP_VULKAN_API_VERSION_BEFORE_1_4
                 VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
                 };
@@ -2342,7 +2384,18 @@ namespace zp
                     supportedExtensions.pushBack( VK_KHR_MAINTENANCE_6_EXTENSION_NAME );
                 }
 
-#if ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
+                VkPhysicalDeviceMemoryPriorityFeaturesEXT memoryPriorityFeatures {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT,
+                };
+
+                if( IsExtensionSupported( VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    pNextPushFront( deviceFeatures, memoryPriorityFeatures );
+                    supportedExtensions.pushBack( VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME );
+                }
+#endif // ZP_VULKAN_API_VERSION_BEFORE_1_4
+
+#if ZP_VULKAN_API_VERSION_BEFORE_1_3
                 VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
                 };
@@ -2352,9 +2405,7 @@ namespace zp
                     pNextPushFront( deviceFeatures, extendedDynamicStateFeatures );
                     supportedExtensions.pushBack( VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME );
                 }
-#endif // ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
 
-#if ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
                 VkPhysicalDeviceExtendedDynamicState2FeaturesEXT extendedDynamicState2Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT,
                 };
@@ -2364,7 +2415,17 @@ namespace zp
                     pNextPushFront( deviceFeatures, extendedDynamicState2Features );
                     supportedExtensions.pushBack( VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME );
                 }
-#endif // ZP_VULKAN_API_VERSION < ZP_VULKAN_API_VERSION_1_3
+#endif // ZP_VULKAN_API_VERSION_BEFORE_1_3
+
+                if( IsExtensionSupported( VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, availableDeviceExtensions ) )
+                {
+                    supportedExtensions.pushBack( VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME );
+                }
+
+                if( IsExtensionSupported( VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, availableDeviceExtensions ))
+                {
+                    supportedExtensions.pushBack( VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME );
+                }
 
                 VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extendedDynamicState3Features {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT,
@@ -2406,31 +2467,27 @@ namespace zp
                     supportedExtensions.pushBack( VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME );
                 }
 
-                VkPhysicalDeviceMemoryPriorityFeaturesEXT memoryPriorityFeatures {
-                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT,
-                };
-
-                if( IsExtensionSupported( VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, availableDeviceExtensions ) )
-                {
-                    pNextPushFront( deviceFeatures, memoryPriorityFeatures );
-                    supportedExtensions.pushBack( VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME );
-                }
-
                 //
                 vkGetPhysicalDeviceFeatures2( m_vkPhysicalDevice, &deviceFeatures );
 
                 ZP_ASSERT( deviceFeaturesVulkan13.dynamicRendering );
                 ZP_ASSERT( deviceFeaturesVulkan13.maintenance4 );
-                ZP_ASSERT( maintenance5Features.maintenance5 );
+                ZP_ASSERT( deviceFeaturesVulkan14.maintenance5 );
+                ZP_ASSERT( deviceFeaturesVulkan14.maintenance6 );
                 // ZP_ASSERT( maintenance6Features.maintenance6 );
                 ZP_ASSERT( graphicsPipelineLibraryFeatures.graphicsPipelineLibrary );
                 ZP_ASSERT( pageableDeviceLocalMemoryFeatures.pageableDeviceLocalMemory );
-                ZP_ASSERT( memoryPriorityFeatures.memoryPriority );
+                // ZP_ASSERT( memoryPriorityFeatures.memoryPriority );
 
                 //
                 VkPhysicalDeviceProperties2 deviceProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
                 };
+
+                VkPhysicalDeviceVulkan11Properties vulkan11DeviceProperties {
+                    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES,
+                };
+                pNextPushFront( deviceProperties, vulkan11DeviceProperties );
 
                 VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties {
                     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR,
@@ -2444,7 +2501,10 @@ namespace zp
 
                 vkGetPhysicalDeviceProperties2( m_vkPhysicalDevice, &deviceProperties );
 
-                PrintPhysicalDeviceInfo( deviceProperties.properties, m_vkPhysicalDeviceMemoryProperties );
+                if constexpr( ZP_DEBUG )
+                {
+                    PrintPhysicalDeviceInfo( deviceProperties.properties, m_vkPhysicalDeviceMemoryProperties );
+                }
 
                 //
                 const VkDeviceCreateInfo localDeviceCreateInfo {
@@ -2490,21 +2550,21 @@ namespace zp
 
             // create descriptor pool
             {
-                const zp_uint32_t kDefaultDescriptorCount = 32;
+                constexpr zp_uint32_t kDefaultDescriptorCount = 32;
 
                 // clang-format off
-                const FixedArray poolSizes{
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, .descriptorCount = kDefaultDescriptorCount },
-                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = kDefaultDescriptorCount }
+                constexpr FixedArray poolSizes{
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_SAMPLER,                   .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,    .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,             .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,             .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,      .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,      .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,            .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,            .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,    .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,    .descriptorCount = kDefaultDescriptorCount },
+                    VkDescriptorPoolSize{ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,          .descriptorCount = kDefaultDescriptorCount }
                 };
                 // clang-format on
 
@@ -5297,7 +5357,9 @@ namespace zp
 
             void Destroy();
 
-            TextureHandle RequestTexture( const RequestTextureDesc& requestTextureDesc );
+            TextureHandle RequestTexture( const RequestTextureDesc& requestTextureDesc ) final;
+
+            void ReleaseTexture( const TextureHandle& textureHandle ) final;
 
             BufferHandle RequestBuffer( zp_size_t size );
 
@@ -5364,6 +5426,11 @@ namespace zp
             return m_context.RequestTexture();
         }
 
+        void VulkanGraphicsDevice::ReleaseTexture( const TextureHandle& textureHandle )
+        {
+            m_context.ReleaseTexture( textureHandle );
+        }
+
         BufferHandle VulkanGraphicsDevice::RequestBuffer( zp_size_t size )
         {
             return m_context.RequestBuffer( size );
@@ -5385,7 +5452,7 @@ namespace zp
                 {
                     const JobHandle parentJob = JobSystem::PrepareEmpty();
 
-                    //job->graphicsDevice->ExecuteCommandBuffer( job->cmdBuffer, parentJob );
+                    // job->graphicsDevice->ExecuteCommandBuffer( job->cmdBuffer, parentJob );
 
                     JobSystem::ScheduleBatchJobs();
 

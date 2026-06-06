@@ -186,6 +186,17 @@ namespace zp
         TestResultStatus status;
     };
 
+    enum class TestResultDisplay : zp_uint32_t
+    {
+        None = 0,
+
+        PassResult = 1 << 0,
+        FailResult = 1 << 1,
+        FinalResults = 1 << 3,
+
+        All = static_cast<zp_uint32_t>( ~0 ),
+    };
+
     class TestResults : public ITestResults
     {
     public:
@@ -209,6 +220,7 @@ namespace zp
         zp_size_t m_numPassed;
         zp_size_t m_numFailed;
         zp_time_t m_startTime;
+        TestResultDisplay m_display;
     };
 
     namespace TestRunner

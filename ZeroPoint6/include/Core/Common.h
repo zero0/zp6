@@ -408,20 +408,48 @@ constexpr zp_int32_t zp_cmp_dsc( const T& lh, const T& rh )
 //
 //
 
-ZP_FORCEINLINE constexpr auto zp_flag32_is_bit_set( zp_uint32_t flag, zp_uint32_t bit ) -> zp_bool_t
-{
-    const zp_uint32_t test = 1 << bit;
-    return ( flag & test ) == test;
-}
-
-ZP_FORCEINLINE constexpr auto zp_flag32_all_set( zp_uint32_t flag, zp_uint32_t mask ) -> zp_bool_t
+ZP_FORCEINLINE constexpr auto zp_flag32_all_set( const zp_uint32_t flag, const zp_uint32_t mask ) -> zp_bool_t
 {
     return ( flag & mask ) == mask;
 }
 
-ZP_FORCEINLINE constexpr auto zp_flag32_any_set( zp_uint32_t flag, zp_uint32_t mask ) -> zp_bool_t
+ZP_FORCEINLINE constexpr auto zp_flag32_any_set( const zp_uint32_t flag, const zp_uint32_t mask ) -> zp_bool_t
 {
     return ( flag & mask ) != 0;
+}
+
+ZP_FORCEINLINE constexpr auto zp_flag32_is_bit_set( const zp_uint32_t flag, const zp_uint32_t bit ) -> zp_bool_t
+{
+    return zp_flag32_all_set( flag, 1 << bit );
+}
+
+constexpr auto zp_flag32_combine( const zp_uint32_t flag0, const zp_uint32_t flag1 ) -> zp_uint32_t
+{
+    return flag0 | flag1;
+}
+
+template<typename... T>
+constexpr auto zp_flag32_combine( const T... flags )
+{
+    return (... | flags);
+}
+
+template<typename T, typename = zp::enable_if<zp::is_enum<T>::value>>
+constexpr auto zp_flag32_all_set( const T flag, const T mask ) -> zp_bool_t
+{
+    return zp_flag32_all_set( static_cast<const zp_uint32_t>( flag ), static_cast<const zp_uint32_t>( mask ) );
+}
+
+template<typename T, typename = zp::enable_if<zp::is_enum<T>::value>>
+constexpr auto zp_flag32_any_set( const T flag, const T mask ) -> zp_bool_t
+{
+    return zp_flag32_any_set( static_cast<const zp_uint32_t>( flag ), static_cast<const zp_uint32_t>( mask ) );
+}
+
+template<typename T, typename = zp::enable_if<zp::is_enum<T>::value>>
+constexpr auto zp_flag32_is_bit_set( const T flag, const zp_uint32_t bit ) -> zp_bool_t
+{
+    return zp_flag32_is_bit_set( static_cast<const zp_uint32_t>( flag ), bit );
 }
 
 //
